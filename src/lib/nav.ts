@@ -81,7 +81,8 @@ export const NAV_RIGHT: NavItem[] = [
 		icon: Activity,
 		match: ['/fitness', '/health'],
 		menu: [
-			{ label: 'Add workout', href: '/fitness?add=workout' },
+			{ label: 'Log food', href: '/fitness/food' },
+			{ label: 'Start workout', href: '/fitness/workouts' },
 			{ label: 'Add photo', href: '/fitness?add=photo' },
 			{ label: 'Add log', href: '/fitness?add=log' }
 		]
