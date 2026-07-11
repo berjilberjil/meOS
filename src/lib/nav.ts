@@ -11,6 +11,7 @@ import Waypoints from '@lucide/svelte/icons/waypoints';
 import SquareStack from '@lucide/svelte/icons/square-stack';
 import Activity from '@lucide/svelte/icons/activity';
 import Package from '@lucide/svelte/icons/package';
+import Gauge from '@lucide/svelte/icons/gauge';
 
 export interface NavMenuItem {
 	label: string;
@@ -93,6 +94,17 @@ export const NAV_RIGHT: NavItem[] = [
 		menu: [
 			{ label: 'Add purchase', href: '/belongings?add=purchase' },
 			{ label: 'Add wardrobe', href: '/belongings?add=wardrobe' }
+		]
+	},
+	{
+		key: 'assets',
+		href: '/assets',
+		label: 'Assets',
+		icon: Gauge,
+		menu: [
+			{ label: 'Add asset', href: '/assets?add=asset' },
+			{ label: 'Add liability', href: '/assets?add=liability' },
+			{ label: 'Set income', href: '/assets?add=income' }
 		]
 	}
 ];
