@@ -34,4 +34,19 @@ describe.skipIf(!ANON || !SERVICE)('RLS isolation', () => {
 		const { data } = await b.from('links').select('*');
 		expect(data).toEqual([]); // B sees none of A's rows
 	});
+
+	it('a user cannot read another user profile or invites', async () => {
+		const stamp = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+		const a = await userClient(`a_${stamp}@t.test`);
+		const aId = (await a.auth.getUser()).data.user!.id;
+		await a.from('profile').upsert({ user_id: aId, display_name: 'Alice' });
+		await a.from('invites').insert({ code: `A-${stamp}`.slice(0, 12).toUpperCase() });
+
+		const b = await userClient(`b_${stamp}@t.test`);
+		const { data: profiles } = await b.from('profile').select('*');
+		expect((profiles ?? []).every((p: { display_name: string | null }) => p.display_name !== 'Alice')).toBe(true);
+
+		const { data: invites } = await b.from('invites').select('*');
+		expect(invites).toEqual([]); // B sees none of A's invites
+	});
 });

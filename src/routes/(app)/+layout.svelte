@@ -10,11 +10,14 @@
 	import { loggedJournalDates } from '$lib/streak/data';
 	import { localToday } from '$lib/streak/streak';
 	import { listTodos } from '$lib/planner/todos';
+	import { ensureProfile } from '$lib/profile/personal';
 
 	let { children } = $props();
 
 	const qc = useQueryClient();
 	onMount(() => {
+		// Multi-user: ensure this account has a profile row on first login.
+		ensureProfile().catch(() => {});
 		const stop = initFinanceSync(() => qc.invalidateQueries({ queryKey: ['finance'] }));
 		// One combined daily reminder (journal streak + to-dos due), at most once a day.
 		if (notifyEnabled()) {

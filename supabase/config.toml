@@ -373,6 +373,11 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+# redeem-invite is called before the user has a session (invite-only signup),
+# so it must not require a JWT. It validates the invite with service_role itself.
+[functions.redeem-invite]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

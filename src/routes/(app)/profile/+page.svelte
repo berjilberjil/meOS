@@ -21,6 +21,9 @@
 	import Bell from '@lucide/svelte/icons/bell';
 	import { getPersonal, savePersonal, BLOOD_GROUPS, EMPTY_PERSONAL, type Personal } from '$lib/profile/personal';
 	import { enableNotifications, disableNotifications, notifyEnabled, notifySupported } from '$lib/notify';
+	import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
+	import { listInvites, createInvite, revokeInvite } from '$lib/auth/invites';
+	import { inviteStatus } from '$lib/auth/inviteLogic';
 
 	let fileEl: HTMLInputElement;
 	let name = $state('');
@@ -33,6 +36,25 @@
 
 	let notifSupported = $state(true);
 	let notifOn = $state(false);
+
+	const qc = useQueryClient();
+	const invitesQ = createQuery(() => ({ queryKey: ['invites'], queryFn: () => listInvites() }));
+	const genInvite = createMutation(() => ({
+		mutationFn: () => createInvite(),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['invites'] });
+			toast.success('Invite created');
+		}
+	}));
+	const revInvite = createMutation(() => ({
+		mutationFn: (id: string) => revokeInvite(id),
+		onSuccess: () => qc.invalidateQueries({ queryKey: ['invites'] })
+	}));
+	const nowIso = new Date().toISOString();
+	function copyInvite(code: string) {
+		navigator.clipboard.writeText(`${location.origin}/signup?invite=${code}`);
+		toast.success('Invite link copied');
+	}
 
 	onMount(async () => {
 		name = profileState.name;
@@ -255,6 +277,31 @@
 			{:else}
 				<Button size="sm" class="gap-2" onclick={turnOnNotif}><Bell class="size-4" /> Enable reminders</Button>
 			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header class="flex-row items-center justify-between">
+			<div>
+				<Card.Title>Invites</Card.Title>
+				<Card.Description>Bring people onto MyOS. Each code works once.</Card.Description>
+			</div>
+			<Button size="sm" disabled={genInvite.isPending} onclick={() => genInvite.mutate()}>Generate</Button>
+		</Card.Header>
+		<Card.Content class="flex flex-col gap-2">
+			{#each invitesQ.data ?? [] as inv (inv.id)}
+				{@const st = inviteStatus(inv, nowIso)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="font-mono font-semibold">{inv.code}</span>
+					<span class="rounded-full bg-secondary px-2 py-0.5 text-xs">{st}</span>
+					{#if st === 'active'}
+						<button class="text-xs text-muted-foreground hover:underline" onclick={() => copyInvite(inv.code)}>Copy link</button>
+						<button class="ml-auto text-xs text-muted-foreground hover:text-destructive" onclick={() => revInvite.mutate(inv.id)}>Revoke</button>
+					{/if}
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">No invites yet. Generate one to add someone.</p>
+			{/each}
 		</Card.Content>
 	</Card.Root>
 

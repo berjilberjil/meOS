@@ -134,7 +134,8 @@
 				{#if error}<p class="err">{error}</p>{/if}
 			</div>
 
-			<p class="foot">Private · single-user</p>
+			<a class="signup" href="/signup">Have an invite? Sign up</a>
+			<p class="foot">Private · invite-only</p>
 		</div>
 	</section>
 </div>
@@ -269,6 +270,14 @@
 		margin-top: 1.1rem;
 		font-size: var(--text-xs);
 		color: rgb(255 255 255 / 0.4);
+	}
+	.signup {
+		margin-top: 0.9rem;
+		font-size: var(--text-sm);
+		color: rgb(255 255 255 / 0.55);
+	}
+	.signup:hover {
+		color: #fff;
 	}
 
 	@keyframes float {
