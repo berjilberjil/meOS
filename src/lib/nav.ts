@@ -10,7 +10,6 @@ import StickyNote from '@lucide/svelte/icons/sticky-note';
 import Waypoints from '@lucide/svelte/icons/waypoints';
 import SquareStack from '@lucide/svelte/icons/square-stack';
 import Activity from '@lucide/svelte/icons/activity';
-import Package from '@lucide/svelte/icons/package';
 import Gauge from '@lucide/svelte/icons/gauge';
 
 export interface NavMenuItem {
@@ -88,24 +87,17 @@ export const NAV_RIGHT: NavItem[] = [
 		]
 	},
 	{
-		key: 'belongings',
-		href: '/belongings',
-		label: 'Belongings',
-		icon: Package,
-		menu: [
-			{ label: 'Add purchase', href: '/belongings?add=purchase' },
-			{ label: 'Add wardrobe', href: '/belongings?add=wardrobe' }
-		]
-	},
-	{
 		key: 'assets',
 		href: '/assets',
 		label: 'Assets',
 		icon: Gauge,
+		// Belongings (inventory) + Assets (ROI / liabilities) live under one tab.
+		match: ['/assets', '/belongings'],
 		menu: [
 			{ label: 'Add asset', href: '/assets?add=asset' },
 			{ label: 'Add liability', href: '/assets?add=liability' },
-			{ label: 'Set income', href: '/assets?add=income' }
+			{ label: 'Add purchase', href: '/belongings?add=purchase' },
+			{ label: 'Add wardrobe', href: '/belongings?add=wardrobe' }
 		]
 	}
 ];
