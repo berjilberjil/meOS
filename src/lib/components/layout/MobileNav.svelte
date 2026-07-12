@@ -232,7 +232,7 @@
 		gap: 1px;
 		border-top: 1px solid var(--border);
 		background: color-mix(in oklch, var(--card) 88%, transparent);
-		backdrop-filter: blur(14px);
+		backdrop-filter: blur(8px);
 		padding: 5px 3px calc(5px + env(safe-area-inset-bottom));
 		overflow: visible; /* let the elevated button + menus escape upward */
 	}

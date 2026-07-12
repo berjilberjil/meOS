@@ -19,9 +19,9 @@
 
 :root {
 	/* Motion tokens */
-	--duration-fast: 100ms;
-	--duration-normal: 180ms;
-	--duration-slow: 280ms;
+	--duration-fast: 90ms;
+	--duration-normal: 130ms;
+	--duration-slow: 190ms;
 
 	/* Signature entrance easing — shared by all page-load motion (.kn-* classes) */
 	--ease-entrance: cubic-bezier(0.22, 1, 0.36, 1);
@@ -163,9 +163,9 @@
  *   bg #1a1b26  fg #c0caf5  blue #7aa2f7  cyan #7dcfff  magenta #bb9af7  green #9ece6a  red #f7768e
  */
 .tui {
-	--duration-fast: 80ms;
-	--duration-normal: 140ms;
-	--duration-slow: 220ms;
+	--duration-fast: 70ms;
+	--duration-normal: 110ms;
+	--duration-slow: 160ms;
 
 	--radius: 3px;
 
@@ -366,7 +366,7 @@
    reduced-motion users get the 0.01ms collapse above, so this is opt-out safe. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-	animation-duration: 220ms;
+	animation-duration: 150ms;
 	animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 ::view-transition-old(root) {
@@ -383,7 +383,6 @@
 @keyframes vt-rise-in {
 	from {
 		opacity: 0;
-		transform: translateY(8px);
 	}
 }
 
@@ -394,33 +393,35 @@
      .kn-enter    → a single panel / column that rises as one
    ========================================================================== */
 @keyframes kn-rise {
-	from { opacity: 0; transform: translateY(12px); }
+	from { opacity: 0; transform: translateY(8px); }
 	to { opacity: 1; transform: none; }
 }
 @keyframes kn-rise-scale {
-	from { opacity: 0; transform: translateY(12px) scale(0.97); }
+	from { opacity: 0; transform: translateY(8px) scale(0.985); }
 	to { opacity: 1; transform: none; }
 }
 @keyframes kn-enter-rise {
-	from { opacity: 0; transform: translateY(14px); }
+	from { opacity: 0; transform: translateY(8px); }
 	to { opacity: 1; transform: none; }
 }
 
+/* Snappy: short duration + tight stagger, so a full page is in by ~0.35s
+   (was ~0.9s). Content reads as "already there," not "loading in." */
 .kn-enter {
-	animation: kn-enter-rise 0.5s var(--ease-entrance) backwards;
+	animation: kn-enter-rise 0.26s var(--ease-entrance) backwards;
 }
 
 .kn-stagger > * {
-	animation: kn-rise 0.5s var(--ease-entrance) backwards;
+	animation: kn-rise 0.24s var(--ease-entrance) backwards;
 }
-.kn-stagger > *:nth-child(2) { animation-delay: 0.06s; }
-.kn-stagger > *:nth-child(3) { animation-delay: 0.12s; }
-.kn-stagger > *:nth-child(4) { animation-delay: 0.18s; }
-.kn-stagger > *:nth-child(5) { animation-delay: 0.24s; }
-.kn-stagger > *:nth-child(6) { animation-delay: 0.3s; }
-.kn-stagger > *:nth-child(n + 7) { animation-delay: 0.36s; }
+.kn-stagger > *:nth-child(2) { animation-delay: 0.03s; }
+.kn-stagger > *:nth-child(3) { animation-delay: 0.05s; }
+.kn-stagger > *:nth-child(4) { animation-delay: 0.07s; }
+.kn-stagger > *:nth-child(5) { animation-delay: 0.09s; }
+.kn-stagger > *:nth-child(6) { animation-delay: 0.11s; }
+.kn-stagger > *:nth-child(n + 7) { animation-delay: 0.12s; }
 
 .kn-card {
-	animation: kn-rise-scale 0.45s var(--ease-entrance) backwards;
-	animation-delay: calc(min(var(--kn-i, 0), 16) * 40ms);
+	animation: kn-rise-scale 0.24s var(--ease-entrance) backwards;
+	animation-delay: calc(min(var(--kn-i, 0), 10) * 18ms);
 }

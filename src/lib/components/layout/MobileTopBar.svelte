@@ -66,7 +66,7 @@
 		padding-top: env(safe-area-inset-top);
 		border-bottom: 1px solid var(--border);
 		background: color-mix(in oklch, var(--card) 88%, transparent);
-		backdrop-filter: blur(14px);
+		backdrop-filter: blur(8px);
 	}
 	@media (min-width: 768px) {
 		.mtop {
