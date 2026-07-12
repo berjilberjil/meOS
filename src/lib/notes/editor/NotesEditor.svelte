@@ -13,6 +13,8 @@
 	import { TextSelection } from '@tiptap/pm/state';
 	import type { JournalDoc } from '$lib/journal/types';
 	import { Callout, FileBlock, Bookmark } from './blocks';
+	import { TodoChip, GoalChip } from './planner-nodes';
+	import type { PlannerBridge } from '$lib/planner/bridge';
 	import { SlashCommand } from './slash';
 	import './editor.css';
 
@@ -21,6 +23,7 @@
 		onUpdate: (doc: JournalDoc) => void;
 		onImageUpload?: (file: File) => Promise<string>;
 		onFileUpload?: (file: File) => Promise<{ src: string; name: string; size: number; mime: string }>;
+		planner?: PlannerBridge;
 		placeholder?: string;
 	}
 	let {
@@ -28,6 +31,7 @@
 		onUpdate,
 		onImageUpload,
 		onFileUpload,
+		planner,
 		placeholder = 'Write something, or press "/" for blocks…'
 	}: Props = $props();
 
@@ -83,6 +87,8 @@
 				Callout,
 				FileBlock,
 				Bookmark,
+				TodoChip,
+				GoalChip,
 				SlashCommand,
 				BubbleMenu.configure({
 					element: bubbleEl,
@@ -134,6 +140,7 @@
 			image: () => imageInput?.click(),
 			file: () => fileInput?.click()
 		};
+		(editor.storage as unknown as Record<string, unknown>).planner = planner;
 	});
 
 	onDestroy(() => editor?.destroy());

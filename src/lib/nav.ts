@@ -61,12 +61,12 @@ export const NAV_LEFT: NavItem[] = [
 		href: '/journal',
 		label: 'Workspace',
 		icon: SquareStack,
+		// /todos & /goals stay matched so Workspace highlights on those deep pages,
+		// but capture now happens inline via the editor's "/" slash menu.
 		match: ['/journal', '/notes', '/todos', '/goals'],
 		menu: [
 			{ label: 'New journal', href: '/journal/new' },
-			{ label: 'New note', href: '/notes/new' },
-			{ label: 'New to-do', href: '/todos?add=1' },
-			{ label: 'New goal', href: '/goals?add=1' }
+			{ label: 'New note', href: '/notes/new' }
 		]
 	}
 ];

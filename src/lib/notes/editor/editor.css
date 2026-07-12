@@ -425,3 +425,125 @@
 		transition: none;
 	}
 }
+
+/* Inline To-do / Goal chips (real planner entities embedded in a note) */
+.notes-editor .ProseMirror .todo-chip,
+.notes-editor .ProseMirror .goal-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	vertical-align: baseline;
+	max-width: 100%;
+	margin: 0 1px;
+	padding: 0.05rem 0.5rem 0.05rem 0.35rem;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	background: color-mix(in oklch, var(--foreground) 4%, var(--card));
+	font-size: 0.92em;
+	line-height: 1.5;
+	user-select: none;
+	white-space: nowrap;
+}
+.notes-editor .ProseMirror .goal-chip {
+	border-color: color-mix(in oklch, var(--primary) 30%, var(--border));
+	background: color-mix(in oklch, var(--primary) 7%, var(--card));
+}
+.notes-editor .ProseMirror .chip-box {
+	border: none;
+	background: none;
+	cursor: pointer;
+	padding: 0;
+	font-size: 1em;
+	line-height: 1;
+	color: var(--muted-foreground);
+}
+.notes-editor .ProseMirror .todo-chip.is-done .chip-box,
+.notes-editor .ProseMirror .goal-chip.is-done .chip-box {
+	color: var(--primary);
+}
+.notes-editor .ProseMirror .chip-goal-ic {
+	font-size: 0.9em;
+}
+.notes-editor .ProseMirror .chip-label {
+	cursor: pointer;
+	color: var(--foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.notes-editor .ProseMirror .todo-chip.is-done .chip-label,
+.notes-editor .ProseMirror .goal-chip.is-done .chip-label {
+	text-decoration: line-through;
+	color: var(--muted-foreground);
+}
+.notes-editor .ProseMirror .chip-meta {
+	font-size: 0.78em;
+	color: var(--muted-foreground);
+}
+.notes-editor .ProseMirror .chip-meta:empty {
+	display: none;
+}
+.notes-editor .ProseMirror .todo-chip.is-removed,
+.notes-editor .ProseMirror .goal-chip.is-removed {
+	opacity: 0.55;
+}
+.notes-editor .ProseMirror .todo-chip.is-removed .chip-label,
+.notes-editor .ProseMirror .goal-chip.is-removed .chip-label {
+	text-decoration: line-through;
+}
+.notes-editor .ProseMirror .todo-chip.ProseMirror-selectednode,
+.notes-editor .ProseMirror .goal-chip.ProseMirror-selectednode {
+	outline: 2px solid color-mix(in oklch, var(--primary) 55%, transparent);
+	outline-offset: 1px;
+}
+
+/* Chip edit popover (rendered to document.body) */
+.chip-popover {
+	position: fixed;
+	z-index: 61;
+	width: 220px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	border-radius: var(--radius-lg);
+	border: 1px solid var(--border);
+	background: var(--popover);
+	color: var(--popover-foreground);
+	box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.5);
+	padding: 0.7rem;
+}
+.chip-pop-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+.chip-pop-label {
+	font-size: 0.72rem;
+	color: var(--muted-foreground);
+}
+.chip-pop-input {
+	border-radius: var(--radius-md);
+	border: 1px solid var(--border);
+	background: var(--card);
+	color: var(--foreground);
+	padding: 0.3rem 0.45rem;
+	font-size: 0.82rem;
+}
+.chip-pop-btns {
+	display: flex;
+	gap: 0.25rem;
+}
+.chip-pop-btn {
+	flex: 1;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--border);
+	background: var(--card);
+	color: var(--foreground);
+	padding: 0.25rem 0.35rem;
+	font-size: 0.75rem;
+	text-transform: capitalize;
+	cursor: pointer;
+}
+.chip-pop-btn.is-sel {
+	border-color: var(--primary);
+	background: color-mix(in oklch, var(--primary) 14%, var(--card));
+}

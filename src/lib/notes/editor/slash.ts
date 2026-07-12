@@ -2,6 +2,8 @@ import { Extension } from '@tiptap/core';
 import type { Editor, Range } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
 import { domainOf, faviconOf } from './blocks';
+import { todoChipAttrs, goalChipAttrs } from './planner-chip';
+import type { PlannerBridge } from '$lib/planner/bridge';
 
 export interface SlashItem {
 	title: string;
@@ -18,12 +20,44 @@ function pick(editor: Editor, kind: 'image' | 'file') {
 	p?.[kind]?.();
 }
 
+function planner(editor: Editor): PlannerBridge | undefined {
+	return (editor.storage as unknown as Record<string, unknown>).planner as PlannerBridge | undefined;
+}
+
+// The text already typed on the current line becomes the entity title; the whole
+// line (title + the "/todo" trigger) is cleared and replaced by the chip.
+function lineTitle(editor: Editor, range: Range): { blockStart: number; title: string } {
+	const { state } = editor;
+	const $from = state.doc.resolve(range.from);
+	const blockStart = $from.start();
+	const title = state.doc.textBetween(blockStart, range.from, '\n', '\n').trim();
+	return { blockStart, title };
+}
+
 const ITEMS: SlashItem[] = [
 	{ title: 'Text', sub: 'Plain paragraph', icon: '¶', keywords: 'text paragraph plain body', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).setParagraph().run() },
 	{ title: 'Heading 1', sub: 'Large section heading', icon: 'H1', keywords: 'h1 heading title big', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run() },
 	{ title: 'Heading 2', sub: 'Medium heading', icon: 'H2', keywords: 'h2 heading subtitle', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run() },
 	{ title: 'Heading 3', sub: 'Small heading', icon: 'H3', keywords: 'h3 heading', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run() },
-	{ title: 'To-do', sub: 'Checklist with checkboxes', icon: '☑', keywords: 'todo task checkbox checklist', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleTaskList().run() },
+	{ title: 'To-do', sub: 'Tracked task — due date & priority', icon: '✅', keywords: 'todo task tracked due priority reminder planner', run: ({ editor, range }) => {
+		const p = planner(editor);
+		const { blockStart, title } = lineTitle(editor, range);
+		editor.chain().focus().deleteRange({ from: blockStart, to: range.to }).run();
+		if (!p) return;
+		p.createTodo(title)
+			.then((todo) => editor.chain().focus().insertContent({ type: 'todoChip', attrs: todoChipAttrs(todo) }).run())
+			.catch(() => { if (title) editor.chain().focus().insertContent(title).run(); });
+	} },
+	{ title: 'Goal', sub: 'Track a life goal', icon: '🎯', keywords: 'goal target objective ambition life planner', run: ({ editor, range }) => {
+		const p = planner(editor);
+		const { blockStart, title } = lineTitle(editor, range);
+		editor.chain().focus().deleteRange({ from: blockStart, to: range.to }).run();
+		if (!p) return;
+		p.createGoal(title)
+			.then((goal) => editor.chain().focus().insertContent({ type: 'goalChip', attrs: goalChipAttrs(goal) }).run())
+			.catch(() => { if (title) editor.chain().focus().insertContent(title).run(); });
+	} },
+	{ title: 'Checklist', sub: 'Plain checkboxes for a throwaway list', icon: '☑', keywords: 'checklist checkbox plain list tasks', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleTaskList().run() },
 	{ title: 'Bullet list', sub: 'Unordered list', icon: '•', keywords: 'bullet unordered list ul', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBulletList().run() },
 	{ title: 'Numbered list', sub: 'Ordered list', icon: '1.', keywords: 'numbered ordered list ol', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleOrderedList().run() },
 	{ title: 'Toggle', sub: 'Collapsible section', icon: '▸', keywords: 'toggle details collapse fold', run: ({ editor, range }) => editor.chain().focus().deleteRange(range).setDetails().run() },

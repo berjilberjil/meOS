@@ -1,12 +1,13 @@
 <script lang="ts">
-	import { createQuery } from '@tanstack/svelte-query';
+	import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
 	import * as Card from '$lib/components/ui/card';
+	import { Input } from '$lib/components/ui/input';
 	import { formatINR, sumPaise } from '$lib/money';
 	import { todayIso, monthKey } from '$lib/finance/dates';
 	import { accountsRepo, netWorth } from '$lib/finance/accounts';
 	import { listByMonth as txnsByMonth } from '$lib/finance/transactions';
 	import { categoriesRepo } from '$lib/finance/categories';
-	import { listTodos, todoBucket } from '$lib/planner/todos';
+	import { listTodos, todoBucket, addTodo } from '$lib/planner/todos';
 	import { goalsRepo } from '$lib/planner/goals';
 	import { listNotes } from '$lib/notes/notes';
 	import { recentHealth, recentFitness, totalDuration } from '$lib/health/logs';
@@ -43,6 +44,19 @@
 			return computeStreak(logged, today, settings.freezes_total).current;
 		}
 	}));
+
+	const qc = useQueryClient();
+	let newTodo = $state('');
+	const addTodoM = createMutation(() => ({
+		mutationFn: (title: string) => addTodo(title, null, 0),
+		onSuccess: () => qc.invalidateQueries({ queryKey: ['todos'] })
+	}));
+	function quickAddTodo() {
+		const t = newTodo.trim();
+		if (!t) return;
+		newTodo = '';
+		addTodoM.mutate(t);
+	}
 
 	const accounts = $derived(accountsQ.data ?? []);
 	const txns = $derived(txnsQ.data ?? []);
@@ -110,12 +124,12 @@
 	const monthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
 	const stats = $derived([
-		{ label: 'Net worth', value: formatINR(worth), sub: `${accounts.length} accounts`, icon: Wallet, tone: 'var(--foreground)' },
-		{ label: `Spent · ${monthName}`, value: formatINR(spent), sub: `${expenses.length} expenses`, icon: TrendingDown, tone: '#fb7185' },
-		{ label: `Income · ${monthName}`, value: formatINR(earned), sub: `${income.length} credits`, icon: TrendingUp, tone: '#34d399' },
-		{ label: 'Journal streak', value: `${streakQ.data ?? 0}`, sub: 'days in a row', icon: Flame, tone: '#ff8c1a' },
-		{ label: 'To-dos due', value: `${todosDue.length}`, sub: `${todosActive.length} active`, icon: ListChecks, tone: '#60a5fa' },
-		{ label: 'Goals active', value: `${goalsActive}`, sub: `${goals.length} total`, icon: Target, tone: '#a78bfa' }
+		{ label: 'Net worth', value: formatINR(worth), sub: `${accounts.length} accounts`, icon: Wallet, tone: 'var(--foreground)', href: undefined as string | undefined },
+		{ label: `Spent · ${monthName}`, value: formatINR(spent), sub: `${expenses.length} expenses`, icon: TrendingDown, tone: '#fb7185', href: undefined as string | undefined },
+		{ label: `Income · ${monthName}`, value: formatINR(earned), sub: `${income.length} credits`, icon: TrendingUp, tone: '#34d399', href: undefined as string | undefined },
+		{ label: 'Journal streak', value: `${streakQ.data ?? 0}`, sub: 'days in a row', icon: Flame, tone: '#ff8c1a', href: undefined as string | undefined },
+		{ label: 'To-dos due', value: `${todosDue.length}`, sub: `${todosActive.length} active`, icon: ListChecks, tone: '#60a5fa', href: '/todos' },
+		{ label: 'Goals active', value: `${goalsActive}`, sub: `${goals.length} total`, icon: Target, tone: '#a78bfa', href: '/goals' }
 	]);
 </script>
 
@@ -128,16 +142,18 @@
 	<!-- Stat cards -->
 	<div class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
 		{#each stats as s (s.label)}
-			<Card.Root>
-				<Card.Content class="flex flex-col gap-1 pt-5">
-					<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<s.icon class="size-3.5" style="color:{s.tone}" />
-						{s.label}
-					</div>
-					<div class="text-2xl font-bold tracking-tight">{s.value}</div>
-					<div class="text-xs text-muted-foreground">{s.sub}</div>
-				</Card.Content>
-			</Card.Root>
+			<svelte:element this={s.href ? 'a' : 'div'} href={s.href} class="block">
+				<Card.Root class={s.href ? 'h-full transition-colors hover:border-primary/50' : 'h-full'}>
+					<Card.Content class="flex flex-col gap-1 pt-5">
+						<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<s.icon class="size-3.5" style="color:{s.tone}" />
+							{s.label}
+						</div>
+						<div class="text-2xl font-bold tracking-tight">{s.value}</div>
+						<div class="text-xs text-muted-foreground">{s.sub}</div>
+					</Card.Content>
+				</Card.Root>
+			</svelte:element>
 		{/each}
 	</div>
 
@@ -184,7 +200,10 @@
 	<!-- Lists -->
 	<div class="grid gap-3 lg:grid-cols-2">
 		<Card.Root>
-			<Card.Header><Card.Title class="text-base">Upcoming to-dos</Card.Title></Card.Header>
+			<Card.Header class="flex flex-row items-center justify-between">
+				<Card.Title class="text-base">Upcoming to-dos</Card.Title>
+				<a href="/todos" class="text-xs text-muted-foreground hover:text-foreground">See all →</a>
+			</Card.Header>
 			<Card.Content class="divide-y divide-border">
 				{#each upcoming as t (t.id)}
 					{@const b = todoBucket(t.due_on, t.done, today)}
@@ -197,6 +216,14 @@
 				{:else}
 					<p class="py-6 text-center text-sm text-muted-foreground">Nothing scheduled. Clear runway.</p>
 				{/each}
+				<div class="flex gap-2 pt-3">
+					<Input
+						bind:value={newTodo}
+						placeholder="Quick add a to-do…"
+						class="h-8 text-sm"
+						onkeydown={(e) => e.key === 'Enter' && quickAddTodo()}
+					/>
+				</div>
 			</Card.Content>
 		</Card.Root>
 

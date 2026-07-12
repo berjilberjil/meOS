@@ -8,6 +8,7 @@
 	import { createNote, updateNote, listNotes, type Note } from '$lib/notes/notes';
 	import { uploadNoteImage, uploadNoteFile, withPathMedia } from '$lib/notes/media';
 	import { signedUrlFor } from '$lib/journal/media';
+	import { createPlannerBridge } from '$lib/planner/bridge';
 	import type { JournalDoc } from '$lib/journal/types';
 	import Pin from '@lucide/svelte/icons/pin';
 	import Link2 from '@lucide/svelte/icons/link';
@@ -16,6 +17,7 @@
 	let { note }: { note?: Note } = $props();
 
 	const qc = useQueryClient();
+	const planner = createPlannerBridge(qc);
 	const savedId = note?.id ?? crypto.randomUUID();
 
 	/* svelte-ignore state_referenced_locally */
@@ -116,6 +118,7 @@
 			}}
 			onImageUpload={handleImage}
 			onFileUpload={handleFile}
+			{planner}
 		/>
 	{/snippet}
 </EditorShell>

@@ -6,11 +6,12 @@
 
 	let { children } = $props();
 
+	// To-dos & Goals are now captured inline via the editor's "/" slash menu and
+	// reviewed on the Dashboard; their full pages live at /todos and /goals but are
+	// intentionally off the tab bar.
 	const tabs = [
 		{ href: '/journal', label: 'Journal' },
-		{ href: '/notes', label: 'Notes' },
-		{ href: '/todos', label: 'To-dos' },
-		{ href: '/goals', label: 'Goals' }
+		{ href: '/notes', label: 'Notes' }
 	];
 
 	// Publish to the desktop top bar; keep an in-content row for phones.

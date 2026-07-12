@@ -10,6 +10,7 @@
 	import { createEntry, updateEntry, listByMonth } from '$lib/journal/entries';
 	import { uploadJournalImage, uploadJournalFile, signedUrlFor } from '$lib/journal/media';
 	import { withPathMedia } from '$lib/notes/media';
+	import { createPlannerBridge } from '$lib/planner/bridge';
 	import { todayIso, monthKey } from '$lib/finance/dates';
 	import { MOODS, type JournalDoc, type JournalEntry } from '$lib/journal/types';
 	import Download from '@lucide/svelte/icons/download';
@@ -17,6 +18,7 @@
 	let { entry, date }: { entry?: JournalEntry; date?: string } = $props();
 
 	const qc = useQueryClient();
+	const planner = createPlannerBridge(qc);
 	const entryId = entry?.id ?? crypto.randomUUID();
 
 	/* svelte-ignore state_referenced_locally */
@@ -131,7 +133,8 @@
 			}}
 			onImageUpload={handleImage}
 			onFileUpload={handleFile}
-			placeholder="Write about your day, or press “/” for blocks…"
+			{planner}
+				placeholder="Write about your day, or press “/” for blocks…"
 		/>
 	{/snippet}
 </EditorShell>
