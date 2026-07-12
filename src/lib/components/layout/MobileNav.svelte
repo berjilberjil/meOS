@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { goto, preloadData } from '$app/navigation';
 	import { page } from '$app/state';
 	import { NAV_LEFT, NAV_RIGHT, DASHBOARD, type NavItem } from '$lib/nav';
 	import * as haptics from '$lib/haptics';
@@ -16,6 +16,15 @@
 	function tabTap(item: NavItem) {
 		haptics.tick();
 		goto(item.href);
+	}
+
+	// These are <button>s driven by goto (for the long-press fan menu), so
+	// SvelteKit's `data-sveltekit-preload-data="hover"` (anchors only) never fires
+	// for them — every tab switch used to cold-load the route chunk + data, and the
+	// View Transition froze the page until it finished. Warm the route on intent
+	// (hover / press) so navigation is already cached by the time goto runs.
+	function warm(item: NavItem) {
+		preloadData(item.href).catch(() => {});
 	}
 
 	// ---- Long-press fan menu (any nav button with a `menu`) ----
@@ -41,6 +50,7 @@
 	}
 
 	function navDown(item: NavItem, e: PointerEvent) {
+		warm(item); // head start for touch (no hover): press → preload → release navigates
 		pressItem = item;
 		startX = e.clientX;
 		startY = e.clientY;
@@ -150,6 +160,7 @@
 		aria-label={item.menu
 			? `${item.label} — tap to open, hold for quick actions`
 			: item.label}
+		onpointerenter={() => warm(item)}
 		onpointerdown={(e) => navDown(item, e)}
 		onpointermove={navMove}
 		onpointerup={() => navUp(item)}
