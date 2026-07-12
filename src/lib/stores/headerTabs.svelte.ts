@@ -6,9 +6,19 @@ export interface HeaderTab {
 
 export const headerTabs = $state<{ tabs: HeaderTab[] }>({ tabs: [] });
 
-export function setHeaderTabs(tabs: HeaderTab[]): void {
+// Ownership token. During client-side navigation the incoming section's layout
+// mounts (setHeaderTabs) around the same time the outgoing layout unmounts
+// (clearHeaderTabs); without ownership the outgoing onDestroy would wipe the
+// tabs the incoming layout just set. Each set gets a fresh token; a clear only
+// applies if it still owns the current tabs. (Identity comparison won't work —
+// Svelte proxies the array — so we track a monotonic token instead.)
+let owner = 0;
+
+export function setHeaderTabs(tabs: HeaderTab[]): number {
 	headerTabs.tabs = tabs;
+	return ++owner;
 }
-export function clearHeaderTabs(): void {
-	headerTabs.tabs = [];
+
+export function clearHeaderTabs(token: number): void {
+	if (token === owner) headerTabs.tabs = [];
 }

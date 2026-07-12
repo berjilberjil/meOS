@@ -15,8 +15,8 @@
 	];
 
 	// Publish to the desktop top bar; keep an in-content row for phones.
-	setHeaderTabs(tabs);
-	onDestroy(clearHeaderTabs);
+	const headerToken = setHeaderTabs(tabs);
+	onDestroy(() => clearHeaderTabs(headerToken));
 
 	function active(href: string): boolean {
 		const p = page.url.pathname;

@@ -13,8 +13,8 @@
 		{ href: '/fitness/plan', label: 'Plan' },
 		{ href: '/fitness/progress', label: 'Progress' }
 	];
-	setHeaderTabs(tabs);
-	onDestroy(clearHeaderTabs);
+	const headerToken = setHeaderTabs(tabs);
+	onDestroy(() => clearHeaderTabs(headerToken));
 </script>
 
 <div class="flex flex-col gap-4">

@@ -20,8 +20,8 @@
 	];
 
 	// Desktop: tabs in the top bar. Phones: keep the in-content row below.
-	setHeaderTabs(tabs);
-	onDestroy(clearHeaderTabs);
+	const headerToken = setHeaderTabs(tabs);
+	onDestroy(() => clearHeaderTabs(headerToken));
 
 	onMount(async () => {
 		if (!navigator.onLine) return;

@@ -11,8 +11,8 @@
 		{ href: '/assets', label: 'Assets & Liabilities' },
 		{ href: '/belongings', label: 'Belongings' }
 	];
-	setHeaderTabs(tabs);
-	onDestroy(clearHeaderTabs);
+	const headerToken = setHeaderTabs(tabs);
+	onDestroy(() => clearHeaderTabs(headerToken));
 
 	function active(href: string): boolean {
 		return page.url.pathname === href || page.url.pathname.startsWith(href + '/');
