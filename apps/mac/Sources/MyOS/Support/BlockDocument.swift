@@ -1,0 +1,109 @@
+import Foundation
+
+// A note's rich content: an ordered list of typed blocks — the native answer to
+// a Notion/TipTap document. This is the on-disk shape (JSON inside a note's
+// `content`). It maps conceptually 1:1 to ProseMirror nodes so an embed path
+// stays open later, but on disk we keep a flat, self-describing block list.
+
+enum BlockType: String, Codable, Hashable {
+    case paragraph, heading, bullet, numbered, todo, quote, code, divider
+}
+
+// Inline formatting applied to a run of text within a block.
+enum Mark: Codable, Hashable {
+    case bold, italic, code, strike
+    case link(String)
+
+    private enum CodingKeys: String, CodingKey { case t, href }
+    private enum Kind: String, Codable { case bold, italic, code, strike, link }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        switch try c.decode(Kind.self, forKey: .t) {
+        case .bold:   self = .bold
+        case .italic: self = .italic
+        case .code:   self = .code
+        case .strike: self = .strike
+        case .link:   self = .link(try c.decodeIfPresent(String.self, forKey: .href) ?? "")
+        }
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .bold:            try c.encode(Kind.bold, forKey: .t)
+        case .italic:          try c.encode(Kind.italic, forKey: .t)
+        case .code:            try c.encode(Kind.code, forKey: .t)
+        case .strike:          try c.encode(Kind.strike, forKey: .t)
+        case .link(let href):  try c.encode(Kind.link, forKey: .t); try c.encode(href, forKey: .href)
+        }
+    }
+}
+
+// A run of text sharing the same set of marks.
+struct TextSpan: Codable, Hashable {
+    var text: String
+    var marks: [Mark] = []
+}
+
+struct Block: Codable, Hashable, Identifiable {
+    var id: String
+    var type: BlockType
+    var spans: [TextSpan] = []
+    var checked: Bool? = nil     // todo
+    var level: Int? = nil        // heading: 1...3
+    var language: String? = nil  // code
+
+    enum CodingKeys: String, CodingKey { case id, type, spans, checked, level, language }
+
+    init(id: String = Block.newID(), type: BlockType, spans: [TextSpan] = [],
+         checked: Bool? = nil, level: Int? = nil, language: String? = nil) {
+        self.id = id; self.type = type; self.spans = spans
+        self.checked = checked; self.level = level; self.language = language
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decodeIfPresent(String.self, forKey: .id) ?? Block.newID()
+        type     = try c.decode(BlockType.self, forKey: .type)
+        spans    = try c.decodeIfPresent([TextSpan].self, forKey: .spans) ?? []
+        checked  = try c.decodeIfPresent(Bool.self, forKey: .checked)
+        level    = try c.decodeIfPresent(Int.self, forKey: .level)
+        language = try c.decodeIfPresent(String.self, forKey: .language)
+    }
+
+    var plainText: String { spans.map(\.text).joined() }
+    var isEmpty: Bool { type != .divider && plainText.isEmpty }
+
+    static func newID() -> String { String(UUID().uuidString.prefix(8)).lowercased() }
+    static func paragraph(_ text: String = "") -> Block {
+        Block(type: .paragraph, spans: text.isEmpty ? [] : [TextSpan(text: text)])
+    }
+}
+
+struct BlockDoc: Codable, Hashable {
+    var blocks: [Block]
+
+    init(blocks: [Block] = [Block.paragraph()]) {
+        self.blocks = blocks.isEmpty ? [Block.paragraph()] : blocks
+    }
+
+    /// Flattened plain text — the mirror used for search, list previews, and the
+    /// AI quick-log. Dividers render as a rule glyph so previews read cleanly.
+    var plainText: String {
+        blocks.map { $0.type == .divider ? "———" : $0.plainText }
+            .joined(separator: "\n")
+    }
+
+    var isEffectivelyEmpty: Bool {
+        blocks.allSatisfy { $0.type == .paragraph && $0.plainText.isEmpty }
+    }
+
+    /// Migrate a legacy plain-text body into blocks: each line becomes a
+    /// paragraph. Lossless and reversible via `plainText`.
+    static func from(plainText text: String) -> BlockDoc {
+        let trimmed = text.replacingOccurrences(of: "\r\n", with: "\n")
+        guard !trimmed.isEmpty else { return BlockDoc() }
+        let blocks = trimmed.components(separatedBy: "\n").map { Block.paragraph($0) }
+        return BlockDoc(blocks: blocks)
+    }
+}

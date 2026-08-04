@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.berjil.myos.backend</string>
+
+    <!-- Start the SvelteKit backend (vite dev on :5173) and keep it alive. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/npm</string>
+        <string>run</string>
+        <string>dev</string>
+    </array>
+
+    <!-- Run from apps/web so vite finds the project and loads .env. -->
+    <key>WorkingDirectory</key>
+    <string>/Users/berjilskcript/Documents/Personal/MyOS/apps/web</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/berjilskcript/Library/Logs/myos-backend.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/berjilskcript/Library/Logs/myos-backend.log</string>
+</dict>
+</plist>

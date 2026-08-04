@@ -1,0 +1,14 @@
+{
+  "name": "myos-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MyOS monorepo — headless SvelteKit backend (apps/web) + native macOS SwiftUI app (apps/mac).",
+  "scripts": {
+    "dev": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build",
+    "web": "npm --prefix apps/web run dev",
+    "web:check": "npm --prefix apps/web run check",
+    "mac:gen": "cd apps/mac && xcodegen generate",
+    "mac:open": "open apps/mac/MyOS.xcodeproj"
+  }
+}

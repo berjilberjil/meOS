@@ -1,0 +1,25 @@
+# deps
+node_modules/
+
+# secrets — NEVER commit
+.env
+.env.*
+!.env.example
+
+# build output
+build/
+.svelte-kit/
+.netlify/
+dist/
+
+# macOS / Xcode
+.DS_Store
+apps/mac/*.xcodeproj
+apps/mac/build/
+apps/mac/.build/
+apps/mac/DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Claude Code / agent local worktrees — never commit
+.claude/worktrees/
