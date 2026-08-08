@@ -1,8 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
 import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 
 /**
@@ -34,8 +33,6 @@ const PlanSchema = z.object({
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw error(503, 'AI is not configured on the server');
 
   const body = await request.json().catch(() => ({}));
   const goal = String(body.goal ?? 'maintain');
@@ -62,10 +59,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     `Every name MUST come from the lists above so it resolves. "summary" is one blunt sentence on the plan's logic.`
   ].join('\n');
 
+  let resolved;
   try {
-    const google = createGoogleGenerativeAI({ apiKey });
+    resolved = await resolveModel('plan', locals.user.id);
+  } catch (e) {
+    throw error(503, (e as Error)?.message ?? 'AI is not configured on the server');
+  }
+
+  try {
     const { object } = await generateObject({
-      model: google(env.GEMINI_REASONING_MODEL ?? env.GEMINI_MODEL ?? 'gemini-2.5-flash'),
+      model: resolved.model,
       schema: PlanSchema,
       prompt
     });

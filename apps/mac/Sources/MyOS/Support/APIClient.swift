@@ -176,6 +176,74 @@ final class APIClient {
     private struct ChatRequest: Encodable { let messages: [ChatTurn]; let context: String; let agent: AgentInfo }
     private struct ChatReply: Decodable { let reply: String }
 
+    // MARK: - AI providers & models
+
+    /// One saved provider key — masked; the raw secret never leaves the server.
+    struct AIKeyDTO: Codable, Identifiable, Hashable {
+        let id: Int
+        let provider: String
+        var label: String
+        var masked: String
+        var enabled: Bool
+        var models: [String]
+    }
+    /// A routing choice: which saved key + which model name.
+    struct AIRouteRef: Codable, Hashable { var keyId: Int; var model: String }
+    /// Per-feature routing map. `defaultRoute` (JSON "default") covers anything not
+    /// explicitly routed.
+    struct AIRouting: Codable, Hashable {
+        var defaultRoute: AIRouteRef?
+        var features: [String: AIRouteRef]?
+        enum CodingKeys: String, CodingKey {
+            case defaultRoute = "default"
+            case features
+        }
+        init(defaultRoute: AIRouteRef? = nil, features: [String: AIRouteRef]? = nil) {
+            self.defaultRoute = defaultRoute; self.features = features
+        }
+    }
+
+    func aiKeys() async throws -> [AIKeyDTO] {
+        struct R: Decodable { let keys: [AIKeyDTO] }
+        return try decoder.decode(R.self, from: try await request("GET", "api/ai/keys")).keys
+    }
+
+    /// Add a key. The server validates it live (which fetches its models) then stores
+    /// it encrypted — so this can take a moment; it uses the longer AI timeout.
+    func aiAddKey(provider: String, label: String, key: String) async throws -> AIKeyDTO {
+        struct R: Decodable { let key: AIKeyDTO }
+        let body = AddKeyRequest(provider: provider, label: label, key: key)
+        return try decoder.decode(R.self, from: try await request("POST", "api/ai/keys", body: body, using: aiSession)).key
+    }
+
+    func aiUpdateKey(id: Int, label: String? = nil, enabled: Bool? = nil, key: String? = nil) async throws -> AIKeyDTO {
+        struct R: Decodable { let key: AIKeyDTO }
+        let body = PatchKeyRequest(label: label, enabled: enabled, key: key)
+        let session = key != nil ? aiSession : nil
+        return try decoder.decode(R.self, from: try await request("PATCH", "api/ai/keys/\(id)", body: body, using: session)).key
+    }
+
+    func aiDeleteKey(id: Int) async throws {
+        _ = try await request("DELETE", "api/ai/keys/\(id)")
+    }
+
+    /// Re-validate a stored key and refresh its model list. Returns the fresh list.
+    func aiCheckKey(id: Int) async throws -> [String] {
+        struct R: Decodable { let models: [String] }
+        return try decoder.decode(R.self, from: try await request("POST", "api/ai/keys/\(id)/check", using: aiSession)).models
+    }
+
+    func aiRoutes() async throws -> AIRouting {
+        (try? decoder.decode(AIRouting.self, from: try await request("GET", "api/ai/routes"))) ?? AIRouting()
+    }
+
+    func aiPutRoutes(_ routing: AIRouting) async throws {
+        _ = try await request("PUT", "api/ai/routes", body: routing)
+    }
+
+    private struct AddKeyRequest: Encodable { let provider: String; let label: String; let key: String }
+    private struct PatchKeyRequest: Encodable { let label: String?; let enabled: Bool?; let key: String? }
+
     // MARK: - Instant-relaunch cache
 
     private static let cacheDir: URL = {

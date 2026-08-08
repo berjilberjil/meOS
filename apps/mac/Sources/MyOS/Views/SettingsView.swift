@@ -16,6 +16,7 @@ struct SettingsView: View {
             accountCard.knRise(1)
             identityCard.knRise(2)
             AgentSettingsCard().knRise(3)
+            AIProvidersCard().knRise(3)
             fitnessCard.knRise(3)
             financeCard.knRise(4)
             growwCard.knRise(5)

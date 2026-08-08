@@ -1,8 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
 import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 import { financePrinciples } from '$lib/finance';
 
@@ -72,16 +71,19 @@ function buildPrompt(body: any): string {
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw error(503, 'AI is not configured on the server');
 
   const body = await request.json().catch(() => ({}));
 
+  let resolved;
   try {
-    const google = createGoogleGenerativeAI({ apiKey });
+    resolved = await resolveModel('analysis', locals.user.id);
+  } catch (e) {
+    throw error(503, (e as Error)?.message ?? 'AI is not configured on the server');
+  }
+
+  try {
     const { object } = await generateObject({
-      // A weekly, high-value call — use a stronger reasoning model if one is set.
-      model: google(env.GEMINI_REASONING_MODEL ?? env.GEMINI_MODEL ?? 'gemini-2.5-flash'),
+      model: resolved.model,
       schema: AdviceSchema,
       prompt: buildPrompt(body)
     });

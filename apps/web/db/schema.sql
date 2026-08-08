@@ -25,3 +25,22 @@ create table if not exists app_state (
   updated_at timestamptz not null default now(),
   primary key (user_id, key)
 );
+
+-- User-added AI provider keys (Gemini / Anthropic / OpenAI). The secret is stored
+-- AES-256-GCM-encrypted (see src/lib/server/secrets.ts) so a DB dump alone can't
+-- read it. `masked` is the display form; `models` caches the last fetched model
+-- list. Per-feature routing (which key + model for chat/analysis/…) lives in
+-- app_state under 'myos.ai.routes'.
+create table if not exists ai_credentials (
+  id         serial primary key,
+  user_id    integer not null references users(id) on delete cascade,
+  provider   text not null,
+  label      text not null,
+  secret     text not null,
+  masked     text not null,
+  enabled    boolean not null default true,
+  models     jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists ai_credentials_user_idx on ai_credentials(user_id);

@@ -1,8 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
 import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 import { CATEGORIES, CATEGORY_HINTS, QUALITIES, QUALITY_HINTS } from '$lib/finance';
 
@@ -78,17 +77,21 @@ function buildPrompt(text: string): string {
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw error(503, 'AI logging is not configured on the server');
 
   const body = await request.json().catch(() => ({}));
   const text = String(body.text ?? '').trim();
   if (!text) throw error(400, 'Nothing to parse');
 
+  let resolved;
   try {
-    const google = createGoogleGenerativeAI({ apiKey });
+    resolved = await resolveModel('parse', locals.user.id);
+  } catch (e) {
+    throw error(503, (e as Error)?.message ?? 'AI logging is not configured on the server');
+  }
+
+  try {
     const { object } = await generateObject({
-      model: google(env.GEMINI_MODEL ?? 'gemini-2.5-flash'),
+      model: resolved.model,
       schema: ParseSchema,
       prompt: buildPrompt(text)
     });

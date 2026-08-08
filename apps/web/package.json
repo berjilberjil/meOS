@@ -11,7 +11,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.94",
     "@ai-sdk/google": "^2.0.0",
+    "@ai-sdk/openai": "^2.0.117",
     "ai": "^5.0.0",
     "postgres": "^3.4.9",
     "zod": "^3.25.0"

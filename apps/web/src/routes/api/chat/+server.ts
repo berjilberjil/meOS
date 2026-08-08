@@ -1,8 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
 import { generateText } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { resolveModel } from '$lib/server/ai';
 import { mentorChatSystem } from '$lib/mentor';
 
 /**
@@ -16,8 +15,6 @@ type Msg = { role: 'user' | 'assistant'; content: string };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw error(503, 'AI is not configured on the server');
 
   const body = await request.json().catch(() => ({}));
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
@@ -41,10 +38,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     throw error(400, 'Nothing to answer');
   }
 
+  let resolved;
   try {
-    const google = createGoogleGenerativeAI({ apiKey });
+    resolved = await resolveModel('chat', locals.user.id);
+  } catch (e) {
+    throw error(503, (e as Error)?.message ?? 'AI is not configured on the server');
+  }
+
+  try {
     const { text } = await generateText({
-      model: google(env.GEMINI_MODEL ?? 'gemini-2.5-flash'),
+      model: resolved.model,
       system: mentorChatSystem(context, persona),
       messages
     });

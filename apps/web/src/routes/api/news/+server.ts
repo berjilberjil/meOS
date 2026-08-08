@@ -1,8 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
 import { generateText, generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 
 /**
@@ -33,12 +32,18 @@ const SEARCH_PROMPT = [
 
 export const POST: RequestHandler = async ({ locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw error(503, 'AI is not configured on the server');
+
+  let resolved;
+  try {
+    resolved = await resolveModel('news', locals.user.id);
+  } catch (e) {
+    throw error(503, (e as Error)?.message ?? 'AI is not configured on the server');
+  }
+  if (!resolved.google) throw error(503, 'News needs a Gemini key — it uses Google Search grounding');
 
   try {
-    const google = createGoogleGenerativeAI({ apiKey });
-    const model = google(env.GEMINI_MODEL ?? 'gemini-2.5-flash');
+    const model = resolved.model;
+    const google = resolved.google;
 
     // 1) Grounded search → real current news as text.
     const { text } = await generateText({

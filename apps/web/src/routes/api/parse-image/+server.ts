@@ -1,8 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
 import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 import { CATEGORIES, CATEGORY_HINTS, QUALITIES, QUALITY_HINTS, HOLDING_TYPES } from '$lib/finance';
 
@@ -78,8 +77,6 @@ function portfolioPrompt(): string {
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) throw error(503, 'AI is not configured on the server');
 
   const body = await request.json().catch(() => ({}));
   const mode = body.mode === 'portfolio' ? 'portfolio' : 'transactions';
@@ -92,10 +89,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const schema = mode === 'portfolio' ? PortfolioResult : TxnResult;
   const prompt = mode === 'portfolio' ? portfolioPrompt() : txnPrompt();
 
+  let resolved;
   try {
-    const google = createGoogleGenerativeAI({ apiKey });
+    resolved = await resolveModel('vision', locals.user.id);
+  } catch (e) {
+    throw error(503, (e as Error)?.message ?? 'AI is not configured on the server');
+  }
+
+  try {
     const { object } = await generateObject({
-      model: google(env.GEMINI_MODEL ?? 'gemini-2.5-flash'),
+      model: resolved.model,
       schema,
       messages: [
         {
