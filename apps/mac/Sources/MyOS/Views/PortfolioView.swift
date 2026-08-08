@@ -140,7 +140,7 @@ struct PortfolioView: View {
                     }
                     .buttonStyle(KGhostButtonStyle(color: Palette.green))
                     .disabled(state.growwBusy)
-                    .help("Pull live LTP from Groww for holdings with a symbol set")
+                    .help("Pull live prices from Yahoo Finance for holdings with a ticker set")
                     Button { editingSnapshot = snap } label: { Label("Edit", systemImage: "pencil") }
                         .buttonStyle(KGhostButtonStyle())
                         .help("Edit quantities, amounts, symbols, or remove holdings")
@@ -678,15 +678,15 @@ private struct EditableHoldingRow: View {
                 TextField("Name", text: $holding.name)
                     .textFieldStyle(.plain).font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.text).frame(maxWidth: .infinity, alignment: .leading)
-                // Groww symbol for live prices (e.g. NSE_ITC)
-                TextField("NSE_…", text: Binding(get: { holding.symbol ?? "" },
-                                                 set: { holding.symbol = $0.isEmpty ? nil : $0.uppercased() }))
+                // Yahoo ticker for live prices (e.g. ITC.NS, TCS.BO, AAPL)
+                TextField("ITC.NS", text: Binding(get: { holding.symbol ?? "" },
+                                                  set: { holding.symbol = $0.isEmpty ? nil : $0.uppercased() }))
                     .textFieldStyle(.plain).font(.system(size: 12, weight: .semibold)).monospaced()
                     .foregroundStyle(Palette.text).frame(width: 96)
                     .padding(.horizontal, 8).padding(.vertical, 7)
                     .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
-                    .help("Groww symbol for live prices")
+                    .help("Yahoo ticker for live prices — ITC.NS (NSE), TCS.BO (BSE), AAPL (US)")
                 HoldingTypeMenu(type: $holding.type)
                 Button { showConfirm = true } label: {
                     Image(systemName: "trash").font(.system(size: 11, weight: .bold))

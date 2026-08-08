@@ -344,40 +344,37 @@ final class AppState: ObservableObject {
         push(StateKey.portfolio, portfolio)
     }
 
-    // MARK: - Groww live prices
+    // MARK: - Live prices (Yahoo Finance — free, no key/token)
 
-    @Published var growwToken: String = UserDefaults.standard.string(forKey: "myos.groww.token") ?? "" {
-        didSet { UserDefaults.standard.set(growwToken, forKey: "myos.groww.token") }
-    }
     @Published var growwBusy = false
     @Published var growwError: String?
     @Published var growwLastRefresh: String?
 
-    /// Pull live LTP from Groww for the latest snapshot's holdings that have a
-    /// symbol + units, and update their current value (price × units).
+    /// Pull live prices from Yahoo Finance for the latest snapshot's holdings that
+    /// have a ticker + units, and update their current value (price × units). US
+    /// tickers are auto-converted to INR inside MarketDataClient.
     func refreshLivePrices() async {
         growwError = nil
         guard let snap = portfolio.latest else { growwError = "Add a portfolio snapshot first."; return }
-        let token = growwToken.trimmingCharacters(in: .whitespaces)
-        guard !token.isEmpty else { growwError = "Add your Groww access token in Settings."; return }
         let symbols = snap.holdings.compactMap { h -> String? in
             guard let s = h.symbol?.trimmingCharacters(in: .whitespaces), !s.isEmpty else { return nil }
             return s
         }
-        guard !symbols.isEmpty else { growwError = "Set a Groww symbol (e.g. NSE_ITC) on your holdings first — edit the snapshot."; return }
+        guard !symbols.isEmpty else { growwError = "Set a ticker (e.g. ITC.NS, TCS.BO, AAPL) on your holdings first — edit the snapshot."; return }
         growwBusy = true
         defer { growwBusy = false }
         do {
-            let prices = try await GrowwClient.ltp(symbols: Array(Set(symbols)), token: token)
+            let prices = try await MarketDataClient.pricesInINR(symbols)
             var holdings = snap.holdings
             var updated = 0
             for i in holdings.indices {
-                if let sym = holdings[i].symbol, let price = prices[sym], let u = holdings[i].units, u > 0 {
+                if let sym = holdings[i].symbol?.trimmingCharacters(in: .whitespaces),
+                   let price = prices[sym], let u = holdings[i].units, u > 0 {
                     holdings[i].currentInr = price * u
                     updated += 1
                 }
             }
-            guard updated > 0 else { growwError = "Groww returned no prices for those symbols. Check the symbol format (NSE_ITC)."; return }
+            guard updated > 0 else { growwError = "No prices came back for those tickers. Check the format (ITC.NS, TCS.BO, AAPL)."; return }
             updateSnapshotHoldings(snap.id, holdings: holdings)
             growwLastRefresh = Self.nowStamp()
         } catch {

@@ -25,26 +25,15 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Groww live prices
+    // MARK: - Live prices
 
     private var growwCard: some View {
         Card {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    SectionTitle(text: "Groww live prices")
-                    Spacer()
-                    Button { if let u = URL(string: "https://groww.in/trade-api/api-keys") { NSWorkspace.shared.open(u) } } label: {
-                        Label("Get token", systemImage: "arrow.up.right")
-                    }
-                    .buttonStyle(KGhostButtonStyle())
-                }
-                Text("Paste your Groww access token to pull live prices into your portfolio. Tokens reset daily at 6 AM — regenerate and paste a fresh one. Then set a symbol (e.g. NSE_ITC) on each holding and tap “Live prices” in Invest.")
+            VStack(alignment: .leading, spacing: 10) {
+                SectionTitle(text: "Live prices")
+                Text("Live prices come free from Yahoo Finance — no key or token needed. Set a ticker on each holding (ITC.NS for NSE, TCS.BO for BSE, AAPL for US), then tap “Live prices” in Invest. US holdings are auto-converted to INR.")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                SecureField("", text: $state.growwToken,
-                            prompt: Text("Groww access token").foregroundColor(Palette.faint))
-                    .textFieldStyle(.plain).font(.system(size: 12)).monospaced().foregroundStyle(Palette.text)
-                    .knField()
                 if let ts = state.growwLastRefresh {
                     Text("Last live refresh: \(Fmt.day(ts))").font(.system(size: 10)).foregroundStyle(Palette.green)
                 }
