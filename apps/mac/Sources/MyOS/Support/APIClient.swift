@@ -10,12 +10,14 @@ struct APIError: LocalizedError {
 }
 
 final class APIClient {
-    /// Dev default is the local SvelteKit server. Override at runtime by setting
-    /// the `myos.baseURL` UserDefaults key (e.g. your deployed HTTPS domain).
+    /// Default is the deployed production backend — the app always talks to the
+    /// cloud, even in local testing. Override at runtime by setting the
+    /// `myos.baseURL` UserDefaults key (e.g. back to http://localhost:5173 for
+    /// local backend work).
     static var baseURL: URL {
         if let s = UserDefaults.standard.string(forKey: "myos.baseURL"),
            let u = URL(string: s) { return u }
-        return URL(string: "http://localhost:5173")!
+        return URL(string: "https://myos-berjil.netlify.app")!
     }
 
     private let session: URLSession
@@ -138,6 +140,14 @@ final class APIClient {
     func news() async throws -> NewsResult {
         let data = try await request("POST", "api/news", body: [String: String](), using: aiSession)
         return try decoder.decode(NewsResult.self, from: data)
+    }
+
+    /// Classify a YouTube video into a Productivity category (uses the free model).
+    func categorize(title: String, channel: String) async throws -> String {
+        struct R: Decodable { let category: String }
+        let data = try await request("POST", "api/categorize",
+                                     body: ["title": title, "channel": channel], using: aiSession)
+        return try decoder.decode(R.self, from: data).category
     }
 
     /// Static anatomy body-map data (front/back SVG + muscle groups). Cached to disk.

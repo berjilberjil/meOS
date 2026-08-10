@@ -493,11 +493,12 @@ extension View {
 // Currency + number formatting for INR.
 enum Fmt {
     static func inr(_ n: Double) -> String {
+        let sign = n < 0 ? "-" : ""
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.maximumFractionDigits = 0
         f.locale = Locale(identifier: "en_IN")
-        return "₹" + (f.string(from: NSNumber(value: n)) ?? "0")
+        return "\(sign)₹" + (f.string(from: NSNumber(value: abs(n))) ?? "0")
     }
     /// Compact lakh/crore style for big numbers.
     static func inrShort(_ n: Double) -> String {

@@ -18,5 +18,8 @@ export const handle: Handle = async ({ event, resolve }) => {
       /* db unavailable — treat as logged out */
     }
   }
-  return resolve(event);
+  const response = await resolve(event);
+  // Private personal backend — keep every response out of search engines.
+  response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return response;
 };

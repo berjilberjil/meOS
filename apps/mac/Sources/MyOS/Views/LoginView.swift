@@ -13,13 +13,11 @@ struct LoginView: View {
         VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Palette.brand)
-                    .frame(width: 52, height: 52)
-                    .overlay(
-                        Image(systemName: "command")
-                            .font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
-                    )
+                Image("LogoMark")
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 60, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
                     .knShadow()
                 VStack(spacing: 5) {
                     Text("MyOS")

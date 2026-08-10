@@ -46,9 +46,71 @@ struct FitnessView: View {
             profileCard.knRise(2)
             caloriesCard.knRise(3)
             weightCard.knRise(4)
-            nutritionCard.knRise(5)
-            ProgressPhotosCard().knRise(6)
+            stepsCard.knRise(5)
+            nutritionCard.knRise(6)
+            ProgressPhotosCard().knRise(7)
         }
+    }
+
+    // MARK: - Steps (manual now; iPhone HealthKit sync writes the same field next month)
+
+    @State private var stepsInput = ""
+    @FocusState private var stepsFocused: Bool
+
+    private var stepsCard: some View {
+        let steps = today.steps ?? 0
+        let target = state.stepsTarget
+        let frac = target > 0 ? min(1, Double(steps) / Double(target)) : 0
+        return Card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    SectionTitle(text: "Steps")
+                    Spacer()
+                    Text("goal \(steps.formatted()) / \(target.formatted())")
+                        .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(steps.formatted())
+                        .font(.system(size: 30, weight: .heavy, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(Palette.text)
+                    Text("steps today").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Spacer()
+                    if steps >= target && target > 0 {
+                        Text("Goal hit").font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Palette.flame)
+                    }
+                }
+                MeterBar(fraction: frac, tint: Palette.flame)
+                HStack(spacing: 10) {
+                    HStack(spacing: 6) {
+                        TextField("", text: $stepsInput,
+                                  prompt: Text("Set today's steps").foregroundColor(Palette.faint))
+                            .textFieldStyle(.plain).font(.system(size: 16, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .foregroundStyle(Palette.text).frame(width: 140)
+                            .focused($stepsFocused)
+                            .onSubmit(saveSteps)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(stepsFocused ? Palette.brand : Palette.border, lineWidth: 2))
+                    Button("Log", action: saveSteps).buttonStyle(KPrimaryButtonStyle())
+                        .disabled(Int(stepsInput.trimmingCharacters(in: .whitespaces)) == nil)
+                    ForEach([1000, 2000], id: \.self) { d in
+                        Button { state.setTodaySteps(steps + d) } label: { Text("+\(d / 1000)k") }
+                            .buttonStyle(KSoftButtonStyle(tint: Palette.flame))
+                    }
+                    Spacer()
+                }
+                Text("Manual for now — your iPhone syncs this from Apple Health once the phone app ships.")
+                    .font(.system(size: 10)).foregroundStyle(Palette.faint)
+            }
+        }
+    }
+
+    private func saveSteps() {
+        guard let n = Int(stepsInput.trimmingCharacters(in: .whitespaces)), n >= 0 else { return }
+        state.setTodaySteps(n); stepsInput = ""; stepsFocused = false
     }
 
     // MARK: - Weight (easy logging)
@@ -173,7 +235,7 @@ struct FitnessView: View {
 
     private var waterStat: some View {
         let ml = today.waterMl ?? 0
-        let target = fp.waterTargetMl ?? 3000
+        let target = max(1, fp.waterTargetMl ?? 3000)   // a 0-L goal must not NaN the meter
         return Card(padding: 13) {
             VStack(alignment: .leading, spacing: 7) {
                 Text("WATER").font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6).foregroundStyle(Palette.faint)

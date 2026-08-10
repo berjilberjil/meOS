@@ -14,6 +14,9 @@ schemes:
     build:
       targets:
         MyOS: all
+    test:
+      targets:
+        - MyOSTests
 targets:
   MyOS:
     type: application
@@ -30,3 +33,14 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     entitlements:
       path: MyOS.entitlements
+  MyOSTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: MyOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.berjil.myos.tests
+        GENERATE_INFOPLIST_FILE: YES

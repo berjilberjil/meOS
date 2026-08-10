@@ -57,20 +57,29 @@ struct FinanceView: View {
         LazyVGrid(columns: cols, spacing: 12) {
             StatTile(label: "This month in", value: Fmt.inrShort(state.monthIncome), accent: Palette.green)
             StatTile(label: "This month out", value: Fmt.inrShort(state.monthExpense), accent: Palette.red)
-            StatTile(label: "Savings rate", value: "\(Int(state.savingsRate * 100))%", accent: Palette.brand)
+            StatTile(label: "Savings rate", value: "\(Int(state.savingsRate * 100))%",
+                     sub: savingsSub, accent: Palette.brand)
             StatTile(label: "Wasted", value: Fmt.inrShort(state.monthWasted), accent: Palette.red)
         }
         .knRise(2)
 
-        if state.monthExpense > 0 { qualityCard.knRise(3) }
-        if !state.monthByCategory.isEmpty { breakdownCard.knRise(4) }
-        goldLoanCard.knRise(5)
-        emergencyCard.knRise(6)
-        insuranceCard.knRise(7)
+        NetWorthCard().knRise(3)
+        if state.monthExpense > 0 { qualityCard.knRise(4) }
+        if !state.monthByCategory.isEmpty { breakdownCard.knRise(5) }
+        goldLoanCard.knRise(6)
+        emergencyCard.knRise(7)
+        insuranceCard.knRise(8)
         // Adding a transaction lives just above the ledger — screenshot scanning is
         // the "Scan" icon in the header, not a giant drop zone on top.
-        quickAddCard.knRise(8)
-        transactionsList.knRise(9)
+        quickAddCard.knRise(9)
+        transactionsList.knRise(10)
+    }
+
+    /// The savings-rate tile's subtitle: rupees kept + change vs last month.
+    private var savingsSub: String {
+        var s = "\(Fmt.inrShort(max(0, state.monthSaved))) kept"
+        if let d = state.savingsRateDeltaPP, d != 0 { s += " · \(d > 0 ? "+" : "")\(d)pp" }
+        return s
     }
 
     // Manual add-by-hand. (Screenshot scanning moved to the header "Scan" icon.)

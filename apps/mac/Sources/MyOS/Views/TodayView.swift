@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct TodayView: View {
     @EnvironmentObject var state: AppState
@@ -6,6 +7,7 @@ struct TodayView: View {
 
     @State private var newFocus = ""
     @FocusState private var focusFieldActive: Bool
+    @State private var expandedNews: Set<String> = []
 
     private let cols = [GridItem(.adaptive(minimum: 168), spacing: 12)]
 
@@ -30,6 +32,7 @@ struct TodayView: View {
             }
             .knRise(1)
 
+            if !state.nextEvents.isEmpty { comingUpCard.knRise(2) }
             suggestionsCard.knRise(2)
             newsCard.knRise(3)
             focusCard.knRise(4)
@@ -56,11 +59,64 @@ struct TodayView: View {
         }
     }
 
-    // MARK: - Tech + finance news
+    // MARK: - Coming up (next life events)
+
+    private var comingUpCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    SectionTitle(text: "Coming up")
+                    Spacer()
+                    Button { go(.events) } label: { Label("All events", systemImage: "calendar") }
+                        .buttonStyle(KGhostButtonStyle())
+                }
+                ForEach(state.nextEvents) { e in
+                    Button { go(.events) } label: { eventLine(e) }
+                        .buttonStyle(KPressStyle())
+                }
+            }
+        }
+    }
+
+    private func eventLine(_ e: EventItem) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: e.category.icon)
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(e.category.color)
+                .frame(width: 30, height: 30)
+                .background(e.category.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    if e.special { Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Palette.amber) }
+                    Text(e.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                }
+                Text(eventCountdown(e)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.faint)
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+    }
+
+    private func eventCountdown(_ e: EventItem) -> String {
+        guard let d = state.daysUntil(e.date) else { return Fmt.day(e.date) }
+        switch d {
+        case 0: return "Today"
+        case 1: return "Tomorrow"
+        case -1: return "Yesterday"
+        case let n where n > 1: return "in \(n) days"
+        default: return "\(-d) days ago"
+        }
+    }
+
+    // MARK: - Tech + finance news (two columns, tap a story to expand)
+
+    private let techCats: Set<String> = ["tech", "ai"]
+    private let financeCats: Set<String> = ["markets", "india", "finance", "crypto"]
 
     private var newsCard: some View {
         Card {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
                     Image(systemName: "newspaper.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.blue)
                     SectionTitle(text: "Tech & finance news")
@@ -75,8 +131,16 @@ struct TodayView: View {
                     .disabled(state.newsBusy)
                 }
                 if let n = state.news, !n.items.isEmpty {
-                    ForEach(n.items) { item in newsRow(item) }
-                    Text("Surfaced with AI · Google Search").font(.system(size: 9)).foregroundStyle(Palette.faint)
+                    HStack(alignment: .top, spacing: 18) {
+                        newsColumn("Tech", tint: Palette.purple, icon: "cpu.fill",
+                                   items: n.items.filter { techCats.contains($0.category) })
+                        Rectangle().fill(Palette.border).frame(width: 1)
+                        newsColumn("Finance", tint: Palette.green, icon: "indianrupeesign.circle.fill",
+                                   items: n.items.filter { financeCats.contains($0.category) })
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    Text("Surfaced with AI · Google Search · tap a story for more")
+                        .font(.system(size: 9)).foregroundStyle(Palette.faint)
                 } else if state.newsBusy {
                     HStack(spacing: 8) { ProgressView().controlSize(.small)
                         Text("Getting today's news…").font(.system(size: 13)).foregroundStyle(Palette.muted) }
@@ -91,26 +155,101 @@ struct TodayView: View {
         }
     }
 
-    private func newsRow(_ item: NewsResult.Item) -> some View {
-        HStack(alignment: .top, spacing: 11) {
-            Text(item.category.uppercased())
-                .font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.5)
-                .foregroundStyle(newsColor(item.category))
-                .padding(.horizontal, 7).padding(.vertical, 4)
-                .background(newsColor(item.category).opacity(0.15), in: Capsule())
-                .frame(width: 62)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(item.summary).font(.system(size: 12)).foregroundStyle(Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let s = item.source, !s.isEmpty {
-                    Text(s).font(.system(size: 10)).foregroundStyle(Palette.faint)
+    private func newsColumn(_ title: String, tint: Color, icon: String, items: [NewsResult.Item]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(tint)
+                Text(title.uppercased()).font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .tracking(0.6).foregroundStyle(tint)
+            }
+            if items.isEmpty {
+                Text("Nothing today.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+            } else {
+                ForEach(items) { item in newsRow(item, tint: tint) }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func newsRow(_ item: NewsResult.Item, tint: Color) -> some View {
+        let open = expandedNews.contains(item.id)
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.knFast) {
+                    if open { expandedNews.remove(item.id) } else { expandedNews.insert(item.id) }
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(item.category.uppercased())
+                            .font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.5)
+                            .foregroundStyle(newsColor(item.category))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(newsColor(item.category).opacity(0.15), in: Capsule())
+                        if let t = item.time, !t.isEmpty {
+                            Text(t).font(.system(size: 9, weight: .medium)).foregroundStyle(Palette.faint)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: open ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 8, weight: .bold)).foregroundStyle(Palette.faint)
+                    }
+                    Text(item.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
+                    Text(item.summary).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(KPressStyle())
+
+            if open {
+                if let d = item.detail, !d.isEmpty {
+                    Text(d).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
+                }
+                HStack(spacing: 8) {
+                    if let s = item.source, !s.isEmpty {
+                        Button {
+                            if let u = item.url, let url = URL(string: u) { NSWorkspace.shared.open(url) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "link").font(.system(size: 9, weight: .bold))
+                                Text(s).font(.system(size: 10, weight: .heavy, design: .rounded)).lineLimit(1)
+                                if item.url != nil { Image(systemName: "arrow.up.right").font(.system(size: 8, weight: .bold)) }
+                            }
+                            .foregroundStyle(tint)
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .background(tint.opacity(0.14), in: Capsule())
+                        }
+                        .buttonStyle(KPressStyle())
+                        .disabled(item.url == nil)
+                        .help(item.url ?? s)
+                    }
+                    Button { askAboutNews(item) } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles").font(.system(size: 9, weight: .bold))
+                            Text("Ask AI").font(.system(size: 10, weight: .heavy, design: .rounded))
+                        }
+                        .foregroundStyle(Palette.brand)
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .background(Palette.brand.opacity(0.14), in: Capsule())
+                    }
+                    .buttonStyle(KPressStyle())
+                    .help("Chat about this with your mentor")
+                    Spacer(minLength: 0)
                 }
             }
-            Spacer(minLength: 0)
         }
-        .padding(.vertical, 3)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.surface2.opacity(open ? 0.4 : 0.18),
+                    in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+    }
+
+    private func askAboutNews(_ item: NewsResult.Item) {
+        var p = "Explain this news and what it means for me and my finance content: \(item.title). \(item.summary)"
+        if let d = item.detail, !d.isEmpty { p += " \(d)" }
+        state.askMentor(p)
     }
 
     private func newsColor(_ cat: String) -> Color {
@@ -321,7 +460,7 @@ struct TodayView: View {
         return "No weight logged"
     }
     private var proteinLine: String {
-        let p = state.fitnessDay(state.todayKey).proteinG ?? 0
+        let p = state.consumed(state.todayKey).protein
         return "\(Int(p)) g protein"
     }
     private var journalLine: String {

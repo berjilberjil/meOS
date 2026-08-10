@@ -27,6 +27,9 @@ final class AppState: ObservableObject {
     @Published var chat = ChatState()
     @Published var nutrition = NutritionState()
     @Published var training = TrainingState()
+    @Published var events: [EventItem] = []
+    @Published var watch: [WatchItem] = []
+    @Published var networth = NetWorthState()
 
     // Sync status
     @Published var lastSyncError: String?
@@ -72,6 +75,9 @@ final class AppState: ObservableObject {
         chat    = s.chat ?? ChatState()
         nutrition = s.nutrition ?? NutritionState()
         training  = s.training ?? TrainingState()
+        events    = s.events ?? []
+        watch     = s.watch ?? []
+        networth  = s.networth ?? NetWorthState()
     }
 
     // MARK: - Session lifecycle
@@ -123,6 +129,7 @@ final class AppState: ObservableObject {
         fitnessProfile = FitnessProfile(); journalPresets = JournalPresets()
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
+        events = []; watch = []; networth = NetWorthState()
         username = ""; isHydrated = false; lastSyncError = nil
         phase = .loggedOut
     }
@@ -235,17 +242,37 @@ final class AppState: ObservableObject {
     }
 
     func deleteTransaction(_ id: String) {
+        guard let old = finance.txns.first(where: { $0.id == id }) else { return }
         finance.txns.removeAll { $0.id == id }
+        // Deleting a gold-loan payment must restore the outstanding balance it
+        // shrank, otherwise the loan card/net worth drifts permanently low.
+        if old.kind == .expense && old.category == "loan" {
+            finance.meta.goldLoanOutstandingInr = max(0, finance.meta.goldLoanOutstandingInr + old.amountInr)
+        }
         push(StateKey.finance, finance)
     }
 
     /// Edit a saved transaction in place (keeps its id and list position).
     func updateTransaction(_ txn: Transaction) {
         guard let i = finance.txns.firstIndex(where: { $0.id == txn.id }) else { return }
+        let old = finance.txns[i]
         var t = txn
         t.amountInr = max(0, t.amountInr)
         finance.txns[i] = t
+        reconcileGoldLoan(from: old, to: t)
         push(StateKey.finance, finance)
+    }
+
+    /// Keep `goldLoanOutstandingInr` in sync with the loan-payment ledger when a
+    /// transaction is edited: undo the old amount's effect, apply the new one.
+    private func reconcileGoldLoan(from old: Transaction, to new: Transaction) {
+        let wasLoan = old.kind == .expense && old.category == "loan"
+        let isLoan  = new.kind == .expense && new.category == "loan"
+        guard wasLoan || isLoan else { return }
+        var delta = 0.0
+        if wasLoan { delta += old.amountInr }   // undo the original decrement
+        if isLoan  { delta -= new.amountInr }   // apply the new one
+        if delta != 0 { finance.meta.goldLoanOutstandingInr = max(0, finance.meta.goldLoanOutstandingInr + delta) }
     }
 
     func saveFinanceMeta(_ meta: FinanceMeta) {
@@ -264,11 +291,32 @@ final class AppState: ObservableObject {
     var spentToday: Double {
         finance.txns.filter { $0.date == todayKey && $0.kind == .expense }.reduce(0) { $0 + $1.amountInr }
     }
-    /// Savings rate this month, using logged income or the profile monthly income, whichever is higher.
-    var savingsRate: Double {
-        let income = max(monthIncome, finance.meta.monthlyIncomeInr)
-        guard income > 0 else { return 0 }
-        return max(0, (income - monthExpense) / income)
+    /// Savings rate for a `yyyy-MM` month — logged income or the profile monthly
+    /// income, whichever is higher, minus that month's expenses.
+    func savingsRate(forMonth prefix: String) -> Double {
+        let txns = finance.txns.filter { $0.date.hasPrefix(prefix) }
+        let inc = max(txns.filter { $0.kind == .income }.reduce(0) { $0 + $1.amountInr },
+                      finance.meta.monthlyIncomeInr)
+        guard inc > 0 else { return 0 }
+        let exp = txns.filter { $0.kind == .expense }.reduce(0) { $0 + $1.amountInr }
+        return max(0, (inc - exp) / inc)
+    }
+    /// Savings rate this month.
+    var savingsRate: Double { savingsRate(forMonth: monthPrefix) }
+    /// Rupees kept this month (income − expense) — can read as the full income if nothing's spent.
+    var monthSaved: Double { max(monthIncome, finance.meta.monthlyIncomeInr) - monthExpense }
+    /// The previous calendar month's `yyyy-MM` prefix (pure string math, no timezone drift).
+    var prevMonthPrefix: String {
+        let parts = monthPrefix.split(separator: "-")
+        guard parts.count == 2, var y = Int(parts[0]), var m = Int(parts[1]) else { return monthPrefix }
+        m -= 1; if m < 1 { m = 12; y -= 1 }
+        return String(format: "%04d-%02d", y, m)
+    }
+    /// Change in savings rate vs last month, in percentage points (nil if no prior-month data).
+    var savingsRateDeltaPP: Int? {
+        let prev = finance.txns.contains { $0.date.hasPrefix(prevMonthPrefix) }
+        guard prev else { return nil }
+        return Int((savingsRate - savingsRate(forMonth: prevMonthPrefix)) * 100)
     }
     var goldLoanPaid: Double { max(0, finance.meta.goldLoanStartInr - finance.meta.goldLoanOutstandingInr) }
     var goldLoanFraction: Double {
@@ -321,6 +369,8 @@ final class AppState: ObservableObject {
         portfolio.snapshots.removeAll { $0.date == snap.date }
         portfolio.snapshots.insert(snap, at: 0)
         portfolio.snapshots.sort { $0.date > $1.date }
+        // A fresh snapshot makes any earlier AI read stale — don't show old numbers.
+        portfolio.advice = nil
         push(StateKey.portfolio, portfolio)
     }
 
@@ -336,6 +386,8 @@ final class AppState: ObservableObject {
         portfolio.snapshots[si].holdings = holdings.map {
             var h = $0; h.investedInr = max(0, h.investedInr); h.currentInr = max(0, h.currentInr); return h
         }
+        // Changing holdings invalidates any AI read based on the old snapshot.
+        if portfolio.snapshots[si].id == portfolio.latest?.id { portfolio.advice = nil }
         push(StateKey.portfolio, portfolio)
     }
 
@@ -514,6 +566,14 @@ final class AppState: ObservableObject {
         updateFitness(todayKey) { $0.weightKg = kg.map { max(0, $0) } }
     }
 
+    /// Set today's step count. Manual today; the iPhone client writes this same field
+    /// from HealthKit next month — nothing else has to change for it to sync.
+    func setTodaySteps(_ steps: Int?) {
+        updateFitness(todayKey) { $0.steps = steps.map { max(0, $0) } }
+    }
+    /// The daily step goal, defaulting to 8,000 when unset.
+    var stepsTarget: Int { fitnessProfile.stepsTarget ?? 8000 }
+
     // MARK: - Fitness profile
 
     func updateFitnessProfile(_ transform: (inout FitnessProfile) -> Void) {
@@ -602,7 +662,9 @@ final class AppState: ObservableObject {
         return out
     }
 
-    /// Total macros eaten on a date.
+    /// Total macros eaten on a date. Merges the food log (meal items) with the
+    /// fitness day's AI-quick-logged calories/protein, so the Food tab, Fitness
+    /// card, Today line and mentor context all agree on the same numbers.
     func consumed(_ date: String) -> Macros {
         let log = mealLog(date)
         var total = Macros.zero
@@ -611,6 +673,9 @@ final class AppState: ObservableObject {
                 if let f = food(item.foodId) { total = total + f.perServing.scaled(item.quantity) }
             }
         }
+        let fd = fitness[date]
+        total.calories += fd?.calories ?? 0
+        total.protein += fd?.proteinG ?? 0
         return total
     }
 
@@ -981,6 +1046,10 @@ final class AppState: ObservableObject {
 
     @Published var chatBusy = false
     @Published var chatError: String?
+    /// A prompt requested from elsewhere (e.g. "Ask AI" on a news story). The chat
+    /// widget observes this, opens itself, and sends it.
+    @Published var pendingChatPrompt: String? = nil
+    func askMentor(_ prompt: String) { pendingChatPrompt = prompt }
     @Published var suggestions: SuggestResult?
     @Published var suggestBusy = false
     @Published var suggestError: String?
@@ -1019,8 +1088,8 @@ final class AppState: ObservableObject {
         if let cal = calorieTargets() {
             l.append("CALORIES: BMR \(cal.bmr), TDEE \(cal.tdee). Maintain \(cal.maintain), cut \(cal.cut), bulk \(cal.bulk) kcal. Protein target \(cal.proteinG)g.")
         }
-        let td = fitnessDay(todayKey)
-        l.append("TODAY INTAKE: \(Int(td.calories ?? 0)) kcal, \(Int(td.proteinG ?? 0))g protein, \(Fmt.trimKg((td.waterMl ?? 0)/1000))L water.")
+        let td = consumed(todayKey)
+        l.append("TODAY INTAKE: \(Int(td.calories)) kcal, \(Int(td.protein))g protein, \(Fmt.trimKg((fitnessDay(todayKey).waterMl ?? 0)/1000))L water.")
 
         let e = journalEntry(todayKey)
         l.append("JOURNAL: \(journalStreak)-day streak" + (e.mood.map { ", mood today \($0)/5" } ?? ", no entry today yet") + ".")
@@ -1097,6 +1166,114 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Net worth (hybrid: tracked pieces pulled live + manual lines)
+
+    /// Assets already tracked elsewhere — shown read-only so they never drift/double-count.
+    var autoAssets: [(String, Double)] {
+        var out: [(String, Double)] = []
+        if portfolioCurrent > 0 { out.append(("Investments", portfolioCurrent)) }
+        if finance.meta.emergencyCurrentInr > 0 { out.append(("Emergency fund", finance.meta.emergencyCurrentInr)) }
+        return out
+    }
+    /// Liabilities already tracked — the gold loan.
+    var autoLiabilities: [(String, Double)] {
+        finance.meta.goldLoanOutstandingInr > 0 ? [("Gold loan", finance.meta.goldLoanOutstandingInr)] : []
+    }
+    var manualAssetsTotal: Double { networth.assets.reduce(0) { $0 + $1.amountInr } }
+    var manualLiabilitiesTotal: Double { networth.liabilities.reduce(0) { $0 + $1.amountInr } }
+    var totalAssets: Double { autoAssets.reduce(0) { $0 + $1.1 } + manualAssetsTotal }
+    var totalLiabilities: Double { autoLiabilities.reduce(0) { $0 + $1.1 } + manualLiabilitiesTotal }
+    var netWorth: Double { totalAssets - totalLiabilities }
+
+    func addNetWorthLine(asset: Bool, label: String, amountInr: Double) {
+        let line = NetWorthLine(label: label.trimmingCharacters(in: .whitespaces), amountInr: max(0, amountInr))
+        guard !line.label.isEmpty else { return }
+        if asset { networth.assets.append(line) } else { networth.liabilities.append(line) }
+        push(StateKey.networth, networth)
+    }
+    func updateNetWorthLine(asset: Bool, _ line: NetWorthLine) {
+        var l = line; l.amountInr = max(0, l.amountInr)
+        if asset {
+            if let i = networth.assets.firstIndex(where: { $0.id == l.id }) { networth.assets[i] = l }
+        } else {
+            if let i = networth.liabilities.firstIndex(where: { $0.id == l.id }) { networth.liabilities[i] = l }
+        }
+        push(StateKey.networth, networth)
+    }
+    func deleteNetWorthLine(asset: Bool, _ id: String) {
+        if asset { networth.assets.removeAll { $0.id == id } }
+        else { networth.liabilities.removeAll { $0.id == id } }
+        push(StateKey.networth, networth)
+    }
+
+    // MARK: - Events (upcoming life timeline)
+
+    /// Undone events, soonest first — the timeline order.
+    var sortedEvents: [EventItem] { events.filter { !$0.done }.sorted { $0.date < $1.date } }
+    /// Past / handled events, most recent first — the archive.
+    var doneEvents: [EventItem] { events.filter { $0.done }.sorted { $0.date > $1.date } }
+    /// The next couple of things coming up — for the Today spine.
+    var nextEvents: [EventItem] { Array(sortedEvents.prefix(2)) }
+
+    func addEvent(date: String, title: String, category: EventCategory, note: String = "", special: Bool = false) {
+        let t = title.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, !date.isEmpty else { return }
+        events.append(EventItem(date: date, title: t, category: category, note: note, special: special))
+        push(StateKey.events, events)
+    }
+    func updateEvent(_ e: EventItem) {
+        guard let i = events.firstIndex(where: { $0.id == e.id }) else { return }
+        var ev = e; ev.title = ev.title.trimmingCharacters(in: .whitespaces)
+        events[i] = ev
+        push(StateKey.events, events)
+    }
+    func toggleEventDone(_ id: String) {
+        guard let i = events.firstIndex(where: { $0.id == id }) else { return }
+        events[i].done.toggle()
+        push(StateKey.events, events)
+    }
+    func deleteEvent(_ id: String) {
+        events.removeAll { $0.id == id }
+        push(StateKey.events, events)
+    }
+    /// Whole days from today to an event date (negative = overdue). Timezone-stable.
+    func daysUntil(_ dateKey: String) -> Int? {
+        guard let d = Self.date(fromKey: dateKey), let today = Self.date(fromKey: todayKey) else { return nil }
+        return Calendar(identifier: .gregorian).dateComponents([.day], from: today, to: d).day
+    }
+
+    // MARK: - Productivity / watch log
+
+    var sortedWatch: [WatchItem] { watch.sorted { $0.addedAt > $1.addedAt } }
+
+    @discardableResult
+    func addWatchItem(_ item: WatchItem) -> WatchItem {
+        var it = item
+        if it.addedAt.isEmpty { it.addedAt = Self.nowStamp() }
+        watch.insert(it, at: 0)
+        push(StateKey.watch, watch)
+        return it
+    }
+    func updateWatchItem(_ item: WatchItem) {
+        guard let i = watch.firstIndex(where: { $0.id == item.id }) else { return }
+        watch[i] = item
+        push(StateKey.watch, watch)
+    }
+    func toggleWatched(_ id: String) {
+        guard let i = watch.firstIndex(where: { $0.id == id }) else { return }
+        watch[i].watched.toggle()
+        push(StateKey.watch, watch)
+    }
+    func deleteWatchItem(_ id: String) {
+        watch.removeAll { $0.id == id }
+        push(StateKey.watch, watch)
+    }
+    /// Best-effort AI category for a video (free model). Returns nil on any failure.
+    func categorizeVideo(title: String, channel: String) async -> WatchCategory? {
+        guard let cat = try? await api.categorize(title: title, channel: channel) else { return nil }
+        return WatchCategory(rawValue: cat)
+    }
+
     // MARK: - Data management (reset)  — all guarded behind hold-to-confirm in the UI
 
     func resetFinance()   { finance = FinanceState();   push(StateKey.finance, finance) }
@@ -1122,5 +1299,8 @@ final class AppState: ObservableObject {
         nutrition = NutritionState();  push(StateKey.nutrition, nutrition)
         training = TrainingState();    push(StateKey.training, training)
         days = [:];                    push(StateKey.days, days)
+        events = [];                   push(StateKey.events, events)
+        watch = [];                    push(StateKey.watch, watch)
+        networth = NetWorthState();    push(StateKey.networth, networth)
     }
 }

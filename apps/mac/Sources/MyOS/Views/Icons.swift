@@ -12,8 +12,10 @@ struct NavGlyph: View {
         Group {
             switch tab {
             case .today:   SunGlyph(s: size)
+            case .events:  CalendarGlyph(s: size)
             case .finance: CoinGlyph(s: size)
             case .fitness: DumbbellGlyph(s: size)
+            case .productivity: PlayGlyph(s: size)
             case .journal: BookGlyph(s: size)
             case .notes:   NoteGlyph(s: size)
             case .profile: AvatarGlyph(s: size)
@@ -162,6 +164,65 @@ struct GearGlyph: View {
             Circle().fill(Palette.sidebar)
                 .frame(width: s * 0.24, height: s * 0.24)
         }
+    }
+}
+
+// MARK: - Events · calendar
+
+struct CalendarGlyph: View {
+    let s: CGFloat
+    var body: some View {
+        ZStack {
+            // red frame — the header strip shows above/around the white body
+            RoundedRectangle(cornerRadius: s * 0.15, style: .continuous)
+                .fill(Palette.red)
+                .frame(width: s * 0.74, height: s * 0.7)
+                .offset(y: s * 0.04)
+            // white page
+            RoundedRectangle(cornerRadius: s * 0.09, style: .continuous)
+                .fill(.white)
+                .frame(width: s * 0.6, height: s * 0.44)
+                .offset(y: s * 0.12)
+            // binding rings poking above the top
+            Capsule().fill(Palette.red.mixedWithBlack(0.25))
+                .frame(width: s * 0.07, height: s * 0.18).offset(x: -s * 0.17, y: -s * 0.32)
+            Capsule().fill(Palette.red.mixedWithBlack(0.25))
+                .frame(width: s * 0.07, height: s * 0.18).offset(x: s * 0.17, y: -s * 0.32)
+            // the highlighted day
+            RoundedRectangle(cornerRadius: s * 0.03, style: .continuous)
+                .fill(Palette.red)
+                .frame(width: s * 0.15, height: s * 0.15).offset(y: s * 0.12)
+        }
+    }
+}
+
+// MARK: - Productivity · play screen
+
+struct PlayGlyph: View {
+    let s: CGFloat
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: s * 0.2, style: .continuous)
+                .fill(LinearGradient(colors: [Palette.purple, Palette.purple.mixedWithBlack(0.18)],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(width: s * 0.82, height: s * 0.6)
+            PlayTriangle()
+                .fill(.white)
+                .frame(width: s * 0.22, height: s * 0.26)
+                .offset(x: s * 0.03)
+        }
+    }
+}
+
+/// A right-pointing play triangle.
+private struct PlayTriangle: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.midY))
+        p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+        p.closeSubpath()
+        return p
     }
 }
 

@@ -15,6 +15,13 @@ struct ChatWidget: View {
             else { launcher.transition(.scale.combined(with: .opacity)) }
         }
         .animation(.knPop, value: open)
+        // Opened from elsewhere (e.g. "Ask AI" on a news story) — pop open and send.
+        .onChange(of: state.pendingChatPrompt) { _, p in
+            guard let p, !p.isEmpty else { return }
+            open = true
+            state.pendingChatPrompt = nil
+            Task { await state.sendChat(p) }
+        }
     }
 
     // MARK: - Launcher

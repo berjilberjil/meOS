@@ -1,13 +1,15 @@
 import SwiftUI
 
 enum NavTab: String, CaseIterable, Identifiable {
-    case today, finance, fitness, journal, notes, profile, settings
+    case today, events, finance, fitness, productivity, journal, notes, profile, settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .today: return "Today"
+        case .events: return "Events"
         case .finance: return "Finance"
         case .fitness: return "Fitness"
+        case .productivity: return "Productivity"
         case .journal: return "Journal"
         case .notes: return "Notes"
         case .profile: return "Profile"
@@ -17,8 +19,10 @@ enum NavTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .today: return "sun.max.fill"
+        case .events: return "calendar"
         case .finance: return "indianrupeesign.circle.fill"
         case .fitness: return "figure.run"
+        case .productivity: return "play.rectangle.fill"
         case .journal: return "book.closed.fill"
         case .notes: return "note.text"
         case .profile: return "person.crop.circle.fill"
@@ -37,14 +41,7 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 204, ideal: 216, max: 240)
                 .toolbarBackground(.hidden, for: .windowToolbar)
         } detail: {
-            VStack(spacing: 0) {
-                QuickLogBar()
-                    // Clear the hidden title bar / traffic-light zone so the quick-log
-                    // bar never collides with the window controls at the top.
-                    .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 12)
-                    .frame(maxWidth: 1120)
-                    .frame(maxWidth: .infinity)
-
+            ZStack(alignment: .bottom) {
                 // Notes manages its own scrolling (its editor hosts an NSScrollView);
                 // every other tab shares the standard scrolling container.
                 if tab == .notes {
@@ -55,15 +52,19 @@ struct MainView: View {
                         Group {
                             switch tab {
                             case .today:   TodayView(go: { switchTo($0) })
+                            case .events:  EventsView()
                             case .finance: FinanceView()
                             case .fitness: FitnessView()
+                            case .productivity: ProductivityView()
                             case .journal: JournalView()
                             case .notes:   EmptyView()
                             case .profile: ProfileView()
                             case .settings: SettingsView()
                             }
                         }
-                        .padding(.horizontal, 28).padding(.top, 6).padding(.bottom, 28)
+                        // Top padding clears the hidden title bar / traffic-light zone;
+                        // the tall bottom padding keeps content clear of the floating log bar.
+                        .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 104)
                         .frame(maxWidth: 1120)
                         .frame(maxWidth: .infinity)
                     }
@@ -71,11 +72,21 @@ struct MainView: View {
                     .id(tab)
                     .transition(.opacity)
                 }
+
+                // The AI command bar now floats at the bottom center. Trailing inset
+                // leaves room for the chat widget's corner.
+                QuickLogBar()
+                    .padding(.horizontal, 28)
+                    .frame(maxWidth: 1080)
+                    .frame(maxWidth: .infinity)
+                    .padding(.trailing, 64)
+                    .padding(.bottom, 18)
             }
-            .background(Palette.bg)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Palette.bg.ignoresSafeArea())
             .toolbarBackground(.hidden, for: .windowToolbar)
             .overlay(alignment: .bottomTrailing) {
-                ChatWidget().padding(20)
+                ChatWidget().padding(.trailing, 20).padding(.bottom, 18)
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -88,21 +99,16 @@ struct MainView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 9) {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(LinearGradient(colors: [Palette.brand, Palette.brandDeep],
-                                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Text("M")
-                            .font(.system(size: 18, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
-                    )
+                Image("LogoMark")
+                    .resizable().interpolation(.high)
+                    .frame(width: 32, height: 32)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .knShadow()
                 Text("MyOS")
                     .font(.system(size: 22, weight: .heavy, design: .rounded))
                     .foregroundStyle(Palette.brand)
             }
-            .padding(.horizontal, 14).padding(.top, 30).padding(.bottom, 16)
+            .padding(.horizontal, 14).padding(.top, 34).padding(.bottom, 16)
 
             ForEach(NavTab.allCases) { t in
                 NavItem(tab: t, active: tab == t) { switchTo(t) }
@@ -133,7 +139,7 @@ struct MainView: View {
             .padding(.horizontal, 8).padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Palette.sidebar)
+        .background(Palette.sidebar.ignoresSafeArea())
         .overlay(alignment: .trailing) {
             Rectangle().fill(Palette.border).frame(width: 2)
         }

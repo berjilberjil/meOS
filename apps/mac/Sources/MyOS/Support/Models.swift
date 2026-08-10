@@ -269,6 +269,8 @@ struct FitnessDay: Codable, Hashable {
     var calories: Double?
     var proteinG: Double?
     var waterMl: Double?
+    var steps: Int?             // daily step count — manual for now; the iPhone client
+                               // (next month) writes this from HealthKit into the same key.
     var note: String?
 }
 
@@ -343,11 +345,12 @@ struct FitnessProfile: Codable, Hashable {
     var calorieTargetKcal: Double? = nil
     var proteinTargetG: Double? = nil
     var waterTargetMl: Double? = nil
+    var stepsTarget: Int? = nil        // daily step goal (nil → the 8,000 default the UI shows)
 
     init() {}
 
     enum CodingKeys: String, CodingKey {
-        case goal, sex, activity, targetWeightKg, calorieTargetKcal, proteinTargetG, waterTargetMl
+        case goal, sex, activity, targetWeightKg, calorieTargetKcal, proteinTargetG, waterTargetMl, stepsTarget
     }
 
     // Lenient: a profile saved before a field existed still loads.
@@ -360,6 +363,7 @@ struct FitnessProfile: Codable, Hashable {
         calorieTargetKcal = try c.decodeIfPresent(Double.self, forKey: .calorieTargetKcal)
         proteinTargetG    = try c.decodeIfPresent(Double.self, forKey: .proteinTargetG)
         waterTargetMl     = try c.decodeIfPresent(Double.self, forKey: .waterTargetMl)
+        stepsTarget       = try c.decodeIfPresent(Int.self, forKey: .stepsTarget)
     }
 }
 
@@ -514,8 +518,11 @@ struct NewsResult: Codable, Hashable {
         var title: String
         var category: String
         var summary: String
+        var detail: String?          // 2-3 sentence deeper explanation (shown on expand)
         var source: String?
-        enum CodingKeys: String, CodingKey { case title, category, summary, source }
+        var url: String?             // link to the source (opens in browser)
+        var time: String?            // when it happened — human date/time
+        enum CodingKeys: String, CodingKey { case title, category, summary, detail, source, url, time }
     }
     var items: [Item] = []
 }
@@ -593,6 +600,9 @@ struct Profile: Codable, Hashable {
     // Body
     var heightCm: Double? = nil
 
+    // Photo — base64-encoded JPEG/PNG the user picks; empty = show initials.
+    var photoBase64: String = ""
+
     // Career
     var role: String = ""
     var work: String = ""
@@ -622,7 +632,7 @@ struct Profile: Codable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case name, dob, age, bloodGroup, relationship, phone, email, city, hometown, education
-        case heightCm, role, work, website, instagram, github
+        case heightCm, photoBase64, role, work, website, instagram, github
         case goalsShort, goalsMid, goalsLong, achievements, healthNotes, about, habits
     }
 
@@ -644,6 +654,7 @@ struct Profile: Codable, Hashable {
         hometown     = try c.decodeIfPresent(String.self, forKey: .hometown) ?? d.hometown
         education    = try c.decodeIfPresent(String.self, forKey: .education) ?? d.education
         heightCm     = try c.decodeIfPresent(Double.self, forKey: .heightCm) ?? d.heightCm
+        photoBase64  = try c.decodeIfPresent(String.self, forKey: .photoBase64) ?? d.photoBase64
         role         = try c.decodeIfPresent(String.self, forKey: .role) ?? d.role
         work         = try c.decodeIfPresent(String.self, forKey: .work) ?? d.work
         website      = try c.decodeIfPresent(String.self, forKey: .website) ?? d.website
@@ -656,6 +667,183 @@ struct Profile: Codable, Hashable {
         healthNotes  = try c.decodeIfPresent(String.self, forKey: .healthNotes) ?? d.healthNotes
         about        = try c.decodeIfPresent(String.self, forKey: .about) ?? d.about
         habits       = try c.decodeIfPresent([String].self, forKey: .habits) ?? d.habits
+    }
+}
+
+// MARK: - Profile pure logic (unit-tested)
+
+extension Profile {
+    /// Initials shown in the avatar circle when no photo is set.
+    var initials: String {
+        let parts = name.split(separator: " ").prefix(2)
+        let letters = parts.compactMap { $0.first.map(String.init) }.joined()
+        return letters.isEmpty ? "?" : letters.uppercased()
+    }
+
+    /// Body mass index in kg/m² — nil unless both height and weight are valid (> 0).
+    static func bmi(heightCm: Double, weightKg: Double) -> Double? {
+        guard heightCm > 0, weightKg > 0 else { return nil }
+        let m = heightCm / 100
+        return weightKg / (m * m)
+    }
+
+    /// WHO-style label for a computed BMI.
+    static func bmiCategory(_ bmi: Double) -> String {
+        switch bmi {
+        case ..<18.5: return "underweight"
+        case ..<25:   return "normal range"
+        case ..<30:   return "overweight"
+        default:      return "obese range"
+        }
+    }
+}
+
+// MARK: - Events  (key: myos.events — [EventItem])
+
+/// What kind of upcoming event this is — drives the chip colour + glyph.
+enum EventCategory: String, Codable, Hashable, CaseIterable {
+    case travel, family, work, personal, milestone, reminder, other
+    var label: String {
+        switch self {
+        case .travel:    return "Travel"
+        case .family:    return "Family"
+        case .work:      return "Work"
+        case .personal:  return "Personal"
+        case .milestone: return "Milestone"
+        case .reminder:  return "Reminder"
+        case .other:     return "Other"
+        }
+    }
+}
+
+/// One upcoming (or past) life event — normal or special. Sorted by `date`.
+struct EventItem: Codable, Identifiable, Hashable {
+    var id: String
+    var date: String            // yyyy-MM-dd
+    var title: String
+    var category: EventCategory
+    var note: String
+    var special: Bool           // the big ones (a wedding, a lifetime trip) — highlighted
+    var done: Bool              // handled / passed — drops to the archive
+
+    init(id: String = UUID().uuidString.lowercased(), date: String, title: String,
+         category: EventCategory = .personal, note: String = "", special: Bool = false, done: Bool = false) {
+        self.id = id; self.date = date; self.title = title
+        self.category = category; self.note = note; self.special = special; self.done = done
+    }
+
+    enum CodingKeys: String, CodingKey { case id, date, title, category, note, special, done }
+
+    // Lenient: an event saved before a field existed still loads.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
+        date     = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
+        title    = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        category = (try? c.decode(EventCategory.self, forKey: .category)) ?? .personal
+        note     = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        special  = try c.decodeIfPresent(Bool.self, forKey: .special) ?? false
+        done     = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
+    }
+}
+
+// MARK: - Productivity / watch log  (key: myos.watch — [WatchItem])
+
+/// The learning bucket a video belongs to — aligned to the content pillars.
+enum WatchCategory: String, Codable, Hashable, CaseIterable {
+    case finance, business, investing, economy, content, mindset, tech, other
+    var label: String {
+        switch self {
+        case .finance:   return "Finance"
+        case .business:  return "Business"
+        case .investing: return "Investing"
+        case .economy:   return "Economy"
+        case .content:   return "Content"
+        case .mindset:   return "Mindset"
+        case .tech:      return "Tech"
+        case .other:     return "Other"
+        }
+    }
+}
+
+/// One YouTube video in the watch log — metadata is fetched from YouTube's public
+/// oEmbed endpoint (no API key) when the link is pasted; `takeaway` is the user's
+/// "what I learned" note that feeds the Teach-Everything habit.
+struct WatchItem: Codable, Identifiable, Hashable {
+    var id: String
+    var url: String
+    var videoId: String
+    var title: String
+    var channel: String
+    var thumbUrl: String
+    var addedAt: String         // ISO stamp
+    var category: WatchCategory
+    var takeaway: String
+    var watched: Bool
+
+    init(id: String = UUID().uuidString.lowercased(), url: String, videoId: String,
+         title: String = "", channel: String = "", thumbUrl: String = "", addedAt: String = "",
+         category: WatchCategory = .other, takeaway: String = "", watched: Bool = false) {
+        self.id = id; self.url = url; self.videoId = videoId; self.title = title
+        self.channel = channel; self.thumbUrl = thumbUrl; self.addedAt = addedAt
+        self.category = category; self.takeaway = takeaway; self.watched = watched
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, url, videoId, title, channel, thumbUrl, addedAt, category, takeaway, watched
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
+        url      = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
+        videoId  = try c.decodeIfPresent(String.self, forKey: .videoId) ?? ""
+        title    = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        channel  = try c.decodeIfPresent(String.self, forKey: .channel) ?? ""
+        thumbUrl = try c.decodeIfPresent(String.self, forKey: .thumbUrl) ?? ""
+        addedAt  = try c.decodeIfPresent(String.self, forKey: .addedAt) ?? ""
+        category = (try? c.decode(WatchCategory.self, forKey: .category)) ?? .other
+        takeaway = try c.decodeIfPresent(String.self, forKey: .takeaway) ?? ""
+        watched  = try c.decodeIfPresent(Bool.self, forKey: .watched) ?? false
+    }
+}
+
+// MARK: - Net worth  (key: myos.networth)
+
+/// One manually-entered asset or liability line (bank cash, mom's gold, other loan).
+/// Tracked pieces — portfolio value, emergency fund, gold loan — are pulled live and
+/// never stored here, so they can't drift or double-count.
+struct NetWorthLine: Codable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var amountInr: Double
+
+    init(id: String = UUID().uuidString.lowercased(), label: String, amountInr: Double) {
+        self.id = id; self.label = label; self.amountInr = amountInr
+    }
+
+    enum CodingKeys: String, CodingKey { case id, label, amountInr }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id        = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
+        label     = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        amountInr = try c.decodeIfPresent(Double.self, forKey: .amountInr) ?? 0
+    }
+}
+
+struct NetWorthState: Codable, Hashable {
+    var assets: [NetWorthLine] = []
+    var liabilities: [NetWorthLine] = []
+
+    init() {}
+
+    enum CodingKeys: String, CodingKey { case assets, liabilities }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        assets      = try c.decodeIfPresent([NetWorthLine].self, forKey: .assets) ?? []
+        liabilities = try c.decodeIfPresent([NetWorthLine].self, forKey: .liabilities) ?? []
     }
 }
 
@@ -674,6 +862,9 @@ struct AppStatePayload: Codable {
     var chat: ChatState?
     var nutrition: NutritionState?
     var training: TrainingState?
+    var events: [EventItem]?
+    var watch: [WatchItem]?
+    var networth: NetWorthState?
 
     init() {}
 
@@ -690,6 +881,9 @@ struct AppStatePayload: Codable {
         case chat           = "myos.chat"
         case nutrition      = "myos.nutrition"
         case training       = "myos.training"
+        case events         = "myos.events"
+        case watch          = "myos.watch"
+        case networth       = "myos.networth"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -709,6 +903,9 @@ struct AppStatePayload: Codable {
         chat           = try? c.decodeIfPresent(ChatState.self, forKey: .chat)
         nutrition      = try? c.decodeIfPresent(NutritionState.self, forKey: .nutrition)
         training       = try? c.decodeIfPresent(TrainingState.self, forKey: .training)
+        events         = try? c.decodeIfPresent([EventItem].self, forKey: .events)
+        watch          = try? c.decodeIfPresent([WatchItem].self, forKey: .watch)
+        networth       = try? c.decodeIfPresent(NetWorthState.self, forKey: .networth)
     }
 }
 
@@ -850,4 +1047,7 @@ enum StateKey {
     static let chat           = "myos.chat"
     static let nutrition      = "myos.nutrition"
     static let training       = "myos.training"
+    static let events         = "myos.events"
+    static let watch          = "myos.watch"
+    static let networth       = "myos.networth"
 }

@@ -87,6 +87,14 @@ struct BlockDoc: Codable, Hashable {
         self.blocks = blocks.isEmpty ? [Block.paragraph()] : blocks
     }
 
+    // Custom decode so a synced `{"blocks":[]}` (any client, any version) can
+    // never reach the editor as an empty document — `locate()` indexes blocks[0].
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let decoded = try c.decodeIfPresent([Block].self, forKey: .blocks) ?? []
+        blocks = decoded.isEmpty ? [Block.paragraph()] : decoded
+    }
+
     /// Flattened plain text — the mirror used for search, list previews, and the
     /// AI quick-log. Dividers render as a rule glyph so previews read cleanly.
     var plainText: String {

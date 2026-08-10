@@ -1,9 +1,12 @@
 import SwiftUI
+import AppKit
 
 /// The whole person in one place — identity, body, career, goals, achievements,
 /// health, links. Every field edits in place and autosaves to `myos.profile`.
 struct ProfileView: View {
     @EnvironmentObject var state: AppState
+    @State private var weightDraft = ""
+    @FocusState private var weightFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -23,16 +26,7 @@ struct ProfileView: View {
     private var headerCard: some View {
         Card {
             HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(colors: [Palette.brand, Palette.brandDeep],
-                                             startPoint: .top, endPoint: .bottom))
-                    Text(initials)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 64, height: 64)
-                .knShadow()
+                avatar
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(state.profile.name.isEmpty ? "Your name" : state.profile.name)
@@ -63,10 +57,77 @@ struct ProfileView: View {
         .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
     }
 
-    private var initials: String {
-        let parts = state.profile.name.split(separator: " ").prefix(2)
-        let letters = parts.compactMap { $0.first.map(String.init) }.joined()
-        return letters.isEmpty ? "?" : letters.uppercased()
+    private var initials: String { state.profile.initials }
+
+    // MARK: - Avatar (tap the camera to change your photo)
+
+    private var avatar: some View {
+        ZStack {
+            if let img = profileImage {
+                Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                LinearGradient(colors: [Palette.brand, Palette.brandDeep], startPoint: .top, endPoint: .bottom)
+                Text(initials).font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
+            }
+        }
+        .frame(width: 64, height: 64)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Palette.border, lineWidth: 2))
+        .knShadow()
+        .overlay(alignment: .bottomTrailing) {
+            Button(action: pickPhoto) {
+                Image(systemName: "camera.fill").font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white).frame(width: 22, height: 22)
+                    .background(Palette.blue, in: Circle())
+                    .overlay(Circle().strokeBorder(Palette.surface, lineWidth: 2))
+            }
+            .buttonStyle(KPressStyle())
+            .help("Change photo")
+            .offset(x: 3, y: 3)
+        }
+        .contextMenu {
+            Button("Change photo…", action: pickPhoto)
+            if profileImage != nil {
+                Button("Remove photo", role: .destructive) { state.updateProfile { $0.photoBase64 = "" } }
+            }
+        }
+    }
+
+    private var profileImage: NSImage? {
+        guard !state.profile.photoBase64.isEmpty,
+              let data = Data(base64Encoded: state.profile.photoBase64),
+              let img = NSImage(data: data) else { return nil }
+        return img
+    }
+
+    private func pickPhoto() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = "Use Photo"
+        guard panel.runModal() == .OK, let url = panel.url, let img = NSImage(contentsOf: url) else { return }
+        if let b64 = Self.downscaledJPEGBase64(img, maxSide: 320) {
+            state.updateProfile { $0.photoBase64 = b64 }
+        }
+    }
+
+    /// Downscale to a square-capped JPEG and base64-encode — keeps the synced doc small.
+    private static func downscaledJPEGBase64(_ image: NSImage, maxSide: CGFloat) -> String? {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        let scale = min(1, maxSide / max(size.width, size.height))
+        let target = NSSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(target.width),
+            pixelsHigh: Int(target.height), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+            isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        rep.size = target
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(origin: .zero, size: target))
+        NSGraphicsContext.restoreGraphicsState()
+        guard let data = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else { return nil }
+        return data.base64EncodedString()
     }
 
     // MARK: - Identity
@@ -103,9 +164,20 @@ struct ProfileView: View {
                 LazyVGrid(columns: fieldCols, spacing: 12) {
                     doubleField("Height (cm)", get: { state.profile.heightCm },
                                 set: { v in state.updateProfile { $0.heightCm = v } }, placeholder: "172")
-                    // Editable — writes today's Fitness log, so the two tabs stay in sync.
-                    doubleField("Weight (kg)", get: { state.latestWeightKg },
-                                set: { v in state.setTodayWeight(v) }, placeholder: "72")
+                    // Editable — commits today's Fitness log on submit/blur (not per
+                    // keystroke, so typing "72" doesn't log 7 then 72, and BMI/calorie
+                    // targets don't flicker mid-edit). Prefills today's weigh-in.
+                    labelled("Weight (kg)") {
+                        TextField("", text: $weightDraft,
+                                  prompt: Text("72").foregroundColor(Palette.faint))
+                            .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                            .knField(focused: weightFocused)
+                            .focused($weightFocused)
+                            .onSubmit(commitWeight)
+                            .onChange(of: weightFocused) { _, now in if !now { commitWeight() } }
+                    }
+                    .onAppear { if !weightFocused { weightDraft = todayWeightText } }
+                    .onDisappear { commitWeight() }
                     readOnly("BMI", bmiText, hint: bmiCategory)
                 }
             }
@@ -113,22 +185,31 @@ struct ProfileView: View {
     }
 
     private var bmiText: String {
-        guard let h = state.profile.heightCm, h > 0, let w = state.latestWeightKg else { return "—" }
-        let m = h / 100
-        return String(format: "%.1f", w / (m * m))
+        guard let h = state.profile.heightCm, let w = state.latestWeightKg,
+              let b = Profile.bmi(heightCm: h, weightKg: w) else { return "—" }
+        return String(format: "%.1f", b)
     }
 
     private var bmiCategory: String {
-        guard let h = state.profile.heightCm, h > 0, let w = state.latestWeightKg else {
-            return "needs height + weight"
+        guard let h = state.profile.heightCm, let w = state.latestWeightKg,
+              let b = Profile.bmi(heightCm: h, weightKg: w) else { return "needs height + weight" }
+        return Profile.bmiCategory(b)
+    }
+
+    /// Today's own weigh-in (not any past day) — what the Weight field prefills with.
+    private var todayWeightText: String {
+        state.fitnessDay(state.todayKey).weightKg.map { Fmt.trimKg($0) } ?? ""
+    }
+
+    private func commitWeight() {
+        let t = weightDraft.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty {
+            if state.fitnessDay(state.todayKey).weightKg != nil { state.setTodayWeight(nil) }
+        } else if let w = Double(t), w > 0 {
+            state.setTodayWeight(w)
         }
-        let bmi = w / ((h / 100) * (h / 100))
-        switch bmi {
-        case ..<18.5: return "underweight"
-        case ..<25:   return "normal range"
-        case ..<30:   return "overweight"
-        default:      return "obese range"
-        }
+        weightDraft = todayWeightText
+        weightFocused = false
     }
 
     // MARK: - Career

@@ -17,7 +17,10 @@ const NewsSchema = z.object({
         title: z.string(),
         category: z.enum(['tech', 'ai', 'markets', 'india', 'finance', 'crypto']),
         summary: z.string(), // one line
-        source: z.string().nullable()
+        detail: z.string(), // 2-3 sentences of extra context, shown when expanded
+        source: z.string().nullable(), // publication name
+        url: z.string().nullable(), // link to the article/source
+        time: z.string().nullable() // when it happened / was published, human readable
       })
     )
     .max(8)
@@ -27,7 +30,8 @@ const SEARCH_PROMPT = [
   `Find the most important TECH and FINANCE news from the last 3 days, useful to someone who follows`,
   `tech and Indian markets. Cover: major AI / big-tech launches (e.g. new Claude/OpenAI/Google models),`,
   `Indian stock market moves (Nifty/Sensex), RBI, notable earnings, and 1-2 global finance items.`,
-  `For each, give a one-line factual summary and the source name. Prefer the newest, highest-impact items.`
+  `For each item give: a one-line factual summary, the source publication name, the source article URL,`,
+  `and the date it was published or happened. Prefer the newest, highest-impact items.`
 ].join(' ');
 
 export const POST: RequestHandler = async ({ locals }) => {
@@ -56,7 +60,12 @@ export const POST: RequestHandler = async ({ locals }) => {
     const { object } = await generateObject({
       model,
       schema: NewsSchema,
-      prompt: `Turn these grounded search results into 5-8 concise news items. Keep facts and sources; drop anything vague.\n\n${text}`
+      prompt:
+        `Turn these grounded search results into 5-8 news items. For each: a punchy title, ` +
+        `a one-line summary, a 'detail' of 2-3 sentences with the extra context/why-it-matters, ` +
+        `the source publication name, the source article 'url' (if present in the results, else null), ` +
+        `and 'time' = the human-readable date it was published or happened (e.g. "Aug 7, 2026"). ` +
+        `Keep facts; drop anything vague.\n\n${text}`
     });
 
     return json(object);
