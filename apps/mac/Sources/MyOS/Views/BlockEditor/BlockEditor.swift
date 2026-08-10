@@ -73,6 +73,16 @@ struct BlockEditor: NSViewRepresentable {
         /// attributes consult it instead of misreading the previous block.
         private var trailingBlockMeta: Block?
 
+        /// The trailing empty block, when it's a list item — so the text view can
+        /// draw its bullet/number/checkbox on the otherwise-invisible last line
+        /// (`byParagraphs` never visits the empty line after a final newline).
+        var trailingListDecoration: (type: BlockType, checked: Bool)? {
+            guard let m = trailingBlockMeta,
+                  m.type == .bullet || m.type == .numbered || m.type == .todo else { return nil }
+            return (m.type, m.checked ?? false)
+        }
+        var trailingBlockID: String? { trailingBlockMeta?.id }
+
         init(_ parent: BlockEditor) { self.parent = parent }
 
         // MARK: Change pipeline
@@ -230,6 +240,17 @@ struct BlockEditor: NSViewRepresentable {
             let doc = currentDoc()
             let caret = tv.selectedRange().location
             let (bi, w) = locate(caret, in: doc)
+            // A media block (image / link card) is a single attachment — backspace at
+            // or just after it removes the whole thing, never a stray empty shell.
+            if doc.blocks[bi].isAttachment {
+                var blocks = doc.blocks
+                blocks.remove(at: bi)
+                if blocks.isEmpty { blocks = [Block.paragraph()] }
+                let target = max(0, bi - 1)
+                let within = blocks[target].isAttachment ? 1 : (blocks[target].plainText as NSString).length
+                render(BlockDoc(blocks: blocks), caretBlock: target, caretWithin: within)
+                return true
+            }
             guard w == 0 else { return false }  // mid-line delete → default
 
             var blocks = doc.blocks
@@ -262,6 +283,75 @@ struct BlockEditor: NSViewRepresentable {
             doc.blocks[i].checked = !(doc.blocks[i].checked ?? false)
             let caret = textView?.selectedRange() ?? NSRange(location: 0, length: 0)
             guard let tv = textView, let storage = tv.textStorage else { return }
+            isProgrammatic = true
+            storage.setAttributedString(BlockBridge.attributedString(from: doc))
+            tv.setSelectedRange(NSRange(location: min(caret.location, storage.length), length: 0))
+            isProgrammatic = false
+            rememberTrailing(doc)
+            resetUndo()
+            tv.needsDisplay = true
+            save()
+        }
+
+        // MARK: Media (images + link cards)
+
+        /// Open a file picker and embed the chosen image.
+        func pickImage() {
+            let panel = NSOpenPanel()
+            panel.allowedContentTypes = [.image]
+            panel.allowsMultipleSelection = false
+            panel.canChooseDirectories = false
+            if panel.runModal() == .OK, let url = panel.url, let img = NSImage(contentsOf: url) {
+                insertImage(img)
+            }
+        }
+
+        func insertImage(_ image: NSImage) {
+            guard let base64 = NoteImage.encode(image) else { return }
+            var doc = currentDoc()
+            let (bi, _) = locate(textView?.selectedRange().location ?? 0, in: doc)
+            insertMediaBlock(Block(type: .image, src: base64), after: bi, in: &doc)
+        }
+
+        func insertLink(_ url: URL) {
+            var doc = currentDoc()
+            let (bi, _) = locate(textView?.selectedRange().location ?? 0, in: doc)
+            let block = Block(type: .linkCard, url: url.absoluteString,
+                              linkDomain: url.host?.replacingOccurrences(of: "www.", with: ""))
+            insertMediaBlock(block, after: bi, in: &doc)
+            // Fetch title + thumbnail off-thread, then fill the card in by URL.
+            let target = url
+            Task { [weak self] in
+                guard let meta = await LinkMetadata.fetch(target) else { return }
+                await MainActor.run { self?.updateLinkCard(url: target.absoluteString, meta: meta) }
+            }
+        }
+
+        private func insertMediaBlock(_ block: Block, after bi: Int, in doc: inout BlockDoc) {
+            var blocks = doc.blocks
+            if blocks[bi].type == .paragraph && blocks[bi].plainText.isEmpty {
+                blocks[bi] = block                       // replace an empty line
+            } else {
+                blocks.insert(block, at: bi + 1)
+            }
+            let mi = blocks.firstIndex(where: { $0.id == block.id }) ?? bi
+            // Always leave an editable paragraph after the media so the caret has a home.
+            if mi == blocks.count - 1 || blocks[mi + 1].isAttachment {
+                blocks.insert(Block.paragraph(), at: mi + 1)
+            }
+            render(BlockDoc(blocks: blocks), caretBlock: min(mi + 1, blocks.count - 1), caretWithin: 0)
+        }
+
+        /// Fill a link card with its fetched title/thumbnail (matched by URL, since
+        /// block ids are re-minted on every serialization).
+        func updateLinkCard(url: String, meta: LinkMetadata.Result) {
+            var doc = currentDoc()
+            guard let i = doc.blocks.firstIndex(where: { $0.type == .linkCard && $0.url == url }) else { return }
+            doc.blocks[i].linkTitle = meta.title
+            if let t = meta.thumbBase64 { doc.blocks[i].linkThumb = t }
+            if let d = meta.domain { doc.blocks[i].linkDomain = d }
+            guard let tv = textView, let storage = tv.textStorage else { return }
+            let caret = tv.selectedRange()
             isProgrammatic = true
             storage.setAttributedString(BlockBridge.attributedString(from: doc))
             tv.setSelectedRange(NSRange(location: min(caret.location, storage.length), length: 0))
@@ -509,6 +599,14 @@ struct BlockEditor: NSViewRepresentable {
             tv.setSelectedRange(NSRange(location: removeRange.location, length: 0))
             isProgrammatic = false
 
+            // Image is not a text transform — it opens a picker and embeds media.
+            if cmd.type == .image {
+                dismissSlash()
+                save()
+                pickImage()
+                return
+            }
+
             var doc = currentDoc()
             let (bi, _) = locate(tv.selectedRange().location, in: doc)
             if cmd.type == .divider {
@@ -528,21 +626,28 @@ struct BlockEditor: NSViewRepresentable {
 
         // MARK: - char-offset helpers
 
+        /// A block's length in the attributed string: dividers are invisible (0),
+        /// media blocks are a single attachment char (1), text blocks their UTF-16 length.
+        private func blockLen(_ b: Block) -> Int {
+            if b.type == .divider { return 0 }
+            if b.isAttachment { return 1 }
+            return (b.plainText as NSString).length
+        }
+
         func locate(_ caret: Int, in doc: BlockDoc) -> (Int, Int) {
             var off = 0
             for (i, b) in doc.blocks.enumerated() {
-                let len = b.type == .divider ? 0 : (b.plainText as NSString).length
+                let len = blockLen(b)
                 if caret <= off + len { return (i, caret - off) }
                 off += len + 1
             }
             let last = max(0, doc.blocks.count - 1)
-            let len = doc.blocks[last].type == .divider ? 0 : (doc.blocks[last].plainText as NSString).length
-            return (last, len)
+            return (last, blockLen(doc.blocks[last]))
         }
         func offset(block bi: Int, within w: Int, in doc: BlockDoc) -> Int {
             var off = 0
             for i in 0..<max(0, min(bi, doc.blocks.count)) {
-                off += (doc.blocks[i].type == .divider ? 0 : (doc.blocks[i].plainText as NSString).length) + 1
+                off += blockLen(doc.blocks[i]) + 1
             }
             return off + w
         }

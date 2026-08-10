@@ -1,0 +1,99 @@
+import XCTest
+import CryptoKit
+@testable import MyOS
+
+/// Zero-knowledge vault: proves data is unreadable without the passphrase, that a
+/// fresh device can unlock from the server metadata alone, and that recovery and
+/// passphrase changes behave.
+final class VaultTests: XCTestCase {
+
+    private let financeJSON = #"{"txns":[{"amount":200,"cat":"auto"}]}"#.data(using: .utf8)!
+
+    func testEnvelopeHidesPlaintext() throws {
+        let v = Vault()
+        _ = try v.setup(passphrase: "berjil-strong-pass")
+        let env = try v.sealValue(financeJSON, key: "myos.finance")
+        let s = String(data: env, encoding: .utf8)!
+        XCTAssertFalse(s.contains("auto"), "ciphertext must not leak plaintext")
+        XCTAssertFalse(s.contains("200"))
+        XCTAssertTrue(s.contains("\"ct\""), "should be a {v,ct} envelope")
+    }
+
+    func testFreshDeviceUnlocksFromMetaOnly() throws {
+        // Device A sets up and seals a value.
+        let a = Vault()
+        let (meta, _) = try a.setup(passphrase: "correct-pass-123")
+        let env = try a.sealValue(financeJSON, key: "myos.finance")
+        let envObj = try JSONSerialization.jsonObject(with: env) as! [String: Any]
+
+        // Device B has only the server meta.
+        let b = Vault()
+        b.adoptMeta(meta)
+        XCTAssertFalse(b.isUnlocked)
+        XCTAssertThrowsError(try b.unlock(passphrase: "wrong")) // wrong pass rejected
+        XCTAssertFalse(b.isUnlocked)
+        try b.unlock(passphrase: "correct-pass-123")
+        XCTAssertTrue(b.isUnlocked)
+        XCTAssertEqual(try b.openValue(envObj, key: "myos.finance"), financeJSON)
+    }
+
+    func testSlotBinding() throws {
+        let v = Vault()
+        _ = try v.setup(passphrase: "pass-pass-pass")
+        let env = try v.sealValue(financeJSON, key: "myos.finance")
+        let envObj = try JSONSerialization.jsonObject(with: env) as! [String: Any]
+        XCTAssertThrowsError(try v.openValue(envObj, key: "myos.journal"),
+                             "an envelope must not decrypt under a different key")
+    }
+
+    func testRecoveryCodeUnlocks() throws {
+        let a = Vault()
+        let (meta, code) = try a.setup(passphrase: "some-pass-word")
+        let env = try a.sealValue(financeJSON, key: "myos.finance")
+        let envObj = try JSONSerialization.jsonObject(with: env) as! [String: Any]
+
+        let b = Vault(); b.adoptMeta(meta)
+        try b.unlock(recoveryCode: code)
+        XCTAssertEqual(try b.openValue(envObj, key: "myos.finance"), financeJSON)
+        // Case/format tolerance.
+        let c = Vault(); c.adoptMeta(meta)
+        try c.unlock(recoveryCode: code.lowercased())
+        XCTAssertTrue(c.isUnlocked)
+    }
+
+    func testChangePassphraseKeepsDataAndRecovery() throws {
+        let a = Vault()
+        let (meta, code) = try a.setup(passphrase: "old-pass-word")
+        let env = try a.sealValue(financeJSON, key: "myos.finance")
+        let envObj = try JSONSerialization.jsonObject(with: env) as! [String: Any]
+        let newMeta = try a.rewrap(newPassphrase: "new-pass-word")
+
+        let b = Vault(); b.adoptMeta(newMeta)
+        XCTAssertThrowsError(try b.unlock(passphrase: "old-pass-word"))
+        try b.unlock(passphrase: "new-pass-word")
+        XCTAssertEqual(try b.openValue(envObj, key: "myos.finance"), financeJSON)
+
+        // Recovery still works after a passphrase change.
+        let c = Vault(); c.adoptMeta(newMeta)
+        try c.unlock(recoveryCode: code)
+        XCTAssertTrue(c.isUnlocked)
+    }
+
+    func testPlaintextKeyPolicy() throws {
+        let v = Vault()
+        XCTAssertFalse(v.shouldEncrypt("myos.crypto"))
+        XCTAssertFalse(v.shouldEncrypt("myos.ai.routes"))
+        XCTAssertTrue(v.shouldEncrypt("myos.finance"))
+        XCTAssertTrue(v.shouldEncrypt("myos.journal"))
+    }
+
+    func testKDFDeterministicAndSalted() throws {
+        let salt1 = MyOSCrypto.newSalt()
+        let salt2 = MyOSCrypto.newSalt()
+        let k1 = try MyOSCrypto.deriveKey(from: "abc", salt: salt1, iterations: 10_000)
+        let k1b = try MyOSCrypto.deriveKey(from: "abc", salt: salt1, iterations: 10_000)
+        let k2 = try MyOSCrypto.deriveKey(from: "abc", salt: salt2, iterations: 10_000)
+        XCTAssertEqual(k1.withUnsafeBytes { Data($0) }, k1b.withUnsafeBytes { Data($0) })
+        XCTAssertNotEqual(k1.withUnsafeBytes { Data($0) }, k2.withUnsafeBytes { Data($0) })
+    }
+}

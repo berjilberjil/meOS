@@ -27,6 +27,11 @@ final class APIClient {
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
+    /// The zero-knowledge vault. When set and unlocked, `putState`/state reads
+    /// transparently encrypt and decrypt each `myos.*` value on this device — the
+    /// server only ever stores ciphertext. Set by `AppState` after construction.
+    var vault: Vault?
+
     init() {
         let cfg = URLSessionConfiguration.default
         cfg.httpCookieStorage = .shared
@@ -70,6 +75,27 @@ final class APIClient {
         try decoder.decode(T.self, from: try await request("GET", path))
     }
 
+    /// Like `request`, but sends an already-serialized JSON body verbatim. Used for
+    /// uploading encrypted envelopes and the plaintext crypto meta.
+    @discardableResult
+    private func requestData(_ method: String, _ path: String, bodyData: Data?) async throws -> Data {
+        var req = URLRequest(url: Self.baseURL.appendingPathComponent(path))
+        req.httpMethod = method
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let bodyData {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = bodyData
+        }
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError(status: -1, message: "No response from server")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError(status: http.statusCode, message: Self.errorText(from: data, status: http.statusCode))
+        }
+        return data
+    }
+
     // MARK: - Auth
 
     @discardableResult
@@ -88,18 +114,80 @@ final class APIClient {
 
     func logout() async { _ = try? await request("POST", "api/auth/logout") }
 
-    // MARK: - State
+    // MARK: - State (zero-knowledge)
 
-    func state() async throws -> AppStatePayload {
+    /// Error thrown when encrypted data is present but the vault isn't unlocked —
+    /// callers must gate on the vault so we never decode ciphertext into empty
+    /// models (which would then get pushed back, wiping real data).
+    struct VaultLockedError: Error {}
+
+    /// Fetch the raw `{key: value}` map from the server, cache it (encrypted) for
+    /// instant relaunch, and return it parsed. Values are a mix of encrypted
+    /// envelopes and plaintext (crypto meta, ai.routes, or legacy pre-encryption).
+    func fetchStateRaw() async throws -> [String: Any] {
         let data = try await request("GET", "api/state")
-        let value = try decoder.decode(AppStatePayload.self, from: data)
         Self.writeCache(data, "state.json")
-        return value
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
-    /// Upsert one myos.* key. Fire-and-forget from callers.
+    /// Pull the plaintext crypto metadata out of a raw state map, if the account
+    /// has a vault set up.
+    func cryptoMeta(from raw: [String: Any]) -> CryptoMeta? {
+        guard let obj = raw[Vault.metaKey] else { return nil }
+        guard let d = try? JSONSerialization.data(withJSONObject: obj),
+              let meta = try? decoder.decode(CryptoMeta.self, from: d) else { return nil }
+        return meta
+    }
+
+    /// Decrypt every envelope in a raw state map (using the unlocked vault) and
+    /// decode the result into the typed payload. Plaintext values pass through, so
+    /// pre-encryption data still loads during migration.
+    func decodePayload(fromRaw raw: [String: Any]) throws -> AppStatePayload {
+        var plain: [String: Any] = [:]
+        for (k, v) in raw {
+            if let vault, vault.isEnvelope(v) {
+                guard vault.isUnlocked else { throw VaultLockedError() }
+                let ptData = try vault.openValue(v as! [String: Any], key: k)
+                plain[k] = try JSONSerialization.jsonObject(with: ptData, options: [.fragmentsAllowed])
+            } else {
+                plain[k] = v
+            }
+        }
+        let rebuilt = try JSONSerialization.data(withJSONObject: plain)
+        return try decoder.decode(AppStatePayload.self, from: rebuilt)
+    }
+
+    /// Decode a cached raw-state blob from disk (same decrypt path as the network).
+    func decodeCachedPayload() -> AppStatePayload? {
+        guard let d = try? Data(contentsOf: Self.cacheDir.appendingPathComponent("state.json")),
+              let raw = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let payload = try? decodePayload(fromRaw: raw) else { return nil }
+        return payload
+    }
+
+    /// The raw cached map (used to recover the crypto meta on relaunch before unlock).
+    func cachedRawState() -> [String: Any]? {
+        guard let d = try? Data(contentsOf: Self.cacheDir.appendingPathComponent("state.json")) else { return nil }
+        return try? JSONSerialization.jsonObject(with: d) as? [String: Any]
+    }
+
+    /// Upsert one myos.* key. Encrypts the value on this device first, unless the
+    /// key is in the plaintext set (crypto meta / ai routes) or the vault is absent.
     func putState(_ key: String, _ value: Encodable) async throws {
-        _ = try await request("PUT", "api/state/\(key)", body: value)
+        let plaintext = try encoder.encode(AnyEncodable(value))
+        if let vault, vault.shouldEncrypt(key) {
+            guard vault.isUnlocked else { throw VaultLockedError() }
+            let envelope = try vault.sealValue(plaintext, key: key)
+            _ = try await requestData("PUT", "api/state/\(key)", bodyData: envelope)
+        } else {
+            _ = try await requestData("PUT", "api/state/\(key)", bodyData: plaintext)
+        }
+    }
+
+    /// Upload the plaintext crypto metadata (`myos.crypto`).
+    func putCryptoMeta(_ meta: CryptoMeta) async throws {
+        let data = try encoder.encode(meta)
+        _ = try await requestData("PUT", "api/state/\(Vault.metaKey)", bodyData: data)
     }
 
     // MARK: - AI
@@ -266,11 +354,6 @@ final class APIClient {
 
     private static func writeCache(_ data: Data, _ name: String) {
         try? data.write(to: cacheDir.appendingPathComponent(name), options: .atomic)
-    }
-
-    func cachedState() -> AppStatePayload? {
-        guard let d = try? Data(contentsOf: Self.cacheDir.appendingPathComponent("state.json")) else { return nil }
-        return try? decoder.decode(AppStatePayload.self, from: d)
     }
 
     func clearCache() {

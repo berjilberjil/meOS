@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 /// One place to edit everything and manage the data. Every editor here writes the
 /// same state the feature tabs do, so a change in Settings shows up there and vice
@@ -8,12 +10,20 @@ struct SettingsView: View {
 
     private let fieldCols = [GridItem(.adaptive(minimum: 230), spacing: 12)]
 
+    // Change-passphrase form
+    @State private var newPass = ""
+    @State private var newPassConfirm = ""
+    @State private var passMsg: String?
+    @State private var passOK = false
+    @State private var exportMsg: String?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Settings").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
                 .knRise(0)
 
             accountCard.knRise(1)
+            securityCard.knRise(2)
             identityCard.knRise(2)
             AgentSettingsCard().knRise(3)
             AIProvidersCard().knRise(3)
@@ -70,6 +80,87 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Security & encryption
+
+    private var securityCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle(text: "Security & encryption")
+                Text("Your data is end-to-end encrypted on this Mac with a key only you hold. The server and database only ever store ciphertext — a full breach reveals nothing readable.")
+                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Export (plaintext backup / escape hatch)
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Export my data").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("A decrypted JSON backup. Keep it somewhere safe — it’s not encrypted.")
+                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    }
+                    Spacer()
+                    Button { exportData() } label: { Text("Export…") }
+                        .buttonStyle(KSecondaryButtonStyle())
+                }
+                if let m = exportMsg {
+                    Text(m).font(.system(size: 11)).foregroundStyle(Palette.green)
+                }
+
+                Divider().overlay(Palette.ring)
+
+                // New recovery code
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Recovery code").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("Generate a fresh one-time code (invalidates the old one).")
+                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    }
+                    Spacer()
+                    Button { Task { await state.regenerateRecoveryCode() } } label: { Text("New code") }
+                        .buttonStyle(KSecondaryButtonStyle())
+                }
+
+                Divider().overlay(Palette.ring)
+
+                // Change passphrase
+                Text("Change passphrase").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                SecureField("", text: $newPass, prompt: Text("New passphrase").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
+                SecureField("", text: $newPassConfirm, prompt: Text("Confirm new passphrase").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
+                if let m = passMsg {
+                    Text(m).font(.system(size: 12)).foregroundStyle(passOK ? Palette.green : Palette.red)
+                }
+                Button { Task { await changePass() } } label: { Text("Update passphrase") }
+                    .buttonStyle(KSecondaryButtonStyle())
+            }
+        }
+    }
+
+    private func changePass() async {
+        passMsg = nil; passOK = false
+        guard newPass.count >= 8 else { passMsg = "Use at least 8 characters."; return }
+        guard newPass == newPassConfirm else { passMsg = "The two passphrases don’t match."; return }
+        if await state.changePassphrase(to: newPass) {
+            passOK = true; passMsg = "Passphrase updated."
+            newPass = ""; newPassConfirm = ""
+        } else {
+            passMsg = state.vaultError ?? "Couldn’t update the passphrase."
+        }
+    }
+
+    private func exportData() {
+        exportMsg = nil
+        guard let data = state.exportJSON() else { exportMsg = nil; return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "myos-export.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            do { try data.write(to: url); exportMsg = "Saved to \(url.lastPathComponent)." }
+            catch { exportMsg = "Couldn’t save the file." }
+        }
+    }
+
     // MARK: - Profile & identity (writes state.profile — same as the Profile tab)
 
     private var identityCard: some View {
@@ -82,7 +173,7 @@ struct SettingsView: View {
                 }
                 LazyVGrid(columns: fieldCols, spacing: 12) {
                     KLabeledField(label: "Full name", placeholder: "Your name", text: pf(\.name))
-                    KLabeledField(label: "Date of birth", placeholder: "yyyy-mm-dd", text: pf(\.dob))
+                    KLabeledDateField(label: "Date of birth", text: pf(\.dob))
                     KLabeledNumberField(label: "Age", placeholder: "Age", value: ageBinding)
                     KLabeledMenuField(label: "Blood group", options: Profile.bloodGroupOptions, text: pf(\.bloodGroup))
                     KLabeledMenuField(label: "Relationship", options: Profile.relationshipOptions, text: pf(\.relationship))

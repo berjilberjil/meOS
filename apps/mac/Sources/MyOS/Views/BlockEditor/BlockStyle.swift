@@ -11,6 +11,12 @@ extension NSAttributedString.Key {
     static let todoChecked  = NSAttributedString.Key("myTodoChecked")   // Bool
     static let codeLanguage = NSAttributedString.Key("myCodeLanguage")  // String
     static let inlineCode   = NSAttributedString.Key("myInlineCode")    // Bool (code mark)
+    // Rich-media metadata carried on the attachment character.
+    static let blockImageSrc  = NSAttributedString.Key("myBlockImageSrc")  // String (base64)
+    static let blockLinkURL   = NSAttributedString.Key("myBlockLinkURL")   // String
+    static let blockLinkTitle = NSAttributedString.Key("myBlockLinkTitle") // String
+    static let blockLinkThumb = NSAttributedString.Key("myBlockLinkThumb") // String (base64)
+    static let blockLinkDomain = NSAttributedString.Key("myBlockLinkDomain")// String
 }
 
 enum EditorMetrics {
@@ -146,7 +152,9 @@ enum BlockBridge {
         for (i, block) in doc.blocks.enumerated() {
             let base = EditorTheme.baseAttributes(for: block)
             let start = out.length
-            if block.type != .divider {
+            if block.isAttachment {
+                out.append(attachment(for: block))
+            } else if block.type != .divider {
                 if block.spans.isEmpty {
                     // empty paragraph — nothing to append; separator carries attrs
                 } else {
@@ -157,7 +165,7 @@ enum BlockBridge {
                 }
             }
             // ensure block metadata spans the block text (inline attrs already include it)
-            if out.length > start {
+            if out.length > start && !block.isAttachment {
                 out.addAttributes([
                     .blockType: block.type.rawValue,
                     .blockID: block.id,
@@ -173,6 +181,47 @@ enum BlockBridge {
         return out
     }
 
+    /// One attachment character carrying a media block's data + a rendered image.
+    static func attachment(for block: Block) -> NSAttributedString {
+        let att = NSTextAttachment()
+        switch block.type {
+        case .image:
+            if let s = block.src, let data = Data(base64Encoded: s), let img = NSImage(data: data) {
+                att.image = img
+                let maxW: CGFloat = 560
+                let nat = img.size
+                let w = nat.width > 0 ? min(nat.width, maxW) : maxW
+                let h = nat.width > 0 ? w * nat.height / nat.width : 300
+                att.bounds = NSRect(x: 0, y: 0, width: w, height: h)
+            } else {
+                att.bounds = NSRect(x: 0, y: 0, width: 320, height: 180)
+            }
+        case .linkCard:
+            let img = LinkCardRenderer.render(block)
+            att.image = img
+            att.bounds = NSRect(origin: .zero, size: img.size)
+        default:
+            break
+        }
+        let s = NSMutableAttributedString(attachment: att)
+        s.addAttributes(mediaAttrs(block), range: NSRange(location: 0, length: s.length))
+        return s
+    }
+
+    private static func mediaAttrs(_ block: Block) -> [NSAttributedString.Key: Any] {
+        var a: [NSAttributedString.Key: Any] = [
+            .blockType: block.type.rawValue,
+            .blockID: block.id,
+            .paragraphStyle: EditorTheme.paragraphStyle(for: block),
+        ]
+        if let v = block.src { a[.blockImageSrc] = v }
+        if let v = block.url { a[.blockLinkURL] = v }
+        if let v = block.linkTitle { a[.blockLinkTitle] = v }
+        if let v = block.linkThumb { a[.blockLinkThumb] = v }
+        if let v = block.linkDomain { a[.blockLinkDomain] = v }
+        return a
+    }
+
     /// Serialize the edited attributed string back into a BlockDoc.
     static func blockDoc(from attr: NSAttributedString) -> BlockDoc {
         let ns = attr.string as NSString
@@ -181,21 +230,29 @@ enum BlockBridge {
         let full = NSRange(location: 0, length: ns.length)
         ns.enumerateSubstrings(in: full, options: .byParagraphs) { _, subRange, _, _ in
             let readAt = subRange.length > 0 ? subRange.location : min(subRange.location, ns.length - 1)
-            var typeRaw = BlockType.paragraph.rawValue
-            var level: Int? = nil, checked: Bool? = nil, language: String? = nil
+            var at: [NSAttributedString.Key: Any] = [:]
             if readAt >= 0 && readAt < attr.length {
-                let at = attr.attributes(at: readAt, effectiveRange: nil)
-                if let t = at[.blockType] as? String { typeRaw = t }
-                level = at[.headingLevel] as? Int
-                checked = at[.todoChecked] as? Bool
-                language = at[.codeLanguage] as? String
+                at = attr.attributes(at: readAt, effectiveRange: nil)
             }
+            let typeRaw = (at[.blockType] as? String) ?? BlockType.paragraph.rawValue
             let type = BlockType(rawValue: typeRaw) ?? .paragraph
             idx += 1
             if type == .divider {
                 blocks.append(Block(type: .divider))
                 return
             }
+            if type == .image || type == .linkCard {
+                blocks.append(Block(id: at[.blockID] as? String ?? Block.newID(), type: type,
+                                    src: at[.blockImageSrc] as? String,
+                                    url: at[.blockLinkURL] as? String,
+                                    linkTitle: at[.blockLinkTitle] as? String,
+                                    linkThumb: at[.blockLinkThumb] as? String,
+                                    linkDomain: at[.blockLinkDomain] as? String))
+                return
+            }
+            let level = at[.headingLevel] as? Int
+            let checked = at[.todoChecked] as? Bool
+            let language = at[.codeLanguage] as? String
             let spans = subRange.length > 0 ? Self.spans(in: attr, range: subRange) : []
             blocks.append(Block(type: type, spans: spans,
                                 checked: type == .todo ? (checked ?? false) : nil,

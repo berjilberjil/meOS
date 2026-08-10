@@ -6,13 +6,26 @@ import SwiftUI
 /// (debounced) — so any future client (iPhone/iPad) stays in lockstep.
 @MainActor
 final class AppState: ObservableObject {
-    enum Phase { case loading, loggedOut, loggedIn }
+    /// `.setup` = logged in but no vault yet (create a passphrase). `.locked` =
+    /// vault exists but this device needs the passphrase/recovery code to unlock.
+    enum Phase { case loading, loggedOut, setup, locked, loggedIn }
 
     // Auth / session
     @Published var phase: Phase = .loading
     @Published var username = ""
     @Published var authError: String?
     @Published var isWorking = false
+
+    // Zero-knowledge vault
+    let vault = Vault()
+    /// One-time recovery code to surface after setup / regeneration. The UI shows it
+    /// once, then clears it.
+    @Published var recoveryCodeToShow: String?
+    @Published var vaultError: String?
+    @Published var vaultBusy = false
+    /// Raw state fetched during login, kept until unlock so we can decode without
+    /// a second round trip.
+    private var pendingRaw: [String: Any]?
 
     // Module data (each maps to one myos.* key)
     @Published var finance = FinanceState()
@@ -39,18 +52,28 @@ final class AppState: ObservableObject {
     private let api = APIClient()
     private var pushTasks: [String: Task<Void, Never>] = [:]
 
-    init() { restoreCachedSession() }
+    init() {
+        api.vault = vault
+        restoreCachedSession()
+    }
 
     // MARK: - Instant relaunch
 
     private static let kSessionActive = "myos.session.active"
     private static let kSessionUser   = "myos.session.username"
 
+    /// Show cached data instantly on relaunch — but only if this device's Keychain
+    /// still holds the DEK to decrypt it. On a fresh device (or after logout) there's
+    /// no cached key, so nothing is shown until the user unlocks.
     private func restoreCachedSession() {
-        guard UserDefaults.standard.bool(forKey: Self.kSessionActive),
-              let s = api.cachedState() else { return }
-        apply(s)
+        guard UserDefaults.standard.bool(forKey: Self.kSessionActive) else { return }
         username = UserDefaults.standard.string(forKey: Self.kSessionUser) ?? ""
+        guard let raw = api.cachedRawState() else { return }
+        vault.adoptMeta(api.cryptoMeta(from: raw))
+        guard vault.hasMeta,
+              vault.unlockFromKeychain(username: username),
+              let payload = try? api.decodePayload(fromRaw: raw) else { return }
+        apply(payload)
         isHydrated = false        // stays gated until a fresh pull confirms
         phase = .loggedIn
     }
@@ -88,14 +111,14 @@ final class AppState: ObservableObject {
             let user = try await api.me()
             username = user.username
             markSession(active: true, username: user.username)
-            await hydrate()
-            phase = .loggedIn
         } catch let e as APIError where e.status == 401 || e.status == 403 {
-            await logout()
+            await logout(); return
         } catch {
             if hadCache { lastHydrateError = "Offline — showing saved data." }
             else { phase = .loggedOut }
+            return
         }
+        await loadAndGate(hadCache: hadCache)
     }
 
     func login(username u: String, password p: String) async {
@@ -112,10 +135,36 @@ final class AppState: ObservableObject {
             let user = try await op()
             username = user.username
             markSession(active: true, username: user.username)
-            await hydrate()
-            phase = .loggedIn
+            await loadAndGate(hadCache: false)
         } catch {
             authError = (error as? APIError)?.message ?? error.localizedDescription
+        }
+    }
+
+    /// The heart of the gated flow: pull raw state, then either send the user to
+    /// setup (no vault yet), lock (vault exists but this device can't decrypt), or
+    /// decrypt + apply and go live. Never applies encrypted data without the key.
+    private func loadAndGate(hadCache: Bool) async {
+        do {
+            let raw = try await api.fetchStateRaw()
+            pendingRaw = raw
+            vault.adoptMeta(api.cryptoMeta(from: raw))
+            if !vault.hasMeta { phase = .setup; return }
+            if !vault.isUnlocked && !vault.unlockFromKeychain(username: username) {
+                phase = .locked; return
+            }
+            let payload = try api.decodePayload(fromRaw: raw)
+            apply(payload)
+            isHydrated = true
+            pendingRaw = nil
+            lastSyncError = nil; lastHydrateError = nil
+            phase = .loggedIn
+        } catch is APIClient.VaultLockedError {
+            phase = .locked
+        } catch {
+            isHydrated = false      // keep push gated so we never wipe server data
+            if hadCache { lastHydrateError = "Offline — showing saved data." }
+            else { lastHydrateError = (error as? APIError)?.message ?? "Couldn't load your data." }
         }
     }
 
@@ -123,6 +172,7 @@ final class AppState: ObservableObject {
         await api.logout()
         markSession(active: false)
         api.clearCache()
+        vault.forget(username: username)
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
         finance = FinanceState(); portfolio = PortfolioState(); fitness = [:]; journal = [:]
         notes = []; days = [:]; profile = Profile()
@@ -131,23 +181,149 @@ final class AppState: ObservableObject {
         nutrition = NutritionState(); training = TrainingState()
         events = []; watch = []; networth = NetWorthState()
         username = ""; isHydrated = false; lastSyncError = nil
+        pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
         phase = .loggedOut
     }
 
     func hydrate() async {
         lastHydrateError = nil
-        do {
-            let s = try await api.state()
-            apply(s)
-            isHydrated = true
-            lastSyncError = nil
-        } catch {
-            isHydrated = false      // keep push gated so we never wipe server data
-            lastHydrateError = (error as? APIError)?.message ?? "Couldn't load your data."
-        }
+        await loadAndGate(hadCache: isHydrated)
     }
 
     func refresh() async { await hydrate() }
+
+    // MARK: - Vault: setup / unlock / recovery
+
+    /// First-time setup: create the passphrase, mint the vault, then encrypt every
+    /// existing (plaintext) module in place. Surfaces the recovery code once.
+    func completeVaultSetup(passphrase: String) async {
+        vaultError = nil
+        guard let raw = pendingRaw else { vaultError = "Lost the sync — reopen the app."; return }
+        guard passphrase.count >= 8 else { vaultError = "Use at least 8 characters."; return }
+        vaultBusy = true; defer { vaultBusy = false }
+        do {
+            let (meta, code) = try vault.setup(passphrase: passphrase)
+            // The raw pulled at login is all plaintext (pre-encryption) → passes through.
+            let payload = try api.decodePayload(fromRaw: raw)
+            apply(payload)
+            try await api.putCryptoMeta(meta)
+            // Cache the key BEFORE migrating so an interrupted first run can still
+            // unlock silently next launch (decode tolerates a plaintext/encrypted mix).
+            vault.cacheToKeychain(username: username)
+            isHydrated = true
+            await migrateEncryptExisting(raw: raw)
+            // Refresh the on-disk cache so it holds ciphertext, not the old plaintext.
+            _ = try? await api.fetchStateRaw()
+            recoveryCodeToShow = code
+            pendingRaw = nil
+            lastSyncError = nil; lastHydrateError = nil
+            phase = .loggedIn
+        } catch {
+            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Re-upload every existing module encrypted (one-time migration after setup).
+    private func migrateEncryptExisting(raw: [String: Any]) async {
+        let jobs: [(String, Encodable)] = [
+            (StateKey.finance, finance), (StateKey.portfolio, portfolio),
+            (StateKey.fitness, fitness), (StateKey.fitnessProfile, fitnessProfile),
+            (StateKey.journal, journal), (StateKey.journalPresets, journalPresets),
+            (StateKey.notes, notes), (StateKey.days, days), (StateKey.profile, profile),
+            (StateKey.chat, chat), (StateKey.nutrition, nutrition), (StateKey.training, training),
+            (StateKey.events, events), (StateKey.watch, watch), (StateKey.networth, networth)
+        ]
+        for (key, value) in jobs where raw[key] != nil {
+            try? await api.putState(key, value)
+        }
+    }
+
+    func unlockWithPassphrase(_ passphrase: String) async {
+        vaultError = nil
+        vaultBusy = true; defer { vaultBusy = false }
+        do {
+            try vault.unlock(passphrase: passphrase)
+            vault.cacheToKeychain(username: username)
+            await finishUnlock()
+        } catch {
+            vaultError = "Wrong passphrase. Try again, or use your recovery code."
+        }
+    }
+
+    func unlockWithRecovery(_ code: String) async {
+        vaultError = nil
+        vaultBusy = true; defer { vaultBusy = false }
+        do {
+            try vault.unlock(recoveryCode: code)
+            vault.cacheToKeychain(username: username)
+            await finishUnlock()
+        } catch {
+            vaultError = "That recovery code didn't work — check for typos."
+        }
+    }
+
+    private func finishUnlock() async {
+        do {
+            let raw: [String: Any]
+            if let pending = pendingRaw { raw = pending }
+            else { raw = try await api.fetchStateRaw() }
+            let payload = try api.decodePayload(fromRaw: raw)
+            apply(payload)
+            isHydrated = true
+            pendingRaw = nil
+            lastSyncError = nil; lastHydrateError = nil
+            phase = .loggedIn
+        } catch {
+            vaultError = (error as? APIError)?.message ?? "Couldn't load your data after unlock."
+        }
+    }
+
+    // MARK: - Vault: manage (change passphrase, new recovery code, export)
+
+    @discardableResult
+    func changePassphrase(to newPass: String) async -> Bool {
+        vaultError = nil
+        guard newPass.count >= 8 else { vaultError = "Use at least 8 characters."; return false }
+        do {
+            let meta = try vault.rewrap(newPassphrase: newPass)
+            try await api.putCryptoMeta(meta)
+            vault.cacheToKeychain(username: username)
+            return true
+        } catch {
+            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
+    func regenerateRecoveryCode() async {
+        vaultError = nil
+        do {
+            let (meta, code) = try vault.regenerateRecovery()
+            try await api.putCryptoMeta(meta)
+            recoveryCodeToShow = code
+        } catch {
+            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// A plaintext JSON snapshot of everything — the user's own backup / escape hatch.
+    /// (This is decrypted, so it's a plain file: the UI warns before saving.)
+    func exportJSON() -> Data? {
+        var out: [String: Any] = ["exportedAt": Self.nowStamp(), "user": username]
+        func add(_ k: String, _ v: Encodable) {
+            if let d = try? JSONEncoder().encode(AnyEncodable(v)),
+               let obj = try? JSONSerialization.jsonObject(with: d, options: [.fragmentsAllowed]) {
+                out[k] = obj
+            }
+        }
+        add("profile", profile); add("finance", finance); add("portfolio", portfolio)
+        add("fitness", fitness); add("fitnessProfile", fitnessProfile)
+        add("journal", journal); add("journalPresets", journalPresets)
+        add("notes", notes); add("days", days); add("chat", chat)
+        add("nutrition", nutrition); add("training", training)
+        add("events", events); add("watch", watch); add("networth", networth)
+        return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
+    }
 
     // MARK: - Debounced push
 
@@ -163,6 +339,10 @@ final class AppState: ObservableObject {
             do {
                 try await api.putState(key, value)
                 await MainActor.run { self.lastSyncError = nil }
+            } catch is CancellationError {
+                return                        // superseded by a newer edit — not an error
+            } catch let e as URLError where e.code == .cancelled {
+                return                        // the in-flight request was replaced — ignore
             } catch {
                 let msg = (error as? APIError)?.message ?? error.localizedDescription
                 await MainActor.run { self.lastSyncError = "Couldn't save \(key): \(msg)" }

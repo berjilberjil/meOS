@@ -22,12 +22,23 @@ struct RootView: View {
                 }
             case .loggedOut:
                 LoginView()
+            case .setup:
+                VaultSetupView()
+            case .locked:
+                VaultUnlockView()
             case .loggedIn:
                 if BiometricLock.isEnabled && !unlocked {
                     LockView { await tryUnlock() }
                 } else {
                     MainView()
                 }
+            }
+
+            // One-time recovery code — shown above any phase, after setup or a
+            // regeneration from Settings.
+            if let code = state.recoveryCodeToShow {
+                RecoveryCodeOverlay(code: code)
+                    .transition(.opacity)
             }
         }
         .fontDesign(.rounded)   // Feather-substitute: rounds all text app-wide

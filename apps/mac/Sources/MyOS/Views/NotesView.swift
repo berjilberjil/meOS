@@ -12,6 +12,9 @@ struct NotesView: View {
     @State private var openNoteID: String?
     @State private var draftTitle = ""
     @State private var draftDoc = BlockDoc()
+    /// Once the user types in the title field, stop auto-filling it from the body.
+    @State private var titleEdited = false
+    @FocusState private var titleFocused: Bool
 
     @State private var pendingDelete: Note?
 
@@ -220,10 +223,18 @@ struct NotesView: View {
                 .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(Palette.text)
                 .padding(.horizontal, 24)
+                .focused($titleFocused)
+                .onChange(of: titleFocused) { _, now in if now { titleEdited = true } }
                 .onChange(of: draftTitle) { saveDraft() }
 
             BlockEditor(initialDoc: draftDoc) { doc in
                 draftDoc = doc
+                // Until the user names the note, mirror the body's first line into
+                // the title so the note is never left "Untitled".
+                if !titleEdited {
+                    let auto = Self.derivedTitle(from: doc)
+                    if auto != draftTitle { draftTitle = auto }
+                }
                 saveDraft()
             }
             .id(openNoteID)
@@ -241,12 +252,25 @@ struct NotesView: View {
         openNoteID = id
         draftTitle = ""
         draftDoc = BlockDoc()
+        titleEdited = false
     }
 
     private func open(_ note: Note) {
         openNoteID = note.id
         draftTitle = note.title
         draftDoc = note.effectiveDoc
+        // A note that already has a title is treated as user-named — don't overwrite it.
+        titleEdited = !note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The note's title when the user hasn't set one: the first non-empty line of
+    /// the body, capped so a long first line doesn't become an unwieldy title.
+    static func derivedTitle(from doc: BlockDoc) -> String {
+        for b in doc.blocks {
+            let t = b.plainText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !t.isEmpty { return String(t.prefix(80)) }
+        }
+        return ""
     }
 
     private func saveDraft() {

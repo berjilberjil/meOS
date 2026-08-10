@@ -60,7 +60,51 @@ final class BlockTextView: NSTextView {
             coordinator?.toggleChecked(blockID: id)
             return
         }
+        // Clicking a link card opens it.
+        if let url = linkURL(at: p) { NSWorkspace.shared.open(url); return }
         super.mouseDown(with: event)
+    }
+
+    /// The link-card URL at a point, if the click landed on a link-card attachment.
+    private func linkURL(at point: NSPoint) -> URL? {
+        guard let lm = layoutManager, let tc = textContainer, let storage = textStorage,
+              storage.length > 0 else { return nil }
+        let o = textContainerOrigin
+        let inContainer = NSPoint(x: point.x - o.x, y: point.y - o.y)
+        let gi = lm.glyphIndex(for: inContainer, in: tc)
+        let glyphRect = lm.boundingRect(forGlyphRange: NSRange(location: gi, length: 1), in: tc)
+        guard glyphRect.contains(inContainer) else { return nil }
+        let ci = lm.characterIndexForGlyph(at: gi)
+        guard ci < storage.length else { return nil }
+        let at = storage.attributes(at: ci, effectiveRange: nil)
+        guard (at[.blockType] as? String) == BlockType.linkCard.rawValue,
+              let s = at[.blockLinkURL] as? String else { return nil }
+        return URL(string: s)
+    }
+
+    // MARK: Paste — image → embed, lone URL → link card
+
+    override func paste(_ sender: Any?) {
+        let pb = NSPasteboard.general
+        if let img = NSImage(pasteboard: pb) {
+            coordinator?.insertImage(img)
+            return
+        }
+        if let s = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           let url = Self.loneURL(s) {
+            coordinator?.insertLink(url)
+            return
+        }
+        super.paste(sender)
+    }
+
+    /// A pasted string that is *only* an http(s) URL — so pasting a sentence that
+    /// happens to contain a link still pastes as text.
+    private static func loneURL(_ s: String) -> URL? {
+        guard !s.isEmpty, !s.contains(" "), !s.contains("\n"),
+              let url = URL(string: s), let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https", url.host != nil else { return nil }
+        return url
     }
 
     // MARK: Caret geometry (for the slash popover)
@@ -117,51 +161,71 @@ final class BlockTextView: NSTextView {
 
     private func drawBlockDecorations() {
         checkboxRects.removeAll()
+        var lastType: BlockType = .paragraph
+        var lastNumber = 0
         enumerateParagraphs { type, attrs, firstLine, _, number in
             let o = self.textContainerOrigin
             let line = firstLine.offsetBy(dx: o.x, dy: o.y)
-            switch type {
-            case .bullet:
-                let dot = NSRect(x: o.x + 8, y: line.midY - 2.5, width: 5, height: 5)
-                EditorTheme.text.setFill()
-                NSBezierPath(ovalIn: dot).fill()
-            case .numbered:
-                let s = "\(number)."
-                let a: [NSAttributedString.Key: Any] = [
-                    .font: NSFont.systemFont(ofSize: 15, weight: .regular),
-                    .foregroundColor: EditorTheme.muted,
-                ]
-                let size = s.size(withAttributes: a)
-                s.draw(at: NSPoint(x: o.x + EditorMetrics.listGutter - size.width - 6, y: line.minY),
-                       withAttributes: a)
-            case .todo:
-                let checked = (attrs[.todoChecked] as? Bool) ?? false
-                let box = NSRect(x: o.x + 5, y: line.midY - EditorMetrics.checkboxSize / 2,
-                                 width: EditorMetrics.checkboxSize, height: EditorMetrics.checkboxSize)
-                let path = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
-                if checked {
-                    EditorTheme.brand.setFill(); path.fill()
-                    let check = NSBezierPath()
-                    check.move(to: NSPoint(x: box.minX + 4, y: box.midY + 0.5))
-                    check.line(to: NSPoint(x: box.midX - 1, y: box.minY + 4.5))
-                    check.line(to: NSPoint(x: box.maxX - 3.5, y: box.maxY - 4))
-                    check.lineWidth = 1.8
-                    check.lineCapStyle = .round; check.lineJoinStyle = .round
-                    NSColor.white.setStroke(); check.stroke()
-                } else {
-                    EditorTheme.faint.setStroke(); path.lineWidth = 1.5; path.stroke()
-                }
-                let id = attrs[.blockID] as? String ?? ""
-                self.checkboxRects.append((box, id))
-            case .divider:
-                let y = line.midY
-                let rule = NSBezierPath()
-                rule.move(to: NSPoint(x: 6, y: y))
-                rule.line(to: NSPoint(x: self.bounds.width - 6, y: y))
-                rule.lineWidth = 1
-                EditorTheme.border.setStroke(); rule.stroke()
-            default: break
+            self.drawDecoration(type: type, checked: (attrs[.todoChecked] as? Bool) ?? false,
+                                number: number, blockID: attrs[.blockID] as? String ?? "", line: line)
+            lastType = type; lastNumber = number
+        }
+        // The empty trailing list item: `byParagraphs` skips the blank line after a
+        // final newline, so its bullet/number/checkbox would be missing until text
+        // is typed. Draw it on the layout manager's extra line fragment instead.
+        if let lm = layoutManager, lm.extraLineFragmentTextContainer != nil,
+           let deco = coordinator?.trailingListDecoration {
+            let o = textContainerOrigin
+            let line = lm.extraLineFragmentRect.offsetBy(dx: o.x, dy: o.y)
+            let number = deco.type == .numbered ? (lastType == .numbered ? lastNumber + 1 : 1) : 0
+            drawDecoration(type: deco.type, checked: deco.checked, number: number,
+                           blockID: coordinator?.trailingBlockID ?? "", line: line)
+        }
+    }
+
+    /// Draw one block's gutter decoration for a given first-line rect (already in
+    /// view coordinates). Shared by the paragraph walk and the trailing empty line.
+    private func drawDecoration(type: BlockType, checked: Bool, number: Int, blockID: String, line: NSRect) {
+        let o = textContainerOrigin
+        switch type {
+        case .bullet:
+            let dot = NSRect(x: o.x + 8, y: line.midY - 2.5, width: 5, height: 5)
+            EditorTheme.text.setFill()
+            NSBezierPath(ovalIn: dot).fill()
+        case .numbered:
+            let s = "\(number)."
+            let a: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 15, weight: .regular),
+                .foregroundColor: EditorTheme.muted,
+            ]
+            let size = s.size(withAttributes: a)
+            s.draw(at: NSPoint(x: o.x + EditorMetrics.listGutter - size.width - 6, y: line.minY),
+                   withAttributes: a)
+        case .todo:
+            let box = NSRect(x: o.x + 5, y: line.midY - EditorMetrics.checkboxSize / 2,
+                             width: EditorMetrics.checkboxSize, height: EditorMetrics.checkboxSize)
+            let path = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
+            if checked {
+                EditorTheme.brand.setFill(); path.fill()
+                let check = NSBezierPath()
+                check.move(to: NSPoint(x: box.minX + 4, y: box.midY + 0.5))
+                check.line(to: NSPoint(x: box.midX - 1, y: box.minY + 4.5))
+                check.line(to: NSPoint(x: box.maxX - 3.5, y: box.maxY - 4))
+                check.lineWidth = 1.8
+                check.lineCapStyle = .round; check.lineJoinStyle = .round
+                NSColor.white.setStroke(); check.stroke()
+            } else {
+                EditorTheme.faint.setStroke(); path.lineWidth = 1.5; path.stroke()
             }
+            if !blockID.isEmpty { checkboxRects.append((box, blockID)) }
+        case .divider:
+            let y = line.midY
+            let rule = NSBezierPath()
+            rule.move(to: NSPoint(x: 6, y: y))
+            rule.line(to: NSPoint(x: self.bounds.width - 6, y: y))
+            rule.lineWidth = 1
+            EditorTheme.border.setStroke(); rule.stroke()
+        default: break
         }
     }
 

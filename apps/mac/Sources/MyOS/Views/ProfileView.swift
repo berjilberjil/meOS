@@ -140,7 +140,7 @@ struct ProfileView: View {
                 SectionTitle(text: "Identity")
                 LazyVGrid(columns: fieldCols, spacing: 12) {
                     field("Full name", \.name, "Your name")
-                    field("Date of birth", \.dob, "yyyy-mm-dd")
+                    KLabeledDateField(label: "Date of birth", text: bind(\.dob))
                     intField("Age", get: { state.profile.age },
                              set: { v in state.updateProfile { $0.age = v } }, placeholder: "Age")
                     KLabeledMenuField(label: "Blood group", options: Profile.bloodGroupOptions,

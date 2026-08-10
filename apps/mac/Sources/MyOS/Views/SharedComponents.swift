@@ -315,6 +315,64 @@ struct KLabeledPhoneField: View {
     }
 }
 
+/// A validated date-of-birth field. A real date picker — no free text — so a DOB
+/// can never be garbage like "qr23r23". Stores/reads a `yyyy-MM-dd` string; shows a
+/// "set" affordance while empty so an unset DOB doesn't masquerade as a real date.
+struct KLabeledDateField: View {
+    let label: String
+    @Binding var text: String
+
+    private static let fmt: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+    private static let lowerBound: Date = fmt.date(from: "1900-01-01") ?? Date.distantPast
+    private var parsed: Date? { Self.fmt.date(from: text) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            KFieldLabel(text: label)
+            if let d = parsed {
+                HStack(spacing: 6) {
+                    DatePicker("", selection: Binding(
+                        get: { d },
+                        set: { text = Self.fmt.string(from: $0) }),
+                        in: Self.lowerBound...Date(), displayedComponents: .date)
+                        .datePickerStyle(.compact).labelsHidden()
+                    Spacer(minLength: 0)
+                    Button { text = "" } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 12))
+                    }
+                    .buttonStyle(KIconButtonStyle(size: 20)).help("Clear date of birth")
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Palette.surface2.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    .strokeBorder(Palette.border, lineWidth: 1))
+            } else {
+                Button {
+                    let seed = Calendar(identifier: .gregorian).date(byAdding: .year, value: -21, to: Date()) ?? Date()
+                    text = Self.fmt.string(from: seed)
+                } label: {
+                    HStack {
+                        Text("Set date of birth").foregroundStyle(Palette.faint)
+                        Spacer()
+                        Image(systemName: "calendar").foregroundStyle(Palette.faint)
+                    }
+                    .font(.system(size: 13))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(KPressStyle())
+                .knField()
+            }
+        }
+    }
+}
+
 /// Read-only labelled value with a hint (for fields sourced from another tab).
 struct KReadOnlyField: View {
     let label: String

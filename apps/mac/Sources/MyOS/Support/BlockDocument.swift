@@ -7,6 +7,9 @@ import Foundation
 
 enum BlockType: String, Codable, Hashable {
     case paragraph, heading, bullet, numbered, todo, quote, code, divider
+    // Rich media — rendered as a single NSTextAttachment in the editor.
+    case image        // an embedded picture (base64 in `src`)
+    case linkCard     // a pasted URL, shown as a preview card (thumbnail + title)
 }
 
 // Inline formatting applied to a run of text within a block.
@@ -52,27 +55,53 @@ struct Block: Codable, Hashable, Identifiable {
     var checked: Bool? = nil     // todo
     var level: Int? = nil        // heading: 1...3
     var language: String? = nil  // code
+    // Rich media
+    var src: String? = nil       // image: base64 (no data: prefix)
+    var url: String? = nil       // linkCard: the link
+    var linkTitle: String? = nil // linkCard: fetched page/video title
+    var linkThumb: String? = nil // linkCard: fetched thumbnail, base64
+    var linkDomain: String? = nil// linkCard: host, for the card footer
 
-    enum CodingKeys: String, CodingKey { case id, type, spans, checked, level, language }
+    enum CodingKeys: String, CodingKey {
+        case id, type, spans, checked, level, language, src, url, linkTitle, linkThumb, linkDomain
+    }
 
     init(id: String = Block.newID(), type: BlockType, spans: [TextSpan] = [],
-         checked: Bool? = nil, level: Int? = nil, language: String? = nil) {
+         checked: Bool? = nil, level: Int? = nil, language: String? = nil,
+         src: String? = nil, url: String? = nil, linkTitle: String? = nil,
+         linkThumb: String? = nil, linkDomain: String? = nil) {
         self.id = id; self.type = type; self.spans = spans
         self.checked = checked; self.level = level; self.language = language
+        self.src = src; self.url = url; self.linkTitle = linkTitle
+        self.linkThumb = linkThumb; self.linkDomain = linkDomain
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id       = try c.decodeIfPresent(String.self, forKey: .id) ?? Block.newID()
-        type     = try c.decode(BlockType.self, forKey: .type)
-        spans    = try c.decodeIfPresent([TextSpan].self, forKey: .spans) ?? []
-        checked  = try c.decodeIfPresent(Bool.self, forKey: .checked)
-        level    = try c.decodeIfPresent(Int.self, forKey: .level)
-        language = try c.decodeIfPresent(String.self, forKey: .language)
+        id         = try c.decodeIfPresent(String.self, forKey: .id) ?? Block.newID()
+        type       = try c.decode(BlockType.self, forKey: .type)
+        spans      = try c.decodeIfPresent([TextSpan].self, forKey: .spans) ?? []
+        checked    = try c.decodeIfPresent(Bool.self, forKey: .checked)
+        level      = try c.decodeIfPresent(Int.self, forKey: .level)
+        language   = try c.decodeIfPresent(String.self, forKey: .language)
+        src        = try c.decodeIfPresent(String.self, forKey: .src)
+        url        = try c.decodeIfPresent(String.self, forKey: .url)
+        linkTitle  = try c.decodeIfPresent(String.self, forKey: .linkTitle)
+        linkThumb  = try c.decodeIfPresent(String.self, forKey: .linkThumb)
+        linkDomain = try c.decodeIfPresent(String.self, forKey: .linkDomain)
     }
 
-    var plainText: String { spans.map(\.text).joined() }
-    var isEmpty: Bool { type != .divider && plainText.isEmpty }
+    /// Rendered as a single attachment character in the editor (occupies its own
+    /// line, no editable text). The caret math treats these as length 1.
+    var isAttachment: Bool { type == .image || type == .linkCard }
+
+    var plainText: String {
+        // Link cards mirror their URL into the plain-text body so search + previews
+        // still find them; images contribute nothing.
+        if type == .linkCard { return url ?? spans.map(\.text).joined() }
+        return spans.map(\.text).joined()
+    }
+    var isEmpty: Bool { type != .divider && !isAttachment && plainText.isEmpty }
 
     static func newID() -> String { String(UUID().uuidString.prefix(8)).lowercased() }
     static func paragraph(_ text: String = "") -> Block {

@@ -31,6 +31,8 @@ struct SlashCommand: Identifiable, Equatable {
               keywords: ["code", "mono", "snippet"], type: .code, level: nil),
         .init(id: "divider", title: "Divider", subtitle: "Horizontal rule", icon: "minus",
               keywords: ["divider", "rule", "separator", "line"], type: .divider, level: nil),
+        .init(id: "image", title: "Image", subtitle: "Upload a picture", icon: "photo",
+              keywords: ["image", "photo", "picture", "upload", "img"], type: .image, level: nil),
     ]
 }
 
