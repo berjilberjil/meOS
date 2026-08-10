@@ -78,7 +78,6 @@ struct EventsView: View {
             }
             selectedDayCard
         }
-        .frame(maxWidth: 540, alignment: .leading)
     }
 
     private func dayDot(_ key: String) -> Color? {

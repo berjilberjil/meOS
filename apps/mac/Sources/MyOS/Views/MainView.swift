@@ -64,8 +64,9 @@ struct MainView: View {
                         }
                         // Top padding clears the hidden title bar / traffic-light zone;
                         // the tall bottom padding keeps content clear of the floating log bar.
+                        // Events gets the full window width (the calendar fills the screen).
                         .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 104)
-                        .frame(maxWidth: 1120)
+                        .frame(maxWidth: tab == .events ? .infinity : 1120)
                         .frame(maxWidth: .infinity)
                     }
                     // Re-key on tab so each screen's cards replay the rise-in entrance.
