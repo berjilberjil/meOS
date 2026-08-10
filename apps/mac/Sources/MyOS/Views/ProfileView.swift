@@ -143,9 +143,11 @@ struct ProfileView: View {
                     field("Date of birth", \.dob, "yyyy-mm-dd")
                     intField("Age", get: { state.profile.age },
                              set: { v in state.updateProfile { $0.age = v } }, placeholder: "Age")
-                    field("Blood group", \.bloodGroup, "O+ / A+ / B+ …")
-                    field("Relationship", \.relationship, "Single / …")
-                    field("Phone", \.phone, "+91 …")
+                    KLabeledMenuField(label: "Blood group", options: Profile.bloodGroupOptions,
+                                      text: bind(\.bloodGroup))
+                    KLabeledMenuField(label: "Relationship", options: Profile.relationshipOptions,
+                                      text: bind(\.relationship))
+                    KLabeledPhoneField(label: "Phone", text: bind(\.phone))
                     field("Email", \.email, "you@mail.com")
                     field("City", \.city, "City")
                     field("Hometown", \.hometown, "Hometown")

@@ -630,6 +630,11 @@ struct Profile: Codable, Hashable {
     // Daily habit list (used by Today) — generic starter examples, not personal.
     var habits: [String] = ["Gym", "Read", "No junk", "Sleep"]
 
+    // Fixed pick-lists for profile fields that must be one of a set (no free text).
+    static let bloodGroupOptions = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
+    static let relationshipOptions = ["Single", "Married", "In a relationship",
+                                      "Engaged", "Divorced", "Widowed"]
+
     enum CodingKeys: String, CodingKey {
         case name, dob, age, bloodGroup, relationship, phone, email, city, hometown, education
         case heightCm, photoBase64, role, work, website, instagram, github

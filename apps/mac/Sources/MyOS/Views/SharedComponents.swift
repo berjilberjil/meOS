@@ -252,6 +252,69 @@ struct KLabeledNumberField: View {
     }
 }
 
+/// Labelled dropdown for a fixed set of choices (blood group, relationship, …) —
+/// no free text, so users can only pick a valid value. A "Clear" item unsets it.
+struct KLabeledMenuField: View {
+    let label: String
+    var placeholder: String = "Not set"
+    var options: [String] = []
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            KFieldLabel(text: label)
+            Menu {
+                Button { text = "" } label: {
+                    Label("Clear", systemImage: "xmark.circle")
+                }
+                Divider()
+                ForEach(options, id: \.self) { option in
+                    Button { text = option } label: {
+                        if option == text { Label(option, systemImage: "checkmark") }
+                        else { Text(option) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(text.isEmpty ? placeholder : text)
+                        .font(.system(size: 13, weight: text.isEmpty ? .regular : .semibold))
+                        .foregroundStyle(text.isEmpty ? Palette.faint : Palette.text)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint)
+                }
+                .padding(.horizontal, 13).padding(.vertical, 10)
+                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    .strokeBorder(Palette.border, lineWidth: 2))
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden)
+        }
+    }
+}
+
+/// Labelled phone input — digits only, capped at 10, so no stray letters or symbols.
+struct KLabeledPhoneField: View {
+    let label: String
+    var placeholder: String = "10-digit mobile number"
+    @Binding var text: String
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            KFieldLabel(text: label)
+            TextField("", text: Binding(
+                get: { text },
+                set: { text = String($0.filter { $0.isNumber }.prefix(10)) }),
+                prompt: Text(placeholder).foregroundColor(Palette.faint))
+                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .monospacedDigit()
+                .focused($focused)
+                .knField(focused: focused)
+        }
+    }
+}
+
 /// Read-only labelled value with a hint (for fields sourced from another tab).
 struct KReadOnlyField: View {
     let label: String
