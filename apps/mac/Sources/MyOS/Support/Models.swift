@@ -724,34 +724,93 @@ enum EventCategory: String, Codable, Hashable, CaseIterable {
     }
 }
 
-/// One upcoming (or past) life event — normal or special. Sorted by `date`.
+/// A user-defined event tag — name + SF Symbol + colour. The built-in seven (below) are
+/// editable but not deletable; custom tags are fully removable. Ids of the built-ins are
+/// the old `EventCategory` raw values so pre-tag events migrate straight onto them.
+struct EventTag: Codable, Identifiable, Hashable {
+    var id: String
+    var name: String
+    var symbol: String       // SF Symbol name
+    var colorHex: String     // 6-digit RRGGBB (no leading #)
+    var builtIn: Bool
+
+    init(id: String = UUID().uuidString.lowercased(), name: String, symbol: String,
+         colorHex: String, builtIn: Bool = false) {
+        self.id = id; self.name = name; self.symbol = symbol
+        self.colorHex = colorHex; self.builtIn = builtIn
+    }
+
+    /// The seven defaults, seeded when a user has no tags yet.
+    static var seedDefaults: [EventTag] {
+        [
+            EventTag(id: "personal",  name: "Personal",  symbol: "person.fill",    colorHex: "58CC02", builtIn: true),
+            EventTag(id: "travel",    name: "Travel",    symbol: "airplane",       colorHex: "1CB0F6", builtIn: true),
+            EventTag(id: "family",    name: "Family",    symbol: "house.fill",     colorHex: "FF9600", builtIn: true),
+            EventTag(id: "work",      name: "Work",      symbol: "briefcase.fill", colorHex: "FFC800", builtIn: true),
+            EventTag(id: "milestone", name: "Milestone", symbol: "flag.fill",      colorHex: "CE82FF", builtIn: true),
+            EventTag(id: "reminder",  name: "Reminder",  symbol: "bell.fill",      colorHex: "84D8FF", builtIn: true),
+            EventTag(id: "other",     name: "Other",     symbol: "calendar",       colorHex: "9A9A9A", builtIn: true),
+        ]
+    }
+}
+
+/// A photo or short video attached to an event — stored inline as base64 so it rides the
+/// same encrypted sync as everything else. Video is transcoded + capped (see `VideoMedia`).
+struct EventMedia: Codable, Identifiable, Hashable {
+    enum Kind: String, Codable, Hashable { case image, video }
+    var id: String
+    var kind: Kind
+    var data: String         // base64, no data: prefix. image → JPEG · video → mp4
+    var poster: String?      // video only: base64 JPEG first-frame thumbnail
+
+    init(id: String = UUID().uuidString.lowercased(), kind: Kind, data: String, poster: String? = nil) {
+        self.id = id; self.kind = kind; self.data = data; self.poster = poster
+    }
+}
+
+/// One logged life event — a memory. Past, present, or future. Carries multiple tags and
+/// photo/video media. Sorted by `date`.
 struct EventItem: Codable, Identifiable, Hashable {
     var id: String
     var date: String            // yyyy-MM-dd
     var title: String
-    var category: EventCategory
+    var tagIDs: [String]        // references EventTag.id (0..n)
     var note: String
+    var media: [EventMedia]
     var special: Bool           // the big ones (a wedding, a lifetime trip) — highlighted
-    var done: Bool              // handled / passed — drops to the archive
+    // Legacy fields — kept so pre-tag events still decode and migrate. Not used by new UI.
+    var category: EventCategory
+    var done: Bool
 
     init(id: String = UUID().uuidString.lowercased(), date: String, title: String,
-         category: EventCategory = .personal, note: String = "", special: Bool = false, done: Bool = false) {
+         tagIDs: [String] = [], note: String = "", media: [EventMedia] = [],
+         special: Bool = false, category: EventCategory = .personal, done: Bool = false) {
         self.id = id; self.date = date; self.title = title
-        self.category = category; self.note = note; self.special = special; self.done = done
+        self.tagIDs = tagIDs; self.note = note; self.media = media
+        self.special = special; self.category = category; self.done = done
     }
 
-    enum CodingKeys: String, CodingKey { case id, date, title, category, note, special, done }
+    enum CodingKeys: String, CodingKey { case id, date, title, tagIDs, note, media, special, category, done }
 
-    // Lenient: an event saved before a field existed still loads.
+    // Lenient + migrating: an event saved before a field existed still loads, and a
+    // pre-tag event (no `tagIDs`, has `category`) maps its category → the built-in tag id.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id       = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
         date     = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
         title    = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
-        category = (try? c.decode(EventCategory.self, forKey: .category)) ?? .personal
         note     = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        media    = (try? c.decodeIfPresent([EventMedia].self, forKey: .media)) ?? []
         special  = try c.decodeIfPresent(Bool.self, forKey: .special) ?? false
+        category = (try? c.decode(EventCategory.self, forKey: .category)) ?? .personal
         done     = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
+        if c.contains(.tagIDs), let t = try? c.decode([String].self, forKey: .tagIDs) {
+            tagIDs = t
+        } else if c.contains(.category) {
+            tagIDs = [category.rawValue]      // migrate old single category → one tag
+        } else {
+            tagIDs = []
+        }
     }
 }
 
@@ -871,6 +930,7 @@ struct AppStatePayload: Codable {
     var nutrition: NutritionState?
     var training: TrainingState?
     var events: [EventItem]?
+    var eventTags: [EventTag]?
     var watch: [WatchItem]?
     var networth: NetWorthState?
 
@@ -890,6 +950,7 @@ struct AppStatePayload: Codable {
         case nutrition      = "myos.nutrition"
         case training       = "myos.training"
         case events         = "myos.events"
+        case eventTags      = "myos.eventTags"
         case watch          = "myos.watch"
         case networth       = "myos.networth"
     }
@@ -912,6 +973,7 @@ struct AppStatePayload: Codable {
         nutrition      = try? c.decodeIfPresent(NutritionState.self, forKey: .nutrition)
         training       = try? c.decodeIfPresent(TrainingState.self, forKey: .training)
         events         = try? c.decodeIfPresent([EventItem].self, forKey: .events)
+        eventTags      = try? c.decodeIfPresent([EventTag].self, forKey: .eventTags)
         watch          = try? c.decodeIfPresent([WatchItem].self, forKey: .watch)
         networth       = try? c.decodeIfPresent(NetWorthState.self, forKey: .networth)
     }
@@ -1056,6 +1118,7 @@ enum StateKey {
     static let nutrition      = "myos.nutrition"
     static let training       = "myos.training"
     static let events         = "myos.events"
+    static let eventTags      = "myos.eventTags"
     static let watch          = "myos.watch"
     static let networth       = "myos.networth"
 }

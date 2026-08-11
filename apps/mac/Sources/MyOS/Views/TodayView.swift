@@ -79,11 +79,14 @@ struct TodayView: View {
     }
 
     private func eventLine(_ e: EventItem) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: e.category.icon)
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(e.category.color)
+        let tag = state.primaryTag(for: e)
+        let color = tag?.color ?? Palette.brand
+        let icon = tag?.symbol ?? "calendar"
+        return HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(color)
                 .frame(width: 30, height: 30)
-                .background(e.category.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     if e.special { Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Palette.amber) }

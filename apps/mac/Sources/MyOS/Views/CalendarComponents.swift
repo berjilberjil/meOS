@@ -40,6 +40,12 @@ enum CalMath {
         return f.date(from: key)
     }
     static func todayKey() -> String { dateKey(Date()) }
+    /// (isSaturday, isSunday) for a `yyyy-MM-dd` key.
+    static func weekend(_ key: String) -> (sat: Bool, sun: Bool) {
+        guard let d = date(fromKey: key) else { return (false, false) }
+        let wd = cal.component(.weekday, from: d)   // 1=Sun … 7=Sat
+        return (wd == 7, wd == 1)
+    }
     static func addMonth(year: Int, month: Int, delta: Int) -> (Int, Int) {
         var m = month + delta, y = year
         while m > 12 { m -= 12; y += 1 }
@@ -56,11 +62,18 @@ struct KMonthGrid: View {
     let month: Int
     var selected: String? = nil
     var compact: Bool = false
+    var big: Bool = false          // full-width Events calendar — larger cells + type
     /// A dot colour for a day that has content (nil = no dot).
     var dot: (String) -> Color? = { _ in nil }
+    /// A holiday name for a day (nil = none) — shown on hover, flagged with a top dot.
+    var holiday: (String) -> String? = { _ in nil }
     var onTap: (String) -> Void = { _ in }
 
     private let weekdays = ["M", "T", "W", "T", "F", "S", "S"]   // Monday-first
+
+    private var cellHeight: CGFloat { big ? 60 : (compact ? 20 : 38) }
+    private var radius: CGFloat { big ? 12 : (compact ? 5 : 9) }
+    private var colGap: CGFloat { big ? 6 : 0 }
 
     private var cells: [Int?] {
         let lead = (CalMath.firstWeekday(year: year, month: month) + 6) % 7   // Monday-first offset
@@ -68,23 +81,32 @@ struct KMonthGrid: View {
             + (1...CalMath.daysInMonth(year: year, month: month)).map { Optional($0) }
     }
 
+    /// Header letter colour — Saturday blue, Sunday red, weekdays faint.
+    private func weekdayTint(_ i: Int) -> Color {
+        if i == 6 { return Palette.red.opacity(0.85) }
+        if i == 5 { return Palette.blue.opacity(0.85) }
+        return Palette.faint
+    }
+
     var body: some View {
         let rows = (cells.count + 6) / 7
-        VStack(spacing: compact ? 3 : 6) {
-            HStack(spacing: 0) {
+        VStack(spacing: big ? 10 : (compact ? 3 : 6)) {
+            HStack(spacing: colGap) {
                 ForEach(0..<7, id: \.self) { i in
-                    Text(weekdays[i]).font(.system(size: compact ? 8 : 10, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Palette.faint).frame(maxWidth: .infinity)
+                    Text(weekdays[i])
+                        .font(.system(size: big ? 13 : (compact ? 8 : 10), weight: .heavy, design: .rounded))
+                        .foregroundStyle(weekdayTint(i))
+                        .frame(maxWidth: .infinity)
                 }
             }
-            VStack(spacing: compact ? 2 : 4) {
+            VStack(spacing: big ? 6 : (compact ? 2 : 4)) {
                 ForEach(0..<rows, id: \.self) { r in
-                    HStack(spacing: 0) {
+                    HStack(spacing: colGap) {
                         ForEach(0..<7, id: \.self) { c in
                             let i = r * 7 + c
                             Group {
                                 if i < cells.count, let day = cells[i] { cell(day) }
-                                else { Color.clear.frame(height: compact ? 20 : 38) }
+                                else { Color.clear.frame(height: cellHeight) }
                             }
                             .frame(maxWidth: .infinity)
                         }
@@ -99,29 +121,44 @@ struct KMonthGrid: View {
         let isToday = key == CalMath.todayKey()
         let isSel = key == selected
         let dc = dot(key)
-        let radius: CGFloat = compact ? 5 : 9
+        let hol = holiday(key)
+        let wknd = CalMath.weekend(key)
+        let numberColor: Color = isSel ? .white
+            : (wknd.sun ? Palette.red : (wknd.sat ? Palette.blue : (isToday ? Palette.brand : Palette.text)))
+        let weekendBG: Color = wknd.sun ? Palette.red.opacity(0.10)
+            : (wknd.sat ? Palette.blue.opacity(0.06) : .clear)
+        let cellBG: Color = isSel ? Palette.brand : (hol != nil ? Palette.amber.opacity(0.12) : weekendBG)
+
         return Button { onTap(key) } label: {
-            VStack(spacing: compact ? 1 : 3) {
+            VStack(spacing: big ? 4 : (compact ? 1 : 3)) {
                 Text("\(day)")
-                    .font(.system(size: compact ? 9 : 13, weight: (isSel || isToday) ? .heavy : .medium, design: .rounded))
+                    .font(.system(size: big ? 21 : (compact ? 9 : 13),
+                                  weight: (isSel || isToday) ? .heavy : .medium, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(isSel ? .white : (isToday ? Palette.brand : Palette.text))
+                    .foregroundStyle(numberColor)
                 if !compact {
                     Circle().fill(isSel ? Color.white.opacity(dc == nil ? 0 : 0.9) : (dc ?? .clear))
-                        .frame(width: 5, height: 5)
+                        .frame(width: big ? 7 : 5, height: big ? 7 : 5)
                 }
             }
-            .frame(maxWidth: .infinity).frame(height: compact ? 20 : 38)
-            .background(RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(isSel ? Palette.brand : .clear))
+            .frame(maxWidth: .infinity).frame(height: cellHeight)
+            .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(cellBG))
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .strokeBorder(isToday && !isSel ? Palette.brand.opacity(0.55) : .clear, lineWidth: 1.5))
+            .overlay(alignment: .top) {
+                if hol != nil {
+                    Circle().fill(isSel ? Color.white : Palette.amber)
+                        .frame(width: big ? 5 : 3, height: big ? 5 : 3)
+                        .padding(.top, big ? 5 : 2)
+                }
+            }
             .overlay(alignment: .bottom) {
                 if compact, let dc { Circle().fill(dc).frame(width: 3, height: 3).padding(.bottom, 2) }
             }
             .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         }
         .buttonStyle(KPressStyle(scale: 0.92))
+        .help(hol ?? "")
     }
 }
 

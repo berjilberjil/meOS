@@ -1,19 +1,22 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
-/// The Events tab — an upcoming-life timeline. Normal or special, everything the
-/// user wants to see coming: a trip, a wedding, a visit home, a lifetime holiday,
-/// or a small "send that email". Sorted by date, grouped by how soon it is.
+/// The Events tab — a **memory log**. Log anything that happened or is coming up: a trip,
+/// a wedding, a visit home, a small win. Past, present, or future — each with tags and
+/// photos/videos. The calendar is the surface; a list of that month's memories always
+/// sits below it. Tap any day to log a new one.
 struct EventsView: View {
     @EnvironmentObject var state: AppState
     @State private var editTarget: EventEditTarget?
-    @State private var showPast = false
     @State private var mode: Mode = .month
     @State private var viewYear = 0
     @State private var viewMonth = 0
     @State private var selectedDay: String? = nil
+    @State private var showTags = false
 
     enum Mode: String, CaseIterable, Hashable {
-        case list, month, year
+        case month, year
         var label: String { rawValue.capitalized }
     }
 
@@ -25,6 +28,8 @@ struct EventsView: View {
                 Text("Events").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
                 Spacer()
                 Segmented(options: Mode.allCases.map { ($0, $0.label) }, selection: $mode)
+                Button { showTags = true } label: { Label("Tags", systemImage: "tag") }
+                    .buttonStyle(KGhostButtonStyle())
                 Button { editTarget = EventEditTarget(event: nil) } label: {
                     Label("Add event", systemImage: "plus")
                 }
@@ -34,7 +39,6 @@ struct EventsView: View {
 
             Group {
                 switch mode {
-                case .list:  listView
                 case .month: monthView
                 case .year:  yearView
                 }
@@ -48,102 +52,147 @@ struct EventsView: View {
             }
         }
         .sheet(item: $editTarget) { t in EventEditor(target: t) }
+        .sheet(isPresented: $showTags) { TagManagerSheet() }
     }
 
-    // MARK: - List (timeline)
-
-    @ViewBuilder private var listView: some View {
-        if state.sortedEvents.isEmpty && state.doneEvents.isEmpty {
-            emptyState
-        } else {
-            VStack(alignment: .leading, spacing: 18) {
-                timeline
-                if !state.doneEvents.isEmpty { pastSection }
-            }
-        }
-    }
-
-    // MARK: - Month calendar
+    // MARK: - Month calendar + always-visible month list
 
     private var monthView: some View {
         VStack(alignment: .leading, spacing: 16) {
             Card {
-                VStack(spacing: 14) {
+                VStack(spacing: 16) {
                     KMonthHeader(year: viewYear, month: viewMonth,
                                  onPrev: { shiftMonth(-1) }, onNext: { shiftMonth(1) }, onToday: goToday)
-                    KMonthGrid(year: viewYear, month: viewMonth, selected: selectedDay, dot: dayDot) { key in
-                        withAnimation(.knFast) { selectedDay = (selectedDay == key ? nil : key) }
+                    KMonthGrid(year: viewYear, month: viewMonth, selected: selectedDay, big: true,
+                               dot: dayDot, holiday: { Holidays.name($0) }) { key in
+                        selectedDay = key
+                        editTarget = EventEditTarget(event: nil, presetDate: AppState.date(fromKey: key))
                     }
                 }
             }
-            selectedDayCard
+            monthList
+        }
+    }
+
+    private var monthList: some View {
+        let prefix = String(format: "%04d-%02d", viewYear, viewMonth)
+        let days = eventsByDay.keys.filter { $0.hasPrefix(prefix) }.sorted()
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                SectionTitle(text: "\(CalMath.monthName(viewMonth)) memories")
+                let count = days.reduce(0) { $0 + (eventsByDay[$1]?.count ?? 0) }
+                if count > 0 {
+                    Text("\(count)").font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Palette.faint)
+                }
+                Spacer()
+            }
+            if days.isEmpty {
+                Card {
+                    Text("Nothing logged this month yet — tap a day above to add a memory.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                Card {
+                    VStack(spacing: 6) {
+                        ForEach(days, id: \.self) { day in
+                            dayGroup(day, items: eventsByDay[day] ?? [])
+                            if day != days.last { Divider().overlay(Palette.border) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Year overview (12 mini months) + always-visible year list
+
+    private var yearView: some View {
+        let cols = [GridItem(.adaptive(minimum: 150), spacing: 14)]
+        return VStack(alignment: .leading, spacing: 16) {
+            Card {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text(String(viewYear)).font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                        Spacer()
+                        Button { withAnimation(.knFast) { viewYear -= 1 } } label: { Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold)) }
+                            .buttonStyle(KIconButtonStyle(size: 28))
+                        Button { withAnimation(.knFast) { viewYear += 1 } } label: { Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)) }
+                            .buttonStyle(KIconButtonStyle(size: 28))
+                    }
+                    LazyVGrid(columns: cols, spacing: 16) {
+                        ForEach(1...12, id: \.self) { m in
+                            VStack(spacing: 7) {
+                                Text(CalMath.monthName(m, short: true).uppercased())
+                                    .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                KMonthGrid(year: viewYear, month: m, compact: true, dot: dayDot) { _ in
+                                    withAnimation(.knPop) { viewMonth = m; mode = .month }
+                                }
+                            }
+                            .padding(9)
+                            .background(Palette.surface2.opacity(0.3), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        }
+                    }
+                }
+            }
+            yearList
+        }
+    }
+
+    private var yearList: some View {
+        let prefix = String(format: "%04d-", viewYear)
+        let months = (1...12).compactMap { m -> (Int, [String])? in
+            let mp = String(format: "%04d-%02d", viewYear, m)
+            let days = eventsByDay.keys.filter { $0.hasPrefix(mp) }.sorted()
+            return days.isEmpty ? nil : (m, days)
+        }
+        return VStack(alignment: .leading, spacing: 12) {
+            SectionTitle(text: "\(viewYear) memories")
+            if months.isEmpty {
+                Card {
+                    Text("No memories logged in \(String(viewYear)) yet.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                ForEach(months, id: \.0) { (m, days) in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(CalMath.monthName(m)).font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Palette.muted)
+                        Card {
+                            VStack(spacing: 6) {
+                                ForEach(days, id: \.self) { day in
+                                    dayGroup(day, items: eventsByDay[day] ?? [])
+                                    if day != days.last { Divider().overlay(Palette.border) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .id(prefix)
+    }
+
+    // MARK: - Day group (a date header + its events)
+
+    private func dayGroup(_ day: String, items: [EventItem]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { _, e in
+                EventRow(event: e, tags: state.tags(for: e),
+                         edit: { editTarget = EventEditTarget(event: e) },
+                         delete: { state.deleteEvent(e.id) })
+            }
         }
     }
 
     private func dayDot(_ key: String) -> Color? {
         guard let evs = eventsByDay[key], !evs.isEmpty else { return nil }
-        return evs.contains { $0.special } ? Palette.amber : (evs.first?.category.color ?? Palette.brand)
-    }
-
-    @ViewBuilder private var selectedDayCard: some View {
-        if let day = selectedDay {
-            let evs = (eventsByDay[day] ?? []).sorted { !$0.done && $1.done }
-            Card {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(Fmt.day(day)).font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                        Spacer()
-                        Button { editTarget = EventEditTarget(event: nil, presetDate: AppState.date(fromKey: day)) } label: {
-                            Label("Add", systemImage: "plus")
-                        }.buttonStyle(KGhostButtonStyle(color: Palette.brand))
-                    }
-                    if evs.isEmpty {
-                        Text("Nothing on this day. Add what you're planning.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
-                    } else {
-                        ForEach(Array(evs.enumerated()), id: \.element.id) { idx, e in
-                            EventRow(event: e, days: state.daysUntil(e.date),
-                                     toggleDone: { state.toggleEventDone(e.id) },
-                                     edit: { editTarget = EventEditTarget(event: e) },
-                                     delete: { state.deleteEvent(e.id) })
-                            if idx < evs.count - 1 { Divider().overlay(Palette.border) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Year overview (12 mini months)
-
-    private var yearView: some View {
-        let cols = [GridItem(.adaptive(minimum: 150), spacing: 14)]
-        return Card {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text(String(viewYear)).font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                    Spacer()
-                    Button { withAnimation(.knFast) { viewYear -= 1 } } label: { Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold)) }
-                        .buttonStyle(KIconButtonStyle(size: 28))
-                    Button { withAnimation(.knFast) { viewYear += 1 } } label: { Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)) }
-                        .buttonStyle(KIconButtonStyle(size: 28))
-                }
-                LazyVGrid(columns: cols, spacing: 16) {
-                    ForEach(1...12, id: \.self) { m in
-                        VStack(spacing: 7) {
-                            Text(CalMath.monthName(m, short: true).uppercased())
-                                .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            KMonthGrid(year: viewYear, month: m, compact: true, dot: dayDot) { _ in
-                                withAnimation(.knPop) { viewMonth = m; mode = .month }
-                            }
-                        }
-                        .padding(9)
-                        .background(Palette.surface2.opacity(0.3), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                    }
-                }
-            }
-        }
+        if evs.contains(where: { $0.special }) { return Palette.amber }
+        if let first = evs.first, let tag = state.primaryTag(for: first) { return tag.color }
+        return Palette.brand
     }
 
     private func shiftMonth(_ d: Int) {
@@ -154,116 +203,13 @@ struct EventsView: View {
         let c = CalMath.cal.dateComponents([.year, .month], from: Date())
         withAnimation(.knFast) { viewYear = c.year ?? viewYear; viewMonth = c.month ?? viewMonth; selectedDay = CalMath.todayKey() }
     }
-
-    private var emptyState: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Nothing coming up yet").font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                Text("Add the things you're looking forward to — a trip, a visit home, a wedding, a deadline. You'll see them counting down here.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.faint).fixedSize(horizontal: false, vertical: true)
-                Button { editTarget = EventEditTarget(event: nil) } label: { Label("Add your first event", systemImage: "plus") }
-                    .buttonStyle(KPrimaryButtonStyle()).padding(.top, 4)
-            }
-        }
-    }
-
-    // MARK: - Timeline
-
-    private var timeline: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            ForEach(EventBucket.allCases, id: \.self) { bucket in
-                let rows = state.sortedEvents.filter { self.bucket(for: $0) == bucket }
-                if !rows.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 8) {
-                            SectionTitle(text: bucket.title)
-                            Rectangle().fill(bucket.tint).frame(width: 26, height: 3).clipShape(Capsule())
-                        }
-                        Card {
-                            VStack(spacing: 6) {
-                                ForEach(Array(rows.enumerated()), id: \.element.id) { idx, e in
-                                    EventRow(event: e,
-                                             days: state.daysUntil(e.date),
-                                             toggleDone: { state.toggleEventDone(e.id) },
-                                             edit: { editTarget = EventEditTarget(event: e) },
-                                             delete: { state.deleteEvent(e.id) })
-                                    if idx < rows.count - 1 { Divider().overlay(Palette.border) }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var pastSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button { withAnimation(.knNormal) { showPast.toggle() } } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: showPast ? "chevron.down" : "chevron.right").font(.system(size: 10, weight: .heavy))
-                    SectionTitle(text: "Past & done · \(state.doneEvents.count)")
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(KPressStyle())
-            if showPast {
-                Card {
-                    VStack(spacing: 6) {
-                        ForEach(Array(state.doneEvents.enumerated()), id: \.element.id) { idx, e in
-                            EventRow(event: e, days: state.daysUntil(e.date),
-                                     toggleDone: { state.toggleEventDone(e.id) },
-                                     edit: { editTarget = EventEditTarget(event: e) },
-                                     delete: { state.deleteEvent(e.id) })
-                            if idx < state.doneEvents.count - 1 { Divider().overlay(Palette.border) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func bucket(for e: EventItem) -> EventBucket {
-        guard let d = state.daysUntil(e.date) else { return .later }
-        if d < 0 { return .overdue }
-        if d == 0 { return .today }
-        if d <= 7 { return .week }
-        if d <= 31 { return .month }
-        return .later
-    }
-}
-
-// MARK: - Buckets
-
-enum EventBucket: String, CaseIterable {
-    case overdue, today, week, month, later
-    var title: String {
-        switch self {
-        case .overdue: return "Overdue"
-        case .today:   return "Today"
-        case .week:    return "This week"
-        case .month:   return "This month"
-        case .later:   return "Later"
-        }
-    }
-    var tint: Color {
-        switch self {
-        case .overdue: return Palette.red
-        case .today:   return Palette.flame
-        case .week:    return Palette.brand
-        case .month:   return Palette.blue
-        case .later:   return Palette.muted
-        }
-    }
 }
 
 // MARK: - Row
 
 private struct EventRow: View {
     let event: EventItem
-    let days: Int?
-    let toggleDone: () -> Void
+    let tags: [EventTag]
     let edit: () -> Void
     let delete: () -> Void
     @State private var hover = false
@@ -272,37 +218,25 @@ private struct EventRow: View {
     var body: some View {
         HStack(spacing: 12) {
             dateBadge
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
                     if event.special {
                         Image(systemName: "star.fill").font(.system(size: 11)).foregroundStyle(Palette.amber)
                     }
-                    Text(event.title).font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(event.done ? Palette.muted : Palette.text)
-                        .strikethrough(event.done, color: Palette.faint)
-                        .lineLimit(1)
-                    categoryChip
+                    Text(event.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                    ForEach(tags) { t in tagChip(t) }
                 }
-                HStack(spacing: 6) {
-                    Text(countdown).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(countdownColor)
-                    if !event.note.isEmpty {
-                        Text("· \(event.note)").font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
-                    }
+                if !event.note.isEmpty {
+                    Text(event.note).font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
                 }
+                if !event.media.isEmpty { mediaStrip }
             }
             Spacer(minLength: 0)
-            Button(action: toggleDone) {
-                Image(systemName: event.done ? "arrow.uturn.left" : "checkmark.circle")
-                    .font(.system(size: event.done ? 11 : 13, weight: .bold))
-            }
-            .buttonStyle(KIconButtonStyle(size: 24, color: event.done ? Palette.muted : Palette.green))
-            .opacity(hover ? 1 : 0.001)
-            .help(event.done ? "Move back to upcoming" : "Mark done")
             Button(action: edit) { Image(systemName: "pencil").font(.system(size: 11, weight: .bold)) }
                 .buttonStyle(KIconButtonStyle(size: 24)).opacity(hover ? 1 : 0.001).help("Edit")
             Button { showConfirm = true } label: { Image(systemName: "trash").font(.system(size: 10, weight: .bold)) }
                 .buttonStyle(KIconButtonStyle(size: 24, color: Palette.red)).opacity(hover ? 1 : 0.001).help("Delete")
-                .holdToDelete(isPresented: $showConfirm, title: "Delete this event?",
+                .holdToDelete(isPresented: $showConfirm, title: "Delete this memory?",
                               message: "\(event.title) — this can't be undone.") { delete() }
         }
         .padding(.horizontal, 8).padding(.vertical, 8)
@@ -314,27 +248,45 @@ private struct EventRow: View {
     }
 
     private var rowBackground: Color {
-        if event.special && !event.done { return Palette.amber.opacity(hover ? 0.12 : 0.07) }
+        if event.special { return Palette.amber.opacity(hover ? 0.12 : 0.07) }
         return hover ? Palette.surface2.opacity(0.5) : .clear
     }
+
+    private var accent: Color { tags.first?.color ?? Palette.brand }
 
     private var dateBadge: some View {
         VStack(spacing: 0) {
             Text(dayNumber).font(.system(size: 16, weight: .heavy, design: .rounded)).monospacedDigit()
-                .foregroundStyle(event.done ? Palette.muted : Palette.text)
+                .foregroundStyle(Palette.text)
             Text(monthLabel.uppercased()).font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.4)
-                .foregroundStyle(event.category.color)
+                .foregroundStyle(accent)
         }
         .frame(width: 42, height: 42)
-        .background(event.category.color.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(event.category.color.opacity(0.35), lineWidth: 1))
+        .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(accent.opacity(0.35), lineWidth: 1))
     }
 
-    private var categoryChip: some View {
-        Text(event.category.label).font(.system(size: 9, weight: .heavy, design: .rounded))
-            .foregroundStyle(event.category.color)
-            .padding(.horizontal, 7).padding(.vertical, 2)
-            .background(event.category.color.opacity(0.14), in: Capsule())
+    private func tagChip(_ t: EventTag) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: t.symbol).font(.system(size: 8, weight: .bold))
+            Text(t.name).font(.system(size: 9, weight: .heavy, design: .rounded))
+        }
+        .foregroundStyle(t.color)
+        .padding(.horizontal, 7).padding(.vertical, 2)
+        .background(t.color.opacity(0.14), in: Capsule())
+    }
+
+    private var mediaStrip: some View {
+        HStack(spacing: 5) {
+            ForEach(event.media.prefix(5)) { m in
+                MediaThumb(media: m, size: 30)
+            }
+            if event.media.count > 5 {
+                Text("+\(event.media.count - 5)").font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Palette.faint)
+            }
+        }
+        .padding(.top, 2)
     }
 
     private var dayNumber: String {
@@ -345,22 +297,67 @@ private struct EventRow: View {
         guard let d = AppState.date(fromKey: event.date) else { return "" }
         let f = DateFormatter(); f.dateFormat = "MMM"; return f.string(from: d)
     }
-    private var countdown: String {
-        guard let d = days else { return Fmt.day(event.date) }
-        switch d {
-        case 0: return "Today"
-        case 1: return "Tomorrow"
-        case -1: return "Yesterday"
-        case let n where n > 1: return "in \(n) days"
-        default: return "\(-d) days ago"
+}
+
+// MARK: - Media thumbnail
+
+private struct MediaThumb: View {
+    let media: EventMedia
+    var size: CGFloat = 72
+    var onRemove: (() -> Void)? = nil
+    @State private var hover = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let img = EventMediaIO.image(media) {
+                    Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Rectangle().fill(Palette.surface2)
+                        .overlay(Image(systemName: media.kind == .video ? "film" : "photo").foregroundStyle(Palette.faint))
+                }
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
+            .overlay {
+                if media.kind == .video {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: size * 0.32))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .shadow(radius: 3)
+                }
+            }
+
+            if let onRemove, hover {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 15))
+                        .foregroundStyle(.white, Palette.red)
+                }
+                .buttonStyle(.plain).padding(3)
+            }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { EventMediaIO.open(media) }
+        .onHover { hover = $0 }
+        .help(media.kind == .video ? "Open video" : "Open photo")
     }
-    private var countdownColor: Color {
-        guard let d = days, !event.done else { return Palette.faint }
-        if d < 0 { return Palette.red }
-        if d <= 1 { return Palette.flame }
-        if d <= 7 { return Palette.brand }
-        return Palette.muted
+}
+
+/// Decode / open inline base64 media.
+enum EventMediaIO {
+    static func image(_ m: EventMedia) -> NSImage? {
+        let b64 = m.kind == .video ? m.poster : m.data
+        guard let b64, let d = Data(base64Encoded: b64) else { return nil }
+        return NSImage(data: d)
+    }
+    static func open(_ m: EventMedia) {
+        guard let d = Data(base64Encoded: m.data) else { return }
+        let ext = m.kind == .video ? "mp4" : "jpg"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
+        try? d.write(to: url)
+        NSWorkspace.shared.open(url)
     }
 }
 
@@ -379,10 +376,15 @@ private struct EventEditor: View {
 
     @State private var title = ""
     @State private var date = Date()
-    @State private var category: EventCategory = .personal
+    @State private var selectedTags: Set<String> = []
     @State private var special = false
     @State private var note = ""
+    @State private var media: [EventMedia] = []
     @State private var showCal = false
+    @State private var showTags = false
+    @State private var importing = false
+    @State private var busy = false
+    @State private var mediaError: String?
 
     private var isNew: Bool { target.event == nil }
     private var prettyDate: String {
@@ -392,10 +394,10 @@ private struct EventEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(isNew ? "Add event" : "Edit event")
+            Text(isNew ? "Log a memory" : "Edit memory")
                 .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
 
-            KLabeledField(label: "What is it?", placeholder: "Trip home, a wedding, send the email…", text: $title)
+            KLabeledField(label: "What happened?", placeholder: "Trip home, a wedding, a small win…", text: $title)
 
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -431,48 +433,119 @@ private struct EventEditor: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                KFieldLabel(text: "Category")
+                KFieldLabel(text: "Tags")
                 FlowLayout(spacing: 7, runSpacing: 7) {
-                    ForEach(EventCategory.allCases, id: \.self) { c in catChip(c) }
+                    ForEach(state.eventTags) { tag in tagChip(tag) }
+                    Button { showTags = true } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus").font(.system(size: 9, weight: .heavy))
+                            Text("New tag").font(.system(size: 12, weight: .heavy, design: .rounded))
+                        }
+                        .foregroundStyle(Palette.muted)
+                        .padding(.horizontal, 11).padding(.vertical, 8)
+                        .background(Palette.surface2.opacity(0.6), in: Capsule())
+                    }
+                    .buttonStyle(KPressStyle())
                 }
             }
+
+            mediaSection
 
             KLabeledField(label: "Note", placeholder: "Optional detail", text: $note)
 
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
-                Button(isNew ? "Add" : "Save") { save() }
+                Button(isNew ? "Log it" : "Save") { save() }
                     .buttonStyle(KPrimaryButtonStyle())
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(24).frame(width: 440)
+        .padding(24).frame(width: 470)
         .background(Palette.elevated)
         .onAppear { load() }
+        .sheet(isPresented: $showTags) { TagManagerSheet() }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.image, .movie, .video],
+                      allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { importMedia(urls) }
+        }
     }
 
-    private func catChip(_ c: EventCategory) -> some View {
-        let on = category == c
-        return Button { category = c } label: {
-            HStack(spacing: 5) {
-                Image(systemName: c.icon).font(.system(size: 10, weight: .bold))
-                Text(c.label).font(.system(size: 12, weight: .heavy, design: .rounded))
+    private var mediaSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                KFieldLabel(text: "Photos & videos")
+                Spacer()
+                if busy { ProgressView().controlSize(.small) }
             }
-            .foregroundStyle(on ? .white : c.color)
+            FlowLayout(spacing: 8, runSpacing: 8) {
+                ForEach(media) { m in
+                    MediaThumb(media: m, size: 72, onRemove: { media.removeAll { $0.id == m.id } })
+                }
+                Button { importing = true } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: "plus").font(.system(size: 16, weight: .bold))
+                        Text("Add").font(.system(size: 10, weight: .heavy, design: .rounded))
+                    }
+                    .foregroundStyle(Palette.muted)
+                    .frame(width: 72, height: 72)
+                    .background(Palette.bg.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])).foregroundStyle(Palette.border))
+                }
+                .buttonStyle(KPressStyle())
+            }
+            if let mediaError {
+                Text(mediaError).font(.system(size: 11)).foregroundStyle(Palette.red)
+            }
+        }
+    }
+
+    private func tagChip(_ tag: EventTag) -> some View {
+        let on = selectedTags.contains(tag.id)
+        return Button {
+            if on { selectedTags.remove(tag.id) } else { selectedTags.insert(tag.id) }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: tag.symbol).font(.system(size: 10, weight: .bold))
+                Text(tag.name).font(.system(size: 12, weight: .heavy, design: .rounded))
+            }
+            .foregroundStyle(on ? .white : tag.color)
             .padding(.horizontal, 11).padding(.vertical, 8)
-            .background(on ? c.color : c.color.opacity(0.14), in: Capsule())
+            .background(on ? tag.color : tag.color.opacity(0.14), in: Capsule())
         }
         .buttonStyle(KPressStyle())
+    }
+
+    private func importMedia(_ urls: [URL]) {
+        mediaError = nil
+        busy = true
+        Task {
+            for url in urls {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                let type = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)
+                if let type, type.conforms(to: .image) {
+                    if let img = NSImage(contentsOf: url), let b64 = NoteImage.encode(img) {
+                        media.append(EventMedia(kind: .image, data: b64))
+                    }
+                } else {
+                    do { media.append(try await VideoMedia.encode(from: url)) }
+                    catch { mediaError = error.localizedDescription }
+                }
+            }
+            busy = false
+        }
     }
 
     private func load() {
         if let e = target.event {
             title = e.title
             date = AppState.date(fromKey: e.date) ?? Date()
-            category = e.category
+            selectedTags = Set(e.tagIDs)
             special = e.special
             note = e.note
+            media = e.media
         } else if let pd = target.presetDate {
             date = pd
         }
@@ -482,39 +555,170 @@ private struct EventEditor: View {
         let t = title.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty else { return }
         let key = AppState.dateKey(date)
+        let tagIDs = state.eventTags.filter { selectedTags.contains($0.id) }.map { $0.id }
         if let e = target.event {
-            state.updateEvent(EventItem(id: e.id, date: key, title: t, category: category,
-                                        note: note, special: special, done: e.done))
+            var ev = e
+            ev.date = key; ev.title = t; ev.tagIDs = tagIDs; ev.note = note; ev.special = special; ev.media = media
+            state.updateEvent(ev)
         } else {
-            state.addEvent(date: key, title: t, category: category, note: note, special: special)
+            state.addEvent(date: key, title: t, tagIDs: tagIDs, note: note, special: special, media: media)
         }
         dismiss()
     }
 }
 
-// MARK: - Category styling
+// MARK: - Tag manager
 
-extension EventCategory {
-    var color: Color {
-        switch self {
-        case .travel:    return Palette.blue
-        case .family:    return Palette.flame
-        case .work:      return Palette.amber
-        case .personal:  return Palette.brand
-        case .milestone: return Palette.purple
-        case .reminder:  return Palette.ice
-        case .other:     return Palette.muted
+private struct TagManagerSheet: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var editing: EventTag?
+    @State private var isAdding = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Tags").font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Spacer()
+                Button { isAdding = true; editing = EventTag(name: "", symbol: "star.fill", colorHex: "1CB0F6") } label: {
+                    Label("New tag", systemImage: "plus")
+                }.buttonStyle(KGhostButtonStyle(color: Palette.brand))
+            }
+
+            if let editing {
+                TagEditForm(tag: editing, isNew: isAdding,
+                            onCancel: { self.editing = nil; isAdding = false },
+                            onSave: { t in
+                                if isAdding { state.addTag(name: t.name, symbol: t.symbol, colorHex: t.colorHex) }
+                                else { state.updateTag(t) }
+                                self.editing = nil; isAdding = false
+                            })
+            }
+
+            ScrollView {
+                VStack(spacing: 6) {
+                    ForEach(state.eventTags) { tag in tagRow(tag) }
+                }
+            }
+            .frame(height: 260)
+
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }.buttonStyle(KPrimaryButtonStyle())
+            }
         }
+        .padding(24).frame(width: 460)
+        .background(Palette.elevated)
     }
-    var icon: String {
-        switch self {
-        case .travel:    return "airplane"
-        case .family:    return "house.fill"
-        case .work:      return "briefcase.fill"
-        case .personal:  return "person.fill"
-        case .milestone: return "flag.fill"
-        case .reminder:  return "bell.fill"
-        case .other:     return "calendar"
+
+    private func tagRow(_ tag: EventTag) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: tag.symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(tag.color)
+                .frame(width: 34, height: 34)
+                .background(tag.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Text(tag.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+            if tag.builtIn {
+                Text("built-in").font(.system(size: 9, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                    .padding(.horizontal, 6).padding(.vertical, 2).background(Palette.surface2, in: Capsule())
+            }
+            Spacer()
+            Button { editing = tag; isAdding = false } label: { Image(systemName: "pencil").font(.system(size: 11, weight: .bold)) }
+                .buttonStyle(KIconButtonStyle(size: 26)).help("Edit")
+            if !tag.builtIn {
+                Button { state.deleteTag(tag.id) } label: { Image(systemName: "trash").font(.system(size: 10, weight: .bold)) }
+                    .buttonStyle(KIconButtonStyle(size: 26, color: Palette.red)).help("Delete tag")
+            }
         }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(Palette.surface2.opacity(0.35), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
     }
+}
+
+private struct TagEditForm: View {
+    @State var tag: EventTag
+    let isNew: Bool
+    let onCancel: () -> Void
+    let onSave: (EventTag) -> Void
+
+    private let swatches = ["58CC02", "1CB0F6", "FFC800", "CE82FF", "FF9600", "FF4B4B", "84D8FF", "9A9A9A"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            KLabeledField(label: "Name", placeholder: "Birthday, Anniversary…", text: $tag.name)
+            VStack(alignment: .leading, spacing: 5) {
+                KFieldLabel(text: "Colour")
+                HStack(spacing: 8) {
+                    ForEach(swatches, id: \.self) { hex in
+                        Circle().fill(Color(hexString: hex)).frame(width: 24, height: 24)
+                            .overlay(Circle().strokeBorder(.white, lineWidth: tag.colorHex == hex ? 2 : 0))
+                            .onTapGesture { tag.colorHex = hex }
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                KFieldLabel(text: "Icon")
+                SymbolPicker(selection: $tag.symbol, tint: Color(hexString: tag.colorHex))
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel).buttonStyle(KGhostButtonStyle())
+                Button(isNew ? "Add tag" : "Save") { onSave(tag) }
+                    .buttonStyle(KPrimaryButtonStyle())
+                    .disabled(tag.name.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(14)
+        .background(Palette.bg.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+    }
+}
+
+private struct SymbolPicker: View {
+    @Binding var selection: String
+    var tint: Color
+
+    private let symbols = [
+        "star.fill", "heart.fill", "gift.fill", "airplane", "house.fill", "briefcase.fill",
+        "person.fill", "person.2.fill", "figure.2.and.child.holdinghands", "flag.fill", "bell.fill",
+        "calendar", "birthday.cake.fill", "graduationcap.fill", "cross.case.fill", "stethoscope",
+        "fork.knife", "cup.and.saucer.fill", "gamecontroller.fill", "music.note", "film.fill",
+        "camera.fill", "book.fill", "pencil", "paintbrush.fill", "hammer.fill", "car.fill",
+        "tram.fill", "bicycle", "figure.run", "dumbbell.fill", "sportscourt.fill", "trophy.fill",
+        "leaf.fill", "pawprint.fill", "sun.max.fill", "moon.stars.fill", "flame.fill",
+        "sparkles", "party.popper.fill", "balloon.fill", "hands.clap.fill", "dollarsign.circle.fill",
+        "creditcard.fill", "phone.fill", "envelope.fill", "mappin.and.ellipse", "globe"
+    ]
+    private let cols = [GridItem(.adaptive(minimum: 38), spacing: 6)]
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: cols, spacing: 6) {
+                ForEach(symbols, id: \.self) { s in
+                    let on = selection == s
+                    Button { selection = s } label: {
+                        Image(systemName: s).font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(on ? .white : tint)
+                            .frame(width: 38, height: 38)
+                            .background(on ? tint : tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    }
+                    .buttonStyle(KPressStyle())
+                }
+            }
+            .padding(2)
+        }
+        .frame(height: 132)
+    }
+}
+
+// MARK: - Colour from hex string + tag colour
+
+extension Color {
+    /// Parse an "RRGGBB" (or "#RRGGBB") string into a Color via the existing hex init.
+    init(hexString: String) {
+        let s = hexString.hasPrefix("#") ? String(hexString.dropFirst()) : hexString
+        self.init(hex: UInt32(s, radix: 16) ?? 0x9A9A9A)
+    }
+}
+
+extension EventTag {
+    var color: Color { Color(hexString: colorHex) }
 }

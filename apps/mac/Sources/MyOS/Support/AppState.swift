@@ -41,6 +41,7 @@ final class AppState: ObservableObject {
     @Published var nutrition = NutritionState()
     @Published var training = TrainingState()
     @Published var events: [EventItem] = []
+    @Published var eventTags: [EventTag] = []
     @Published var watch: [WatchItem] = []
     @Published var networth = NetWorthState()
 
@@ -99,6 +100,8 @@ final class AppState: ObservableObject {
         nutrition = s.nutrition ?? NutritionState()
         training  = s.training ?? TrainingState()
         events    = s.events ?? []
+        eventTags = s.eventTags ?? []
+        if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
         watch     = s.watch ?? []
         networth  = s.networth ?? NetWorthState()
     }
@@ -231,7 +234,8 @@ final class AppState: ObservableObject {
             (StateKey.journal, journal), (StateKey.journalPresets, journalPresets),
             (StateKey.notes, notes), (StateKey.days, days), (StateKey.profile, profile),
             (StateKey.chat, chat), (StateKey.nutrition, nutrition), (StateKey.training, training),
-            (StateKey.events, events), (StateKey.watch, watch), (StateKey.networth, networth)
+            (StateKey.events, events), (StateKey.eventTags, eventTags),
+            (StateKey.watch, watch), (StateKey.networth, networth)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -321,7 +325,8 @@ final class AppState: ObservableObject {
         add("journal", journal); add("journalPresets", journalPresets)
         add("notes", notes); add("days", days); add("chat", chat)
         add("nutrition", nutrition); add("training", training)
-        add("events", events); add("watch", watch); add("networth", networth)
+        add("events", events); add("eventTags", eventTags)
+        add("watch", watch); add("networth", networth)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -1391,19 +1396,19 @@ final class AppState: ObservableObject {
         push(StateKey.networth, networth)
     }
 
-    // MARK: - Events (upcoming life timeline)
+    // MARK: - Events (a memory log — past, present, or future)
 
-    /// Undone events, soonest first — the timeline order.
-    var sortedEvents: [EventItem] { events.filter { !$0.done }.sorted { $0.date < $1.date } }
-    /// Past / handled events, most recent first — the archive.
-    var doneEvents: [EventItem] { events.filter { $0.done }.sorted { $0.date > $1.date } }
-    /// The next couple of things coming up — for the Today spine.
-    var nextEvents: [EventItem] { Array(sortedEvents.prefix(2)) }
+    /// The next couple of things coming up — for the Today spine. Date-based, not "done".
+    var nextEvents: [EventItem] {
+        let today = todayKey
+        return Array(events.filter { $0.date >= today }.sorted { $0.date < $1.date }.prefix(2))
+    }
 
-    func addEvent(date: String, title: String, category: EventCategory, note: String = "", special: Bool = false) {
+    func addEvent(date: String, title: String, tagIDs: [String] = [], note: String = "",
+                  special: Bool = false, media: [EventMedia] = []) {
         let t = title.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty, !date.isEmpty else { return }
-        events.append(EventItem(date: date, title: t, category: category, note: note, special: special))
+        events.append(EventItem(date: date, title: t, tagIDs: tagIDs, note: note, media: media, special: special))
         push(StateKey.events, events)
     }
     func updateEvent(_ e: EventItem) {
@@ -1412,19 +1417,44 @@ final class AppState: ObservableObject {
         events[i] = ev
         push(StateKey.events, events)
     }
-    func toggleEventDone(_ id: String) {
-        guard let i = events.firstIndex(where: { $0.id == id }) else { return }
-        events[i].done.toggle()
-        push(StateKey.events, events)
-    }
     func deleteEvent(_ id: String) {
         events.removeAll { $0.id == id }
         push(StateKey.events, events)
     }
-    /// Whole days from today to an event date (negative = overdue). Timezone-stable.
+    /// Whole days from today to a date (negative = past). Timezone-stable.
     func daysUntil(_ dateKey: String) -> Int? {
         guard let d = Self.date(fromKey: dateKey), let today = Self.date(fromKey: todayKey) else { return nil }
         return Calendar(identifier: .gregorian).dateComponents([.day], from: today, to: d).day
+    }
+
+    // MARK: - Event tags (custom: name + SF Symbol + colour)
+
+    /// Resolve an event's tag ids to tags, in order.
+    func tags(for e: EventItem) -> [EventTag] {
+        e.tagIDs.compactMap { id in eventTags.first { $0.id == id } }
+    }
+    /// The first resolvable tag — drives an event's badge colour / glyph.
+    func primaryTag(for e: EventItem) -> EventTag? { tags(for: e).first }
+
+    func addTag(name: String, symbol: String, colorHex: String) {
+        let n = name.trimmingCharacters(in: .whitespaces)
+        guard !n.isEmpty else { return }
+        eventTags.append(EventTag(name: n, symbol: symbol, colorHex: colorHex))
+        push(StateKey.eventTags, eventTags)
+    }
+    func updateTag(_ tag: EventTag) {
+        guard let i = eventTags.firstIndex(where: { $0.id == tag.id }) else { return }
+        var t = tag; t.name = t.name.trimmingCharacters(in: .whitespaces)
+        eventTags[i] = t
+        push(StateKey.eventTags, eventTags)
+    }
+    /// Delete a custom tag (built-ins are protected) and scrub it from every event.
+    func deleteTag(_ id: String) {
+        guard let t = eventTags.first(where: { $0.id == id }), !t.builtIn else { return }
+        eventTags.removeAll { $0.id == id }
+        for i in events.indices { events[i].tagIDs.removeAll { $0 == id } }
+        push(StateKey.eventTags, eventTags)
+        push(StateKey.events, events)
     }
 
     // MARK: - Productivity / watch log
