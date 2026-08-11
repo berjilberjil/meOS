@@ -6,8 +6,8 @@ import AppKit
 /// we transcode to ≤540p H.264 and hard-cap the encoded bytes. A first-frame poster is
 /// grabbed for the grid so we never decode the whole clip just to show a thumbnail.
 enum VideoMedia {
-    /// Hard cap on the encoded video, in bytes (15 MB).
-    static let maxBytes = 15 * 1024 * 1024
+    /// Hard cap on the encoded video, in bytes (25 MB per clip).
+    static let maxBytes = 25 * 1024 * 1024
 
     enum Failure: LocalizedError {
         case exportFailed
@@ -15,13 +15,14 @@ enum VideoMedia {
         var errorDescription: String? {
             switch self {
             case .exportFailed:     return "Couldn't compress that video."
-            case .tooLarge(let mb): return "That clip is \(mb) MB after compression — keep it under 15 MB (try a shorter clip)."
+            case .tooLarge(let mb): return "That clip is \(mb) MB after compression — keep it under 25 MB (try a shorter clip)."
             }
         }
     }
 
-    /// Transcode → cap → base64. Returns an image/video `EventMedia`. Throws `Failure`.
-    static func encode(from url: URL) async throws -> EventMedia {
+    /// Transcode → cap → base64. `onProgress` is called on the main actor with 0…1 while
+    /// the transcode runs, so the UI can show a live percentage. Throws `Failure`.
+    static func encode(from url: URL, onProgress: @escaping (Double) -> Void = { _ in }) async throws -> EventMedia {
         let asset = AVURLAsset(url: url)
         guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset960x540) else {
             throw Failure.exportFailed
@@ -32,14 +33,24 @@ enum VideoMedia {
         export.outputFileType = .mp4
         export.shouldOptimizeForNetworkUse = true
 
+        // Poll transcode progress on the main actor so the editor can render a live %.
+        let poller = Task { @MainActor in
+            while !Task.isCancelled {
+                onProgress(Double(export.progress))
+                try? await Task.sleep(nanoseconds: 120_000_000)
+            }
+        }
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             export.exportAsynchronously { cont.resume() }
         }
+        poller.cancel()
+
         guard export.status == .completed else { throw Failure.exportFailed }
         defer { try? FileManager.default.removeItem(at: out) }
 
         let data = try Data(contentsOf: out)
         guard data.count <= maxBytes else { throw Failure.tooLarge(mb: data.count / (1024 * 1024)) }
+        await MainActor.run { onProgress(1.0) }
 
         let poster = firstFramePoster(asset)
         return EventMedia(kind: .video, data: data.base64EncodedString(), poster: poster)

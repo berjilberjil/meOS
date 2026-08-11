@@ -67,6 +67,8 @@ struct KMonthGrid: View {
     var dot: (String) -> Color? = { _ in nil }
     /// A holiday name for a day (nil = none) — shown on hover, flagged with a top dot.
     var holiday: (String) -> String? = { _ in nil }
+    /// A rich card to float on hover for a day (nil = none) — e.g. that day's memories.
+    var hoverCard: (String) -> AnyView? = { _ in nil }
     var onTap: (String) -> Void = { _ in }
 
     private let weekdays = ["M", "T", "W", "T", "F", "S", "S"]   // Monday-first
@@ -105,7 +107,13 @@ struct KMonthGrid: View {
                         ForEach(0..<7, id: \.self) { c in
                             let i = r * 7 + c
                             Group {
-                                if i < cells.count, let day = cells[i] { cell(day) }
+                                if i < cells.count, let day = cells[i] {
+                                    let k = CalMath.key(year, month, day)
+                                    DayCell(day: day, key: k, selected: selected,
+                                            compact: compact, big: big, radius: radius, cellHeight: cellHeight,
+                                            dotColor: dot(k), holidayName: holiday(k), hoverCard: hoverCard(k),
+                                            onTap: { onTap(k) })
+                                }
                                 else { Color.clear.frame(height: cellHeight) }
                             }
                             .frame(maxWidth: .infinity)
@@ -116,20 +124,36 @@ struct KMonthGrid: View {
         }
     }
 
-    private func cell(_ day: Int) -> some View {
-        let key = CalMath.key(year, month, day)
+}
+
+/// One day button — hover lift + (optionally) a floating card of that day's memories.
+private struct DayCell: View {
+    let day: Int
+    let key: String
+    let selected: String?
+    let compact: Bool
+    let big: Bool
+    let radius: CGFloat
+    let cellHeight: CGFloat
+    let dotColor: Color?
+    let holidayName: String?
+    let hoverCard: AnyView?
+    let onTap: () -> Void
+
+    @State private var hover = false
+    @State private var showCard = false
+
+    var body: some View {
         let isToday = key == CalMath.todayKey()
         let isSel = key == selected
-        let dc = dot(key)
-        let hol = holiday(key)
         let wknd = CalMath.weekend(key)
         let numberColor: Color = isSel ? .white
             : (wknd.sun ? Palette.red : (wknd.sat ? Palette.blue : (isToday ? Palette.brand : Palette.text)))
         let weekendBG: Color = wknd.sun ? Palette.red.opacity(0.10)
             : (wknd.sat ? Palette.blue.opacity(0.06) : .clear)
-        let cellBG: Color = isSel ? Palette.brand : (hol != nil ? Palette.amber.opacity(0.12) : weekendBG)
+        let cellBG: Color = isSel ? Palette.brand : (holidayName != nil ? Palette.amber.opacity(0.12) : weekendBG)
 
-        return Button { onTap(key) } label: {
+        return Button(action: onTap) {
             VStack(spacing: big ? 4 : (compact ? 1 : 3)) {
                 Text("\(day)")
                     .font(.system(size: big ? 21 : (compact ? 9 : 13),
@@ -137,28 +161,53 @@ struct KMonthGrid: View {
                     .monospacedDigit()
                     .foregroundStyle(numberColor)
                 if !compact {
-                    Circle().fill(isSel ? Color.white.opacity(dc == nil ? 0 : 0.9) : (dc ?? .clear))
+                    Circle().fill(isSel ? Color.white.opacity(dotColor == nil ? 0 : 0.9) : (dotColor ?? .clear))
                         .frame(width: big ? 7 : 5, height: big ? 7 : 5)
                 }
             }
             .frame(maxWidth: .infinity).frame(height: cellHeight)
             .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(cellBG))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)   // hover lift
+                .fill(Color.white.opacity(hover && !isSel ? 0.07 : 0)))
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(isToday && !isSel ? Palette.brand.opacity(0.55) : .clear, lineWidth: 1.5))
+                .strokeBorder(borderColor(isToday: isToday, isSel: isSel), lineWidth: 1.5))
             .overlay(alignment: .top) {
-                if hol != nil {
+                if holidayName != nil {
                     Circle().fill(isSel ? Color.white : Palette.amber)
                         .frame(width: big ? 5 : 3, height: big ? 5 : 3)
                         .padding(.top, big ? 5 : 2)
                 }
             }
             .overlay(alignment: .bottom) {
-                if compact, let dc { Circle().fill(dc).frame(width: 3, height: 3).padding(.bottom, 2) }
+                if compact, let dotColor { Circle().fill(dotColor).frame(width: 3, height: 3).padding(.bottom, 2) }
             }
             .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         }
         .buttonStyle(KPressStyle(scale: 0.92))
-        .help(hol ?? "")
+        .help(holidayName ?? "")
+        .onHover { h in
+            hover = h
+            if hoverCard != nil {
+                if h { scheduleCard() } else { showCard = false }
+            }
+        }
+        .animation(.knFast, value: hover)
+        .zIndex(hover ? 1 : 0)
+        .popover(isPresented: $showCard, arrowEdge: .bottom) { hoverCard }
+    }
+
+    private func borderColor(isToday: Bool, isSel: Bool) -> Color {
+        if isToday && !isSel { return Palette.brand.opacity(0.55) }
+        if hover && !isSel { return Palette.border }
+        return .clear
+    }
+
+    // Show the card after a short dwell so a quick sweep across the grid doesn't flash it.
+    private func scheduleCard() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 260_000_000)
+            if hover { showCard = true }
+        }
     }
 }
 

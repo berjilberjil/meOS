@@ -1,11 +1,12 @@
 import SwiftUI
 import AppKit
+import AVKit
 import UniformTypeIdentifiers
 
 /// The Events tab — a **memory log**. Log anything that happened or is coming up: a trip,
 /// a wedding, a visit home, a small win. Past, present, or future — each with tags and
 /// photos/videos. The calendar is the surface; a list of that month's memories always
-/// sits below it. Tap any day to log a new one.
+/// sits below it. Tap any day to log a new one; hover a day to peek what's on it.
 struct EventsView: View {
     @EnvironmentObject var state: AppState
     @State private var editTarget: EventEditTarget?
@@ -14,6 +15,7 @@ struct EventsView: View {
     @State private var viewMonth = 0
     @State private var selectedDay: String? = nil
     @State private var showTags = false
+    @State private var viewer: EventMedia?
 
     enum Mode: String, CaseIterable, Hashable {
         case month, year
@@ -21,6 +23,18 @@ struct EventsView: View {
     }
 
     private var eventsByDay: [String: [EventItem]] { Dictionary(grouping: state.events, by: { $0.date }) }
+
+    /// Precomputed once per render — the dot colour for each day. Cheap O(1) lookups keep
+    /// the Year view (12 mini-months × ~40 cells) from rebuilding this per cell.
+    private var dayColors: [String: Color] {
+        var m: [String: Color] = [:]
+        for (day, evs) in eventsByDay {
+            if evs.contains(where: { $0.special }) { m[day] = Palette.amber }
+            else if let first = evs.first, let t = state.primaryTag(for: first) { m[day] = t.color }
+            else { m[day] = Palette.brand }
+        }
+        return m
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -53,37 +67,40 @@ struct EventsView: View {
         }
         .sheet(item: $editTarget) { t in EventEditor(target: t) }
         .sheet(isPresented: $showTags) { TagManagerSheet() }
+        .sheet(item: $viewer) { MediaViewer(media: $0) }
     }
 
     // MARK: - Month calendar + always-visible month list
 
     private var monthView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let byDay = eventsByDay
+        let colors = dayColors
+        return VStack(alignment: .leading, spacing: 16) {
             Card {
                 VStack(spacing: 16) {
                     KMonthHeader(year: viewYear, month: viewMonth,
                                  onPrev: { shiftMonth(-1) }, onNext: { shiftMonth(1) }, onToday: goToday)
                     KMonthGrid(year: viewYear, month: viewMonth, selected: selectedDay, big: true,
-                               dot: dayDot, holiday: { Holidays.name($0) }) { key in
+                               dot: { colors[$0] }, holiday: { Holidays.name($0) },
+                               hoverCard: { dayCard(for: $0, byDay: byDay) }) { key in
                         selectedDay = key
                         editTarget = EventEditTarget(event: nil, presetDate: AppState.date(fromKey: key))
                     }
                 }
             }
-            monthList
+            monthList(byDay: byDay)
         }
     }
 
-    private var monthList: some View {
+    private func monthList(byDay: [String: [EventItem]]) -> some View {
         let prefix = String(format: "%04d-%02d", viewYear, viewMonth)
-        let days = eventsByDay.keys.filter { $0.hasPrefix(prefix) }.sorted()
+        let days = byDay.keys.filter { $0.hasPrefix(prefix) }.sorted()
+        let count = days.reduce(0) { $0 + (byDay[$1]?.count ?? 0) }
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 SectionTitle(text: "\(CalMath.monthName(viewMonth)) memories")
-                let count = days.reduce(0) { $0 + (eventsByDay[$1]?.count ?? 0) }
                 if count > 0 {
-                    Text("\(count)").font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Palette.faint)
+                    Text("\(count)").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
                 }
                 Spacer()
             }
@@ -97,7 +114,7 @@ struct EventsView: View {
                 Card {
                     VStack(spacing: 6) {
                         ForEach(days, id: \.self) { day in
-                            dayGroup(day, items: eventsByDay[day] ?? [])
+                            dayGroup(items: byDay[day] ?? [])
                             if day != days.last { Divider().overlay(Palette.border) }
                         }
                     }
@@ -109,6 +126,8 @@ struct EventsView: View {
     // MARK: - Year overview (12 mini months) + always-visible year list
 
     private var yearView: some View {
+        let byDay = eventsByDay
+        let colors = dayColors
         let cols = [GridItem(.adaptive(minimum: 150), spacing: 14)]
         return VStack(alignment: .leading, spacing: 16) {
             Card {
@@ -127,7 +146,7 @@ struct EventsView: View {
                                 Text(CalMath.monthName(m, short: true).uppercased())
                                     .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                KMonthGrid(year: viewYear, month: m, compact: true, dot: dayDot) { _ in
+                                KMonthGrid(year: viewYear, month: m, compact: true, dot: { colors[$0] }) { _ in
                                     withAnimation(.knPop) { viewMonth = m; mode = .month }
                                 }
                             }
@@ -137,15 +156,14 @@ struct EventsView: View {
                     }
                 }
             }
-            yearList
+            yearList(byDay: byDay)
         }
     }
 
-    private var yearList: some View {
-        let prefix = String(format: "%04d-", viewYear)
+    private func yearList(byDay: [String: [EventItem]]) -> some View {
         let months = (1...12).compactMap { m -> (Int, [String])? in
             let mp = String(format: "%04d-%02d", viewYear, m)
-            let days = eventsByDay.keys.filter { $0.hasPrefix(mp) }.sorted()
+            let days = byDay.keys.filter { $0.hasPrefix(mp) }.sorted()
             return days.isEmpty ? nil : (m, days)
         }
         return VStack(alignment: .leading, spacing: 12) {
@@ -159,12 +177,11 @@ struct EventsView: View {
             } else {
                 ForEach(months, id: \.0) { (m, days) in
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(CalMath.monthName(m)).font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Palette.muted)
+                        Text(CalMath.monthName(m)).font(.system(size: 12, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
                         Card {
                             VStack(spacing: 6) {
                                 ForEach(days, id: \.self) { day in
-                                    dayGroup(day, items: eventsByDay[day] ?? [])
+                                    dayGroup(items: byDay[day] ?? [])
                                     if day != days.last { Divider().overlay(Palette.border) }
                                 }
                             }
@@ -173,26 +190,47 @@ struct EventsView: View {
                 }
             }
         }
-        .id(prefix)
     }
 
-    // MARK: - Day group (a date header + its events)
+    // MARK: - Shared bits
 
-    private func dayGroup(_ day: String, items: [EventItem]) -> some View {
+    private func dayGroup(items: [EventItem]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { _, e in
+            ForEach(items) { e in
                 EventRow(event: e, tags: state.tags(for: e),
+                         open: { viewer = $0 },
                          edit: { editTarget = EventEditTarget(event: e) },
                          delete: { state.deleteEvent(e.id) })
             }
         }
     }
 
-    private func dayDot(_ key: String) -> Color? {
-        guard let evs = eventsByDay[key], !evs.isEmpty else { return nil }
-        if evs.contains(where: { $0.special }) { return Palette.amber }
-        if let first = evs.first, let tag = state.primaryTag(for: first) { return tag.color }
-        return Palette.brand
+    /// The floating card shown when hovering a day that has memories.
+    private func dayCard(for key: String, byDay: [String: [EventItem]]) -> AnyView? {
+        guard let evs = byDay[key], !evs.isEmpty else { return nil }
+        return AnyView(
+            VStack(alignment: .leading, spacing: 10) {
+                Text(Fmt.day(key)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                ForEach(evs) { e in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 8) {
+                            if e.special { Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Palette.amber) }
+                            if let t = state.primaryTag(for: e) {
+                                Image(systemName: t.symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(t.color)
+                            }
+                            Text(e.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                        }
+                        if !e.media.isEmpty {
+                            HStack(spacing: 4) {
+                                ForEach(e.media.prefix(4)) { m in MediaThumb(media: m, size: 34) }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(13).frame(minWidth: 190, maxWidth: 280, alignment: .leading)
+            .background(Palette.elevated)
+        )
     }
 
     private func shiftMonth(_ d: Int) {
@@ -210,6 +248,7 @@ struct EventsView: View {
 private struct EventRow: View {
     let event: EventItem
     let tags: [EventTag]
+    let open: (EventMedia) -> Void
     let edit: () -> Void
     let delete: () -> Void
     @State private var hover = false
@@ -279,7 +318,7 @@ private struct EventRow: View {
     private var mediaStrip: some View {
         HStack(spacing: 5) {
             ForEach(event.media.prefix(5)) { m in
-                MediaThumb(media: m, size: 30)
+                MediaThumb(media: m, size: 30, onOpen: open)
             }
             if event.media.count > 5 {
                 Text("+\(event.media.count - 5)").font(.system(size: 10, weight: .heavy, design: .rounded))
@@ -299,12 +338,13 @@ private struct EventRow: View {
     }
 }
 
-// MARK: - Media thumbnail
+// MARK: - Media thumbnail + in-app viewer
 
 private struct MediaThumb: View {
     let media: EventMedia
     var size: CGFloat = 72
     var onRemove: (() -> Void)? = nil
+    var onOpen: ((EventMedia) -> Void)? = nil
     @State private var hover = false
 
     var body: some View {
@@ -324,40 +364,74 @@ private struct MediaThumb: View {
                 if media.kind == .video {
                     Image(systemName: "play.circle.fill")
                         .font(.system(size: size * 0.32))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .shadow(radius: 3)
+                        .foregroundStyle(.white.opacity(0.9)).shadow(radius: 3)
                 }
             }
 
             if let onRemove, hover {
                 Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 15))
-                        .foregroundStyle(.white, Palette.red)
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 15)).foregroundStyle(.white, Palette.red)
                 }
                 .buttonStyle(.plain).padding(3)
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture { EventMediaIO.open(media) }
+        .onTapGesture { onOpen?(media) }
         .onHover { hover = $0 }
-        .help(media.kind == .video ? "Open video" : "Open photo")
+        .help(onOpen == nil ? "" : (media.kind == .video ? "Open video" : "Open photo"))
     }
 }
 
-/// Decode / open inline base64 media.
+/// Decode inline base64 media to an image / a temp file URL for playback.
 enum EventMediaIO {
     static func image(_ m: EventMedia) -> NSImage? {
         let b64 = m.kind == .video ? m.poster : m.data
         guard let b64, let d = Data(base64Encoded: b64) else { return nil }
         return NSImage(data: d)
     }
-    static func open(_ m: EventMedia) {
-        guard let d = Data(base64Encoded: m.data) else { return }
+    static func tempURL(_ m: EventMedia) -> URL? {
+        guard let d = Data(base64Encoded: m.data) else { return nil }
         let ext = m.kind == .video ? "mp4" : "jpg"
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
-        try? d.write(to: url)
-        NSWorkspace.shared.open(url)
+        do { try d.write(to: url); return url } catch { return nil }
+    }
+}
+
+/// Full media viewer — shown in-app. Images fit the window; videos play via AVKit.
+private struct MediaViewer: View {
+    let media: EventMedia
+    @Environment(\.dismiss) private var dismiss
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Palette.bg.ignoresSafeArea()
+            content.padding(24)
+            Button { dismiss() } label: {
+                Image(systemName: "xmark.circle.fill").font(.system(size: 24)).foregroundStyle(.white.opacity(0.85))
+            }
+            .buttonStyle(.plain).padding(14).keyboardShortcut(.cancelAction)
+        }
+        .frame(minWidth: 720, minHeight: 520)
+        .onAppear(perform: start)
+        .onDisappear { player?.pause() }
+    }
+
+    @ViewBuilder private var content: some View {
+        if media.kind == .video {
+            if let player { VideoPlayer(player: player) }
+            else { ProgressView().tint(Palette.brand) }
+        } else if let img = EventMediaIO.image(media) {
+            Image(nsImage: img).resizable().scaledToFit()
+        } else {
+            Text("Couldn't load this media.").font(.system(size: 13)).foregroundStyle(Palette.faint)
+        }
+    }
+
+    private func start() {
+        guard media.kind == .video, let url = EventMediaIO.tempURL(media) else { return }
+        let p = AVPlayer(url: url); player = p; p.play()
     }
 }
 
@@ -367,6 +441,14 @@ struct EventEditTarget: Identifiable {
     let id = UUID()
     var event: EventItem?
     var presetDate: Date? = nil
+}
+
+/// A media import in flight — shows a live % (real transcode progress for video).
+private struct MediaUpload: Identifiable {
+    let id = UUID()
+    let kind: EventMedia.Kind
+    var progress: Double = 0
+    var failed = false
 }
 
 private struct EventEditor: View {
@@ -380,11 +462,12 @@ private struct EventEditor: View {
     @State private var special = false
     @State private var note = ""
     @State private var media: [EventMedia] = []
+    @State private var uploads: [MediaUpload] = []
     @State private var showCal = false
     @State private var showTags = false
     @State private var importing = false
-    @State private var busy = false
     @State private var mediaError: String?
+    @State private var viewerMedia: EventMedia?
 
     private var isNew: Bool { target.event == nil }
     private var prettyDate: String {
@@ -458,13 +541,14 @@ private struct EventEditor: View {
                 Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
                 Button(isNew ? "Log it" : "Save") { save() }
                     .buttonStyle(KPrimaryButtonStyle())
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || !uploads.filter { !$0.failed }.isEmpty)
             }
         }
         .padding(24).frame(width: 470)
         .background(Palette.elevated)
         .onAppear { load() }
         .sheet(isPresented: $showTags) { TagManagerSheet() }
+        .sheet(item: $viewerMedia) { MediaViewer(media: $0) }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.image, .movie, .video],
                       allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { importMedia(urls) }
@@ -473,15 +557,12 @@ private struct EventEditor: View {
 
     private var mediaSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                KFieldLabel(text: "Photos & videos")
-                Spacer()
-                if busy { ProgressView().controlSize(.small) }
-            }
+            KFieldLabel(text: "Photos & videos")
             FlowLayout(spacing: 8, runSpacing: 8) {
                 ForEach(media) { m in
-                    MediaThumb(media: m, size: 72, onRemove: { media.removeAll { $0.id == m.id } })
+                    MediaThumb(media: m, size: 72, onRemove: { media.removeAll { $0.id == m.id } }, onOpen: { viewerMedia = $0 })
                 }
+                ForEach(uploads) { u in uploadTile(u) }
                 Button { importing = true } label: {
                     VStack(spacing: 5) {
                         Image(systemName: "plus").font(.system(size: 16, weight: .bold))
@@ -499,6 +580,31 @@ private struct EventEditor: View {
                 Text(mediaError).font(.system(size: 11)).foregroundStyle(Palette.red)
             }
         }
+    }
+
+    private func uploadTile(_ u: MediaUpload) -> some View {
+        VStack(spacing: 5) {
+            if u.failed {
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 16)).foregroundStyle(Palette.red)
+                Text("Failed").font(.system(size: 9, weight: .heavy, design: .rounded)).foregroundStyle(Palette.red)
+            } else {
+                ZStack {
+                    Circle().stroke(Palette.surface2, lineWidth: 3)
+                    Circle().trim(from: 0, to: max(0.02, u.progress))
+                        .stroke(Palette.brand, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(Int(u.progress * 100))").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                }
+                .frame(width: 34, height: 34)
+                Text(u.kind == .video ? "Video" : "Photo").font(.system(size: 9, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+            }
+        }
+        .frame(width: 72, height: 72)
+        .background(Palette.bg.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
+        .animation(.knFast, value: u.progress)
+        .help(u.failed ? "Tap to dismiss" : "\(Int(u.progress * 100))% uploaded")
+        .onTapGesture { if u.failed { uploads.removeAll { $0.id == u.id } } }
     }
 
     private func tagChip(_ tag: EventTag) -> some View {
@@ -519,23 +625,40 @@ private struct EventEditor: View {
 
     private func importMedia(_ urls: [URL]) {
         mediaError = nil
-        busy = true
-        Task {
-            for url in urls {
+        for url in urls {
+            let isImage = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)?.conforms(to: .image) ?? false
+            let up = MediaUpload(kind: isImage ? .image : .video)
+            uploads.append(up)
+            let id = up.id
+            Task { @MainActor in
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                let type = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)
-                if let type, type.conforms(to: .image) {
+                if isImage {
+                    setProgress(id, 0.5)
                     if let img = NSImage(contentsOf: url), let b64 = NoteImage.encode(img) {
                         media.append(EventMedia(kind: .image, data: b64))
+                        uploads.removeAll { $0.id == id }
+                    } else {
+                        markFailed(id); mediaError = "Couldn't read that image."
                     }
                 } else {
-                    do { media.append(try await VideoMedia.encode(from: url)) }
-                    catch { mediaError = error.localizedDescription }
+                    do {
+                        let m = try await VideoMedia.encode(from: url) { p in setProgress(id, p) }
+                        media.append(m)
+                        uploads.removeAll { $0.id == id }
+                    } catch {
+                        markFailed(id); mediaError = error.localizedDescription
+                    }
                 }
             }
-            busy = false
         }
+    }
+
+    private func setProgress(_ id: UUID, _ p: Double) {
+        if let i = uploads.firstIndex(where: { $0.id == id }) { uploads[i].progress = p }
+    }
+    private func markFailed(_ id: UUID) {
+        if let i = uploads.firstIndex(where: { $0.id == id }) { uploads[i].failed = true }
     }
 
     private func load() {
