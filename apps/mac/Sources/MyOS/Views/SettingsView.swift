@@ -8,8 +8,6 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
 
-    private let fieldCols = [GridItem(.adaptive(minimum: 230), spacing: 12)]
-
     // Change-passphrase form
     @State private var newPass = ""
     @State private var newPassConfirm = ""
@@ -24,7 +22,6 @@ struct SettingsView: View {
 
             accountCard.knRise(1)
             securityCard.knRise(2)
-            identityCard.knRise(2)
             AgentSettingsCard().knRise(3)
             AIProvidersCard().knRise(3)
             fitnessCard.knRise(3)
@@ -161,48 +158,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Profile & identity (writes state.profile — same as the Profile tab)
-
-    private var identityCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    SectionTitle(text: "Profile & identity")
-                    Spacer()
-                    Text("syncs with the Profile tab").font(.system(size: 10)).foregroundStyle(Palette.faint)
-                }
-                LazyVGrid(columns: fieldCols, spacing: 12) {
-                    KLabeledField(label: "Full name", placeholder: "Your name", text: pf(\.name))
-                    KLabeledDateField(label: "Date of birth", text: pf(\.dob))
-                    KLabeledNumberField(label: "Age", placeholder: "Age", value: ageBinding)
-                    KLabeledMenuField(label: "Blood group", options: Profile.bloodGroupOptions, text: pf(\.bloodGroup))
-                    KLabeledMenuField(label: "Relationship", options: Profile.relationshipOptions, text: pf(\.relationship))
-                    KLabeledPhoneField(label: "Phone", text: pf(\.phone))
-                    KLabeledField(label: "Email", placeholder: "you@mail.com", text: pf(\.email))
-                    KLabeledField(label: "City", placeholder: "City", text: pf(\.city))
-                    KLabeledField(label: "Hometown", placeholder: "Hometown", text: pf(\.hometown))
-                    KLabeledField(label: "Education", placeholder: "College, year", text: pf(\.education))
-                    KLabeledField(label: "Role", placeholder: "Title — Company", text: pf(\.role))
-                    KLabeledField(label: "What I do", placeholder: "One line on the work", text: pf(\.work))
-                    KLabeledField(label: "Website", placeholder: "https://…", text: pf(\.website))
-                    KLabeledField(label: "Instagram", placeholder: "https://…", text: pf(\.instagram))
-                    KLabeledField(label: "GitHub", placeholder: "https://…", text: pf(\.github))
-                }
-
-                VStack(alignment: .leading, spacing: 5) {
-                    KFieldLabel(text: "About you — what your assistant should know")
-                    TextField("", text: pf(\.about),
-                              prompt: Text("Your story, work, family, goals, positioning — anything your assistant should know about you. Private: stored in your account, never in the app's code.")
-                                .foregroundColor(Palette.faint),
-                              axis: .vertical)
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
-                        .lineLimit(3...8)
-                        .knField()
-                }
-            }
-        }
-    }
-
     // MARK: - Fitness profile (same editor as the Fitness tab)
 
     private var fitnessCard: some View {
@@ -300,16 +255,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Binding helpers
-
-    private func pf(_ kp: WritableKeyPath<Profile, String>) -> Binding<String> {
-        Binding(get: { state.profile[keyPath: kp] },
-                set: { v in state.updateProfile { $0[keyPath: kp] = v } })
-    }
-    private var ageBinding: Binding<Double?> {
-        Binding(get: { state.profile.age.map(Double.init) },
-                set: { v in state.updateProfile { $0.age = v.map { Int($0) } } })
-    }
 }
 
 /// A destructive reset row — label + a Reset button that opens a hold-to-confirm.

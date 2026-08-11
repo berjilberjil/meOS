@@ -2,9 +2,11 @@ import SwiftUI
 import AppKit
 
 /// The whole person in one place — identity, body, career, goals, achievements,
-/// health, links. Every field edits in place and autosaves to `myos.profile`.
+/// health, links. Read-only by default; tap **Edit profile** to change anything, then
+/// **Done**. Autosaves to `myos.profile` while editing.
 struct ProfileView: View {
     @EnvironmentObject var state: AppState
+    @State private var isEditing = false
     @State private var weightDraft = ""
     @FocusState private var weightFocused: Bool
 
@@ -14,10 +16,11 @@ struct ProfileView: View {
             identityCard.knRise(1)
             bodyCard.knRise(2)
             careerCard.knRise(3)
-            goalsCard.knRise(4)
-            achievementsCard.knRise(5)
-            healthCard.knRise(6)
-            linksCard.knRise(7)
+            aboutCard.knRise(4)
+            goalsCard.knRise(5)
+            achievementsCard.knRise(6)
+            healthCard.knRise(7)
+            linksCard.knRise(8)
         }
     }
 
@@ -42,7 +45,22 @@ struct ProfileView: View {
                     .padding(.top, 2)
                 }
                 Spacer()
+                editButton
             }
+        }
+    }
+
+    @ViewBuilder private var editButton: some View {
+        if isEditing {
+            Button { withAnimation(.knFast) { isEditing = false } } label: {
+                Label("Done", systemImage: "checkmark")
+            }
+            .buttonStyle(KPrimaryButtonStyle())
+        } else {
+            Button { withAnimation(.knFast) { isEditing = true } } label: {
+                Label("Edit profile", systemImage: "pencil")
+            }
+            .buttonStyle(KGhostButtonStyle(color: Palette.brand))
         }
     }
 
@@ -59,7 +77,7 @@ struct ProfileView: View {
 
     private var initials: String { state.profile.initials }
 
-    // MARK: - Avatar (tap the camera to change your photo)
+    // MARK: - Avatar (tap the camera to change your photo — edit mode only)
 
     private var avatar: some View {
         ZStack {
@@ -75,20 +93,24 @@ struct ProfileView: View {
         .overlay(Circle().strokeBorder(Palette.border, lineWidth: 2))
         .knShadow()
         .overlay(alignment: .bottomTrailing) {
-            Button(action: pickPhoto) {
-                Image(systemName: "camera.fill").font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white).frame(width: 22, height: 22)
-                    .background(Palette.blue, in: Circle())
-                    .overlay(Circle().strokeBorder(Palette.surface, lineWidth: 2))
+            if isEditing {
+                Button(action: pickPhoto) {
+                    Image(systemName: "camera.fill").font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white).frame(width: 22, height: 22)
+                        .background(Palette.blue, in: Circle())
+                        .overlay(Circle().strokeBorder(Palette.surface, lineWidth: 2))
+                }
+                .buttonStyle(KPressStyle())
+                .help("Change photo")
+                .offset(x: 3, y: 3)
             }
-            .buttonStyle(KPressStyle())
-            .help("Change photo")
-            .offset(x: 3, y: 3)
         }
         .contextMenu {
-            Button("Change photo…", action: pickPhoto)
-            if profileImage != nil {
-                Button("Remove photo", role: .destructive) { state.updateProfile { $0.photoBase64 = "" } }
+            if isEditing {
+                Button("Change photo…", action: pickPhoto)
+                if profileImage != nil {
+                    Button("Remove photo", role: .destructive) { state.updateProfile { $0.photoBase64 = "" } }
+                }
             }
         }
     }
@@ -140,14 +162,12 @@ struct ProfileView: View {
                 SectionTitle(text: "Identity")
                 LazyVGrid(columns: fieldCols, spacing: 12) {
                     field("Full name", \.name, "Your name")
-                    KLabeledDateField(label: "Date of birth", text: bind(\.dob))
+                    dateField("Date of birth", \.dob)
                     intField("Age", get: { state.profile.age },
                              set: { v in state.updateProfile { $0.age = v } }, placeholder: "Age")
-                    KLabeledMenuField(label: "Blood group", options: Profile.bloodGroupOptions,
-                                      text: bind(\.bloodGroup))
-                    KLabeledMenuField(label: "Relationship", options: Profile.relationshipOptions,
-                                      text: bind(\.relationship))
-                    KLabeledPhoneField(label: "Phone", text: bind(\.phone))
+                    menuField("Blood group", Profile.bloodGroupOptions, \.bloodGroup)
+                    menuField("Relationship", Profile.relationshipOptions, \.relationship)
+                    phoneField("Phone", \.phone)
                     field("Email", \.email, "you@mail.com")
                     field("City", \.city, "City")
                     field("Hometown", \.hometown, "Hometown")
@@ -167,9 +187,8 @@ struct ProfileView: View {
                     doubleField("Height (cm)", get: { state.profile.heightCm },
                                 set: { v in state.updateProfile { $0.heightCm = v } }, placeholder: "172")
                     // Editable — commits today's Fitness log on submit/blur (not per
-                    // keystroke, so typing "72" doesn't log 7 then 72, and BMI/calorie
-                    // targets don't flicker mid-edit). Prefills today's weigh-in.
-                    labelled("Weight (kg)") {
+                    // keystroke). Prefills today's weigh-in.
+                    labelledEditable("Weight (kg)", value: todayWeightText) {
                         TextField("", text: $weightDraft,
                                   prompt: Text("72").foregroundColor(Palette.faint))
                             .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
@@ -227,11 +246,36 @@ struct ProfileView: View {
                                set: { v in var m = state.finance.meta; m.monthlyIncomeInr = v
                                           state.saveFinanceMeta(m) }, placeholder: "40000")
                 }
-                labelled("What I do") {
+                labelledEditable("What I do", value: state.profile.work) {
                     TextField("", text: bind(\.work),
                               prompt: Text("One line on the work…").foregroundColor(Palette.faint))
                         .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
                         .knField()
+                }
+            }
+        }
+    }
+
+    // MARK: - About (context for the assistant)
+
+    private var aboutCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle(text: "About")
+                if isEditing {
+                    TextField("", text: bind(\.about),
+                              prompt: Text("Your story, work, family, goals, positioning — anything your assistant should know about you. Private: stored in your account, never in the app's code.")
+                                .foregroundColor(Palette.faint),
+                              axis: .vertical)
+                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .lineLimit(3...10)
+                        .knField()
+                } else {
+                    Text(state.profile.about.isEmpty ? "Nothing yet — tap Edit profile to add context for your assistant." : state.profile.about)
+                        .font(.system(size: 13))
+                        .foregroundStyle(state.profile.about.isEmpty ? Palette.faint : Palette.text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -243,13 +287,13 @@ struct ProfileView: View {
         Card {
             VStack(alignment: .leading, spacing: 16) {
                 SectionTitle(text: "Goals")
-                GoalList(title: "Short term", color: Palette.green, items: state.profile.goalsShort,
+                GoalList(title: "Short term", color: Palette.green, items: state.profile.goalsShort, editing: isEditing,
                          add: { s in state.updateProfile { $0.goalsShort.append(s) } },
                          remove: { i in state.updateProfile { $0.goalsShort.remove(at: i) } })
-                GoalList(title: "Mid term", color: Palette.blue, items: state.profile.goalsMid,
+                GoalList(title: "Mid term", color: Palette.blue, items: state.profile.goalsMid, editing: isEditing,
                          add: { s in state.updateProfile { $0.goalsMid.append(s) } },
                          remove: { i in state.updateProfile { $0.goalsMid.remove(at: i) } })
-                GoalList(title: "Long term", color: Palette.purple, items: state.profile.goalsLong,
+                GoalList(title: "Long term", color: Palette.purple, items: state.profile.goalsLong, editing: isEditing,
                          add: { s in state.updateProfile { $0.goalsLong.append(s) } },
                          remove: { i in state.updateProfile { $0.goalsLong.remove(at: i) } })
             }
@@ -260,7 +304,7 @@ struct ProfileView: View {
 
     private var achievementsCard: some View {
         Card {
-            AchievementsEditor()
+            AchievementsEditor(editing: isEditing)
         }
     }
 
@@ -270,7 +314,7 @@ struct ProfileView: View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: "Health notes")
-                HealthEditor()
+                HealthEditor(editing: isEditing)
             }
         }
     }
@@ -290,17 +334,24 @@ struct ProfileView: View {
 
     private func linkRow(_ icon: String, _ label: String,
                          _ keyPath: WritableKeyPath<Profile, String>) -> some View {
-        HStack(spacing: 10) {
+        let value = state.profile[keyPath: keyPath]
+        return HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.muted)
                 .frame(width: 22)
             Text(label).font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.muted)
                 .frame(width: 74, alignment: .leading)
-            TextField("", text: bind(keyPath),
-                      prompt: Text("https://…").foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
-            if let url = URL(string: state.profile[keyPath: keyPath]),
-               url.scheme?.hasPrefix("http") == true {
+            if isEditing {
+                TextField("", text: bind(keyPath),
+                          prompt: Text("https://…").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+            } else {
+                Text(value.isEmpty ? "—" : value)
+                    .font(.system(size: 13)).foregroundStyle(value.isEmpty ? Palette.faint : Palette.text)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            if let url = URL(string: value), url.scheme?.hasPrefix("http") == true {
                 Button { NSWorkspace.shared.open(url) } label: {
                     Image(systemName: "arrow.up.right").font(.system(size: 11, weight: .bold))
                 }
@@ -317,9 +368,33 @@ struct ProfileView: View {
                 set: { v in state.updateProfile { $0[keyPath: keyPath] = v } })
     }
 
+    /// A labelled slot that shows an editable control when editing, else read-only text.
+    private func labelledEditable<V: View>(_ label: String, value: String,
+                                           @ViewBuilder content: () -> V) -> some View {
+        labelled(label) {
+            if isEditing { content() } else { readText(value) }
+        }
+    }
+
+    @ViewBuilder private func readText(_ value: String) -> some View {
+        Text(value.isEmpty ? "—" : value)
+            .font(.system(size: 13, weight: value.isEmpty ? .regular : .semibold))
+            .foregroundStyle(value.isEmpty ? Palette.faint : Palette.text)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Palette.surface2.opacity(0.25),
+                        in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .strokeBorder(Palette.border.opacity(0.6), lineWidth: 1))
+    }
+
+    private func readField(_ label: String, _ value: String) -> some View {
+        labelled(label) { readText(value) }
+    }
+
     private func field(_ label: String, _ keyPath: WritableKeyPath<Profile, String>,
                        _ placeholder: String) -> some View {
-        labelled(label) {
+        labelledEditable(label, value: state.profile[keyPath: keyPath]) {
             TextField("", text: bind(keyPath),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
                 .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
@@ -327,9 +402,30 @@ struct ProfileView: View {
         }
     }
 
+    // Date / menu / phone use KLabeled* (own label) when editing, plain read row otherwise.
+    private func dateField(_ label: String, _ keyPath: WritableKeyPath<Profile, String>) -> some View {
+        Group {
+            if isEditing { KLabeledDateField(label: label, text: bind(keyPath)) }
+            else { readField(label, state.profile[keyPath: keyPath]) }
+        }
+    }
+    private func menuField(_ label: String, _ options: [String],
+                           _ keyPath: WritableKeyPath<Profile, String>) -> some View {
+        Group {
+            if isEditing { KLabeledMenuField(label: label, options: options, text: bind(keyPath)) }
+            else { readField(label, state.profile[keyPath: keyPath]) }
+        }
+    }
+    private func phoneField(_ label: String, _ keyPath: WritableKeyPath<Profile, String>) -> some View {
+        Group {
+            if isEditing { KLabeledPhoneField(label: label, text: bind(keyPath)) }
+            else { readField(label, state.profile[keyPath: keyPath]) }
+        }
+    }
+
     private func intField(_ label: String, get: @escaping () -> Int?,
                           set: @escaping (Int?) -> Void, placeholder: String) -> some View {
-        labelled(label) {
+        labelledEditable(label, value: get().map(String.init) ?? "") {
             TextField("", text: Binding(get: { get().map(String.init) ?? "" },
                                         set: { set(Int($0.trimmingCharacters(in: .whitespaces))) }),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
@@ -340,7 +436,7 @@ struct ProfileView: View {
 
     private func doubleField(_ label: String, get: @escaping () -> Double?,
                              set: @escaping (Double?) -> Void, placeholder: String) -> some View {
-        labelled(label) {
+        labelledEditable(label, value: get().map { Fmt.trimKg($0) } ?? "") {
             TextField("", text: Binding(get: { get().map { Fmt.trimKg($0) } ?? "" },
                                         set: { set(Double($0.trimmingCharacters(in: .whitespaces))) }),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
@@ -352,7 +448,7 @@ struct ProfileView: View {
     /// Whole-rupee money field (no decimals) — writes 0 when cleared.
     private func moneyField(_ label: String, get: @escaping () -> Double,
                             set: @escaping (Double) -> Void, placeholder: String) -> some View {
-        labelled(label) {
+        labelledEditable(label, value: get() == 0 ? "" : "₹\(Int(get().rounded()))") {
             TextField("", text: Binding(get: { get() == 0 ? "" : String(Int(get().rounded())) },
                                         set: { set(Double($0.filter { $0.isNumber }) ?? 0) }),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
@@ -389,12 +485,13 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Goal list (add / remove, colored bullets)
+// MARK: - Goal list (add / remove only in edit mode)
 
 private struct GoalList: View {
     let title: String
     let color: Color
     let items: [String]
+    let editing: Bool
     let add: (String) -> Void
     let remove: (Int) -> Void
     @State private var text = ""
@@ -406,36 +503,41 @@ private struct GoalList: View {
                 Circle().fill(color).frame(width: 7, height: 7)
                 Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.text)
             }
+            if items.isEmpty && !editing {
+                Text("—").font(.system(size: 13)).foregroundStyle(Palette.faint).padding(.leading, 2)
+            }
             ForEach(Array(items.enumerated()), id: \.offset) { i, item in
                 HStack(spacing: 9) {
                     Image(systemName: "target").font(.system(size: 10)).foregroundStyle(color)
                     Text(item).font(.system(size: 13)).foregroundStyle(Palette.text)
                     Spacer()
-                    Button { remove(i) } label: {
-                        Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                    if editing {
+                        Button { remove(i) } label: {
+                            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                        }
+                        .buttonStyle(KIconButtonStyle(size: 22))
                     }
-                    .buttonStyle(KIconButtonStyle(size: 22))
                 }
                 .padding(.leading, 2)
             }
-            HStack(spacing: 8) {
-                TextField("", text: $text,
-                          prompt: Text("Add a \(title.lowercased()) goal…").foregroundColor(Palette.faint))
-                    .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
-                    .focused($focused)
-                    .onSubmit(commit)
-                Button(action: commit) {
-                    Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(color)
+            if editing {
+                HStack(spacing: 8) {
+                    TextField("", text: $text,
+                              prompt: Text("Add a \(title.lowercased()) goal…").foregroundColor(Palette.faint))
+                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .focused($focused)
+                        .onSubmit(commit)
+                    Button(action: commit) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(color)
+                    }
+                    .buttonStyle(KPressStyle())
+                    .opacity(text.isEmpty ? 0.35 : 1)
+                    .disabled(text.isEmpty)
                 }
-                .buttonStyle(KPressStyle())
-                .opacity(text.isEmpty ? 0.35 : 1)
-                .disabled(text.isEmpty)
+                .knField(focused: focused)
+                .onChange(of: focused) { _, now in if !now { commit() } }
+                .onDisappear { commit() }
             }
-            .knField(focused: focused)
-            // No-data-loss: typed-but-unsubmitted text is saved when the field
-            // loses focus or the view goes away (tab switch), not just on Enter.
-            .onChange(of: focused) { _, now in if !now { commit() } }
-            .onDisappear { commit() }
         }
     }
 
@@ -450,6 +552,7 @@ private struct GoalList: View {
 
 private struct AchievementsEditor: View {
     @EnvironmentObject var state: AppState
+    let editing: Bool
     @State private var year = ""
     @State private var title = ""
     @FocusState private var focused: Bool
@@ -477,37 +580,39 @@ private struct AchievementsEditor: View {
                         }
                     }
                     Spacer()
-                    Button {
-                        state.updateProfile { $0.achievements.removeAll { $0.id == m.id } }
-                    } label: {
-                        Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                    if editing {
+                        Button {
+                            state.updateProfile { $0.achievements.removeAll { $0.id == m.id } }
+                        } label: {
+                            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                        }
+                        .buttonStyle(KIconButtonStyle(size: 22))
                     }
-                    .buttonStyle(KIconButtonStyle(size: 22))
                 }
             }
 
-            HStack(spacing: 8) {
-                TextField("", text: $year, prompt: Text("Year").foregroundColor(Palette.faint))
-                    .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
-                    .frame(width: 52)
-                Rectangle().fill(Palette.border).frame(width: 1, height: 16)
-                TextField("", text: $title,
-                          prompt: Text("What did you achieve?").foregroundColor(Palette.faint))
-                    .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
-                    .focused($focused)
-                    .onSubmit(commit)
-                Button(action: commit) {
-                    Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.amber)
+            if editing {
+                HStack(spacing: 8) {
+                    TextField("", text: $year, prompt: Text("Year").foregroundColor(Palette.faint))
+                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .frame(width: 52)
+                    Rectangle().fill(Palette.border).frame(width: 1, height: 16)
+                    TextField("", text: $title,
+                              prompt: Text("What did you achieve?").foregroundColor(Palette.faint))
+                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .focused($focused)
+                        .onSubmit(commit)
+                    Button(action: commit) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.amber)
+                    }
+                    .buttonStyle(KPressStyle())
+                    .opacity(title.isEmpty ? 0.35 : 1)
+                    .disabled(title.isEmpty)
                 }
-                .buttonStyle(KPressStyle())
-                .opacity(title.isEmpty ? 0.35 : 1)
-                .disabled(title.isEmpty)
+                .knField(focused: focused)
+                .onChange(of: focused) { _, now in if !now { commit() } }
+                .onDisappear { commit() }
             }
-            .knField(focused: focused)
-            // No-data-loss: a typed-but-unsubmitted achievement is saved on blur
-            // or when the view goes away.
-            .onChange(of: focused) { _, now in if !now { commit() } }
-            .onDisappear { commit() }
         }
     }
 
@@ -524,20 +629,29 @@ private struct AchievementsEditor: View {
 
 private struct HealthEditor: View {
     @EnvironmentObject var state: AppState
+    let editing: Bool
     @FocusState private var focused: Bool
 
     var body: some View {
-        TextEditor(text: Binding(get: { state.profile.healthNotes },
-                                 set: { v in state.updateProfile { $0.healthNotes = v } }))
-            .font(.system(size: 13)).foregroundStyle(Palette.text)
-            .scrollContentBackground(.hidden)
-            .focused($focused)
-            .frame(minHeight: 64)
-            .padding(10)
-            .background(Palette.surface2.opacity(0.6),
-                        in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                .strokeBorder(focused ? Palette.brand.opacity(0.7) : Palette.border, lineWidth: 1))
-            .animation(.knFast, value: focused)
+        if editing {
+            TextEditor(text: Binding(get: { state.profile.healthNotes },
+                                     set: { v in state.updateProfile { $0.healthNotes = v } }))
+                .font(.system(size: 13)).foregroundStyle(Palette.text)
+                .scrollContentBackground(.hidden)
+                .focused($focused)
+                .frame(minHeight: 64)
+                .padding(10)
+                .background(Palette.surface2.opacity(0.6),
+                            in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    .strokeBorder(focused ? Palette.brand.opacity(0.7) : Palette.border, lineWidth: 1))
+                .animation(.knFast, value: focused)
+        } else {
+            Text(state.profile.healthNotes.isEmpty ? "—" : state.profile.healthNotes)
+                .font(.system(size: 13))
+                .foregroundStyle(state.profile.healthNotes.isEmpty ? Palette.faint : Palette.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
