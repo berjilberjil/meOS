@@ -1138,6 +1138,11 @@ final class AppState: ObservableObject {
         notes[i].pinned.toggle()
         push(StateKey.notes, notes)
     }
+    func toggleLockNote(_ id: String) {
+        guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
+        notes[i].locked.toggle()
+        push(StateKey.notes, notes)
+    }
     /// Display order: pinned first, then most-recently-edited.
     var sortedNotes: [Note] {
         notes.sorted { a, b in

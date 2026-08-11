@@ -34,13 +34,19 @@ enum NavTab: String, CaseIterable, Identifiable {
 struct MainView: View {
     @EnvironmentObject var state: AppState
     @State private var tab: NavTab = .today
+    private static let kCollapsed = "myos.sidebar.collapsed"
+    @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
 
     var body: some View {
-        NavigationSplitView {
+        // A plain HStack, NOT NavigationSplitView. The split view auto-injects a
+        // window toolbar (the sidebar-toggle button) whose grey glass material was
+        // the "unwanted grey band" up top. The app draws its own always-visible
+        // rail, so we don't need it — this removes the toolbar at the source.
+        HStack(spacing: 0) {
             sidebar
-                .navigationSplitViewColumnWidth(min: 204, ideal: 216, max: 240)
-                .toolbarBackground(.hidden, for: .windowToolbar)
-        } detail: {
+                .frame(width: collapsed ? 68 : 216)
+                .animation(.knNormal, value: collapsed)
+
             ZStack(alignment: .bottom) {
                 // Notes manages its own scrolling (its editor hosts an NSScrollView);
                 // every other tab shares the standard scrolling container.
@@ -85,12 +91,12 @@ struct MainView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Palette.bg.ignoresSafeArea())
-            .toolbarBackground(.hidden, for: .windowToolbar)
             .overlay(alignment: .bottomTrailing) {
                 ChatWidget().padding(.trailing, 20).padding(.bottom, 18)
             }
         }
-        .navigationSplitViewStyle(.balanced)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.bg.ignoresSafeArea())
     }
 
     private func switchTo(_ t: NavTab) {
@@ -98,51 +104,88 @@ struct MainView: View {
     }
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 9) {
-                Image("LogoMark")
-                    .resizable().interpolation(.high)
-                    .frame(width: 32, height: 32)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .knShadow()
-                Text("MyOS")
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Palette.brand)
-            }
-            .padding(.horizontal, 14).padding(.top, 34).padding(.bottom, 16)
+        VStack(alignment: collapsed ? .center : .leading, spacing: 4) {
+            sidebarHeader
 
             ForEach(NavTab.allCases) { t in
-                NavItem(tab: t, active: tab == t) { switchTo(t) }
-                    .padding(.horizontal, 8)
+                NavItem(tab: t, active: tab == t, collapsed: collapsed) { switchTo(t) }
+                    .padding(.horizontal, collapsed ? 10 : 8)
             }
 
             Spacer()
 
             if let err = state.lastSyncError ?? state.lastHydrateError {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10))
-                    Text(err).lineLimit(2)
+                Group {
+                    if collapsed {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 13)).help(err)
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10))
+                            Text(err).lineLimit(2)
+                        }
+                        .font(.system(size: 11))
+                    }
                 }
-                .font(.system(size: 11))
                 .foregroundStyle(Palette.amber)
                 .padding(.horizontal, 14).padding(.bottom, 10)
             }
 
             Button { Task { await state.logout() } } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                    Text(state.username.isEmpty ? "Log out" : "@\(state.username)")
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
+                if collapsed {
+                    Image(systemName: "rectangle.portrait.and.arrow.right").font(.system(size: 15))
+                        .frame(width: 44, height: 30)
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Text(state.username.isEmpty ? "Log out" : "@\(state.username)")
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
                 }
             }
             .buttonStyle(KGhostButtonStyle(color: Palette.faint))
             .padding(.horizontal, 8).padding(.bottom, 12)
+            .help(collapsed ? (state.username.isEmpty ? "Log out" : "@\(state.username)") : "")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Palette.sidebar.ignoresSafeArea())
         .overlay(alignment: .trailing) {
             Rectangle().fill(Palette.border).frame(width: 2)
+        }
+    }
+
+    // Logo + wordmark + a collapse/expand toggle. Collapsed: logo over the toggle.
+    private var sidebarHeader: some View {
+        let logo = Image("LogoMark")
+            .resizable().interpolation(.high)
+            .frame(width: 32, height: 32)
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .knShadow()
+        let toggle = Button {
+            collapsed.toggle()
+            UserDefaults.standard.set(collapsed, forKey: Self.kCollapsed)
+        } label: {
+            Image(systemName: "sidebar.left").font(.system(size: 14, weight: .semibold))
+        }
+        .buttonStyle(KIconButtonStyle(size: 28, color: Palette.faint))
+        .help(collapsed ? "Expand sidebar" : "Collapse sidebar")
+
+        return Group {
+            if collapsed {
+                VStack(spacing: 10) { logo; toggle }
+                    .padding(.top, 30).padding(.bottom, 14)
+            } else {
+                HStack(spacing: 9) {
+                    logo
+                    Text("MyOS")
+                        .font(.system(size: 22, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Palette.brand)
+                    Spacer(minLength: 0)
+                    toggle
+                }
+                .padding(.horizontal, 14).padding(.top, 34).padding(.bottom, 16)
+            }
         }
     }
 }
@@ -152,6 +195,7 @@ struct MainView: View {
 private struct NavItem: View {
     let tab: NavTab
     let active: Bool
+    var collapsed: Bool = false
     let action: () -> Void
     @State private var hover = false
 
@@ -159,13 +203,16 @@ private struct NavItem: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 NavGlyph(tab: tab, size: 26)
-                Text(tab.title.uppercased())
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .tracking(0.6)
-                    .foregroundStyle(active ? Palette.blue : (hover ? Palette.text : Palette.muted))
-                Spacer(minLength: 0)
+                if !collapsed {
+                    Text(tab.title.uppercased())
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .tracking(0.6)
+                        .foregroundStyle(active ? Palette.blue : (hover ? Palette.text : Palette.muted))
+                    Spacer(minLength: 0)
+                }
             }
-            .padding(.horizontal, 12).padding(.vertical, 9)
+            .frame(maxWidth: collapsed ? .infinity : nil)
+            .padding(.horizontal, collapsed ? 8 : 12).padding(.vertical, 9)
             .background(background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
@@ -177,6 +224,7 @@ private struct NavItem: View {
         .onHover { h in hover = h; cursor(h) }
         .animation(.knFast, value: hover)
         .animation(.knFast, value: active)
+        .help(collapsed ? tab.title : "")
     }
 
     private var background: Color {

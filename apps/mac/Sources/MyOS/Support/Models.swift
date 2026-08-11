@@ -450,17 +450,19 @@ struct Note: Codable, Identifiable, Hashable {
     var title: String
     var body: String                 // plain-text mirror of `content` (search / previews / AI)
     var pinned: Bool = false
+    var locked: Bool = false          // hides preview + gates the editor behind an unlock
     var content: BlockDoc? = nil      // rich block content (source of truth once edited)
 
-    enum CodingKeys: String, CodingKey { case id, createdAt, updatedAt, title, body, pinned, content }
+    enum CodingKeys: String, CodingKey { case id, createdAt, updatedAt, title, body, pinned, locked, content }
 
     init(id: String, createdAt: String, updatedAt: String, title: String, body: String,
-         pinned: Bool = false, content: BlockDoc? = nil) {
+         pinned: Bool = false, locked: Bool = false, content: BlockDoc? = nil) {
         self.id = id; self.createdAt = createdAt; self.updatedAt = updatedAt
-        self.title = title; self.body = body; self.pinned = pinned; self.content = content
+        self.title = title; self.body = body; self.pinned = pinned
+        self.locked = locked; self.content = content
     }
 
-    // Custom decode so notes saved before `pinned`/`content` existed still load.
+    // Custom decode so notes saved before `pinned`/`locked`/`content` existed still load.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id        = try c.decode(String.self, forKey: .id)
@@ -469,6 +471,7 @@ struct Note: Codable, Identifiable, Hashable {
         title     = try c.decode(String.self, forKey: .title)
         body      = try c.decode(String.self, forKey: .body)
         pinned    = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
+        locked    = try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false
         content   = try c.decodeIfPresent(BlockDoc.self, forKey: .content)
     }
 

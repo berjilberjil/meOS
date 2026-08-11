@@ -8,6 +8,10 @@ import SwiftUI
 struct BlockEditor: NSViewRepresentable {
     let initialDoc: BlockDoc
     var placeholder: String = "Write something, or press ‘/’ for commands…"
+    /// Bumped from SwiftUI to reveal the native find bar (Find in Note).
+    var findToken: Int = 0
+    /// Extra scroll inset so the last lines clear the floating log bar.
+    var bottomInset: CGFloat = 0
     var onChange: (BlockDoc) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -35,6 +39,12 @@ struct BlockEditor: NSViewRepresentable {
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
+        // Without an unbounded maxSize the text view can't grow past its initial
+        // frame, so long notes get clipped and there's nothing to scroll.
+        tv.minSize = NSSize(width: 0, height: 0)
+        tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        tv.usesFindBar = true
+        tv.isIncrementalSearchingEnabled = true
         tv.placeholderText = placeholder
         tv.typingAttributes = EditorTheme.baseAttributes(for: Block.paragraph())
         tv.textStorage?.setAttributedString(BlockBridge.attributedString(from: initialDoc))
@@ -47,6 +57,8 @@ struct BlockEditor: NSViewRepresentable {
         scroll.drawsBackground = false
         scroll.backgroundColor = NSColor.clear
         scroll.automaticallyAdjustsContentInsets = false
+        scroll.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
+        context.coordinator.lastFindToken = findToken
 
         DispatchQueue.main.async { [weak tv] in
             guard let tv else { return }
@@ -57,6 +69,14 @@ struct BlockEditor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.parent = self
+        if nsView.contentInsets.bottom != bottomInset {
+            nsView.contentInsets.bottom = bottomInset
+        }
+        // A change in findToken is the SwiftUI signal to open the find bar.
+        if findToken != context.coordinator.lastFindToken {
+            context.coordinator.lastFindToken = findToken
+            context.coordinator.showFindBar()
+        }
     }
 
     // MARK: - Coordinator
@@ -65,7 +85,17 @@ struct BlockEditor: NSViewRepresentable {
         var parent: BlockEditor
         weak var textView: BlockTextView?
         var isProgrammatic = false
+        var lastFindToken = 0
         let slash = SlashMenuController()
+
+        /// Reveal the native find bar (drives "Find in Note").
+        func showFindBar() {
+            guard let tv = textView else { return }
+            let item = NSMenuItem()
+            item.tag = NSTextFinder.Action.showFindInterface.rawValue
+            tv.window?.makeFirstResponder(tv)
+            tv.performTextFinderAction(item)
+        }
 
         /// The empty last block, if any. An empty trailing block has zero
         /// characters in the attributed string, so its type lives only here
