@@ -1,16 +1,42 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
 import UniformTypeIdentifiers
+#else
+import UIKit
+import PhotosUI
+#endif
 
 /// A drop / paste / choose target for screenshots. Normalises everything to PNG
-/// base64 and hands it back via `onImages`. Reused by the Money capture card and
-/// the Portfolio tracker — the one place image input lives in MyOS.
+/// base64 and hands it back via `onImages`. Reused by the Money capture card, the
+/// Portfolio tracker, and the Food scanner — the one place image input lives in
+/// MyOS. macOS supports drag-drop + paste + a file picker; iOS supports the
+/// camera (the whole point of scanning a food label on your phone) plus the
+/// photo library.
 struct ImageDropZone: View {
     var title: String
     var subtitle: String
     var tint: Color = Palette.brand
     var busy: Bool = false
     /// (base64 PNGs, mediaType) — mediaType is always "image/png" here.
+    var onImages: ([String], String) -> Void
+
+    var body: some View {
+        #if os(macOS)
+        MacImageDropZone(title: title, subtitle: subtitle, tint: tint, busy: busy, onImages: onImages)
+        #else
+        IOSImageDropZone(title: title, subtitle: subtitle, tint: tint, busy: busy, onImages: onImages)
+        #endif
+    }
+}
+
+#if os(macOS)
+
+private struct MacImageDropZone: View {
+    var title: String
+    var subtitle: String
+    var tint: Color
+    var busy: Bool
     var onImages: ([String], String) -> Void
 
     @State private var targeted = false
@@ -157,3 +183,123 @@ struct ImageDropZone: View {
         return rep.representation(using: .png, properties: [:])
     }
 }
+
+#else
+
+/// iOS: the camera is the point — scan a receipt, a nutrition label, a portfolio
+/// screen right where you are. The photo library covers screenshots.
+private struct IOSImageDropZone: View {
+    var title: String
+    var subtitle: String
+    var tint: Color
+    var busy: Bool
+    var onImages: ([String], String) -> Void
+
+    @State private var showCamera = false
+    @State private var pickerItems: [PhotosPickerItem] = []
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: busy ? "sparkles" : "photo.on.rectangle.angled")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(busy ? tint : Palette.muted)
+                .symbolEffect(.pulse, isActive: busy)
+                .frame(height: 30)
+
+            VStack(spacing: 3) {
+                Text(busy ? "Reading it…" : title)
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Palette.text)
+                Text(busy ? "AI is pulling out the numbers." : subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.faint)
+                    .multilineTextAlignment(.center)
+            }
+
+            if !busy {
+                HStack(spacing: 8) {
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        Button { showCamera = true } label: { Label("Camera", systemImage: "camera") }
+                            .buttonStyle(KSoftButtonStyle(tint: tint))
+                    }
+                    PhotosPicker(selection: $pickerItems, maxSelectionCount: 8, matching: .images) {
+                        Label("Photo library", systemImage: "photo.on.rectangle")
+                    }
+                    .buttonStyle(KSoftButtonStyle(tint: tint))
+                }
+            } else {
+                ProgressView().controlSize(.small).tint(tint)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 26).padding(.horizontal, 18)
+        .background(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).fill(Palette.bg.opacity(0.5)))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [7, 6]))
+                .foregroundStyle(Palette.border)
+        )
+        .animation(.knNormal, value: busy)
+        .onChange(of: pickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task {
+                var out: [Data] = []
+                for item in items {
+                    if let raw = try? await item.loadTransferable(type: Data.self),
+                       let png = Self.normalizedPNG(raw) {
+                        out.append(png)
+                    }
+                }
+                pickerItems = []
+                emit(out)
+            }
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraCapture { image in
+                if let img = image, let png = Self.pngData(img) { emit([png]) }
+            }
+        }
+    }
+
+    private func emit(_ data: [Data]) {
+        guard !data.isEmpty else { return }
+        onImages(data.map { $0.base64EncodedString() }, "image/png")
+    }
+
+    static func normalizedPNG(_ data: Data) -> Data? {
+        guard let img = UIImage(data: data) else { return nil }
+        return pngData(img)
+    }
+    static func pngData(_ image: UIImage) -> Data? { image.pngData() }
+}
+
+/// Thin UIImagePickerController wrapper — SwiftUI has no native camera capture view.
+private struct CameraCapture: UIViewControllerRepresentable {
+    let onCapture: (UIImage?) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let vc = UIImagePickerController()
+        vc.sourceType = .camera
+        vc.delegate = context.coordinator
+        return vc
+    }
+    func updateUIViewController(_ vc: UIImagePickerController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture) }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onCapture: (UIImage?) -> Void
+        init(onCapture: @escaping (UIImage?) -> Void) { self.onCapture = onCapture }
+
+        func imagePickerController(_ picker: UIImagePickerController,
+                                    didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            onCapture(info[.originalImage] as? UIImage)
+            picker.dismiss(animated: true)
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            onCapture(nil)
+            picker.dismiss(animated: true)
+        }
+    }
+}
+
+#endif

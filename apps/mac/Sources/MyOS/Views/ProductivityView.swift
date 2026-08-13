@@ -140,10 +140,10 @@ struct ProductivityView: View {
                          onPrev: { let (y, m) = CalMath.addMonth(year: calYear, month: calMonth, delta: -1); calYear = y; calMonth = m },
                          onNext: { let (y, m) = CalMath.addMonth(year: calYear, month: calMonth, delta: 1); calYear = y; calMonth = m })
             KMonthGrid(year: calYear, month: calMonth, selected: dayFilter,
-                       dot: { daysWithVideos.contains($0) ? Palette.purple : nil }) { key in
+                       dot: { daysWithVideos.contains($0) ? Palette.purple : nil }, onTap: { key in
                 withAnimation(.knFast) { dayFilter = (dayFilter == key ? nil : key) }
                 showCal = false
-            }
+            })
         }
         .padding(12).frame(width: 288).background(Palette.elevated)
     }

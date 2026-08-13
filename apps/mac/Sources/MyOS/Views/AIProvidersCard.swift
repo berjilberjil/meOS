@@ -58,6 +58,7 @@ struct AIProvidersCard: View {
 
 private struct AddKeyForm: View {
     @ObservedObject var store: AISettingsStore
+    @Environment(\.openURL) private var openURL
     @State private var provider: AIProvider = .gemini
     @State private var label = ""
     @State private var keyText = ""
@@ -74,7 +75,7 @@ private struct AddKeyForm: View {
                 Segmented(options: AIProvider.allCases.map { ($0, $0.label) }, selection: $provider)
                 Spacer()
                 if let url = provider.getKeyURL {
-                    Button { NSWorkspace.shared.open(url) } label: {
+                    Button { openURL(url) } label: {
                         Label("Get key", systemImage: "arrow.up.right")
                     }
                     .buttonStyle(KGhostButtonStyle())

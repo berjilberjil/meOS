@@ -1,0 +1,35 @@
+import SwiftUI
+
+// Shared tab identity — used by both the macOS sidebar (MainView) and the iOS
+// tab bar (iOS MainView) plus TodayView's "go to tab" links. Kept in Support/
+// so every platform target sees the same enum.
+enum NavTab: String, CaseIterable, Identifiable {
+    case today, events, finance, fitness, productivity, journal, notes, profile, settings
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .today: return "Today"
+        case .events: return "Events"
+        case .finance: return "Finance"
+        case .fitness: return "Fitness"
+        case .productivity: return "Productivity"
+        case .journal: return "Journal"
+        case .notes: return "Notes"
+        case .profile: return "Profile"
+        case .settings: return "Settings"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .today: return "sun.max.fill"
+        case .events: return "calendar"
+        case .finance: return "indianrupeesign.circle.fill"
+        case .fitness: return "figure.run"
+        case .productivity: return "play.rectangle.fill"
+        case .journal: return "book.closed.fill"
+        case .notes: return "note.text"
+        case .profile: return "person.crop.circle.fill"
+        case .settings: return "gearshape.fill"
+        }
+    }
+}

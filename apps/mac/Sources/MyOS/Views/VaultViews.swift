@@ -1,5 +1,9 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 
 // MARK: - Setup (first-time: create the encryption passphrase)
 
@@ -148,8 +152,12 @@ struct RecoveryCodeOverlay: View {
                     .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.ring, lineWidth: 1))
 
                 Button {
+                    #if os(macOS)
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(code, forType: .string)
+                    #else
+                    UIPasteboard.general.string = code
+                    #endif
                     withAnimation(.knFast) { copied = true }
                 } label: {
                     Label(copied ? "Copied" : "Copy code", systemImage: copied ? "checkmark" : "doc.on.doc")
@@ -160,7 +168,9 @@ struct RecoveryCodeOverlay: View {
                 Toggle(isOn: $saved) {
                     Text("I’ve saved this somewhere safe").font(.system(size: 13)).foregroundStyle(Palette.text)
                 }
+                #if os(macOS)
                 .toggleStyle(.checkbox)
+                #endif
                 .padding(.top, 2)
 
                 PrimaryButton(title: "Done", loading: false) {

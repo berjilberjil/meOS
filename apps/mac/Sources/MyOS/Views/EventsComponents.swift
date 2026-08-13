@@ -146,9 +146,9 @@ struct EventsView: View {
                                 Text(CalMath.monthName(m, short: true).uppercased())
                                     .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                KMonthGrid(year: viewYear, month: m, compact: true, dot: { colors[$0] }) { _ in
+                                KMonthGrid(year: viewYear, month: m, compact: true, dot: { colors[$0] }, onTap: { _ in
                                     withAnimation(.knPop) { viewMonth = m; mode = .month }
-                                }
+                                })
                             }
                             .padding(9)
                             .background(Palette.surface2.opacity(0.3), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -832,16 +832,6 @@ private struct SymbolPicker: View {
     }
 }
 
-// MARK: - Colour from hex string + tag colour
-
-extension Color {
-    /// Parse an "RRGGBB" (or "#RRGGBB") string into a Color via the existing hex init.
-    init(hexString: String) {
-        let s = hexString.hasPrefix("#") ? String(hexString.dropFirst()) : hexString
-        self.init(hex: UInt32(s, radix: 16) ?? 0x9A9A9A)
-    }
-}
-
-extension EventTag {
-    var color: Color { Color(hexString: colorHex) }
-}
+// Color(hexString:) + EventTag.color now live in Support/CategoryStyle.swift —
+// TodayView needs EventTag's color for the "next events" strip without pulling
+// in the rest of this AppKit-heavy file (shared with iOS).

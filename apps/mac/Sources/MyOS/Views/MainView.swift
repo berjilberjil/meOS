@@ -1,35 +1,6 @@
 import SwiftUI
 
-enum NavTab: String, CaseIterable, Identifiable {
-    case today, events, finance, fitness, productivity, journal, notes, profile, settings
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .today: return "Today"
-        case .events: return "Events"
-        case .finance: return "Finance"
-        case .fitness: return "Fitness"
-        case .productivity: return "Productivity"
-        case .journal: return "Journal"
-        case .notes: return "Notes"
-        case .profile: return "Profile"
-        case .settings: return "Settings"
-        }
-    }
-    var icon: String {
-        switch self {
-        case .today: return "sun.max.fill"
-        case .events: return "calendar"
-        case .finance: return "indianrupeesign.circle.fill"
-        case .fitness: return "figure.run"
-        case .productivity: return "play.rectangle.fill"
-        case .journal: return "book.closed.fill"
-        case .notes: return "note.text"
-        case .profile: return "person.crop.circle.fill"
-        case .settings: return "gearshape.fill"
-        }
-    }
-}
+// NavTab now lives in Support/Navigation.swift, shared with iOS.
 
 struct MainView: View {
     @EnvironmentObject var state: AppState

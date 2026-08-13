@@ -1,5 +1,24 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+typealias PlatformColor = NSColor
+#else
+import UIKit
+typealias PlatformColor = UIColor
+#endif
+
+/// sRGB components of a Color, read via the platform color type (NSColor on
+/// macOS, UIColor on iOS) so `mixedWithBlack`/`mixedWithWhite` work everywhere.
+private func platformComponents(_ color: Color, fallback: PlatformColor) -> (r: Double, g: Double, b: Double, a: Double) {
+    #if os(macOS)
+    let c = NSColor(color).usingColorSpace(.sRGB) ?? fallback
+    return (Double(c.redComponent), Double(c.greenComponent), Double(c.blueComponent), Double(c.alphaComponent))
+    #else
+    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
+    return (Double(r), Double(g), Double(b), Double(a))
+    #endif
+}
 
 // MyOS design language — Duolingo-inspired. Dark teal-navy canvas, bright candy
 // feature colors, chunky rounded cards with a visible 2px border, SF Rounded
@@ -20,21 +39,13 @@ extension Color {
     /// Blend toward black by `t` (0…1) — used to derive a button's darker 3D edge
     /// from its face color, so any tint gets a matching edge for free.
     func mixedWithBlack(_ t: Double) -> Color {
-        let ns = NSColor(self).usingColorSpace(.sRGB) ?? .black
-        return Color(.sRGB,
-                     red: Double(ns.redComponent) * (1 - t),
-                     green: Double(ns.greenComponent) * (1 - t),
-                     blue: Double(ns.blueComponent) * (1 - t),
-                     opacity: Double(ns.alphaComponent))
+        let c = platformComponents(self, fallback: .black)
+        return Color(.sRGB, red: c.r * (1 - t), green: c.g * (1 - t), blue: c.b * (1 - t), opacity: c.a)
     }
     /// Blend toward white by `t` — hover highlight.
     func mixedWithWhite(_ t: Double) -> Color {
-        let ns = NSColor(self).usingColorSpace(.sRGB) ?? .white
-        return Color(.sRGB,
-                     red: Double(ns.redComponent) + (1 - Double(ns.redComponent)) * t,
-                     green: Double(ns.greenComponent) + (1 - Double(ns.greenComponent)) * t,
-                     blue: Double(ns.blueComponent) + (1 - Double(ns.blueComponent)) * t,
-                     opacity: Double(ns.alphaComponent))
+        let c = platformComponents(self, fallback: .white)
+        return Color(.sRGB, red: c.r + (1 - c.r) * t, green: c.g + (1 - c.g) * t, blue: c.b + (1 - c.b) * t, opacity: c.a)
     }
 }
 
@@ -96,11 +107,12 @@ extension Animation {
 // MARK: - Elevation
 
 extension View {
-    /// Soft, layered shadow for floating surfaces.
+    /// Soft, layered shadow for floating surfaces. Toned down from the original
+    /// 0.5/0.3 opacity + 26/14 radius, which read as too heavy.
     func knShadow(_ strong: Bool = false) -> some View {
-        shadow(color: .black.opacity(strong ? 0.5 : 0.3),
-               radius: strong ? 26 : 14,
-               x: 0, y: strong ? 12 : 6)
+        shadow(color: .black.opacity(strong ? 0.35 : 0.2),
+               radius: strong ? 18 : 10,
+               x: 0, y: strong ? 8 : 4)
     }
 }
 
@@ -342,8 +354,11 @@ struct KSoftButtonStyle: ButtonStyle {
 }
 
 // Balanced pointing-hand cursor (uses .set(), so no push/pop imbalance on disappear).
+// No-op on iOS — there's no pointer to change.
 func cursor(_ inside: Bool) {
+    #if os(macOS)
     if inside { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
+    #endif
 }
 
 /// Adds only tactile press-scale — for buttons that carry their own visual state
@@ -415,6 +430,7 @@ struct Segmented<T: Hashable>: View {
                 let on = selection == opt.value
                 Text(opt.title)
                     .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .lineLimit(1).minimumScaleFactor(0.7)
                     .foregroundStyle(on ? Palette.text : Palette.muted)
                     .padding(.horizontal, 14).padding(.vertical, 7)
                     .background {

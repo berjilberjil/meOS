@@ -1023,6 +1023,7 @@ struct ImageParseResult: Codable {
     let summary: String
     let transactions: [TxnItem]?
     let holdings: [HoldingItem]?
+    let foods: [FoodItem]?
 
     struct TxnItem: Codable {
         let kind: TxnKind
@@ -1041,6 +1042,17 @@ struct ImageParseResult: Codable {
         let currentInr: Double
         let units: Double?
         let note: String?
+    }
+    struct FoodItem: Codable {
+        let name: String
+        let category: String
+        let servingLabel: String
+        let calories: Double
+        let protein: Double
+        let carbs: Double
+        let fiber: Double
+        let fats: Double
+        let vitamins: String?
     }
 }
 

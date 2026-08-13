@@ -1,8 +1,11 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#endif
 
 struct TodayView: View {
     @EnvironmentObject var state: AppState
+    @Environment(\.openURL) private var openURL
     var go: (NavTab) -> Void
 
     @State private var newFocus = ""
@@ -213,7 +216,7 @@ struct TodayView: View {
                 HStack(spacing: 8) {
                     if let s = item.source, !s.isEmpty {
                         Button {
-                            if let u = item.url, let url = URL(string: u) { NSWorkspace.shared.open(url) }
+                            if let u = item.url, let url = URL(string: u) { openURL(url) }
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "link").font(.system(size: 9, weight: .bold))

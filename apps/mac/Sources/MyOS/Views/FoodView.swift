@@ -8,6 +8,8 @@ struct FoodView: View {
     @State private var editingFood: Food?
     @State private var newFood = false
     @State private var showPlan = false
+    @State private var scanningFood = false
+    @State private var scanPayload: FoodScanPayload?
 
     private var key: String { state.todayKey }
     private var log: MealLog { state.mealLog(key) }
@@ -24,6 +26,8 @@ struct FoodView: View {
             HStack(spacing: 10) {
                 Button { showPlan = true } label: { Label("Weekly meal plan", systemImage: "calendar") }
                     .buttonStyle(KSecondaryButtonStyle())
+                Button { scanningFood = true } label: { Label("Scan food photo", systemImage: "camera.viewfinder") }
+                    .buttonStyle(KSecondaryButtonStyle())
                 Button { newFood = true } label: { Label("New food", systemImage: "plus") }
                     .buttonStyle(KGhostButtonStyle())
             }
@@ -37,6 +41,14 @@ struct FoodView: View {
         .sheet(isPresented: $newFood) { FoodEditor(food: nil) }
         .sheet(item: $editingFood) { f in FoodEditor(food: f) }
         .sheet(isPresented: $showPlan) { MealPlanSheet() }
+        .sheet(isPresented: $scanningFood) {
+            FoodScanSheet { summary, foods in
+                scanPayload = FoodScanPayload(summary: summary, foods: foods)
+            }
+        }
+        .sheet(item: $scanPayload) { payload in
+            FoodScanReviewSheet(summary: payload.summary, foods: payload.foods, logDate: key)
+        }
     }
 
     // MARK: - Totals vs targets
@@ -399,5 +411,197 @@ struct MealPlanSheet: View {
             }
             Divider().overlay(Palette.border)
         }
+    }
+}
+
+// MARK: - Scan a food photo
+
+/// Payload handed from the scan sheet to the review sheet.
+struct FoodScanPayload: Identifiable {
+    let id = UUID()
+    let summary: String
+    let foods: [Food]
+}
+
+/// Drop/paste a photo of a packaged food's label (or a menu item) and let AI read
+/// it into one or more draft Foods, reviewed next in `FoodScanReviewSheet`.
+struct FoodScanSheet: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    let onRead: (String, [Food]) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Scan a food photo").font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Spacer()
+                Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
+                    .buttonStyle(KIconButtonStyle(size: 28))
+            }
+            ImageDropZone(
+                title: "Drop a nutrition label or product photo",
+                subtitle: "A packaged snack, a menu item, anything with visible macros. AI adds it to your food library and you confirm before it's logged.",
+                tint: Palette.brand,
+                busy: state.imageBusy
+            ) { imgs, mt in
+                Task { @MainActor in
+                    let r = await state.analyzeFood(imagesBase64: imgs, mediaType: mt)
+                    if state.imageError == nil {
+                        onRead(r.summary, r.drafts)
+                        dismiss()
+                    }
+                }
+            }
+            if let err = state.imageError {
+                Text(err).font(.system(size: 12)).foregroundStyle(Palette.red)
+            }
+        }
+        .padding(20).frame(width: 440)
+        .background(Palette.elevated)
+    }
+}
+
+/// Review-then-save for scanned foods: confirm/edit the extracted macros, pick
+/// which meal to file each under, then save — this both adds the food to the
+/// library and logs it for `logDate` in one step.
+struct FoodScanReviewSheet: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    let summary: String
+    let logDate: String
+    @State private var drafts: [DraftScanFood]
+
+    init(summary: String, foods: [Food], logDate: String) {
+        self.summary = summary
+        self.logDate = logDate
+        _drafts = State(initialValue: foods.map { DraftScanFood(food: $0) })
+    }
+
+    private var included: [DraftScanFood] { drafts.filter { $0.include } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Review \(drafts.count) \(drafts.count == 1 ? "food" : "foods")")
+                    .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                if !summary.isEmpty {
+                    Text(summary).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                }
+            }
+            .padding(20)
+
+            Divider().overlay(Palette.border)
+
+            if drafts.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "text.magnifyingglass").font(.system(size: 26)).foregroundStyle(Palette.faint)
+                    Text("Couldn't read a food from that image.").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    Text("Try a clearer, closer photo of the label.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 40)
+            } else {
+                ScrollView {
+                    VStack(spacing: 10) {
+                        ForEach($drafts) { $d in ScanFoodRow(draft: $d) }
+                    }
+                    .padding(16)
+                }
+                .frame(maxHeight: 460)
+            }
+
+            Divider().overlay(Palette.border)
+
+            HStack {
+                Text("\(included.count) selected").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.muted)
+                Spacer()
+                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                Button("Add & log \(included.count)") {
+                    for d in included {
+                        let saved = state.addFood(d.food)
+                        state.addFoodToMeal(date: logDate, meal: d.meal, foodId: saved.id, quantity: d.quantity)
+                    }
+                    dismiss()
+                }
+                .buttonStyle(KPrimaryButtonStyle())
+                .disabled(included.isEmpty)
+                .opacity(included.isEmpty ? 0.5 : 1)
+            }
+            .padding(20)
+        }
+        .frame(width: 560)
+        .background(Palette.elevated)
+    }
+}
+
+/// One extracted food, editable before it's saved to the library and logged.
+struct DraftScanFood: Identifiable {
+    let id = UUID()
+    var food: Food
+    var meal: MealKey = .snacks
+    var quantity: Double = 1
+    var include = true
+}
+
+private struct ScanFoodRow: View {
+    @Binding var draft: DraftScanFood
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Button { draft.include.toggle() } label: {
+                    Image(systemName: draft.include ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(draft.include ? Palette.green : Palette.faint)
+                }
+                .buttonStyle(KPressStyle())
+                FoodIcon(category: draft.food.category, size: 28)
+                TextField("Name", text: $draft.food.name)
+                    .textFieldStyle(.plain).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                Spacer()
+                Menu {
+                    ForEach(MealKey.allCases, id: \.self) { m in Button(m.label) { draft.meal = m } }
+                } label: {
+                    Label(draft.meal.label, systemImage: draft.meal.icon).font(.system(size: 11, weight: .semibold))
+                }
+                .menuStyle(.borderlessButton).fixedSize()
+            }
+            HStack(spacing: 8) {
+                TextField("Serving", text: $draft.food.servingLabel)
+                    .textFieldStyle(.plain).font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+                Stepper(value: $draft.quantity, in: 0.5...20, step: 0.5) {
+                    Text("× \(Fmt.trimKg(draft.quantity)) serving\(draft.quantity == 1 ? "" : "s")")
+                        .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                }
+                .fixedSize()
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 8)], spacing: 8) {
+                macroField("Cal", \.calories)
+                macroField("Protein", \.protein)
+                macroField("Carbs", \.carbs)
+                macroField("Fiber", \.fiber)
+                macroField("Fat", \.fats)
+            }
+        }
+        .padding(11)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            .strokeBorder(draft.include ? Palette.border : Palette.border.opacity(0.5), lineWidth: 1))
+        .opacity(draft.include ? 1 : 0.55)
+        .animation(.knFast, value: draft.include)
+    }
+
+    private func macroField(_ label: String, _ kp: WritableKeyPath<Macros, Double>) -> some View {
+        HStack(spacing: 4) {
+            Text(label).font(.system(size: 10)).foregroundStyle(Palette.faint)
+            TextField("0", value: Binding(get: { draft.food.perServing[keyPath: kp] },
+                                          set: { draft.food.perServing[keyPath: kp] = $0 }),
+                      format: .number)
+                .textFieldStyle(.plain).monospacedDigit().font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Palette.text)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
     }
 }

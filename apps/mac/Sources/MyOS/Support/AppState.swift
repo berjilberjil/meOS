@@ -679,6 +679,29 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Read a photo of a packaged food (nutrition label, product pack, menu item)
+    /// into draft Foods for review. Does NOT save or log anything.
+    func analyzeFood(imagesBase64: [String], mediaType: String) async -> (summary: String, drafts: [Food]) {
+        imageError = nil
+        guard isHydrated else { imageError = "Not synced yet — try again in a moment."; return ("", []) }
+        imageBusy = true
+        defer { imageBusy = false }
+        do {
+            let r = try await api.parseImage(imagesBase64: imagesBase64, mediaType: mediaType, mode: "food")
+            let drafts: [Food] = (r.foods ?? []).map { item in
+                Food(name: item.name, category: FoodCategory(rawValue: item.category) ?? .other,
+                     servingLabel: item.servingLabel,
+                     perServing: Macros(calories: item.calories, protein: item.protein, carbs: item.carbs,
+                                        fiber: item.fiber, fats: item.fats),
+                     vitamins: item.vitamins)
+            }
+            return (r.summary, drafts)
+        } catch {
+            imageError = (error as? APIError)?.message ?? error.localizedDescription
+            return ("", [])
+        }
+    }
+
     /// Ask the AI for a weekly read on the latest snapshot, grounded in the loan/
     /// income/protection context. Saves the advice on success.
     func requestPortfolioReview() async {

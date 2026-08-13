@@ -253,9 +253,9 @@ struct KDatePicker: View {
         VStack(spacing: 10) {
             KMonthHeader(year: viewYear, month: viewMonth, showToday: false,
                          onPrev: { shift(-1) }, onNext: { shift(1) })
-            KMonthGrid(year: viewYear, month: viewMonth, selected: CalMath.dateKey(date)) { key in
+            KMonthGrid(year: viewYear, month: viewMonth, selected: CalMath.dateKey(date), onTap: { key in
                 if let d = CalMath.date(fromKey: key) { date = d }
-            }
+            })
         }
         .padding(12)
         .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))

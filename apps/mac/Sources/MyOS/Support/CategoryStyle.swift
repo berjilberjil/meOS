@@ -1,5 +1,17 @@
 import SwiftUI
 
+extension Color {
+    /// Parse an "RRGGBB" (or "#RRGGBB") string into a Color via the existing hex init.
+    init(hexString: String) {
+        let s = hexString.hasPrefix("#") ? String(hexString.dropFirst()) : hexString
+        self.init(hex: UInt32(s, radix: 16) ?? 0x9A9A9A)
+    }
+}
+
+extension EventTag {
+    var color: Color { Color(hexString: colorHex) }
+}
+
 /// Visual identity for spending categories and the quality read — an SF Symbol
 /// and a Palette colour each, so rows, chips, and breakdowns read at a glance.
 /// Keeps the colourful, playful Duolingo feel without new asset files.

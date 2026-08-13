@@ -48,7 +48,9 @@ struct FitnessView: View {
             weightCard.knRise(4)
             stepsCard.knRise(5)
             nutritionCard.knRise(6)
+            #if os(macOS)
             ProgressPhotosCard().knRise(7)
+            #endif
         }
     }
 

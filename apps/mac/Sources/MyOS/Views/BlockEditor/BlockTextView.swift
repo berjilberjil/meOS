@@ -110,7 +110,7 @@ final class BlockTextView: NSTextView {
     // MARK: Caret geometry (for the slash popover)
 
     func caretRectOnScreen() -> NSRect {
-        guard let lm = layoutManager, let tc = textContainer else { return .zero }
+        guard let lm = layoutManager, textContainer != nil else { return .zero }
         let len = textStorage?.length ?? 0
         let loc = min(selectedRange().location, len)
         let glyph = lm.glyphIndexForCharacter(at: loc)

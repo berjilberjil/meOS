@@ -43,8 +43,8 @@ struct QuickLogBar: View {
                     .strokeBorder(focused ? Palette.brand.opacity(0.75) : Palette.border,
                                   lineWidth: focused ? 1.5 : 1)
             )
-            .shadow(color: focused ? Palette.brand.opacity(0.22) : .black.opacity(0.25),
-                    radius: focused ? 18 : 10, x: 0, y: focused ? 0 : 4)
+            .shadow(color: focused ? Palette.brand.opacity(0.15) : .black.opacity(0.18),
+                    radius: focused ? 14 : 7, x: 0, y: focused ? 0 : 3)
             .animation(.knNormal, value: focused)
             .animation(.knFast, value: text.isEmpty)
 

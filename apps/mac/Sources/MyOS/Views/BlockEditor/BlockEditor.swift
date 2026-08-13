@@ -454,7 +454,6 @@ struct BlockEditor: NSViewRepresentable {
             for p in patterns {
                 let mk = p.marker as NSString
                 guard lastChar == mk.substring(from: mk.length - 1) else { continue }
-                let closeEnd = caret
                 let closeStart = caret - mk.length
                 guard closeStart >= para.location else { continue }
                 guard ns.substring(with: NSRange(location: closeStart, length: mk.length)) == p.marker else { continue }
@@ -502,18 +501,17 @@ struct BlockEditor: NSViewRepresentable {
                 var new = at
                 let base = blockMeta(from: at)
                 let size = EditorTheme.baseSize(base); let weight = EditorTheme.baseWeight(base)
-                var bold = false, italic = false, code = base.type == .code, strike = false
+                var bold = false, italic = false, code = base.type == .code
                 if let f = at[.font] as? NSFont {
                     bold = f.fontDescriptor.symbolicTraits.contains(.bold)
                     italic = f.fontDescriptor.symbolicTraits.contains(.italic)
                 }
                 if at[.inlineCode] as? Bool == true { code = true }
-                if at[.strikethroughStyle] != nil { strike = true }
                 switch mark {
                 case .bold: bold = true
                 case .italic: italic = true
                 case .code: code = true; new[.inlineCode] = true; new[.foregroundColor] = NSColor(Palette.purple)
-                case .strike: strike = true; new[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+                case .strike: new[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
                 case .link: break
                 }
                 new[.font] = EditorTheme.font(size: size, weight: weight, bold: bold, italic: italic, mono: code)
@@ -571,20 +569,19 @@ struct BlockEditor: NSViewRepresentable {
             storage.enumerateAttributes(in: sel, options: []) { at, r, _ in
                 var new = at
                 let base = blockMeta(from: at)
-                var bold = false, italic = false, code = base.type == .code, strike = false
+                var bold = false, italic = false, code = base.type == .code
                 if let f = at[.font] as? NSFont {
                     bold = f.fontDescriptor.symbolicTraits.contains(.bold)
                     italic = f.fontDescriptor.symbolicTraits.contains(.italic)
                 }
                 if at[.inlineCode] as? Bool == true { code = true }
-                if at[.strikethroughStyle] != nil { strike = true }
                 let want = !allHave
                 switch mark {
                 case .bold: bold = want
                 case .italic: italic = want
                 case .code: code = want; new[.inlineCode] = want ? true : nil
                     new[.foregroundColor] = want ? NSColor(Palette.purple) : EditorTheme.baseColor(base)
-                case .strike: strike = want; new[.strikethroughStyle] = want ? NSUnderlineStyle.single.rawValue : nil
+                case .strike: new[.strikethroughStyle] = want ? NSUnderlineStyle.single.rawValue : nil
                 case .link: break
                 }
                 new[.font] = EditorTheme.font(size: EditorTheme.baseSize(base), weight: EditorTheme.baseWeight(base),

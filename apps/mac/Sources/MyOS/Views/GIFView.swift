@@ -1,8 +1,14 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 
 // In-app animated GIF exercise demos (ExerciseDB mirror), like fitOS. Loads the
-// bytes once, then hands them to an NSImageView that animates them.
+// bytes once, then hands them to a native image view. macOS animates every frame
+// via NSImageView; iOS shows the first frame as a static image (UIImage doesn't
+// animate multi-frame GIF data without a custom decoder).
 
 struct GIFView: View {
     let url: URL
@@ -35,6 +41,7 @@ struct GIFView: View {
     }
 }
 
+#if os(macOS)
 /// NSImageView wrapper that animates a GIF from raw data.
 private struct AnimatedGIF: NSViewRepresentable {
     let data: Data
@@ -52,3 +59,16 @@ private struct AnimatedGIF: NSViewRepresentable {
         v.animates = true
     }
 }
+#else
+/// Static first-frame fallback — good enough for a demo thumbnail on iOS.
+private struct AnimatedGIF: View {
+    let data: Data
+    var body: some View {
+        if let img = UIImage(data: data) {
+            Image(uiImage: img).resizable().aspectRatio(contentMode: .fit)
+        } else {
+            Color.clear
+        }
+    }
+}
+#endif
