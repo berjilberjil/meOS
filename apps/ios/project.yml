@@ -32,20 +32,21 @@ targets:
       - path: ../mac/Sources/MyOS/Views/LoginView.swift
       - path: ../mac/Sources/MyOS/Views/TodayView.swift
       - path: ../mac/Sources/MyOS/Views/QuickLogBar.swift
-      - path: ../mac/Sources/MyOS/Views/FinanceView.swift
-      - path: ../mac/Sources/MyOS/Views/FinanceComponents.swift
-      - path: ../mac/Sources/MyOS/Views/NetWorthCard.swift
+      - path: ../mac/Sources/MyOS/Views/FoldView.swift
+      # Fold snapshot bundled from OUTSIDE the repo (device-local cache) so real
+      # numbers show on iPhone without putting financial data into git.
+      - path: /Users/berjilskcript/Library/Application Support/MyOS/fold.json
+        buildPhase: resources
       - path: ../mac/Sources/MyOS/Views/FitnessView.swift
       - path: ../mac/Sources/MyOS/Views/FoodView.swift
       - path: ../mac/Sources/MyOS/Views/WorkoutView.swift
       - path: ../mac/Sources/MyOS/Views/GIFView.swift
       - path: ../mac/Sources/MyOS/Views/BodyView.swift
       - path: ../mac/Sources/MyOS/Views/JournalView.swift
-      - path: ../mac/Sources/MyOS/Views/PortfolioView.swift
-      - path: ../mac/Sources/MyOS/Views/TxnReviewSheet.swift
       - path: ../mac/Sources/MyOS/Views/ChatWidget.swift
       - path: ../mac/Sources/MyOS/Views/AIProvidersCard.swift
       - path: ../mac/Sources/MyOS/Views/AgentSettingsCard.swift
+      - path: ../mac/Sources/MyOS/Views/AppearanceCard.swift
       - path: ../mac/Sources/MyOS/Views/Editors.swift
       - path: ../mac/Sources/MyOS/Views/CalendarComponents.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift

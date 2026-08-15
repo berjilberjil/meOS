@@ -371,7 +371,11 @@ struct ExercisePickerSheet: View {
             }
             .frame(maxHeight: 400)
         }
+        #if os(macOS)
         .frame(width: 480)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .background(Palette.elevated)
     }
 
@@ -434,7 +438,12 @@ struct ExerciseEditor: View {
                 .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(24).frame(width: 460)
+        .padding(24)
+        #if os(macOS)
+        .frame(width: 460)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .background(Palette.elevated)
     }
 
@@ -467,45 +476,63 @@ struct ExerciseDetailSheet: View {
                     .buttonStyle(KIconButtonStyle(size: 28))
             }
 
+            #if os(macOS)
             HStack(alignment: .top, spacing: 16) {
-                // Demo
-                Group {
-                    if let url = exercise.gifURL {
-                        GIFView(url: url)
-                    } else {
-                        ZStack { Palette.surface2.opacity(0.5)
-                            VStack(spacing: 8) {
-                                ExerciseIcon(category: exercise.category, size: 54)
-                                Text("No demo").font(.system(size: 11)).foregroundStyle(Palette.faint)
-                            }
-                        }
-                    }
-                }
-                .frame(width: 240, height: 240)
-                .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
+                demoView.frame(width: 240, height: 240)
+                musclesPanel.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            #else
+            // Narrow phone widths can't fit the demo + muscle panel side by side —
+            // stack them so nothing clips horizontally.
+            VStack(alignment: .leading, spacing: 16) {
+                demoView.frame(height: 240).frame(maxWidth: .infinity)
+                musclesPanel.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            #endif
+        }
+        .padding(20)
+        #if os(macOS)
+        .frame(width: 560)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
+        .background(Palette.elevated)
+    }
 
-                // Muscles worked → body highlight
-                VStack(alignment: .leading, spacing: 10) {
-                    KFieldLabel(text: "Muscles worked")
-                    if exercise.muscles.isEmpty {
-                        Text("—").font(.system(size: 13)).foregroundStyle(Palette.faint)
-                    } else {
-                        MiniBody(slugs: exercise.muscles).frame(height: 200)
-                        FlowLayout(spacing: 6, runSpacing: 6) {
-                            ForEach(exercise.muscles, id: \.self) { slug in
-                                Text(MuscleSlug.name(slug))
-                                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.text)
-                                    .padding(.horizontal, 9).padding(.vertical, 4)
-                                    .background(Palette.brand.opacity(0.15), in: Capsule())
-                            }
-                        }
+    private var demoView: some View {
+        Group {
+            if let url = exercise.gifURL {
+                GIFView(url: url)
+            } else {
+                ZStack { Palette.surface2.opacity(0.5)
+                    VStack(spacing: 8) {
+                        ExerciseIcon(category: exercise.category, size: 54)
+                        Text("No demo").font(.system(size: 11)).foregroundStyle(Palette.faint)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(20).frame(width: 560)
-        .background(Palette.elevated)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
+    }
+
+    private var musclesPanel: some View {
+        // Muscles worked → body highlight
+        VStack(alignment: .leading, spacing: 10) {
+            KFieldLabel(text: "Muscles worked")
+            if exercise.muscles.isEmpty {
+                Text("—").font(.system(size: 13)).foregroundStyle(Palette.faint)
+            } else {
+                MiniBody(slugs: exercise.muscles).frame(height: 200)
+                FlowLayout(spacing: 6, runSpacing: 6) {
+                    ForEach(exercise.muscles, id: \.self) { slug in
+                        Text(MuscleSlug.name(slug))
+                            .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.text)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(Palette.brand.opacity(0.15), in: Capsule())
+                    }
+                }
+            }
+        }
     }
 }

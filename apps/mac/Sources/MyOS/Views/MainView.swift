@@ -30,7 +30,7 @@ struct MainView: View {
                             switch tab {
                             case .today:   TodayView(go: { switchTo($0) })
                             case .events:  EventsView()
-                            case .finance: FinanceView()
+                            case .fold: FoldView()
                             case .fitness: FitnessView()
                             case .productivity: ProductivityView()
                             case .journal: JournalView()

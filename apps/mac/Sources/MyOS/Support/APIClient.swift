@@ -190,6 +190,11 @@ final class APIClient {
         _ = try await requestData("PUT", "api/state/\(Vault.metaKey)", bodyData: data)
     }
 
+    /// Delete one myos.* key from the server (used to purge removed modules).
+    func deleteState(_ key: String) async throws {
+        _ = try await request("DELETE", "api/state/\(key)")
+    }
+
     // MARK: - AI
 
     func parse(text: String) async throws -> ParseResult {
@@ -197,17 +202,11 @@ final class APIClient {
         return try decoder.decode(ParseResult.self, from: data)
     }
 
-    /// Read one or more screenshots. mode: "transactions" or "portfolio".
+    /// Read one or more food photos (nutrition label / product pack / menu). mode: "food".
     func parseImage(imagesBase64: [String], mediaType: String, mode: String) async throws -> ImageParseResult {
         let body = ImageRequest(images: imagesBase64, mediaType: mediaType, mode: mode)
         let data = try await request("POST", "api/parse-image", body: body, using: aiSession)
         return try decoder.decode(ImageParseResult.self, from: data)
-    }
-
-    /// Weekly portfolio review, grounded server-side in the finance principles.
-    func advise(_ payload: AdviceRequest) async throws -> PortfolioAdvice {
-        let data = try await request("POST", "api/advise", body: payload, using: aiSession)
-        return try decoder.decode(PortfolioAdvice.self, from: data)
     }
 
     /// Mentor chat. Sends the conversation + a data snapshot + who the assistant

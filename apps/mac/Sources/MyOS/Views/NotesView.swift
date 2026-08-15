@@ -1,11 +1,9 @@
 import SwiftUI
 
-/// How the notes browse screen lays out — grid (default) or single-column list.
-enum NotesLayout: String { case grid, list }
-
-/// Notes has two screens: a **browse** listing (grid / list of all notes, the home
-/// screen) and a **detail** two-pane (Apple-Notes style — notes-list column + full
-/// editor). Clicking a note in browse drills into detail; a back button returns.
+/// Notes has two screens: a **browse** listing (single-column list of all notes,
+/// the home screen) and a **detail** two-pane (Apple-Notes style — notes-list
+/// column + full editor). Clicking a note in browse drills into detail; a back
+/// button returns.
 struct NotesView: View {
     @EnvironmentObject var state: AppState
     @State private var query = ""
@@ -29,12 +27,6 @@ struct NotesView: View {
     @State private var unlocked: Set<String> = []
     /// Bumped to open the editor's native find bar.
     @State private var findToken = 0
-
-    // Browse view-mode preference (grid default). A UI pref, kept in UserDefaults.
-    private static let kLayout = "myos.notes.layout"
-    @State private var layout: NotesLayout =
-        NotesLayout(rawValue: UserDefaults.standard.string(forKey: NotesView.kLayout) ?? "") ?? .grid
-    private let gridCols = [GridItem(.adaptive(minimum: 250), spacing: 14)]
 
     private var filtered: [Note] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
@@ -83,12 +75,6 @@ struct NotesView: View {
                              : "No notes match “\(query)”.")
                             .font(.system(size: 13)).foregroundStyle(Palette.faint)
                     }
-                } else if layout == .grid {
-                    LazyVGrid(columns: gridCols, alignment: .leading, spacing: 14) {
-                        ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, note in
-                            noteCard(note, grid: true).knRise(min(idx, 8))
-                        }
-                    }
                 } else {
                     ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, note in
                         noteCard(note).knRise(min(idx, 8))
@@ -109,38 +95,10 @@ struct NotesView: View {
                     .font(.system(size: 13, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             }
             Spacer()
-            if !state.notes.isEmpty { layoutToggle }
             Button { startNew() } label: { Label("New note", systemImage: "plus") }
                 .buttonStyle(KPrimaryButtonStyle())
                 .keyboardShortcut("n", modifiers: .command)
         }
-    }
-
-    private var layoutToggle: some View {
-        HStack(spacing: 2) {
-            layoutButton(.grid, "square.grid.2x2.fill")
-            layoutButton(.list, "list.bullet")
-        }
-        .padding(3)
-        .background(Palette.bg, in: Capsule())
-        .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 2))
-    }
-
-    private func layoutButton(_ l: NotesLayout, _ icon: String) -> some View {
-        let on = layout == l
-        return Button {
-            withAnimation(.knNormal) { layout = l }
-            UserDefaults.standard.set(l.rawValue, forKey: Self.kLayout)
-        } label: {
-            Image(systemName: icon).font(.system(size: 12, weight: .bold))
-                .foregroundStyle(on ? Palette.text : Palette.muted)
-                .frame(width: 32, height: 26)
-                .background { if on { Capsule().fill(Palette.surface2) } }
-                .contentShape(Capsule())
-        }
-        .buttonStyle(KPressStyle())
-        .onHover { h in cursor(h) }
-        .help(l == .grid ? "Grid view" : "List view")
     }
 
     private var browseSearch: some View {
@@ -159,7 +117,7 @@ struct NotesView: View {
         .knField(focused: searchFocused)
     }
 
-    private func noteCard(_ note: Note, grid: Bool = false) -> some View {
+    private func noteCard(_ note: Note) -> some View {
         let hidden = note.locked && !unlocked.contains(note.id)
         return Button { openFromBrowse(note) } label: {
             Card {
@@ -189,13 +147,12 @@ struct NotesView: View {
                     let preview = hidden ? "Locked" : note.body
                     if !preview.isEmpty {
                         Text(preview).font(.system(size: 13)).foregroundStyle(Palette.muted)
-                            .lineLimit(grid ? 7 : 3).multilineTextAlignment(.leading)
+                            .lineLimit(3).multilineTextAlignment(.leading)
                     }
-                    if grid { Spacer(minLength: 0) }
                     Text(Fmt.day(note.updatedAt))
                         .font(.system(size: 11)).foregroundStyle(Palette.faint)
                 }
-                .frame(minHeight: grid ? 120 : 0, alignment: .topLeading)
+                .frame(minHeight: 0, alignment: .topLeading)
             }
         }
         .buttonStyle(KPressStyle())

@@ -13,7 +13,7 @@ struct NavGlyph: View {
             switch tab {
             case .today:   SunGlyph(s: size)
             case .events:  CalendarGlyph(s: size)
-            case .finance: CoinGlyph(s: size)
+            case .fold: CoinGlyph(s: size)
             case .fitness: DumbbellGlyph(s: size)
             case .productivity: PlayGlyph(s: size)
             case .journal: BookGlyph(s: size)
@@ -51,7 +51,7 @@ struct SunGlyph: View {
     }
 }
 
-// MARK: - Finance · coin
+// MARK: - Fold · coin
 
 struct CoinGlyph: View {
     let s: CGFloat

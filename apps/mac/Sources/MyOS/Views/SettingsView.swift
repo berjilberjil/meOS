@@ -22,29 +22,12 @@ struct SettingsView: View {
 
             accountCard.knRise(1)
             securityCard.knRise(2)
+            AppearanceCard().knRise(3)
             AgentSettingsCard().knRise(3)
             AIProvidersCard().knRise(3)
             fitnessCard.knRise(3)
-            financeCard.knRise(4)
-            growwCard.knRise(5)
             presetsCard.knRise(6)
             dataCard.knRise(7)
-        }
-    }
-
-    // MARK: - Live prices
-
-    private var growwCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionTitle(text: "Live prices")
-                Text("Live prices come free from Yahoo Finance — no key or token needed. Set a ticker on each holding (ITC.NS for NSE, TCS.BO for BSE, AAPL for US), then tap “Live prices” in Invest. US holdings are auto-converted to INR.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let ts = state.growwLastRefresh {
-                    Text("Last live refresh: \(Fmt.day(ts))").font(.system(size: 10)).foregroundStyle(Palette.green)
-                }
-            }
         }
     }
 
@@ -173,21 +156,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Finance targets (same values as Finance › Edit targets)
-
-    private var financeCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    SectionTitle(text: "Finance targets")
-                    Spacer()
-                    Text("syncs with the Finance tab").font(.system(size: 10)).foregroundStyle(Palette.faint)
-                }
-                FinanceTargetsEditor()
-            }
-        }
-    }
-
     // MARK: - Journal presets
 
     private var presetsCard: some View {
@@ -213,18 +181,6 @@ struct SettingsView: View {
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
-                DangerResetRow(title: "Reset finance",
-                               subtitle: "All transactions + targets",
-                               confirmTitle: "Reset all finance data?",
-                               confirmMessage: "Deletes every transaction and resets your targets. This can't be undone.") {
-                    state.resetFinance()
-                }
-                DangerResetRow(title: "Reset portfolio",
-                               subtitle: "All snapshots + holdings",
-                               confirmTitle: "Reset the whole portfolio?",
-                               confirmMessage: "Deletes every snapshot and holding. This can't be undone.") {
-                    state.resetPortfolio()
-                }
                 DangerResetRow(title: "Reset journal",
                                subtitle: "Every day's entries",
                                confirmTitle: "Reset the journal?",
@@ -247,7 +203,7 @@ struct SettingsView: View {
                 DangerResetRow(title: "Reset everything",
                                subtitle: "All data — keeps your profile & chips",
                                confirmTitle: "Reset ALL data?",
-                               confirmMessage: "Wipes finance, portfolio, journal, notes, fitness and your day plans. Your profile identity and journal chips are kept. This can't be undone.",
+                               confirmMessage: "Wipes journal, notes, fitness and your day plans. Your profile identity and journal chips are kept. This can't be undone.",
                                tint: Palette.red, emphatic: true) {
                     state.resetEverything()
                 }

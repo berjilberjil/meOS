@@ -8,260 +8,6 @@ struct AuthUser: Codable, Hashable {
     let username: String
 }
 
-// MARK: - Finance  (key: myos.finance)
-
-enum TxnKind: String, Codable, Hashable {
-    case income, expense
-}
-
-/// How worthwhile a spend was — the "useless / useful / best investment" read
-/// the user asked for. Set by the AI (or by hand); nil until judged. Income has none.
-enum TxnQuality: String, Codable, Hashable, CaseIterable {
-    case useless        // impulse / avoidable / a want he could skip
-    case useful         // a genuine need — rent, groceries, bills, transport
-    case investment     // builds future wealth, skills, health or income
-}
-
-/// Where a transaction came from — a small trust signal on the row.
-enum TxnSource: String, Codable, Hashable {
-    case manual         // typed into the form
-    case screenshot     // read from a UPI screenshot
-    case statement      // read from a bank statement
-    case ai             // parsed from the command bar
-}
-
-struct Transaction: Codable, Identifiable, Hashable {
-    var id: String
-    var date: String            // yyyy-MM-dd
-    var kind: TxnKind
-    var amountInr: Double
-    var category: String
-    var quality: TxnQuality?    // useless / useful / investment
-    var merchant: String?       // payee or sender (from a screenshot)
-    var account: String?        // bank / app the money moved through
-    var note: String?
-    var source: TxnSource?
-
-    init(id: String, date: String, kind: TxnKind, amountInr: Double, category: String,
-         quality: TxnQuality? = nil, merchant: String? = nil, account: String? = nil,
-         note: String? = nil, source: TxnSource? = nil) {
-        self.id = id; self.date = date; self.kind = kind
-        self.amountInr = amountInr; self.category = category
-        self.quality = quality; self.merchant = merchant; self.account = account
-        self.note = note; self.source = source
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case id, date, kind, amountInr, category, quality, merchant, account, note, source
-    }
-
-    // Lenient: a row missing any field decodes instead of failing the whole load.
-    // Fields added later (quality/merchant/account/source) default to nil on old rows.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id        = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
-        date      = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-        kind      = (try? c.decode(TxnKind.self, forKey: .kind)) ?? .expense
-        amountInr = try c.decodeIfPresent(Double.self, forKey: .amountInr) ?? 0
-        category  = try c.decodeIfPresent(String.self, forKey: .category) ?? "other"
-        quality   = try? c.decode(TxnQuality.self, forKey: .quality)
-        merchant  = try c.decodeIfPresent(String.self, forKey: .merchant)
-        account   = try c.decodeIfPresent(String.self, forKey: .account)
-        note      = try c.decodeIfPresent(String.self, forKey: .note)
-        source    = try? c.decode(TxnSource.self, forKey: .source)
-    }
-}
-
-/// The canonical category vocabulary. Mirrors apps/web/src/lib/finance.ts — keep
-/// the two lists in sync. Visual styling (icon + colour) lives in Theme.swift.
-enum Categories {
-    static let all = [
-        "food", "groceries", "transport", "travel", "shopping", "gadgets",
-        "health", "fitness", "bills", "rent", "subscriptions", "entertainment",
-        "education", "editor", "family", "loan", "investment",
-        "salary", "freelance", "refund", "misc"
-    ]
-    /// Categories that read as income (used to default the kind toggle).
-    static let income = ["salary", "freelance", "refund"]
-}
-
-struct FinanceMeta: Codable, Hashable {
-    // Neutral defaults — a fresh account starts empty. Real values live in the
-    // user's synced DB record and load on hydrate; nothing personal is seeded here.
-    var goldLoanStartInr: Double = 0
-    var goldLoanOutstandingInr: Double = 0
-    var goldLoanRatePct: Double = 0
-    var emergencyTargetInr: Double = 0
-    var emergencyCurrentInr: Double = 0
-    var monthlyIncomeInr: Double = 0
-    var termInsuranceBought: Bool = false
-    var healthInsuranceBought: Bool = false
-
-    init() {}
-
-    enum CodingKeys: String, CodingKey {
-        case goldLoanStartInr, goldLoanOutstandingInr, goldLoanRatePct
-        case emergencyTargetInr, emergencyCurrentInr, monthlyIncomeInr
-        case termInsuranceBought, healthInsuranceBought
-    }
-
-    // Lenient: fields added in later versions default instead of throwing, so an
-    // older stored meta still loads (this was the hydrate-breaking bug).
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        let d = FinanceMeta()
-        goldLoanStartInr       = try c.decodeIfPresent(Double.self, forKey: .goldLoanStartInr) ?? d.goldLoanStartInr
-        goldLoanOutstandingInr = try c.decodeIfPresent(Double.self, forKey: .goldLoanOutstandingInr) ?? d.goldLoanOutstandingInr
-        goldLoanRatePct        = try c.decodeIfPresent(Double.self, forKey: .goldLoanRatePct) ?? d.goldLoanRatePct
-        emergencyTargetInr     = try c.decodeIfPresent(Double.self, forKey: .emergencyTargetInr) ?? d.emergencyTargetInr
-        emergencyCurrentInr    = try c.decodeIfPresent(Double.self, forKey: .emergencyCurrentInr) ?? d.emergencyCurrentInr
-        monthlyIncomeInr       = try c.decodeIfPresent(Double.self, forKey: .monthlyIncomeInr) ?? d.monthlyIncomeInr
-        termInsuranceBought    = try c.decodeIfPresent(Bool.self, forKey: .termInsuranceBought) ?? d.termInsuranceBought
-        healthInsuranceBought  = try c.decodeIfPresent(Bool.self, forKey: .healthInsuranceBought) ?? d.healthInsuranceBought
-    }
-}
-
-struct FinanceState: Codable, Hashable {
-    var txns: [Transaction] = []
-    var meta: FinanceMeta = FinanceMeta()
-
-    init() {}
-
-    enum CodingKeys: String, CodingKey { case txns, meta }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        txns = try c.decodeIfPresent([Transaction].self, forKey: .txns) ?? []
-        meta = try c.decodeIfPresent(FinanceMeta.self, forKey: .meta) ?? FinanceMeta()
-    }
-}
-
-// MARK: - Portfolio  (key: myos.portfolio)
-
-enum HoldingType: String, Codable, Hashable, CaseIterable {
-    case stock, mutualFund, etf, gold, crypto, other
-    var label: String {
-        switch self {
-        case .stock: return "Stock"
-        case .mutualFund: return "Mutual fund"
-        case .etf: return "ETF"
-        case .gold: return "Gold"
-        case .crypto: return "Crypto"
-        case .other: return "Other"
-        }
-    }
-}
-
-/// One position read from a portfolio screenshot.
-struct Holding: Codable, Identifiable, Hashable {
-    var id: String
-    var name: String
-    var type: HoldingType
-    var investedInr: Double
-    var currentInr: Double
-    var units: Double?
-    var note: String?
-    var symbol: String?     // Groww exchange symbol (e.g. "NSE_ITC") for live prices
-
-    init(id: String = UUID().uuidString.lowercased(), name: String, type: HoldingType,
-         investedInr: Double, currentInr: Double, units: Double? = nil, note: String? = nil,
-         symbol: String? = nil) {
-        self.id = id; self.name = name; self.type = type
-        self.investedInr = investedInr; self.currentInr = currentInr
-        self.units = units; self.note = note; self.symbol = symbol
-    }
-
-    enum CodingKeys: String, CodingKey { case id, name, type, investedInr, currentInr, units, note, symbol }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id          = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
-        name        = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
-        type        = (try? c.decode(HoldingType.self, forKey: .type)) ?? .other
-        investedInr = try c.decodeIfPresent(Double.self, forKey: .investedInr) ?? 0
-        currentInr  = try c.decodeIfPresent(Double.self, forKey: .currentInr) ?? 0
-        units       = try c.decodeIfPresent(Double.self, forKey: .units)
-        note        = try c.decodeIfPresent(String.self, forKey: .note)
-        symbol      = try c.decodeIfPresent(String.self, forKey: .symbol)
-    }
-
-    var pnl: Double { currentInr - investedInr }
-    var returnPct: Double { investedInr > 0 ? pnl / investedInr : 0 }
-}
-
-/// A weekly snapshot of the whole portfolio — the unit the user re-uploads to track change.
-struct PortfolioSnapshot: Codable, Identifiable, Hashable {
-    var id: String
-    var date: String            // yyyy-MM-dd
-    var holdings: [Holding]
-    var note: String?
-
-    init(id: String = UUID().uuidString.lowercased(), date: String, holdings: [Holding], note: String? = nil) {
-        self.id = id; self.date = date; self.holdings = holdings; self.note = note
-    }
-
-    enum CodingKeys: String, CodingKey { case id, date, holdings, note }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id       = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
-        date     = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-        holdings = try c.decodeIfPresent([Holding].self, forKey: .holdings) ?? []
-        note     = try c.decodeIfPresent(String.self, forKey: .note)
-    }
-
-    var totalInvested: Double { holdings.reduce(0) { $0 + $1.investedInr } }
-    var totalCurrent: Double { holdings.reduce(0) { $0 + $1.currentInr } }
-    var pnl: Double { totalCurrent - totalInvested }
-    var returnPct: Double { totalInvested > 0 ? pnl / totalInvested : 0 }
-}
-
-/// The AI's weekly read on the portfolio — grounded in the finance principles.
-struct PortfolioAdvice: Codable, Hashable {
-    var date: String = ""       // stamped client-side after the call
-    var verdict: String = ""
-    var allocation: String = ""
-    var diversification: String = ""
-    var actions: [String] = []
-    var ideas: [String] = []
-    var summary: String = ""
-
-    init() {}
-
-    enum CodingKeys: String, CodingKey {
-        case date, verdict, allocation, diversification, actions, ideas, summary
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        date            = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-        verdict         = try c.decodeIfPresent(String.self, forKey: .verdict) ?? ""
-        allocation      = try c.decodeIfPresent(String.self, forKey: .allocation) ?? ""
-        diversification = try c.decodeIfPresent(String.self, forKey: .diversification) ?? ""
-        actions         = try c.decodeIfPresent([String].self, forKey: .actions) ?? []
-        ideas           = try c.decodeIfPresent([String].self, forKey: .ideas) ?? []
-        summary         = try c.decodeIfPresent(String.self, forKey: .summary) ?? ""
-    }
-}
-
-struct PortfolioState: Codable, Hashable {
-    var snapshots: [PortfolioSnapshot] = []     // newest first
-    var advice: PortfolioAdvice? = nil
-
-    init() {}
-
-    enum CodingKeys: String, CodingKey { case snapshots, advice }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        snapshots = try c.decodeIfPresent([PortfolioSnapshot].self, forKey: .snapshots) ?? []
-        advice    = try? c.decode(PortfolioAdvice.self, forKey: .advice)
-    }
-
-    var latest: PortfolioSnapshot? { snapshots.first }
-    var previous: PortfolioSnapshot? { snapshots.count > 1 ? snapshots[1] : nil }
-}
-
 // MARK: - Fitness  (key: myos.fitness — [date: FitnessDay])
 
 struct FitnessDay: Codable, Hashable {
@@ -504,13 +250,59 @@ struct ChatMessage: Codable, Identifiable, Hashable {
     }
 }
 
-struct ChatState: Codable, Hashable {
-    var messages: [ChatMessage] = []
-    init() {}
-    enum CodingKeys: String, CodingKey { case messages }
+/// One saved conversation with the mentor — a titled thread of turns.
+struct ChatThread: Codable, Identifiable, Hashable {
+    var id: String
+    var title: String
+    var createdAt: String
+    var updatedAt: String
+    var messages: [ChatMessage]
+
+    init(id: String, title: String = "New chat", createdAt: String = "",
+         updatedAt: String = "", messages: [ChatMessage] = []) {
+        self.id = id; self.title = title; self.createdAt = createdAt
+        self.updatedAt = updatedAt; self.messages = messages
+    }
+
+    enum CodingKeys: String, CodingKey { case id, title, createdAt, updatedAt, messages }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        messages = try c.decodeIfPresent([ChatMessage].self, forKey: .messages) ?? []
+        id        = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
+        title     = try c.decodeIfPresent(String.self, forKey: .title) ?? "New chat"
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt) ?? ""
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt) ?? ""
+        messages  = try c.decodeIfPresent([ChatMessage].self, forKey: .messages) ?? []
+    }
+}
+
+/// The mentor chat store — many threads plus which one is active. Migrates the old
+/// single-conversation shape (`{messages:[…]}`) into one thread on first load.
+struct ChatState: Codable, Hashable {
+    var threads: [ChatThread] = []
+    var activeID: String? = nil
+
+    init() {}
+
+    enum CodingKeys: String, CodingKey { case threads, activeID }
+    private enum LegacyKeys: String, CodingKey { case messages }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let t = try? c.decodeIfPresent([ChatThread].self, forKey: .threads) { threads = t }
+        if threads.isEmpty, let lc = try? decoder.container(keyedBy: LegacyKeys.self),
+           let msgs = try? lc.decodeIfPresent([ChatMessage].self, forKey: .messages), !msgs.isEmpty {
+            let title = msgs.first(where: { $0.role == "user" }).map { String($0.content.prefix(40)) } ?? "Chat"
+            threads = [ChatThread(id: UUID().uuidString.lowercased(), title: title, messages: msgs)]
+        }
+        if let a = try? c.decodeIfPresent(String.self, forKey: .activeID) { activeID = a }
+        if activeID == nil { activeID = threads.first?.id }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(threads, forKey: .threads)
+        try c.encodeIfPresent(activeID, forKey: .activeID)
     }
 }
 
@@ -875,50 +667,9 @@ struct WatchItem: Codable, Identifiable, Hashable {
     }
 }
 
-// MARK: - Net worth  (key: myos.networth)
-
-/// One manually-entered asset or liability line (bank cash, mom's gold, other loan).
-/// Tracked pieces — portfolio value, emergency fund, gold loan — are pulled live and
-/// never stored here, so they can't drift or double-count.
-struct NetWorthLine: Codable, Identifiable, Hashable {
-    var id: String
-    var label: String
-    var amountInr: Double
-
-    init(id: String = UUID().uuidString.lowercased(), label: String, amountInr: Double) {
-        self.id = id; self.label = label; self.amountInr = amountInr
-    }
-
-    enum CodingKeys: String, CodingKey { case id, label, amountInr }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id        = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
-        label     = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
-        amountInr = try c.decodeIfPresent(Double.self, forKey: .amountInr) ?? 0
-    }
-}
-
-struct NetWorthState: Codable, Hashable {
-    var assets: [NetWorthLine] = []
-    var liabilities: [NetWorthLine] = []
-
-    init() {}
-
-    enum CodingKeys: String, CodingKey { case assets, liabilities }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        assets      = try c.decodeIfPresent([NetWorthLine].self, forKey: .assets) ?? []
-        liabilities = try c.decodeIfPresent([NetWorthLine].self, forKey: .liabilities) ?? []
-    }
-}
-
 // MARK: - Full state payload (decodes GET /api/state)
 
 struct AppStatePayload: Codable {
-    var finance: FinanceState?
-    var portfolio: PortfolioState?
     var fitness: [String: FitnessDay]?
     var fitnessProfile: FitnessProfile?
     var journal: [String: JournalEntry]?
@@ -932,13 +683,10 @@ struct AppStatePayload: Codable {
     var events: [EventItem]?
     var eventTags: [EventTag]?
     var watch: [WatchItem]?
-    var networth: NetWorthState?
 
     init() {}
 
     enum CodingKeys: String, CodingKey {
-        case finance        = "myos.finance"
-        case portfolio      = "myos.portfolio"
         case fitness        = "myos.fitness"
         case fitnessProfile = "myos.fitnessProfile"
         case journal        = "myos.journal"
@@ -952,7 +700,6 @@ struct AppStatePayload: Codable {
         case events         = "myos.events"
         case eventTags      = "myos.eventTags"
         case watch          = "myos.watch"
-        case networth       = "myos.networth"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -960,8 +707,6 @@ struct AppStatePayload: Codable {
     // is left nil, so `apply` uses that module's default — same as an absent key.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        finance        = try? c.decodeIfPresent(FinanceState.self, forKey: .finance)
-        portfolio      = try? c.decodeIfPresent(PortfolioState.self, forKey: .portfolio)
         fitness        = try? c.decodeIfPresent([String: FitnessDay].self, forKey: .fitness)
         fitnessProfile = try? c.decodeIfPresent(FitnessProfile.self, forKey: .fitnessProfile)
         journal        = try? c.decodeIfPresent([String: JournalEntry].self, forKey: .journal)
@@ -975,22 +720,12 @@ struct AppStatePayload: Codable {
         events         = try? c.decodeIfPresent([EventItem].self, forKey: .events)
         eventTags      = try? c.decodeIfPresent([EventTag].self, forKey: .eventTags)
         watch          = try? c.decodeIfPresent([WatchItem].self, forKey: .watch)
-        networth       = try? c.decodeIfPresent(NetWorthState.self, forKey: .networth)
     }
 }
 
 // MARK: - AI parse result (decodes POST /api/parse)
 
 struct ParseResult: Codable {
-    struct Fin: Codable {
-        let spoken: String
-        let kind: TxnKind
-        let amountInr: Double
-        let category: String
-        let quality: String?
-        let merchant: String?
-        let note: String?
-    }
     struct Fit: Codable {
         let weightKg: Double?
         let calories: Double?
@@ -1011,7 +746,6 @@ struct ParseResult: Codable {
         let body: String
     }
     let summary: String
-    let finance: [Fin]
     let fitness: Fit?
     let journal: Jrn?
     let notes: [Nte]
@@ -1021,28 +755,8 @@ struct ParseResult: Codable {
 
 struct ImageParseResult: Codable {
     let summary: String
-    let transactions: [TxnItem]?
-    let holdings: [HoldingItem]?
     let foods: [FoodItem]?
 
-    struct TxnItem: Codable {
-        let kind: TxnKind
-        let amountInr: Double
-        let category: String
-        let quality: String?
-        let merchant: String?
-        let account: String?
-        let note: String?
-        let date: String?
-    }
-    struct HoldingItem: Codable {
-        let name: String
-        let type: String
-        let investedInr: Double?
-        let currentInr: Double
-        let units: Double?
-        let note: String?
-    }
     struct FoodItem: Codable {
         let name: String
         let category: String
@@ -1056,69 +770,8 @@ struct ImageParseResult: Codable {
     }
 }
 
-// MARK: - Draft rows for the review-then-save sheets
-
-/// An extracted transaction awaiting the user's confirmation. Editable; `include`
-/// drives whether it gets saved.
-struct DraftTxn: Identifiable, Hashable {
-    var id = UUID().uuidString.lowercased()
-    var include = true
-    var kind: TxnKind
-    var amountInr: Double
-    var category: String
-    var quality: TxnQuality?
-    var merchant: String?
-    var account: String?
-    var note: String?
-    var date: String
-}
-
-/// An extracted holding awaiting confirmation before it becomes a snapshot.
-struct DraftHolding: Identifiable, Hashable {
-    var id = UUID().uuidString.lowercased()
-    var include = true
-    var name: String
-    var type: HoldingType
-    var investedInr: Double
-    var currentInr: Double
-    var units: Double?
-    var note: String?
-    var symbol: String?
-}
-
-// MARK: - Advice request (encodes POST /api/advise)
-
-struct AdviceRequest: Encodable {
-    struct H: Encodable {
-        let name: String
-        let type: String
-        let investedInr: Double
-        let currentInr: Double
-        let units: Double?
-    }
-    struct Ctx: Encodable {
-        let monthlyIncomeInr: Double
-        let monthExpenseInr: Double
-        let goldLoanOutstandingInr: Double
-        let goldLoanRatePct: Double
-        let emergencyCurrentInr: Double
-        let emergencyTargetInr: Double
-        let termInsuranceBought: Bool
-        let healthInsuranceBought: Bool
-    }
-    struct Prev: Encodable {
-        let date: String
-        let totalCurrent: Double
-    }
-    let holdings: [H]
-    let context: Ctx
-    let prev: Prev?
-}
-
 // Keys — single source of truth for the state store.
 enum StateKey {
-    static let finance        = "myos.finance"
-    static let portfolio      = "myos.portfolio"
     static let fitness        = "myos.fitness"
     static let fitnessProfile = "myos.fitnessProfile"
     static let journal        = "myos.journal"
@@ -1132,5 +785,4 @@ enum StateKey {
     static let events         = "myos.events"
     static let eventTags      = "myos.eventTags"
     static let watch          = "myos.watch"
-    static let networth       = "myos.networth"
 }

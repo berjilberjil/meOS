@@ -25,6 +25,7 @@ xcuserdata/
 apps/ios/*.xcodeproj
 apps/ios/.derived/
 apps/ios/build/
+apps/ios/build-device/
 apps/ios/.build/
 apps/ios/DerivedData/
 

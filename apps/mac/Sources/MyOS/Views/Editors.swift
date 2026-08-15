@@ -75,50 +75,6 @@ struct FitnessProfileEditor: View {
     }
 }
 
-// MARK: - Finance targets editor (the FinanceMeta values)
-
-/// Edits the finance targets — gold loan, emergency fund, income, protection.
-/// Writes the whole `FinanceMeta` on each change (saveFinanceMeta autosaves).
-struct FinanceTargetsEditor: View {
-    @EnvironmentObject var state: AppState
-    private let cols = [GridItem(.adaptive(minimum: 170), spacing: 12)]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            LazyVGrid(columns: cols, spacing: 12) {
-                KLabeledNumberField(label: "Gold loan — start (₹)", placeholder: "1500000",
-                                    value: money(\.goldLoanStartInr))
-                KLabeledNumberField(label: "Gold loan — outstanding (₹)", placeholder: "1500000",
-                                    value: money(\.goldLoanOutstandingInr))
-                KLabeledNumberField(label: "Gold loan rate (%)", placeholder: "11", decimals: 2,
-                                    value: money(\.goldLoanRatePct))
-                KLabeledNumberField(label: "Emergency target (₹)", placeholder: "150000",
-                                    value: money(\.emergencyTargetInr))
-                KLabeledNumberField(label: "Emergency saved (₹)", placeholder: "0",
-                                    value: money(\.emergencyCurrentInr))
-                KLabeledNumberField(label: "Monthly income (₹)", placeholder: "40000",
-                                    value: money(\.monthlyIncomeInr))
-            }
-            VStack(spacing: 8) {
-                Toggle("Term insurance bought", isOn: flag(\.termInsuranceBought))
-                Toggle("Own health insurance bought", isOn: flag(\.healthInsuranceBought))
-            }
-            .toggleStyle(.switch).tint(Palette.brand)
-            .font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.text)
-        }
-    }
-
-    /// A Double? binding over one meta field — nil clears to 0. Saves the whole meta.
-    private func money(_ kp: WritableKeyPath<FinanceMeta, Double>) -> Binding<Double?> {
-        Binding(get: { state.finance.meta[keyPath: kp] },
-                set: { v in var m = state.finance.meta; m[keyPath: kp] = max(0, v ?? 0); state.saveFinanceMeta(m) })
-    }
-    private func flag(_ kp: WritableKeyPath<FinanceMeta, Bool>) -> Binding<Bool> {
-        Binding(get: { state.finance.meta[keyPath: kp] },
-                set: { v in var m = state.finance.meta; m[keyPath: kp] = v; state.saveFinanceMeta(m) })
-    }
-}
-
 // MARK: - Journal presets editor (manage the quick-add chips)
 
 /// Edit the six journal preset sets. Each section shows its chips (removable)

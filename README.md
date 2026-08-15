@@ -1,6 +1,6 @@
 # MyOS — your personal operating system
 
-Your second brain. One app for **money, body, and mind** — and later, everything.
+Your second brain. One app for **body and mind** — and later, everything.
 
 **One product, one backend, native clients on top.** The SvelteKit app in
 `apps/web` is a *headless* backend (auth + a per-user `key → JSON` store + AI
@@ -20,7 +20,7 @@ Live market prices are the one exception — the app calls Groww directly.
 ```mermaid
 flowchart TB
   subgraph client["macOS app — apps/mac · SwiftUI, the only UI"]
-    UI["Today · Finance · Invest · Fitness · Journal · Notes · Settings"]
+    UI["Today · Fitness · Journal · Notes · Settings"]
     API["APIClient"]
     GC["GrowwClient"]
     UI --> API
@@ -30,7 +30,7 @@ flowchart TB
   subgraph backend["Headless backend — apps/web · SvelteKit /api on Netlify"]
     AUTH["Auth — cookie sessions"]
     STATE["State store — key to JSON"]
-    AIR["AI routes (7)"]
+    AIR["AI routes (6)"]
     RESOLVE["resolveModel + secrets (AES-256-GCM)"]
     AIR --> RESOLVE
   end
@@ -69,7 +69,6 @@ All app data is JSON documents under string keys:
 | Key             | Holds                                                             |
 |-----------------|------------------------------------------------------------------|
 | `myos.profile`  | name, currency, targets, insurance checklist                     |
-| `myos.finance`  | `{ txns: [...], meta: {...} }` — cashflow, gold-loan, emergency fund |
 | `myos.fitness`  | per-date weight / calories / protein / water                     |
 | `myos.journal`  | per-date morning/night, wins/mistakes/lessons, gratitude, mood   |
 | `myos.notes`    | quick-capture notes                                              |
@@ -109,8 +108,7 @@ Routable features and the route that serves each:
 | Feature              | Route                | Notes                                      |
 |----------------------|----------------------|--------------------------------------------|
 | Chat                 | `POST /api/chat`     | The floating mentor                        |
-| Analysis & advice    | `POST /api/advise`   | Weekly portfolio review                     |
-| Screenshot reading   | `POST /api/parse-image` | Transactions / holdings from screenshots |
+| Screenshot reading   | `POST /api/parse-image` | Nutrition label reading                 |
 | Quick logging        | `POST /api/parse`    | One line of life → structured entries       |
 | Today suggestions    | `POST /api/suggest`  | "What to do now" nudge                      |
 | Plan generation      | `POST /api/plan`     | Weekly workout + meal plan                   |
@@ -184,6 +182,6 @@ scripts/  Local backend launch agent (launchd).
 
 ## v1 scope
 
-Daily spine (Today) + **Finance**, **Invest**, **Fitness**, **Journal**, **Notes**,
+Daily spine (Today) + **Fitness**, **Journal**, **Notes**,
 AI quick-log, and bring-your-own AI models. Everything else in the PRD (Content Hub,
 Knowledge Vault, Goals, Tasks, Reading, Documents, Analytics) is Phase 2.

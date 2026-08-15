@@ -5,132 +5,113 @@ func moodTint(_ m: Int) -> Color {
     [Palette.red, Color(hex: 0xF59E0B), Palette.amber, Color(hex: 0x7DD37D), Palette.green][max(1, min(5, m)) - 1]
 }
 
-enum JournalMode: String { case day, grid }
-
 struct JournalView: View {
     @EnvironmentObject var state: AppState
 
     @State private var viewedDate: String = AppState.dateKey(Date())
     @State private var showCalendar = false
 
-    private static let kMode = "myos.journal.mode"
-    @State private var mode: JournalMode =
-        JournalMode(rawValue: UserDefaults.standard.string(forKey: JournalView.kMode) ?? "") ?? .day
-    private let gridCols = [GridItem(.adaptive(minimum: 230), spacing: 14)]
-
     private var entry: JournalEntry { state.journalEntry(viewedDate) }
     private var isToday: Bool { viewedDate == state.todayKey }
 
+    #if os(iOS)
+    enum JSeg: String, CaseIterable, Hashable { case events, journal }
+    @State private var jseg: JSeg = .events
+    @State private var showPresets = false
+    #endif
+
     var body: some View {
+        #if os(iOS)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(jseg == .events ? "Events" : "Journal")
+                    .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Spacer()
+                if jseg == .journal {
+                    Button { showPresets = true } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.muted)
+                    }
+                }
+            }
+            Segmented(options: JSeg.allCases.map { ($0, $0.rawValue.capitalized) }, selection: $jseg)
+            if jseg == .events { EventsView() } else { journalBody }
+        }
+        .sheet(isPresented: $showPresets) {
+            NavigationStack {
+                ScrollView {
+                    Card {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SectionTitle(text: "Journal quick-add chips")
+                            JournalPresetsEditor()
+                        }
+                    }
+                    .padding(16)
+                }
+                .background(Palette.bg.ignoresSafeArea())
+                .navigationTitle("Journal presets")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        #else
+        VStack(alignment: .leading, spacing: 18) {
+            header.knRise(0)
+            dayContent
+        }
+        #endif
+    }
+
+    #if os(iOS)
+    /// The journaling half of the tab (streak / mood / reflections) with its own date nav.
+    private var journalBody: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 10) {
-                Text("Journal").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
-                Spacer()
-                modeToggle
-                if mode == .day {
-                    if !isToday {
-                        Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
-                            Text("Today")
-                        }
+                if !isToday {
+                    Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: { Text("Today") }
                         .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
-                        .help("Back to today")
-                    }
-                    dateNavigator
                 }
+                dateNavigator
+                Spacer()
             }
-            .knRise(0)
-
-            if mode == .grid { gridView.knRise(1) } else { dayContent }
+            dayContent
         }
     }
+    #endif
 
-    // Day / grid switch (persists).
-    private var modeToggle: some View {
-        HStack(spacing: 2) {
-            modeButton(.day, "doc.text")
-            modeButton(.grid, "square.grid.2x2.fill")
-        }
-        .padding(3)
-        .background(Palette.bg, in: Capsule())
-        .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 2))
-    }
-    private func modeButton(_ m: JournalMode, _ icon: String) -> some View {
-        let on = mode == m
-        return Button {
-            withAnimation(.knNormal) { mode = m }
-            UserDefaults.standard.set(m.rawValue, forKey: Self.kMode)
-        } label: {
-            Image(systemName: icon).font(.system(size: 12, weight: .bold))
-                .foregroundStyle(on ? Palette.text : Palette.muted)
-                .frame(width: 32, height: 26)
-                .background { if on { Capsule().fill(Palette.surface2) } }
-                .contentShape(Capsule())
-        }
-        .buttonStyle(KPressStyle())
-        .onHover { h in cursor(h) }
-        .help(m == .day ? "Day view" : "Grid view")
-    }
-
-    // MARK: - Grid of past entries
-
-    private var gridView: some View {
-        let days = state.journal.keys.filter { state.journalHasContent($0) }.sorted(by: >)
-        return Group {
-            if days.isEmpty {
-                Card { Text("No journal entries yet. Write your first one in Day view.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.faint) }
-            } else {
-                LazyVGrid(columns: gridCols, alignment: .leading, spacing: 14) {
-                    ForEach(Array(days.enumerated()), id: \.element) { idx, d in
-                        journalCell(d).knRise(min(idx, 8))
+    // The title + Today pill + calendar nav. On iOS the nav drops to its own row
+    // under the title so a long title never gets squeezed into wrapping.
+    @ViewBuilder private var header: some View {
+        #if os(iOS)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Journal").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                .lineLimit(1)
+            HStack(spacing: 10) {
+                if !isToday {
+                    Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
+                        Text("Today")
                     }
+                    .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
+                    .help("Back to today")
                 }
+                dateNavigator
+                Spacer()
             }
         }
-    }
-
-    private func journalCell(_ d: String) -> some View {
-        let e = state.journalEntry(d)
-        let snippet = [e.morning, e.night].first { !$0.isEmpty }
-            ?? e.wins.first ?? e.gratitude.first ?? e.lessons.first ?? ""
-        return Button {
-            viewedDate = d
-            withAnimation(.knNormal) { mode = .day }
-            UserDefaults.standard.set(JournalMode.day.rawValue, forKey: Self.kMode)
-        } label: {
-            Card {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        StreakFlame(day: state.journalStreakDay(d), size: 13)
-                        Text(Fmt.day(d)).font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                        Spacer()
-                        if let m = e.mood {
-                            Text("\(m)").font(.system(size: 11, weight: .bold)).monospacedDigit().foregroundStyle(.white)
-                                .frame(width: 20, height: 20).background(moodTint(m), in: Circle())
-                        }
-                    }
-                    if !snippet.isEmpty {
-                        Text(snippet).font(.system(size: 12)).foregroundStyle(Palette.muted)
-                            .lineLimit(4).multilineTextAlignment(.leading)
-                    }
-                    Spacer(minLength: 0)
-                    HStack(spacing: 8) {
-                        if !e.wins.isEmpty { miniTag("\(e.wins.count) wins", Palette.green) }
-                        if !e.mistakes.isEmpty { miniTag("\(e.mistakes.count) misses", Palette.red) }
-                        if !e.gratitude.isEmpty { miniTag("\(e.gratitude.count) grateful", Palette.purple) }
-                    }
+        #else
+        HStack(spacing: 10) {
+            Text("Journal").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                .lineLimit(1).layoutPriority(1)
+            Spacer()
+            if !isToday {
+                Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
+                    Text("Today")
                 }
-                .frame(minHeight: 110, alignment: .topLeading)
+                .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
+                .help("Back to today")
             }
+            dateNavigator
         }
-        .buttonStyle(KPressStyle())
-        .knHoverLift()
-    }
-
-    private func miniTag(_ text: String, _ tint: Color) -> some View {
-        Text(text).font(.system(size: 9, weight: .heavy, design: .rounded))
-            .foregroundStyle(tint).padding(.horizontal, 7).padding(.vertical, 3)
-            .background(tint.opacity(0.14), in: Capsule())
+        #endif
     }
 
     @ViewBuilder private var dayContent: some View {

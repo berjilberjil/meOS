@@ -241,10 +241,6 @@ struct ProfileView: View {
                 SectionTitle(text: "Career")
                 LazyVGrid(columns: fieldCols, spacing: 12) {
                     field("Role", \.role, "Title — Company")
-                    // Editable — writes Finance meta, so the Finance tab stays in sync.
-                    moneyField("Monthly income (₹)", get: { state.finance.meta.monthlyIncomeInr },
-                               set: { v in var m = state.finance.meta; m.monthlyIncomeInr = v
-                                          state.saveFinanceMeta(m) }, placeholder: "40000")
                 }
                 labelledEditable("What I do", value: state.profile.work) {
                     TextField("", text: bind(\.work),
@@ -441,19 +437,6 @@ struct ProfileView: View {
                                         set: { set(Double($0.trimmingCharacters(in: .whitespaces))) }),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
                 .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
-                .knField()
-        }
-    }
-
-    /// Whole-rupee money field (no decimals) — writes 0 when cleared.
-    private func moneyField(_ label: String, get: @escaping () -> Double,
-                            set: @escaping (Double) -> Void, placeholder: String) -> some View {
-        labelledEditable(label, value: get() == 0 ? "" : "₹\(Int(get().rounded()))") {
-            TextField("", text: Binding(get: { get() == 0 ? "" : String(Int(get().rounded())) },
-                                        set: { set(Double($0.filter { $0.isNumber }) ?? 0) }),
-                      prompt: Text(placeholder).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
-                .monospacedDigit()
                 .knField()
         }
     }

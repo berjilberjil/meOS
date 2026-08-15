@@ -28,8 +28,6 @@ final class AppState: ObservableObject {
     private var pendingRaw: [String: Any]?
 
     // Module data (each maps to one myos.* key)
-    @Published var finance = FinanceState()
-    @Published var portfolio = PortfolioState()
     @Published var fitness: [String: FitnessDay] = [:]
     @Published var fitnessProfile = FitnessProfile()
     @Published var journal: [String: JournalEntry] = [:]
@@ -38,12 +36,12 @@ final class AppState: ObservableObject {
     @Published var days: [String: DayPlan] = [:]
     @Published var profile = Profile()
     @Published var chat = ChatState()
+    @Published var themeVersion = 0        // bumped on theme change to re-render app-wide
     @Published var nutrition = NutritionState()
     @Published var training = TrainingState()
     @Published var events: [EventItem] = []
     @Published var eventTags: [EventTag] = []
     @Published var watch: [WatchItem] = []
-    @Published var networth = NetWorthState()
 
     // Sync status
     @Published var lastSyncError: String?
@@ -87,8 +85,6 @@ final class AppState: ObservableObject {
     }
 
     private func apply(_ s: AppStatePayload) {
-        finance = s.finance ?? FinanceState()
-        portfolio = s.portfolio ?? PortfolioState()
         fitness = s.fitness ?? [:]
         fitnessProfile = s.fitnessProfile ?? FitnessProfile()
         journal = s.journal ?? [:]
@@ -103,7 +99,19 @@ final class AppState: ObservableObject {
         eventTags = s.eventTags ?? []
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
         watch     = s.watch ?? []
-        networth  = s.networth ?? NetWorthState()
+    }
+
+    /// One-time purge of the removed money keys (finance / portfolio / net worth)
+    /// from the synced store — finance tracking now lives in Fold. Deletes the rows
+    /// so the old data stops syncing to every device; runs once per device.
+    private static let kFinancePurged = "myos.finance.purged.v1"
+    private func purgeRemovedFinanceKeys() async {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: Self.kFinancePurged) else { return }
+        for key in ["myos.finance", "myos.portfolio", "myos.networth"] {
+            try? await api.deleteState(key)
+        }
+        d.set(true, forKey: Self.kFinancePurged)
     }
 
     // MARK: - Session lifecycle
@@ -162,6 +170,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            await purgeRemovedFinanceKeys()
         } catch is APIClient.VaultLockedError {
             phase = .locked
         } catch {
@@ -177,12 +186,12 @@ final class AppState: ObservableObject {
         api.clearCache()
         vault.forget(username: username)
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
-        finance = FinanceState(); portfolio = PortfolioState(); fitness = [:]; journal = [:]
+        fitness = [:]; journal = [:]
         notes = []; days = [:]; profile = Profile()
         fitnessProfile = FitnessProfile(); journalPresets = JournalPresets()
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
-        events = []; watch = []; networth = NetWorthState()
+        events = []; watch = []
         username = ""; isHydrated = false; lastSyncError = nil
         pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
         phase = .loggedOut
@@ -229,13 +238,12 @@ final class AppState: ObservableObject {
     /// Re-upload every existing module encrypted (one-time migration after setup).
     private func migrateEncryptExisting(raw: [String: Any]) async {
         let jobs: [(String, Encodable)] = [
-            (StateKey.finance, finance), (StateKey.portfolio, portfolio),
             (StateKey.fitness, fitness), (StateKey.fitnessProfile, fitnessProfile),
             (StateKey.journal, journal), (StateKey.journalPresets, journalPresets),
             (StateKey.notes, notes), (StateKey.days, days), (StateKey.profile, profile),
             (StateKey.chat, chat), (StateKey.nutrition, nutrition), (StateKey.training, training),
             (StateKey.events, events), (StateKey.eventTags, eventTags),
-            (StateKey.watch, watch), (StateKey.networth, networth)
+            (StateKey.watch, watch)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -277,6 +285,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            await purgeRemovedFinanceKeys()
         } catch {
             vaultError = (error as? APIError)?.message ?? "Couldn't load your data after unlock."
         }
@@ -320,13 +329,13 @@ final class AppState: ObservableObject {
                 out[k] = obj
             }
         }
-        add("profile", profile); add("finance", finance); add("portfolio", portfolio)
+        add("profile", profile)
         add("fitness", fitness); add("fitnessProfile", fitnessProfile)
         add("journal", journal); add("journalPresets", journalPresets)
         add("notes", notes); add("days", days); add("chat", chat)
         add("nutrition", nutrition); add("training", training)
         add("events", events); add("eventTags", eventTags)
-        add("watch", watch); add("networth", networth)
+        add("watch", watch)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -394,290 +403,10 @@ final class AppState: ObservableObject {
         return f.date(from: key)
     }
 
-    // MARK: - Finance
-
-    func addTransaction(kind: TxnKind, amountInr: Double, category: String,
-                        quality: TxnQuality? = nil, merchant: String? = nil, account: String? = nil,
-                        note: String? = nil, source: TxnSource? = nil, date: String? = nil) {
-        let txn = Transaction(id: newId(), date: date ?? todayKey, kind: kind,
-                              amountInr: max(0, amountInr), category: category,
-                              quality: quality, merchant: merchant, account: account,
-                              note: note, source: source)
-        finance.txns.insert(txn, at: 0)
-        // A "loan" expense is a gold-loan payment → shrink the outstanding balance.
-        if kind == .expense && category == "loan" {
-            finance.meta.goldLoanOutstandingInr = max(0, finance.meta.goldLoanOutstandingInr - txn.amountInr)
-        }
-        push(StateKey.finance, finance)
-    }
-
-    /// Save a reviewed batch (from a screenshot / statement) in one push.
-    func addTransactions(_ drafts: [DraftTxn], source: TxnSource) {
-        for d in drafts {
-            let txn = Transaction(id: newId(), date: d.date.isEmpty ? todayKey : d.date, kind: d.kind,
-                                  amountInr: max(0, d.amountInr), category: d.category,
-                                  quality: d.quality, merchant: d.merchant, account: d.account,
-                                  note: d.note, source: source)
-            finance.txns.insert(txn, at: 0)
-            if txn.kind == .expense && txn.category == "loan" {
-                finance.meta.goldLoanOutstandingInr = max(0, finance.meta.goldLoanOutstandingInr - txn.amountInr)
-            }
-        }
-        push(StateKey.finance, finance)
-    }
-
-    func deleteTransaction(_ id: String) {
-        guard let old = finance.txns.first(where: { $0.id == id }) else { return }
-        finance.txns.removeAll { $0.id == id }
-        // Deleting a gold-loan payment must restore the outstanding balance it
-        // shrank, otherwise the loan card/net worth drifts permanently low.
-        if old.kind == .expense && old.category == "loan" {
-            finance.meta.goldLoanOutstandingInr = max(0, finance.meta.goldLoanOutstandingInr + old.amountInr)
-        }
-        push(StateKey.finance, finance)
-    }
-
-    /// Edit a saved transaction in place (keeps its id and list position).
-    func updateTransaction(_ txn: Transaction) {
-        guard let i = finance.txns.firstIndex(where: { $0.id == txn.id }) else { return }
-        let old = finance.txns[i]
-        var t = txn
-        t.amountInr = max(0, t.amountInr)
-        finance.txns[i] = t
-        reconcileGoldLoan(from: old, to: t)
-        push(StateKey.finance, finance)
-    }
-
-    /// Keep `goldLoanOutstandingInr` in sync with the loan-payment ledger when a
-    /// transaction is edited: undo the old amount's effect, apply the new one.
-    private func reconcileGoldLoan(from old: Transaction, to new: Transaction) {
-        let wasLoan = old.kind == .expense && old.category == "loan"
-        let isLoan  = new.kind == .expense && new.category == "loan"
-        guard wasLoan || isLoan else { return }
-        var delta = 0.0
-        if wasLoan { delta += old.amountInr }   // undo the original decrement
-        if isLoan  { delta -= new.amountInr }   // apply the new one
-        if delta != 0 { finance.meta.goldLoanOutstandingInr = max(0, finance.meta.goldLoanOutstandingInr + delta) }
-    }
-
-    func saveFinanceMeta(_ meta: FinanceMeta) {
-        finance.meta = meta
-        push(StateKey.finance, finance)
-    }
-
-    func addToEmergencyFund(_ amount: Double) {
-        finance.meta.emergencyCurrentInr = max(0, finance.meta.emergencyCurrentInr + amount)
-        push(StateKey.finance, finance)
-    }
-
-    var monthTxns: [Transaction] { finance.txns.filter { $0.date.hasPrefix(monthPrefix) } }
-    var monthIncome: Double { monthTxns.filter { $0.kind == .income }.reduce(0) { $0 + $1.amountInr } }
-    var monthExpense: Double { monthTxns.filter { $0.kind == .expense }.reduce(0) { $0 + $1.amountInr } }
-    var spentToday: Double {
-        finance.txns.filter { $0.date == todayKey && $0.kind == .expense }.reduce(0) { $0 + $1.amountInr }
-    }
-    /// Savings rate for a `yyyy-MM` month — logged income or the profile monthly
-    /// income, whichever is higher, minus that month's expenses.
-    func savingsRate(forMonth prefix: String) -> Double {
-        let txns = finance.txns.filter { $0.date.hasPrefix(prefix) }
-        let inc = max(txns.filter { $0.kind == .income }.reduce(0) { $0 + $1.amountInr },
-                      finance.meta.monthlyIncomeInr)
-        guard inc > 0 else { return 0 }
-        let exp = txns.filter { $0.kind == .expense }.reduce(0) { $0 + $1.amountInr }
-        return max(0, (inc - exp) / inc)
-    }
-    /// Savings rate this month.
-    var savingsRate: Double { savingsRate(forMonth: monthPrefix) }
-    /// Rupees kept this month (income − expense) — can read as the full income if nothing's spent.
-    var monthSaved: Double { max(monthIncome, finance.meta.monthlyIncomeInr) - monthExpense }
-    /// The previous calendar month's `yyyy-MM` prefix (pure string math, no timezone drift).
-    var prevMonthPrefix: String {
-        let parts = monthPrefix.split(separator: "-")
-        guard parts.count == 2, var y = Int(parts[0]), var m = Int(parts[1]) else { return monthPrefix }
-        m -= 1; if m < 1 { m = 12; y -= 1 }
-        return String(format: "%04d-%02d", y, m)
-    }
-    /// Change in savings rate vs last month, in percentage points (nil if no prior-month data).
-    var savingsRateDeltaPP: Int? {
-        let prev = finance.txns.contains { $0.date.hasPrefix(prevMonthPrefix) }
-        guard prev else { return nil }
-        return Int((savingsRate - savingsRate(forMonth: prevMonthPrefix)) * 100)
-    }
-    var goldLoanPaid: Double { max(0, finance.meta.goldLoanStartInr - finance.meta.goldLoanOutstandingInr) }
-    var goldLoanFraction: Double {
-        guard finance.meta.goldLoanStartInr > 0 else { return 0 }
-        return goldLoanPaid / finance.meta.goldLoanStartInr
-    }
-    var emergencyFraction: Double {
-        guard finance.meta.emergencyTargetInr > 0 else { return 0 }
-        return min(1, finance.meta.emergencyCurrentInr / finance.meta.emergencyTargetInr)
-    }
-
-    /// Category → total spent this month (for the breakdown).
-    var monthByCategory: [(String, Double)] {
-        var m: [String: Double] = [:]
-        for t in monthTxns where t.kind == .expense { m[t.category, default: 0] += t.amountInr }
-        return m.sorted { $0.value > $1.value }
-    }
-
-    /// This month's spend split by the useless / useful / investment read.
-    /// Always returns all three (0 if none) in a fixed order for a stable bar.
-    var monthByQuality: [(TxnQuality, Double)] {
-        var m: [TxnQuality: Double] = [:]
-        for t in monthTxns where t.kind == .expense {
-            if let q = t.quality { m[q, default: 0] += t.amountInr }
-        }
-        return [.useless, .useful, .investment].map { ($0, m[$0] ?? 0) }
-    }
-    /// Spend this month the AI flagged as useless — the "leak" number.
-    var monthWasted: Double { monthByQuality.first { $0.0 == .useless }?.1 ?? 0 }
-    /// Expenses this month not yet judged (manual entries usually) — so the bar reads honestly.
-    var monthUntagged: Double {
-        let tagged = monthByQuality.reduce(0) { $0 + $1.1 }
-        return max(0, monthExpense - tagged)
-    }
-
-    /// A soft duplicate check for the review sheet: same day, same amount, and a
-    /// matching merchant already exists. Defaults those drafts to excluded.
-    func isLikelyDuplicate(amount: Double, date: String, merchant: String?) -> Bool {
-        finance.txns.contains { t in
-            abs(t.amountInr - amount) < 0.5 && t.date == date &&
-            (merchant == nil || t.merchant?.caseInsensitiveCompare(merchant!) == .orderedSame)
-        }
-    }
-
-    // MARK: - Portfolio
-
-    func addSnapshot(_ holdings: [Holding], note: String? = nil, date: String? = nil) {
-        let snap = PortfolioSnapshot(date: date ?? todayKey, holdings: holdings, note: note)
-        // Newest first; one snapshot per day (a re-upload replaces the day's).
-        portfolio.snapshots.removeAll { $0.date == snap.date }
-        portfolio.snapshots.insert(snap, at: 0)
-        portfolio.snapshots.sort { $0.date > $1.date }
-        // A fresh snapshot makes any earlier AI read stale — don't show old numbers.
-        portfolio.advice = nil
-        push(StateKey.portfolio, portfolio)
-    }
-
-    func deleteSnapshot(_ id: String) {
-        portfolio.snapshots.removeAll { $0.id == id }
-        push(StateKey.portfolio, portfolio)
-    }
-
-    /// Replace all holdings inside a snapshot (edit-everything — works on any
-    /// snapshot, not just the latest). Amounts are clamped non-negative.
-    func updateSnapshotHoldings(_ snapshotID: String, holdings: [Holding]) {
-        guard let si = portfolio.snapshots.firstIndex(where: { $0.id == snapshotID }) else { return }
-        portfolio.snapshots[si].holdings = holdings.map {
-            var h = $0; h.investedInr = max(0, h.investedInr); h.currentInr = max(0, h.currentInr); return h
-        }
-        // Changing holdings invalidates any AI read based on the old snapshot.
-        if portfolio.snapshots[si].id == portfolio.latest?.id { portfolio.advice = nil }
-        push(StateKey.portfolio, portfolio)
-    }
-
-    func saveAdvice(_ advice: PortfolioAdvice) {
-        portfolio.advice = advice
-        push(StateKey.portfolio, portfolio)
-    }
-
-    // MARK: - Live prices (Yahoo Finance — free, no key/token)
-
-    @Published var growwBusy = false
-    @Published var growwError: String?
-    @Published var growwLastRefresh: String?
-
-    /// Pull live prices from Yahoo Finance for the latest snapshot's holdings that
-    /// have a ticker + units, and update their current value (price × units). US
-    /// tickers are auto-converted to INR inside MarketDataClient.
-    func refreshLivePrices() async {
-        growwError = nil
-        guard let snap = portfolio.latest else { growwError = "Add a portfolio snapshot first."; return }
-        let symbols = snap.holdings.compactMap { h -> String? in
-            guard let s = h.symbol?.trimmingCharacters(in: .whitespaces), !s.isEmpty else { return nil }
-            return s
-        }
-        guard !symbols.isEmpty else { growwError = "Set a ticker (e.g. ITC.NS, TCS.BO, AAPL) on your holdings first — edit the snapshot."; return }
-        growwBusy = true
-        defer { growwBusy = false }
-        do {
-            let prices = try await MarketDataClient.pricesInINR(symbols)
-            var holdings = snap.holdings
-            var updated = 0
-            for i in holdings.indices {
-                if let sym = holdings[i].symbol?.trimmingCharacters(in: .whitespaces),
-                   let price = prices[sym], let u = holdings[i].units, u > 0 {
-                    holdings[i].currentInr = price * u
-                    updated += 1
-                }
-            }
-            guard updated > 0 else { growwError = "No prices came back for those tickers. Check the format (ITC.NS, TCS.BO, AAPL)."; return }
-            updateSnapshotHoldings(snap.id, holdings: holdings)
-            growwLastRefresh = Self.nowStamp()
-        } catch {
-            growwError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
-    }
-
-    var portfolioInvested: Double { portfolio.latest?.totalInvested ?? 0 }
-    var portfolioCurrent: Double { portfolio.latest?.totalCurrent ?? 0 }
-    var portfolioPnl: Double { portfolio.latest?.pnl ?? 0 }
-    var portfolioReturnPct: Double { portfolio.latest?.returnPct ?? 0 }
-    /// Change in current value vs the previous snapshot (nil if no prior week).
-    var portfolioWeekChange: Double? {
-        guard let now = portfolio.latest, let prev = portfolio.previous else { return nil }
-        return now.totalCurrent - prev.totalCurrent
-    }
-
-    // MARK: - AI: screenshot reading + portfolio review
+    // MARK: - AI: food photo reading
 
     @Published var imageBusy = false
     @Published var imageError: String?
-    @Published var adviceBusy = false
-    @Published var adviceError: String?
-
-    /// Read a UPI screenshot / bank statement into draft transactions for review.
-    /// Returns [] on failure (with imageError set). Does NOT save anything.
-    func analyzeTransactions(imagesBase64: [String], mediaType: String) async -> (summary: String, drafts: [DraftTxn]) {
-        imageError = nil
-        guard isHydrated else { imageError = "Not synced yet — try again in a moment."; return ("", []) }
-        imageBusy = true
-        defer { imageBusy = false }
-        do {
-            let r = try await api.parseImage(imagesBase64: imagesBase64, mediaType: mediaType, mode: "transactions")
-            let drafts: [DraftTxn] = (r.transactions ?? []).map { item in
-                let date = (item.date?.isEmpty == false) ? item.date! : todayKey
-                let dupe = isLikelyDuplicate(amount: item.amountInr, date: date, merchant: item.merchant)
-                return DraftTxn(include: !dupe, kind: item.kind, amountInr: item.amountInr,
-                                category: item.category, quality: item.quality.flatMap(TxnQuality.init),
-                                merchant: item.merchant, account: item.account, note: item.note, date: date)
-            }
-            return (r.summary, drafts)
-        } catch {
-            imageError = (error as? APIError)?.message ?? error.localizedDescription
-            return ("", [])
-        }
-    }
-
-    /// Read a portfolio screenshot into draft holdings for review. Does NOT save.
-    func analyzePortfolio(imagesBase64: [String], mediaType: String) async -> (summary: String, drafts: [DraftHolding]) {
-        imageError = nil
-        guard isHydrated else { imageError = "Not synced yet — try again in a moment."; return ("", []) }
-        imageBusy = true
-        defer { imageBusy = false }
-        do {
-            let r = try await api.parseImage(imagesBase64: imagesBase64, mediaType: mediaType, mode: "portfolio")
-            let drafts: [DraftHolding] = (r.holdings ?? []).map { h in
-                DraftHolding(name: h.name, type: HoldingType(rawValue: h.type) ?? .other,
-                             investedInr: h.investedInr ?? 0, currentInr: h.currentInr,
-                             units: h.units, note: h.note)
-            }
-            return (r.summary, drafts)
-        } catch {
-            imageError = (error as? APIError)?.message ?? error.localizedDescription
-            return ("", [])
-        }
-    }
 
     /// Read a photo of a packaged food (nutrition label, product pack, menu item)
     /// into draft Foods for review. Does NOT save or log anything.
@@ -699,39 +428,6 @@ final class AppState: ObservableObject {
         } catch {
             imageError = (error as? APIError)?.message ?? error.localizedDescription
             return ("", [])
-        }
-    }
-
-    /// Ask the AI for a weekly read on the latest snapshot, grounded in the loan/
-    /// income/protection context. Saves the advice on success.
-    func requestPortfolioReview() async {
-        adviceError = nil
-        guard isHydrated else { adviceError = "Not synced yet — try again in a moment."; return }
-        guard let snap = portfolio.latest else { adviceError = "Add a portfolio snapshot first."; return }
-        adviceBusy = true
-        defer { adviceBusy = false }
-        let m = finance.meta
-        let ctx = AdviceRequest.Ctx(
-            monthlyIncomeInr: max(monthIncome, m.monthlyIncomeInr),
-            monthExpenseInr: monthExpense,
-            goldLoanOutstandingInr: m.goldLoanOutstandingInr,
-            goldLoanRatePct: m.goldLoanRatePct,
-            emergencyCurrentInr: m.emergencyCurrentInr,
-            emergencyTargetInr: m.emergencyTargetInr,
-            termInsuranceBought: m.termInsuranceBought,
-            healthInsuranceBought: m.healthInsuranceBought)
-        let prev = portfolio.previous.map { AdviceRequest.Prev(date: $0.date, totalCurrent: $0.totalCurrent) }
-        let req = AdviceRequest(
-            holdings: snap.holdings.map { AdviceRequest.H(name: $0.name, type: $0.type.rawValue,
-                                                          investedInr: $0.investedInr,
-                                                          currentInr: $0.currentInr, units: $0.units) },
-            context: ctx, prev: prev)
-        do {
-            var advice = try await api.advise(req)
-            advice.date = todayKey
-            saveAdvice(advice)
-        } catch {
-            adviceError = (error as? APIError)?.message ?? error.localizedDescription
         }
     }
 
@@ -1220,11 +916,6 @@ final class AppState: ObservableObject {
     // MARK: - AI parse → route to modules
 
     func applyParse(_ r: ParseResult) {
-        for f in r.finance {
-            addTransaction(kind: f.kind, amountInr: f.amountInr, category: f.category,
-                           quality: f.quality.flatMap(TxnQuality.init), merchant: f.merchant,
-                           note: f.note, source: .ai)
-        }
         if let fit = r.fitness {
             updateFitness(todayKey) { d in
                 if let w = fit.weightKg { d.weightKg = w }
@@ -1277,7 +968,6 @@ final class AppState: ObservableObject {
     func mentorContext() -> String {
         var l: [String] = []
         let p = profile
-        let m = finance.meta
         var who = "PROFILE: \(p.name.isEmpty ? "(no name set)" : p.name)"
         if let a = p.age { who += ", age \(a)" }
         if !p.city.isEmpty { who += ", \(p.city)" }
@@ -1287,11 +977,6 @@ final class AppState: ObservableObject {
         if !p.hometown.isEmpty { l.append("HOMETOWN: \(p.hometown).") }
         let about = p.about.trimmingCharacters(in: .whitespacesAndNewlines)
         if !about.isEmpty { l.append("ABOUT (their own words): \(about)") }
-        l.append("MONEY: income ₹\(Int(m.monthlyIncomeInr))/mo. This month — in \(Fmt.inr(monthIncome)), out \(Fmt.inr(monthExpense)), savings rate \(Int(savingsRate*100))%, wasted (useless) \(Fmt.inr(monthWasted)).")
-        l.append("GOLD LOAN: \(Fmt.inr(m.goldLoanOutstandingInr)) left of \(Fmt.inr(m.goldLoanStartInr)) @ \(Fmt.trimKg(m.goldLoanRatePct))% — \(Int(goldLoanFraction*100))% cleared.")
-        l.append("PROTECTION: emergency fund \(Fmt.inr(m.emergencyCurrentInr)) of \(Fmt.inr(m.emergencyTargetInr)); term insurance \(m.termInsuranceBought ? "bought" : "NOT bought"); own health insurance \(m.healthInsuranceBought ? "bought" : "NOT bought").")
-        let cats = monthByCategory.prefix(4).map { "\($0.0) \(Fmt.inr($0.1))" }.joined(separator: ", ")
-        if !cats.isEmpty { l.append("TOP SPEND THIS MONTH: \(cats).") }
 
         var fit = "FITNESS: goal \(fitnessProfile.goal.label)"
         if let w = latestWeightKg { fit += ", weight \(Fmt.trimKg(w))kg" }
@@ -1309,38 +994,92 @@ final class AppState: ObservableObject {
         if !e.wins.isEmpty { l.append("TODAY WINS: \(e.wins.joined(separator: "; ")).") }
         if !e.mistakes.isEmpty { l.append("TODAY MISTAKES: \(e.mistakes.joined(separator: "; ")).") }
 
-        if let snap = portfolio.latest, !snap.holdings.isEmpty {
-            l.append("PORTFOLIO: invested \(Fmt.inr(snap.totalInvested)), current \(Fmt.inr(snap.totalCurrent)), return \(String(format: "%.1f", snap.returnPct*100))%.")
-        }
         return l.joined(separator: "\n")
     }
 
     /// Send a message to the mentor. Optimistically appends the user turn, then the
     /// reply. History persists to `myos.chat`.
+    /// The active conversation (falls back to the newest thread).
+    var activeThread: ChatThread? {
+        if let id = chat.activeID, let t = chat.threads.first(where: { $0.id == id }) { return t }
+        return chat.threads.first
+    }
+
+    /// Start a fresh conversation and make it active.
+    func newChat() {
+        let t = ChatThread(id: newId(), title: "New chat",
+                           createdAt: Self.nowStamp(), updatedAt: Self.nowStamp())
+        chat.threads.insert(t, at: 0)
+        chat.activeID = t.id
+        chatError = nil
+        if isHydrated { push(StateKey.chat, chat) }
+    }
+
+    func selectChat(_ id: String) {
+        chat.activeID = id
+        chatError = nil
+        if isHydrated { push(StateKey.chat, chat) }
+    }
+
+    func deleteChat(_ id: String) {
+        chat.threads.removeAll { $0.id == id }
+        if chat.activeID == id { chat.activeID = chat.threads.first?.id }
+        if isHydrated { push(StateKey.chat, chat) }
+    }
+
+    /// Ensure there's an active thread to write into; returns its index.
+    private func activeThreadIndex() -> Int {
+        if let id = chat.activeID, let i = chat.threads.firstIndex(where: { $0.id == id }) { return i }
+        let t = ChatThread(id: newId(), title: "New chat",
+                           createdAt: Self.nowStamp(), updatedAt: Self.nowStamp())
+        chat.threads.insert(t, at: 0)
+        chat.activeID = t.id
+        return 0
+    }
+
+    /// Send a message to the mentor in the active thread. Optimistically appends the
+    /// user turn, then the reply. History persists to `myos.chat`.
     func sendChat(_ text: String) async {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, !chatBusy else { return }
         chatError = nil
-        chat.messages.append(ChatMessage(role: "user", content: t, at: Self.nowStamp()))
+        let i = activeThreadIndex()
+        chat.threads[i].messages.append(ChatMessage(role: "user", content: t, at: Self.nowStamp()))
+        chat.threads[i].updatedAt = Self.nowStamp()
+        if chat.threads[i].title == "New chat" { chat.threads[i].title = String(t.prefix(40)) }
+        let threadID = chat.threads[i].id
         if isHydrated { push(StateKey.chat, chat) }
         chatBusy = true
         defer { chatBusy = false }
-        let turns = chat.messages.suffix(24).map { APIClient.ChatTurn(role: $0.role, content: $0.content) }
+        let turns = chat.threads[i].messages.suffix(24).map { APIClient.ChatTurn(role: $0.role, content: $0.content) }
         let a = AgentConfig.shared
         let agent = APIClient.AgentInfo(name: a.displayName, tone: a.tone.directive,
                                         custom: a.custom.trimmingCharacters(in: .whitespacesAndNewlines))
         do {
             let reply = try await api.chat(messages: turns, context: mentorContext(), agent: agent)
-            chat.messages.append(ChatMessage(role: "assistant", content: reply, at: Self.nowStamp()))
+            if let j = chat.threads.firstIndex(where: { $0.id == threadID }) {
+                chat.threads[j].messages.append(ChatMessage(role: "assistant", content: reply, at: Self.nowStamp()))
+                chat.threads[j].updatedAt = Self.nowStamp()
+            }
             if isHydrated { push(StateKey.chat, chat) }
         } catch {
             chatError = (error as? APIError)?.message ?? error.localizedDescription
         }
     }
 
+    /// Delete the active conversation (the header trash button).
     func clearChat() {
-        chat = ChatState()
-        if isHydrated { push(StateKey.chat, chat) }
+        if let id = chat.activeID { deleteChat(id) }
+        else { chat = ChatState(); if isHydrated { push(StateKey.chat, chat) } }
+    }
+
+    // MARK: - Appearance
+
+    /// Switch the app-wide colour theme. Persists the choice and forces a re-render —
+    /// every screen observes AppState, so bumping this recolours the whole app.
+    func setTheme(_ t: AppTheme) {
+        ThemeStore.shared.set(t)
+        themeVersion &+= 1
     }
 
     /// Fetch the Today "what to do now" suggestions (not persisted). Read-only, so
@@ -1377,46 +1116,6 @@ final class AppState: ObservableObject {
         } catch {
             newsError = (error as? APIError)?.message ?? error.localizedDescription
         }
-    }
-
-    // MARK: - Net worth (hybrid: tracked pieces pulled live + manual lines)
-
-    /// Assets already tracked elsewhere — shown read-only so they never drift/double-count.
-    var autoAssets: [(String, Double)] {
-        var out: [(String, Double)] = []
-        if portfolioCurrent > 0 { out.append(("Investments", portfolioCurrent)) }
-        if finance.meta.emergencyCurrentInr > 0 { out.append(("Emergency fund", finance.meta.emergencyCurrentInr)) }
-        return out
-    }
-    /// Liabilities already tracked — the gold loan.
-    var autoLiabilities: [(String, Double)] {
-        finance.meta.goldLoanOutstandingInr > 0 ? [("Gold loan", finance.meta.goldLoanOutstandingInr)] : []
-    }
-    var manualAssetsTotal: Double { networth.assets.reduce(0) { $0 + $1.amountInr } }
-    var manualLiabilitiesTotal: Double { networth.liabilities.reduce(0) { $0 + $1.amountInr } }
-    var totalAssets: Double { autoAssets.reduce(0) { $0 + $1.1 } + manualAssetsTotal }
-    var totalLiabilities: Double { autoLiabilities.reduce(0) { $0 + $1.1 } + manualLiabilitiesTotal }
-    var netWorth: Double { totalAssets - totalLiabilities }
-
-    func addNetWorthLine(asset: Bool, label: String, amountInr: Double) {
-        let line = NetWorthLine(label: label.trimmingCharacters(in: .whitespaces), amountInr: max(0, amountInr))
-        guard !line.label.isEmpty else { return }
-        if asset { networth.assets.append(line) } else { networth.liabilities.append(line) }
-        push(StateKey.networth, networth)
-    }
-    func updateNetWorthLine(asset: Bool, _ line: NetWorthLine) {
-        var l = line; l.amountInr = max(0, l.amountInr)
-        if asset {
-            if let i = networth.assets.firstIndex(where: { $0.id == l.id }) { networth.assets[i] = l }
-        } else {
-            if let i = networth.liabilities.firstIndex(where: { $0.id == l.id }) { networth.liabilities[i] = l }
-        }
-        push(StateKey.networth, networth)
-    }
-    func deleteNetWorthLine(asset: Bool, _ id: String) {
-        if asset { networth.assets.removeAll { $0.id == id } }
-        else { networth.liabilities.removeAll { $0.id == id } }
-        push(StateKey.networth, networth)
     }
 
     // MARK: - Events (a memory log — past, present, or future)
@@ -1514,8 +1213,6 @@ final class AppState: ObservableObject {
 
     // MARK: - Data management (reset)  — all guarded behind hold-to-confirm in the UI
 
-    func resetFinance()   { finance = FinanceState();   push(StateKey.finance, finance) }
-    func resetPortfolio() { portfolio = PortfolioState(); push(StateKey.portfolio, portfolio) }
     func resetJournal()   { journal = [:];              push(StateKey.journal, journal) }
     func resetNotes()     { notes = [];                 push(StateKey.notes, notes) }
     func resetFitness()   {
@@ -1528,8 +1225,6 @@ final class AppState: ObservableObject {
     /// Wipe every accumulated-data module. Keeps the person's `profile` identity
     /// and the journal preset chips — those are configuration, not data.
     func resetEverything() {
-        finance = FinanceState();      push(StateKey.finance, finance)
-        portfolio = PortfolioState();  push(StateKey.portfolio, portfolio)
         journal = [:];                 push(StateKey.journal, journal)
         notes = [];                    push(StateKey.notes, notes)
         fitness = [:];                 push(StateKey.fitness, fitness)
@@ -1539,6 +1234,5 @@ final class AppState: ObservableObject {
         days = [:];                    push(StateKey.days, days)
         events = [];                   push(StateKey.events, events)
         watch = [];                    push(StateKey.watch, watch)
-        networth = NetWorthState();    push(StateKey.networth, networth)
     }
 }

@@ -15,9 +15,10 @@ struct SettingsView: View {
                 .knRise(0)
             accountCard.knRise(1)
             if BiometricLock.isAvailable { securityCard.knRise(2) }
-            AgentSettingsCard().knRise(3)
-            AIProvidersCard().knRise(4)
-            signOutButton.knRise(5)
+            AppearanceCard().knRise(3)
+            AgentSettingsCard().knRise(4)
+            AIProvidersCard().knRise(5)
+            signOutButton.knRise(6)
         }
     }
 

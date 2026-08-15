@@ -49,36 +49,81 @@ extension Color {
     }
 }
 
+/// A named colour scheme. The chrome (canvas / surfaces / text / accent) varies per
+/// theme; the semantic feature colours (red/blue/amber/…) are shared across themes.
+struct AppTheme: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let bg, sidebar, surface, surface2, elevated: Color
+    let border, borderStrong, ring: Color
+    let text, muted, faint: Color
+    let brand, brandDeep, green: Color
+
+    static let foldDark = AppTheme(
+        id: "foldDark", name: "Fold Dark",
+        bg: Color(hex: 0x000000), sidebar: Color(hex: 0x000000),
+        surface: Color(hex: 0x151515), surface2: Color(hex: 0x242424), elevated: Color(hex: 0x1B1B1B),
+        border: Color(hex: 0x242424), borderStrong: Color(hex: 0x333333), ring: Color(hex: 0x242424),
+        text: Color(hex: 0xFFFFFF), muted: Color(hex: 0x9A9A9A), faint: Color(hex: 0x5E5E5E),
+        brand: Color(hex: 0x1FD37A), brandDeep: Color(hex: 0x12A85E), green: Color(hex: 0x1FD37A))
+
+    static let midnight = AppTheme(
+        id: "midnight", name: "Midnight",
+        bg: Color(hex: 0x0B0F1A), sidebar: Color(hex: 0x080B14),
+        surface: Color(hex: 0x141A28), surface2: Color(hex: 0x1F2739), elevated: Color(hex: 0x18202F),
+        border: Color(hex: 0x232C40), borderStrong: Color(hex: 0x33405B), ring: Color(hex: 0x232C40),
+        text: Color(hex: 0xF3F5FA), muted: Color(hex: 0x93A0B8), faint: Color(hex: 0x5A6784),
+        brand: Color(hex: 0x6E8BFF), brandDeep: Color(hex: 0x4C63D6), green: Color(hex: 0x35D07A))
+
+    static let light = AppTheme(
+        id: "light", name: "Light",
+        bg: Color(hex: 0xF6F7F9), sidebar: Color(hex: 0xEFF1F4),
+        surface: Color(hex: 0xFFFFFF), surface2: Color(hex: 0xEDEFF3), elevated: Color(hex: 0xFFFFFF),
+        border: Color(hex: 0xE3E6EB), borderStrong: Color(hex: 0xCED3DB), ring: Color(hex: 0xE3E6EB),
+        text: Color(hex: 0x0B0D12), muted: Color(hex: 0x5C6470), faint: Color(hex: 0x99A1AE),
+        brand: Color(hex: 0x12B76A), brandDeep: Color(hex: 0x0E9257), green: Color(hex: 0x12B76A))
+
+    static let all: [AppTheme] = [foldDark, midnight, light]
+    static func by(id: String) -> AppTheme { all.first { $0.id == id } ?? foldDark }
+}
+
+/// Holds the active theme app-wide and persists the choice. Views pick up a change
+/// because the root re-renders (see AppState.setTheme / RootView).
+final class ThemeStore: ObservableObject {
+    static let shared = ThemeStore()
+    private static let key = "myos.theme"
+    @Published private(set) var theme: AppTheme
+    private init() { theme = AppTheme.by(id: UserDefaults.standard.string(forKey: Self.key) ?? "foldDark") }
+    func set(_ t: AppTheme) {
+        theme = t
+        UserDefaults.standard.set(t.id, forKey: Self.key)
+    }
+}
+
 enum Palette {
-    // Canvas — neutral black & grey (Duolingo colour lives in the accents, not the base).
-    static let bg        = Color(hex: 0x0E0E0E)   // window / content
-    static let sidebar   = Color(hex: 0x090909)   // nav rail (divided by a 2px edge)
-    static let surface   = Color(hex: 0x1A1A1A)   // cards
-    static let surface2  = Color(hex: 0x2A2A2A)   // filled controls / chips / tracks
-    static let elevated  = Color(hex: 0x1E1E1E)   // menus / sheets / popovers
-
-    // Borders — opaque neutral grey, the visible card outline.
-    static let border       = Color(hex: 0x2C2C2C)
-    static let borderStrong = Color(hex: 0x3D3D3D)
-    static let ring         = Color(hex: 0x2C2C2C)
-
-    // Text.
-    static let text      = Color(hex: 0xFFFFFF)
-    static let muted     = Color(hex: 0x9A9A9A)
-    static let faint     = Color(hex: 0x666666)
-
-    // Accent — Feather Green, the primary action + selection color.
-    static let brand     = Color(hex: 0x58CC02)
-    static let brandDeep = Color(hex: 0x58A700)   // green 3D edge
-
-    // Candy feature colors (each pairs with a mixedWithBlack edge at press time).
-    static let green     = Color(hex: 0x58CC02)   // money in / good / wins
-    static let red       = Color(hex: 0xFF4B4B)   // money out / debt / mistakes
-    static let blue      = Color(hex: 0x1CB0F6)   // Macaw blue
-    static let amber     = Color(hex: 0xFFC800)   // Bee gold
-    static let purple    = Color(hex: 0xCE82FF)   // Amethyst
-    static let flame     = Color(hex: 0xFF9600)   // Fox orange — lit streak fire
-    static let ice       = Color(hex: 0x84D8FF)   // frozen streak fire
+    private static var t: AppTheme { ThemeStore.shared.theme }
+    // Chrome — varies per theme.
+    static var bg: Color          { t.bg }
+    static var sidebar: Color     { t.sidebar }
+    static var surface: Color     { t.surface }
+    static var surface2: Color    { t.surface2 }
+    static var elevated: Color    { t.elevated }
+    static var border: Color      { t.border }
+    static var borderStrong: Color { t.borderStrong }
+    static var ring: Color        { t.ring }
+    static var text: Color        { t.text }
+    static var muted: Color       { t.muted }
+    static var faint: Color       { t.faint }
+    static var brand: Color       { t.brand }
+    static var brandDeep: Color   { t.brandDeep }
+    static var green: Color       { t.green }
+    // Semantic feature colours — shared across themes.
+    static let red    = Color(hex: 0xFF5A5F)
+    static let blue   = Color(hex: 0x4AA8FF)
+    static let amber  = Color(hex: 0xFFC24B)
+    static let purple = Color(hex: 0xB98CFF)
+    static let flame  = Color(hex: 0xFF8A3D)
+    static let ice    = Color(hex: 0x7FD1FF)
 }
 
 enum Radius {
@@ -98,10 +143,10 @@ enum Motion {
 
 extension Animation {
     static let knFast     = Animation.easeOut(duration: Motion.fast)
-    static let knNormal   = Animation.easeOut(duration: Motion.normal)
-    // A springy, bouncy entrance — playful, on-brand for a game-like app.
-    static let knEntrance = Animation.spring(response: 0.42, dampingFraction: 0.72)
-    static let knPop      = Animation.spring(response: 0.32, dampingFraction: 0.7)
+    static let knNormal   = Animation.easeInOut(duration: Motion.normal)
+    // A calm, barely-there settle — Fold's motion is smooth, not bouncy.
+    static let knEntrance = Animation.spring(response: 0.5, dampingFraction: 0.9)
+    static let knPop      = Animation.spring(response: 0.34, dampingFraction: 0.88)
 }
 
 // MARK: - Elevation
@@ -110,9 +155,9 @@ extension View {
     /// Soft, layered shadow for floating surfaces. Toned down from the original
     /// 0.5/0.3 opacity + 26/14 radius, which read as too heavy.
     func knShadow(_ strong: Bool = false) -> some View {
-        shadow(color: .black.opacity(strong ? 0.35 : 0.2),
-               radius: strong ? 18 : 10,
-               x: 0, y: strong ? 8 : 4)
+        shadow(color: .black.opacity(strong ? 0.4 : 0.25),
+               radius: strong ? 16 : 7,
+               x: 0, y: strong ? 8 : 3)
     }
 }
 
@@ -131,7 +176,7 @@ struct Card<Content: View>: View {
             .background(Palette.surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Palette.border, lineWidth: 2)
+                    .strokeBorder(Palette.border, lineWidth: 1)
             )
             .knShadow()
     }
@@ -208,23 +253,21 @@ struct KPrimaryButtonStyle: ButtonStyle {
         let tint: Color
         let fullWidth: Bool
         @State private var hover = false
-        private let depth: CGFloat = 4
-        private let vpad: CGFloat = 12
         var body: some View {
             let pressed = configuration.isPressed
-            let face = hover ? tint.mixedWithWhite(0.08) : tint
+            let face = hover ? tint.mixedWithWhite(0.10) : tint
             configuration.label
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
-                .tracking(0.4)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .tracking(0.3)
                 .textCase(.uppercase)
-                .foregroundStyle(.white)
+                .foregroundStyle(Palette.bg)
                 .padding(.horizontal, 20)
-                .padding(.top, vpad + (pressed ? depth : 0))
-                .padding(.bottom, vpad + (pressed ? 0 : depth))
+                .padding(.vertical, 13)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
-                .background(Duo3DBackground(face: face, edge: tint.mixedWithBlack(0.28),
-                                            radius: Radius.md, pressed: pressed, depth: depth))
-                .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(face, in: Capsule())
+                .contentShape(Capsule())
+                .scaleEffect(pressed ? 0.97 : 1)
+                .opacity(pressed ? 0.9 : 1)
                 .animation(.knFast, value: pressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
@@ -242,26 +285,19 @@ struct KSecondaryButtonStyle: ButtonStyle {
         let configuration: ButtonStyleConfiguration
         let fullWidth: Bool
         @State private var hover = false
-        private let depth: CGFloat = 4
-        private let vpad: CGFloat = 11
         var body: some View {
             let pressed = configuration.isPressed
             let face = hover ? Palette.surface2.mixedWithWhite(0.06) : Palette.surface2
             configuration.label
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(Palette.text)
-                .padding(.horizontal, 16)
-                .padding(.top, vpad + (pressed ? depth : 0))
-                .padding(.bottom, vpad + (pressed ? 0 : depth))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
-                .background(Duo3DBackground(face: face, edge: Palette.bg,
-                                            radius: Radius.md, pressed: pressed, depth: depth))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(Palette.border, lineWidth: 2)
-                        .padding(.bottom, pressed ? 0 : depth)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(face, in: Capsule())
+                .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
+                .contentShape(Capsule())
+                .scaleEffect(pressed ? 0.97 : 1)
                 .animation(.knFast, value: pressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
@@ -332,20 +368,17 @@ struct KSoftButtonStyle: ButtonStyle {
         let configuration: ButtonStyleConfiguration
         let tint: Color
         @State private var hover = false
-        private let depth: CGFloat = 3
-        private let vpad: CGFloat = 7
         var body: some View {
             let pressed = configuration.isPressed
-            let base = hover ? tint.opacity(0.28) : tint.opacity(0.2)
+            let base = hover ? tint.opacity(0.26) : tint.opacity(0.16)
             configuration.label
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(tint)
-                .padding(.horizontal, 13)
-                .padding(.top, vpad + (pressed ? depth : 0))
-                .padding(.bottom, vpad + (pressed ? 0 : depth))
-                .background(Duo3DBackground(face: base, edge: tint.opacity(0.4),
-                                            radius: Radius.sm, pressed: pressed, depth: depth))
-                .contentShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(base, in: Capsule())
+                .contentShape(Capsule())
+                .scaleEffect(pressed ? 0.96 : 1)
                 .animation(.knFast, value: pressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
@@ -506,29 +539,8 @@ extension View {
 
 // MARK: - Formatting
 
-// Currency + number formatting for INR.
+// Number formatting.
 enum Fmt {
-    static func inr(_ n: Double) -> String {
-        let sign = n < 0 ? "-" : ""
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.maximumFractionDigits = 0
-        f.locale = Locale(identifier: "en_IN")
-        return "\(sign)₹" + (f.string(from: NSNumber(value: abs(n))) ?? "0")
-    }
-    /// Compact lakh/crore style for big numbers.
-    static func inrShort(_ n: Double) -> String {
-        let a = abs(n)
-        let sign = n < 0 ? "-" : ""
-        if a >= 1e7 { return "\(sign)₹\(trim(a / 1e7))Cr" }
-        if a >= 1e5 { return "\(sign)₹\(trim(a / 1e5))L" }
-        if a >= 1e3 { return "\(sign)₹\(trim(a / 1e3))k" }
-        return inr(n)
-    }
-    private static func trim(_ v: Double) -> String {
-        let r = (v * 100).rounded() / 100
-        return r == r.rounded() ? String(Int(r)) : String(format: "%.2f", r)
-    }
     /// Weight with at most one decimal (e.g. 72 or 72.5).
     static func trimKg(_ v: Double) -> String {
         let r = (v * 10).rounded() / 10

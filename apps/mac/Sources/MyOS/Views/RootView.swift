@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var themeStore = ThemeStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var unlocked = false
 

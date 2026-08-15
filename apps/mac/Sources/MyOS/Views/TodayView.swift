@@ -20,15 +20,6 @@ struct TodayView: View {
 
             // KPI row
             LazyVGrid(columns: cols, spacing: 12) {
-                StatTile(label: "Spent today", value: Fmt.inr(state.spentToday), accent: Palette.red)
-                StatTile(label: "Saved this month",
-                         value: "\(Int(state.savingsRate * 100))%",
-                         sub: "\(Fmt.inrShort(max(state.monthIncome, state.finance.meta.monthlyIncomeInr) - state.monthExpense)) kept",
-                         accent: Palette.green)
-                StatTile(label: "Gold loan left",
-                         value: Fmt.inrShort(state.finance.meta.goldLoanOutstandingInr),
-                         sub: "\(Int(state.goldLoanFraction * 100))% cleared",
-                         accent: Palette.amber)
                 StatTile(label: "Journal streak",
                          value: "\(state.journalStreak)d",
                          accent: Palette.brand)
@@ -44,9 +35,6 @@ struct TodayView: View {
             // Module snapshots
             SectionTitle(text: "Jump back in").knRise(6)
             LazyVGrid(columns: cols, spacing: 12) {
-                snapshot("Finance", Palette.green, "indianrupeesign.circle.fill",
-                         line1: "\(Fmt.inrShort(state.monthExpense)) spent",
-                         line2: "\(state.monthTxns.count) entries this month") { go(.finance) }
                 snapshot("Fitness", Palette.blue, "figure.run",
                          line1: weightLine, line2: proteinLine) { go(.fitness) }
                 snapshot("Journal", Palette.purple, "book.closed.fill",

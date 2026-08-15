@@ -17,7 +17,7 @@ const SuggestSchema = z.object({
   suggestions: z
     .array(
       z.object({
-        area: z.enum(['money', 'fitness', 'content', 'career', 'mind', 'life']),
+        area: z.enum(['fitness', 'content', 'career', 'mind', 'life']),
         title: z.string(), // the action, imperative and short ("Buy term insurance today")
         why: z.string(), // one line, grounded in his data
         impact: z.enum(['high', 'medium', 'low'])

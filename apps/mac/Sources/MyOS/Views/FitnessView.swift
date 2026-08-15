@@ -41,16 +41,110 @@ struct FitnessView: View {
         }
     }
 
+    @State private var showFitnessSettings = false
+
     @ViewBuilder private var todayContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            profileCard.knRise(2)
-            caloriesCard.knRise(3)
+            todayPlanCard.knRise(2)
+            nutritionCard.knRise(3)
             weightCard.knRise(4)
             stepsCard.knRise(5)
-            nutritionCard.knRise(6)
-            #if os(macOS)
-            ProgressPhotosCard().knRise(7)
-            #endif
+            settingsDisclosure.knRise(6)
+        }
+    }
+
+    // MARK: - Today's plan (planned meals + workout for today) — the hero
+
+    private var todayPlanCard: some View {
+        let wd = state.todayWeekday
+        let plan = state.workoutPlan(wd)
+        let plannedMeals = MealKey.allCases.filter { !state.planItems(wd, $0).isEmpty }
+        let mealsLogged = !state.mealLog(state.todayKey).meals.isEmpty
+        return Card {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionTitle(text: "Today's plan")
+
+                HStack {
+                    Label("Meals", systemImage: "fork.knife")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    Spacer()
+                    if !plannedMeals.isEmpty && !mealsLogged {
+                        Button { state.applyMealPlanToToday() } label: { Label("Log all", systemImage: "wand.and.stars") }
+                            .buttonStyle(KSoftButtonStyle(tint: Palette.green))
+                    }
+                    Button { sub = .food } label: { Text("Open") }
+                        .buttonStyle(KGhostButtonStyle(color: Palette.brand))
+                }
+                if plannedMeals.isEmpty {
+                    Text("No meals planned for today — set a weekly plan in Food.")
+                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                } else {
+                    ForEach(plannedMeals, id: \.self) { meal in planMealRow(meal) }
+                }
+
+                Divider().overlay(Palette.border)
+
+                HStack {
+                    Label("Workout", systemImage: "figure.strengthtraining.traditional")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    Spacer()
+                    Button { sub = .workout } label: { Text("Open") }
+                        .buttonStyle(KGhostButtonStyle(color: Palette.brand))
+                }
+                if plan.rest {
+                    Text("Rest day — recover well.").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                } else if plan.items.isEmpty {
+                    Text("No workout planned for today — set a weekly plan in Workout.")
+                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                } else {
+                    ForEach(plan.items, id: \.id) { pe in
+                        HStack(spacing: 8) {
+                            Image(systemName: "dumbbell.fill").font(.system(size: 10)).foregroundStyle(Palette.brand)
+                            Text(state.exercise(pe.exerciseId)?.name ?? "Exercise")
+                                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                            Spacer()
+                            Text("\(pe.sets) × \(pe.reps)").font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                                .foregroundStyle(Palette.muted)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func planMealRow(_ meal: MealKey) -> some View {
+        let names = state.planItems(state.todayWeekday, meal).compactMap { state.food($0.foodId)?.name }
+        return HStack(alignment: .top, spacing: 10) {
+            Text(meal.label).font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.4)
+                .foregroundStyle(Palette.faint).frame(width: 74, alignment: .leading)
+            Text(names.joined(separator: ", ")).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - Fitness settings (goal, targets) — tucked under a disclosure
+
+    private var settingsDisclosure: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button { withAnimation(.knNormal) { showFitnessSettings.toggle() } } label: {
+                HStack {
+                    Label("Fitness settings", systemImage: "slider.horizontal.3")
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.muted)
+                    Spacer()
+                    Image(systemName: showFitnessSettings ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
+                }
+                .padding(.vertical, 4).contentShape(Rectangle())
+            }
+            .buttonStyle(KPressStyle())
+            if showFitnessSettings {
+                caloriesCard
+                profileCard
+                #if os(macOS)
+                ProgressPhotosCard()
+                #endif
+            }
         }
     }
 

@@ -4,13 +4,13 @@ import SwiftUI
 // tab bar (iOS MainView) plus TodayView's "go to tab" links. Kept in Support/
 // so every platform target sees the same enum.
 enum NavTab: String, CaseIterable, Identifiable {
-    case today, events, finance, fitness, productivity, journal, notes, profile, settings
+    case today, events, fold, fitness, productivity, journal, notes, profile, settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .today: return "Today"
         case .events: return "Events"
-        case .finance: return "Finance"
+        case .fold: return "Fold"
         case .fitness: return "Fitness"
         case .productivity: return "Productivity"
         case .journal: return "Journal"
@@ -23,7 +23,7 @@ enum NavTab: String, CaseIterable, Identifiable {
         switch self {
         case .today: return "sun.max.fill"
         case .events: return "calendar"
-        case .finance: return "indianrupeesign.circle.fill"
+        case .fold: return "indianrupeesign.circle.fill"
         case .fitness: return "figure.run"
         case .productivity: return "play.rectangle.fill"
         case .journal: return "book.closed.fill"

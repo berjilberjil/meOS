@@ -3,28 +3,16 @@ import type { RequestHandler } from './$types';
 import { generateObject } from 'ai';
 import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
-import { CATEGORIES, CATEGORY_HINTS, QUALITIES, QUALITY_HINTS } from '$lib/finance';
 
 /**
  * MyOS quick-log AI. The user types (or dictates) ONE line about their day and
  * Gemini splits it into structured entries the native app files into the right
- * key: finance, fitness, journal, notes. The server only structures meaning —
+ * key: fitness, journal, notes. The server only structures meaning —
  * it never touches the database; the client applies the result.
  */
 const ParseSchema = z.object({
   // One short human sentence describing what was logged (for a toast).
   summary: z.string(),
-  finance: z.array(
-    z.object({
-      spoken: z.string(),
-      kind: z.enum(['income', 'expense']),
-      amountInr: z.number(),
-      category: z.enum(CATEGORIES),
-      quality: z.enum(QUALITIES).nullable(),
-      merchant: z.string().nullable(),
-      note: z.string().nullable()
-    })
-  ),
   fitness: z
     .object({
       weightKg: z.number().nullable(),
@@ -50,19 +38,11 @@ const ParseSchema = z.object({
 function buildPrompt(text: string): string {
   return [
     `You convert ONE line of a personal daily log into structured entries for MyOS,`,
-    `the user's personal operating system. All money is Indian rupees (₹). They said:`,
+    `the user's personal operating system. They said:`,
     ``,
     `"${text}"`,
     ``,
-    `Split it across four areas. Only fill what they actually said — leave the rest empty/null.`,
-    ``,
-    `FINANCE — every amount of money spent or received.`,
-    `- kind: "expense" unless it is clearly money coming IN (salary, received, refund) → "income".`,
-    `- amountInr: the number of rupees (e.g. "spent 200 on auto" → 200). "5k"/"5 thousand" → 5000. "1.5L"/"1.5 lakh" → 150000.`,
-    `- category: choose the closest of: ${CATEGORIES.join(', ')}. ${CATEGORY_HINTS}.`,
-    `- quality: judge the spend — ${QUALITY_HINTS}. null for income.`,
-    `- merchant: who was paid / who paid (e.g. "Swiggy", "BSNL", "mom") if clear, else null.`,
-    `- note: short free text if useful, else null.`,
+    `Split it across three areas. Only fill what they actually said — leave the rest empty/null.`,
     ``,
     `FITNESS — body/nutrition numbers. weightKg, calories, proteinG (grams), waterMl (millilitres; "2 litres" → 2000). null each if not mentioned. note optional.`,
     ``,
@@ -71,7 +51,7 @@ function buildPrompt(text: string): string {
     ``,
     `NOTES — only genuine "note this down"/idea/reminder content → title + body. Usually empty.`,
     ``,
-    `summary: one short sentence, e.g. "Logged ₹200 transport, 40g protein, and a low mood."`
+    `summary: one short sentence, e.g. "Logged 40g protein and a low mood."`
   ].join('\n');
 }
 

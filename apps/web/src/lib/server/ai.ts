@@ -14,7 +14,7 @@ import type { ProviderId } from './modelCatalog';
  * to the server's env Gemini config, so the app keeps working with zero setup.
  */
 
-export type Feature = 'chat' | 'analysis' | 'vision' | 'parse' | 'suggest' | 'plan' | 'news';
+export type Feature = 'chat' | 'vision' | 'parse' | 'suggest' | 'plan' | 'news';
 
 export interface Resolved {
   model: LanguageModel;
@@ -65,6 +65,15 @@ async function loadRouting(userId: number): Promise<Routing> {
   return rows.length ? (rows[0].value as Routing) : {};
 }
 
+/** Google retired the Gemini 1.x and 2.0 families — map any of them (from env or a
+ *  user's saved route) to the rolling latest flash so the app self-heals without
+ *  per-user reconfiguration. Current models pass through untouched. */
+function normalizeGemini(model: string): string {
+  const m = model.trim().replace(/^models\//, '');
+  if (/^gemini-(1\.0|1\.5|2\.0)/.test(m) || m === 'gemini-pro') return 'gemini-flash-latest';
+  return m;
+}
+
 function buildModel(provider: ProviderId, apiKey: string, model: string): Resolved {
   if (provider === 'anthropic') {
     return { model: createAnthropic({ apiKey })(model), providerId: 'anthropic' };
@@ -73,7 +82,7 @@ function buildModel(provider: ProviderId, apiKey: string, model: string): Resolv
     return { model: createOpenAI({ apiKey })(model), providerId: 'openai' };
   }
   const google = createGoogleGenerativeAI({ apiKey });
-  return { model: google(model), providerId: 'gemini', google };
+  return { model: google(normalizeGemini(model)), providerId: 'gemini', google };
 }
 
 /** The env-configured Gemini fallback — mirrors each route's prior default. */
@@ -83,7 +92,7 @@ function envFallback(feature: Feature): Resolved {
   let model: string;
   if (feature === 'chat') {
     model = env.GEMINI_CHAT_MODEL ?? 'gemini-flash-latest';
-  } else if (feature === 'analysis' || feature === 'plan') {
+  } else if (feature === 'plan') {
     model = env.GEMINI_REASONING_MODEL ?? env.GEMINI_MODEL ?? 'gemini-flash-latest';
   } else {
     model = env.GEMINI_MODEL ?? 'gemini-flash-latest';

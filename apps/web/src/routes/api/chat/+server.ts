@@ -6,7 +6,7 @@ import { mentorChatSystem } from '$lib/mentor';
 
 /**
  * MyOS chat — the floating mentor. The client sends the conversation plus a
- * human-readable snapshot of the user's current data (finance / fitness / journal /
+ * human-readable snapshot of the user's current data (fitness / journal /
  * profile). The model answers as their blunt mentor, grounded in that snapshot.
  * Read-only: it never touches the database.
  */

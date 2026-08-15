@@ -268,7 +268,11 @@ struct FoodPickerSheet: View {
             }
             .frame(maxHeight: 420)
         }
+        #if os(macOS)
         .frame(width: 460)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .background(Palette.elevated)
     }
 }
@@ -333,7 +337,12 @@ struct FoodEditor: View {
                 .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(24).frame(width: 480)
+        .padding(24)
+        #if os(macOS)
+        .frame(width: 480)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .background(Palette.elevated)
     }
 
@@ -374,7 +383,11 @@ struct MealPlanSheet: View {
             }
             .frame(maxHeight: 460)
         }
+        #if os(macOS)
         .frame(width: 520)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .background(Palette.elevated)
         .onAppear { if weekday.isEmpty { weekday = state.todayWeekday } }
         .sheet(item: $addingTo) { meal in
@@ -456,7 +469,12 @@ struct FoodScanSheet: View {
                 Text(err).font(.system(size: 12)).foregroundStyle(Palette.red)
             }
         }
-        .padding(20).frame(width: 440)
+        .padding(20)
+        #if os(macOS)
+        .frame(width: 440)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .background(Palette.elevated)
     }
 }
@@ -528,7 +546,11 @@ struct FoodScanReviewSheet: View {
             }
             .padding(20)
         }
+        #if os(macOS)
         .frame(width: 560)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .background(Palette.elevated)
     }
 }
