@@ -1,6 +1,6 @@
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { generateText } from 'ai';
+import { streamText } from 'ai';
 import { resolveModel } from '$lib/server/ai';
 import { mentorChatSystem } from '$lib/mentor';
 
@@ -46,12 +46,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   try {
-    const { text } = await generateText({
+    const result = streamText({
       model: resolved.model,
       system: mentorChatSystem(context, persona),
       messages
     });
-    return json({ reply: text });
+    // Stream the reply as plain text so the native client renders tokens as they
+    // arrive. Streaming keeps the connection alive, so long replies no longer hit
+    // the serverless function's response timeout (the old intermittent 502).
+    return result.toTextStreamResponse();
   } catch (e) {
     throw error(502, `Could not answer that: ${(e as Error)?.message ?? 'try again'}`);
   }

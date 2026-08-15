@@ -217,6 +217,58 @@ final class APIClient {
         return try decoder.decode(ChatReply.self, from: data).reply
     }
 
+    /// Streaming mentor chat. Yields the growing reply text as tokens arrive (the
+    /// server returns a plain-text stream). Streaming keeps the connection alive,
+    /// so long replies no longer hit the serverless response-timeout 502.
+    func chatStream(messages: [ChatTurn], context: String, agent: AgentInfo) -> AsyncThrowingStream<String, Error> {
+        // Encode up front so the streaming Task captures only Sendable values.
+        let bodyData: Data
+        do { bodyData = try encoder.encode(AnyEncodable(ChatRequest(messages: messages, context: context, agent: agent))) }
+        catch { return AsyncThrowingStream { $0.finish(throwing: error) } }
+        let session = aiSession
+        let url = Self.baseURL.appendingPathComponent("api/chat")
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    var req = URLRequest(url: url)
+                    req.httpMethod = "POST"
+                    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    req.setValue("text/plain", forHTTPHeaderField: "Accept")
+                    req.httpBody = bodyData
+                    let (bytes, response) = try await session.bytes(for: req)
+                    guard let http = response as? HTTPURLResponse else {
+                        throw APIError(status: -1, message: "No response from server")
+                    }
+                    guard (200..<300).contains(http.statusCode) else {
+                        var data = Data()
+                        for try await b in bytes { data.append(b) }
+                        throw APIError(status: http.statusCode,
+                                       message: Self.errorText(from: data, status: http.statusCode))
+                    }
+                    // Accumulate raw bytes; emit the decoded text so far whenever a
+                    // new whole character completes (handles multi-byte UTF-8 splits).
+                    var buffer = [UInt8]()
+                    var lastCount = -1
+                    for try await byte in bytes {
+                        buffer.append(byte)
+                        if let text = String(bytes: buffer, encoding: .utf8), text.count != lastCount {
+                            lastCount = text.count
+                            continuation.yield(text)
+                        }
+                    }
+                    if let text = String(bytes: buffer, encoding: .utf8), text.count != lastCount {
+                        continuation.yield(text)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     /// Today's "what to do now" mentor nudge from a data snapshot.
     func suggest(context: String) async throws -> SuggestResult {
         let data = try await request("POST", "api/suggest", body: ["context": context], using: aiSession)

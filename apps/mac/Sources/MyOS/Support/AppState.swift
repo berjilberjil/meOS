@@ -1043,6 +1043,7 @@ final class AppState: ObservableObject {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, !chatBusy else { return }
         chatError = nil
+        Haptics.tap()   // send feedback
         let i = activeThreadIndex()
         chat.threads[i].messages.append(ChatMessage(role: "user", content: t, at: Self.nowStamp()))
         chat.threads[i].updatedAt = Self.nowStamp()
@@ -1055,15 +1056,27 @@ final class AppState: ObservableObject {
         let a = AgentConfig.shared
         let agent = APIClient.AgentInfo(name: a.displayName, tone: a.tone.directive,
                                         custom: a.custom.trimmingCharacters(in: .whitespacesAndNewlines))
+        // Add an assistant bubble up front and grow it as tokens stream in.
+        chat.threads[i].messages.append(ChatMessage(role: "assistant", content: "", at: Self.nowStamp()))
         do {
-            let reply = try await api.chat(messages: turns, context: mentorContext(), agent: agent)
-            if let j = chat.threads.firstIndex(where: { $0.id == threadID }) {
-                chat.threads[j].messages.append(ChatMessage(role: "assistant", content: reply, at: Self.nowStamp()))
-                chat.threads[j].updatedAt = Self.nowStamp()
+            for try await full in api.chatStream(messages: turns, context: mentorContext(), agent: agent) {
+                if let j = chat.threads.firstIndex(where: { $0.id == threadID }),
+                   let k = chat.threads[j].messages.lastIndex(where: { $0.role == "assistant" }) {
+                    chat.threads[j].messages[k].content = full
+                    chat.threads[j].updatedAt = Self.nowStamp()
+                }
             }
+            Haptics.success()   // reply complete
             if isHydrated { push(StateKey.chat, chat) }
         } catch {
             chatError = (error as? APIError)?.message ?? error.localizedDescription
+            // Drop the empty assistant bubble if nothing streamed in.
+            if let j = chat.threads.firstIndex(where: { $0.id == threadID }),
+               let last = chat.threads[j].messages.last,
+               last.role == "assistant", last.content.isEmpty {
+                chat.threads[j].messages.removeLast()
+            }
+            if isHydrated { push(StateKey.chat, chat) }
         }
     }
 
