@@ -84,12 +84,27 @@ struct CreateEventIntent: AppIntent {
         let clean = EventVoice.cleanTitle(eventTitle)
         guard !clean.isEmpty else { throw $eventTitle.needsValueError("What's the event?") }
 
+        let today = EventVoice.key(from: Date())
         let key = EventVoice.key(from: date)
-        try await EventIntentStore().addEvent(title: clean, dateKey: key)
 
-        let line = EventVoice.spokenCreated(title: clean, date: key,
-                                            today: EventVoice.key(from: Date()))
-        return .result(dialog: IntentDialog(stringLiteral: line))
+        // Siri's date grammar is the weak link — "next week Friday" has come back as
+        // 1 January the following year. Anything years off is a parse failure, not a
+        // plan, so refuse it outright and make the user say it again.
+        guard EventVoice.isPlausible(key, today: today) else {
+            throw $date.needsValueError(
+                "I heard \(EventVoice.spokenDate(key, today: today)), which doesn't look right. When is it?")
+        }
+
+        // Read the resolved date back before writing. A silent wrong write is the
+        // failure worth designing out — the year is spoken whenever it isn't this
+        // one, so a mis-parse is audible rather than plausible-sounding.
+        try await requestConfirmation(
+            result: .result(dialog: IntentDialog(stringLiteral:
+                "Add \(clean) on \(EventVoice.spokenDate(key, today: today))?")))
+
+        try await EventIntentStore().addEvent(title: clean, dateKey: key)
+        return .result(dialog: IntentDialog(stringLiteral:
+            EventVoice.spokenCreated(title: clean, date: key, today: today)))
     }
 }
 

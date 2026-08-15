@@ -52,6 +52,33 @@ enum EventVoice {
         }
     }
 
+    /// The date spelled out for a confirmation prompt: "Friday 21 August", with the
+    /// year appended whenever it isn't the current one.
+    ///
+    /// The year is the point. Siri's date grammar can resolve a phrase like "next
+    /// week Friday" to something wildly wrong, and "Friday 1 January" sounds
+    /// perfectly reasonable read aloud — "Friday 1 January 2027" does not.
+    static func spokenDate(_ dateKey: String, today todayKey: String) -> String {
+        let parse = formatter()
+        guard let d = parse.date(from: dateKey) else { return "an unknown date" }
+        let out = DateFormatter()
+        out.calendar = Calendar(identifier: .gregorian)
+        out.locale = Locale(identifier: "en_US_POSIX")
+        let sameYear = dateKey.prefix(4) == todayKey.prefix(4)
+        out.dateFormat = sameYear ? "EEEE d MMMM" : "EEEE d MMMM yyyy"
+        return out.string(from: d)
+    }
+
+    /// Is this date close enough to now to be something the user actually meant?
+    ///
+    /// A voice date parser that misfires tends to miss by years, not days, so the
+    /// window is deliberately generous — it's here to catch garbage, not to
+    /// second-guess a real plan.
+    static func isPlausible(_ dateKey: String, today todayKey: String) -> Bool {
+        guard let delta = dayDelta(from: todayKey, to: dateKey) else { return false }
+        return delta >= -366 * 3 && delta <= 366 * 5
+    }
+
     /// Strip dictation noise off a spoken title. Siri often tacks on a full stop.
     static func cleanTitle(_ raw: String) -> String {
         var t = raw.trimmingCharacters(in: .whitespacesAndNewlines)

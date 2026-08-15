@@ -119,4 +119,57 @@ final class EventVoiceTests: XCTestCase {
         XCTAssertEqual(EventVoice.cleanTitle("Dad's birthday!"), "Dad's birthday")
         XCTAssertEqual(EventVoice.cleanTitle("   "), "")
     }
+
+    // MARK: - Date → key (the value Siri hands us)
+
+    private func date(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 12) -> Date {
+        var c = DateComponents()
+        c.year = y; c.month = m; c.day = d; c.hour = h
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
+        return cal.date(from: c)!
+    }
+
+    func testKeyFromDateUsesLocalCalendarDay() {
+        XCTAssertEqual(EventVoice.key(from: date(2026, 8, 21)), "2026-08-21")
+        XCTAssertEqual(EventVoice.key(from: date(2027, 1, 1)), "2027-01-01")
+    }
+
+    /// A week-based-year format string ("YYYY") would report 2027 for late
+    /// December. Guards the calendar-year formatter against that classic slip.
+    func testKeyFromDateNearYearBoundaryStaysInItsOwnYear() {
+        XCTAssertEqual(EventVoice.key(from: date(2026, 12, 29)), "2026-12-29")
+        XCTAssertEqual(EventVoice.key(from: date(2026, 12, 31, 23)), "2026-12-31")
+        XCTAssertEqual(EventVoice.key(from: date(2027, 1, 1, 0)), "2027-01-01")
+    }
+
+    // MARK: - Spoken date (read back before writing, so a bad parse is catchable)
+
+    func testSpokenDateOmitsYearWhenItIsThisYear() {
+        XCTAssertEqual(EventVoice.spokenDate("2026-08-21", today: today), "Friday 21 August")
+    }
+
+    /// The whole point: Siri resolving "next week Friday" to 1 January 2027 must be
+    /// audible. Without the year it would read as an innocuous "Friday 1 January".
+    func testSpokenDateIncludesYearWhenItIsNotThisYear() {
+        XCTAssertEqual(EventVoice.spokenDate("2027-01-01", today: today), "Friday 1 January 2027")
+    }
+
+    func testSpokenDateFallsBackOnGarbage() {
+        XCTAssertEqual(EventVoice.spokenDate("nonsense", today: today), "an unknown date")
+    }
+
+    // MARK: - Plausibility guard
+
+    func testDatesNearTodayArePlausible() {
+        XCTAssertTrue(EventVoice.isPlausible("2026-08-15", today: today))
+        XCTAssertTrue(EventVoice.isPlausible("2027-01-01", today: today))
+        XCTAssertTrue(EventVoice.isPlausible("2025-09-01", today: today))
+    }
+
+    func testAbsurdDatesAreRejected() {
+        XCTAssertFalse(EventVoice.isPlausible("2035-08-15", today: today))
+        XCTAssertFalse(EventVoice.isPlausible("1999-08-15", today: today))
+        XCTAssertFalse(EventVoice.isPlausible("", today: today))
+    }
 }
