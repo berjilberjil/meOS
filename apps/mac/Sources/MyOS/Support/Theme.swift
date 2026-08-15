@@ -241,6 +241,13 @@ private struct Duo3DBackground: View {
     }
 }
 
+extension View {
+    /// Fire a light tap when a button style transitions into the pressed state.
+    func pressHaptic(_ pressed: Bool) -> some View {
+        onChange(of: pressed) { _, now in if now { Haptics.tap() } }
+    }
+}
+
 /// Primary pill — green 3D button, uppercase heavy label. The hero control.
 struct KPrimaryButtonStyle: ButtonStyle {
     var tint: Color = Palette.brand
@@ -271,6 +278,7 @@ struct KPrimaryButtonStyle: ButtonStyle {
                 .animation(.knFast, value: pressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
+                .pressHaptic(configuration.isPressed)
         }
     }
 }
@@ -301,6 +309,7 @@ struct KSecondaryButtonStyle: ButtonStyle {
                 .animation(.knFast, value: pressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
+                .pressHaptic(configuration.isPressed)
         }
     }
 }
@@ -327,6 +336,7 @@ struct KGhostButtonStyle: ButtonStyle {
                 .animation(.knFast, value: configuration.isPressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
+                .pressHaptic(configuration.isPressed)
         }
     }
 }
@@ -353,6 +363,7 @@ struct KIconButtonStyle: ButtonStyle {
                 .animation(.knFast, value: configuration.isPressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
+                .pressHaptic(configuration.isPressed)
         }
     }
 }
@@ -382,6 +393,7 @@ struct KSoftButtonStyle: ButtonStyle {
                 .animation(.knFast, value: pressed)
                 .animation(.knFast, value: hover)
                 .onHover { h in hover = h; cursor(h) }
+                .pressHaptic(configuration.isPressed)
         }
     }
 }
@@ -402,6 +414,7 @@ struct KPressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? scale : 1)
             .animation(.knFast, value: configuration.isPressed)
+            .pressHaptic(configuration.isPressed)
     }
 }
 

@@ -68,6 +68,7 @@ struct MainView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.bg.ignoresSafeArea())
+        .onChange(of: tab) { _, _ in Haptics.selection() }
     }
 
     private func switchTo(_ t: NavTab) {

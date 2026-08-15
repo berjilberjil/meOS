@@ -50,6 +50,7 @@ struct MainView: View {
         }
         .background(Palette.bg.ignoresSafeArea())
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .onChange(of: tab) { _, _ in Haptics.selection() }
     }
 
     /// One tab: scrollable content, re-keyed so cards replay their entrance
