@@ -48,6 +48,7 @@ targets:
       - path: ../mac/Sources/MyOS/Views/AgentSettingsCard.swift
       - path: ../mac/Sources/MyOS/Views/AppearanceCard.swift
       - path: ../mac/Sources/MyOS/Views/GeneralSettingsCard.swift
+      - path: ../mac/Sources/MyOS/Views/NotificationsCard.swift
       - path: ../mac/Sources/MyOS/Views/Editors.swift
       - path: ../mac/Sources/MyOS/Views/CalendarComponents.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift

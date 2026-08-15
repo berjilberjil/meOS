@@ -12,6 +12,7 @@ struct MyOSApp: App {
                 .frame(minWidth: 940, minHeight: 640)
                 .preferredColorScheme(.dark)
                 .tint(Palette.brand)
+                .task { await ReminderStore.shared.syncOnLaunch() }
                 // Force the window chrome fully black so nothing grey shows behind
                 // the traffic lights or in the (now hidden) toolbar strip.
                 .background(WindowChrome())

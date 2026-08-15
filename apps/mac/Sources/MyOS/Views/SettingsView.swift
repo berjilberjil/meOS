@@ -24,6 +24,7 @@ struct SettingsView: View {
             securityCard.knRise(2)
             AppearanceCard().knRise(3)
             GeneralSettingsCard().knRise(3)
+            NotificationsCard().knRise(3)
             AgentSettingsCard().knRise(3)
             AIProvidersCard().knRise(3)
             fitnessCard.knRise(3)

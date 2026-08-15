@@ -10,6 +10,7 @@ struct MyOSApp: App {
                 .environmentObject(state)
                 .preferredColorScheme(.dark)
                 .tint(Palette.brand)
+                .task { await ReminderStore.shared.syncOnLaunch() }
         }
     }
 }
