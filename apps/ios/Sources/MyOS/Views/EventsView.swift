@@ -8,6 +8,7 @@ import UIKit
 /// Mac Events tab.
 struct EventsView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var signals = UISignals.shared
     @State private var editing: EventItem?
     @State private var showNew = false
 
@@ -17,14 +18,9 @@ struct EventsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Button { showNew = true } label: {
-                Label("New event", systemImage: "plus").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
-
             if state.events.isEmpty {
                 Card {
-                    Text("No events yet. Log a memory — a trip, a milestone, a moment.")
+                    Text("No events yet. Double-tap the Journal tab to add a memory — a trip, a milestone, a moment.")
                         .font(.system(size: 13)).foregroundStyle(Palette.faint)
                 }
             } else {
@@ -34,6 +30,14 @@ struct EventsView: View {
         }
         .sheet(isPresented: $showNew) { EventEditorSheet(event: nil) }
         .sheet(item: $editing) { e in EventEditorSheet(event: e) }
+        .onChange(of: signals.pendingNewEvent) { _, now in if now { consumeNewEvent() } }
+        .onAppear { if signals.pendingNewEvent { consumeNewEvent() } }
+    }
+
+    /// Open a fresh event editor in response to a double-tap on the Journal tab.
+    private func consumeNewEvent() {
+        signals.pendingNewEvent = false
+        showNew = true
     }
 
     private func section(_ title: String, _ items: [EventItem]) -> some View {

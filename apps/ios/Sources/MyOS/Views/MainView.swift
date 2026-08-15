@@ -12,10 +12,11 @@ struct MainView: View {
     @EnvironmentObject var state: AppState
     @State private var tab: NavTab = NavTab.resolveLaunch(PrefsStore.shared.launchTab.rawValue, allowed: NavTab.iosTabs)
     @State private var showSettings = false
+    @State private var lastJournalTap = Date.distantPast
 
     var body: some View {
         ZStack {
-            TabView(selection: $tab) {
+            TabView(selection: tabBinding) {
                 page(.today) {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
@@ -51,6 +52,24 @@ struct MainView: View {
         .background(Palette.bg.ignoresSafeArea())
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onChange(of: tab) { _, _ in Haptics.selection() }
+    }
+
+    /// Tab selection with a double-tap detector on the Journal tab: two quick
+    /// taps ask the Events screen to open a new event (see UISignals).
+    private var tabBinding: Binding<NavTab> {
+        Binding(
+            get: { tab },
+            set: { newValue in
+                if newValue == .journal {
+                    let now = Date()
+                    if now.timeIntervalSince(lastJournalTap) < 0.4 {
+                        UISignals.shared.pendingNewEvent = true
+                    }
+                    lastJournalTap = now
+                }
+                tab = newValue
+            }
+        )
     }
 
     /// One tab: scrollable content, re-keyed so cards replay their entrance

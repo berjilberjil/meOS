@@ -25,6 +25,7 @@ struct JournalView: View {
     enum JSeg: String, CaseIterable, Hashable { case events, journal }
     @State private var jseg: JSeg = .events
     @State private var showPresets = false
+    @ObservedObject private var signals = UISignals.shared
     #endif
 
     var body: some View {
@@ -68,6 +69,8 @@ struct JournalView: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
         }
+        // A double-tap on the Journal tab jumps to Events so its editor can open.
+        .onChange(of: signals.pendingNewEvent) { _, now in if now { jseg = .events } }
         #else
         VStack(alignment: .leading, spacing: 18) {
             header.knRise(0)

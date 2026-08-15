@@ -9,11 +9,16 @@ struct NotesView: View {
     @State private var query = ""
     @State private var openID: String?
     @State private var pendingDelete: Note?
+    @State private var revealed = false
+    @State private var titleTaps = 0
+    @State private var tapTimer: Task<Void, Never>?
 
     private var filtered: [Note] {
+        // Locked notes are hidden from the list until revealed (5-tap + Face ID).
+        let base = revealed ? state.sortedNotes : state.sortedNotes.filter { !$0.locked }
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return state.sortedNotes }
-        return state.sortedNotes.filter {
+        guard !q.isEmpty else { return base }
+        return base.filter {
             $0.title.lowercased().contains(q) || (!$0.locked && $0.body.lowercased().contains(q))
         }
     }
@@ -22,6 +27,11 @@ struct NotesView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Notes").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                    .contentShape(Rectangle())
+                    .onTapGesture { handleTitleTap() }
+                if revealed {
+                    Image(systemName: "lock.open.fill").font(.system(size: 12)).foregroundStyle(Palette.brand)
+                }
                 if !state.notes.isEmpty {
                     Text("\(state.notes.count)").font(.system(size: 13, weight: .semibold))
                         .monospacedDigit().foregroundStyle(Palette.faint)
@@ -55,6 +65,7 @@ struct NotesView: View {
             Button("Delete", role: .destructive) { state.deleteNote(n.id); pendingDelete = nil }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
+        .onDisappear { revealed = false; tapTimer?.cancel() }
     }
 
     private func noteRow(_ note: Note) -> some View {
@@ -85,11 +96,35 @@ struct NotesView: View {
             Button { state.togglePinNote(note.id) } label: {
                 Label(note.pinned ? "Unpin" : "Pin", systemImage: note.pinned ? "pin.slash" : "pin")
             }
+            Button { state.toggleLockNote(note.id) } label: {
+                Label(note.locked ? "Unhide" : "Hide", systemImage: note.locked ? "lock.open" : "lock")
+            }
             Button(role: .destructive) { pendingDelete = note } label: { Label("Delete", systemImage: "trash") }
         }
     }
 
     private func newNote() { openID = state.addBlockNote() }
+
+    /// Every tap on the title increments a counter; after a short settle window,
+    /// 2 taps = new note, 5+ taps = reveal hidden (locked) notes behind Face ID.
+    private func handleTitleTap() {
+        titleTaps += 1
+        tapTimer?.cancel()
+        tapTimer = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if Task.isCancelled { return }
+            let count = titleTaps
+            titleTaps = 0
+            if count >= 5 { await revealHidden() }
+            else if count == 2 { newNote() }
+        }
+    }
+
+    private func revealHidden() async {
+        if await BiometricLock.authenticate(reason: "Show hidden notes") {
+            withAnimation(.knFast) { revealed = true }
+        }
+    }
 }
 
 /// Full-screen plain-text editor for one note (iOS).
