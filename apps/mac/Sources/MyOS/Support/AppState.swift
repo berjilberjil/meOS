@@ -58,8 +58,8 @@ final class AppState: ObservableObject {
 
     // MARK: - Instant relaunch
 
-    private static let kSessionActive = "myos.session.active"
-    private static let kSessionUser   = "myos.session.username"
+    private static let kSessionActive = SessionDefaults.active
+    private static let kSessionUser   = SessionDefaults.username
 
     /// Show cached data instantly on relaunch — but only if this device's Keychain
     /// still holds the DEK to decrypt it. On a fresh device (or after logout) there's
