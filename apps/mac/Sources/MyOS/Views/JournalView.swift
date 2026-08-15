@@ -1,8 +1,15 @@
 import SwiftUI
 
-/// Shared mood ramp (1 rough → 5 great), used by the picker and the calendar dots.
+/// Shared mood ramp (1 rough → 5 great), used by the slider and the calendar dots.
 func moodTint(_ m: Int) -> Color {
     [Palette.red, Color(hex: 0xF59E0B), Palette.amber, Color(hex: 0x7DD37D), Palette.green][max(1, min(5, m)) - 1]
+}
+
+/// Which 1...5 mood stop a horizontal position `x` (0..<width) falls on. Pure so
+/// it is unit-testable.
+func moodStop(atX x: CGFloat, width: CGFloat) -> Int {
+    guard width > 0 else { return 1 }
+    return max(1, min(5, Int((x / width) * 5) + 1))
 }
 
 struct JournalView: View {
@@ -34,7 +41,15 @@ struct JournalView: View {
                     }
                 }
             }
-            Segmented(options: JSeg.allCases.map { ($0, $0.rawValue.capitalized) }, selection: $jseg)
+            HStack(spacing: 10) {
+                Segmented(options: JSeg.allCases.map { ($0, $0.rawValue.capitalized) }, selection: $jseg)
+                Spacer(minLength: 8)
+                // "Today" lives on the same row as the Events/Journal tabs, right-aligned.
+                if jseg == .journal && !isToday {
+                    Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: { Text("Today") }
+                        .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
+                }
+            }
             if jseg == .events { EventsView() } else { journalBody }
         }
         .sheet(isPresented: $showPresets) {
@@ -65,11 +80,9 @@ struct JournalView: View {
     /// The journaling half of the tab (streak / mood / reflections) with its own date nav.
     private var journalBody: some View {
         VStack(alignment: .leading, spacing: 18) {
+            // The Today pill now sits on the Events/Journal segmented row above;
+            // this row keeps just the day browser.
             HStack(spacing: 10) {
-                if !isToday {
-                    Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: { Text("Today") }
-                        .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
-                }
                 dateNavigator
                 Spacer()
             }
@@ -204,7 +217,7 @@ struct JournalView: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 SectionTitle(text: isToday ? "Mood today" : "Mood")
-                MoodPicker(mood: entry.mood) { m in
+                MoodSlider(mood: entry.mood) { m in
                     state.updateJournal(viewedDate) { $0.mood = m }
                 }
             }
@@ -520,36 +533,62 @@ private struct JournalCalendar: View {
     }
 }
 
-/// Mood as a clean 1–5 scale (rough → great), tinted along a red→green ramp.
-private struct MoodPicker: View {
+/// Mood as a sliding 1–5 scale (rough → great) with haptic detents. Defaults to
+/// "Rough" until you slide to reflect the day; each stop crossed taps a haptic.
+private struct MoodSlider: View {
     let mood: Int?
     let set: (Int) -> Void
 
     private let words = ["Rough", "Low", "Okay", "Good", "Great"]
+    @State private var dragging: Int? = nil
+
+    private var value: Int { dragging ?? mood ?? 1 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            GeometryReader { geo in
+                let w = geo.size.width
+                let centerX = (CGFloat(value) - 0.5) / 5 * w
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Palette.surface2).frame(height: 10)
+                    Capsule().fill(moodTint(value)).frame(width: max(13, centerX), height: 10)
+                    Circle().fill(.white)
+                        .frame(width: 26, height: 26)
+                        .overlay(Circle().strokeBorder(moodTint(value), lineWidth: 3))
+                        .knShadow()
+                        .offset(x: min(max(0, centerX - 13), w - 26))
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { g in
+                            let m = moodStop(atX: g.location.x, width: w)
+                            if m != value { Haptics.selection() }
+                            dragging = m
+                        }
+                        .onEnded { g in
+                            let m = moodStop(atX: g.location.x, width: w)
+                            dragging = nil
+                            set(m)
+                        }
+                )
+                .animation(.knFast, value: value)
+            }
+            .frame(height: 30)
+
+            HStack(spacing: 0) {
                 ForEach(1...5, id: \.self) { m in
-                    let on = mood == m
-                    Button { set(m) } label: {
-                        Text("\(m)")
-                            .font(.system(size: 15, weight: .semibold)).monospacedDigit()
-                            .foregroundStyle(on ? .white : Palette.muted)
-                            .frame(width: 46, height: 42)
-                            .background(on ? moodTint(m) : Palette.surface2,
-                                        in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                                .strokeBorder(on ? moodTint(m).opacity(0.5) : Palette.border, lineWidth: 1))
-                            .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                    }
-                    .buttonStyle(KPressStyle(scale: 0.93))
+                    Text("\(m)")
+                        .font(.system(size: 11, weight: .bold)).monospacedDigit()
+                        .foregroundStyle(m == value ? moodTint(m) : Palette.faint)
+                        .frame(maxWidth: .infinity)
                 }
             }
-            .animation(.knFast, value: mood)
-            if let m = mood {
-                Text(words[m - 1]).font(.system(size: 12, weight: .medium)).foregroundStyle(moodTint(m))
-            }
+
+            Text(mood == nil ? "Slide to set — \(words[value - 1])" : words[value - 1])
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(mood == nil ? Palette.faint : moodTint(value))
         }
     }
 }

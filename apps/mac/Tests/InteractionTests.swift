@@ -37,4 +37,16 @@ final class InteractionTests: XCTestCase {
         XCTAssertFalse(s.confirmed)
         XCTAssertEqual(s.progress, 0, accuracy: 0.001)
     }
+
+    // MARK: - Mood slider stop mapping
+
+    func testMoodStopMapsPositionToOneThroughFive() {
+        XCTAssertEqual(moodStop(atX: 0, width: 100), 1)
+        XCTAssertEqual(moodStop(atX: 20, width: 100), 2)
+        XCTAssertEqual(moodStop(atX: 50, width: 100), 3)
+        XCTAssertEqual(moodStop(atX: 99, width: 100), 5)
+        XCTAssertEqual(moodStop(atX: 100, width: 100), 5)   // clamped
+        XCTAssertEqual(moodStop(atX: -10, width: 100), 1)   // clamped
+        XCTAssertEqual(moodStop(atX: 10, width: 0), 1)      // zero width guard
+    }
 }
