@@ -29,35 +29,42 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- Siri never transcribes the spoken app name as the literal "MyOS" — it hears
-	     "my OS" / "my iOS" / "mios". Every App Shortcut phrase embeds the
-	     ${applicationName} token, so without these the token never matches and Siri
-	     falls through to a web search. These register the spoken forms that token
-	     should also accept. -->
+	<!-- Siri's voice trigger for this app. Every App Shortcut phrase embeds the
+	     ${applicationName} token, so the token has to be something Siri actually
+	     transcribes.
+
+	     "MyOS" is not. Spoken aloud it is a homophone of "iOS" — one of the
+	     strongest tokens in Apple's speech model — and Siri reliably transcribes it
+	     that way, then web-searches. Sound-alike alternatives ("My OS", "Mios") all
+	     collapsed into "iOS" too, so they were removed rather than kept as noise.
+
+	     "Catherine" is a proper name: phonetically distant from anything Apple
+	     reserves, and Siri nails it. Both spellings are registered because matching
+	     runs on Siri's transcribed text, and it may spell it either way.
+
+	     Hard cap of three — iOS refuses to install the app above that
+	     (MIInstallerErrorDomain 132). -->
 	<key>INAlternativeAppNames</key>
 	<array>
 		<dict>
 			<key>INAlternativeAppName</key>
-			<string>My OS</string>
+			<string>Catherine</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>my oh ess</string>
+			<string>kath rin</string>
 		</dict>
 		<dict>
 			<key>INAlternativeAppName</key>
-			<string>My iOS</string>
+			<string>Katherine</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>my eye oh ess</string>
+			<string>kath rin</string>
 		</dict>
 		<dict>
 			<key>INAlternativeAppName</key>
-			<string>Mios</string>
+			<string>Life OS</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>mee ohs</string>
+			<string>life oh ess</string>
 		</dict>
 	</array>
-	<!-- iOS rejects the install outright above three entries (MIInstallerErrorDomain
-	     132), so these three are the whole budget: the two most likely mis-hearings
-	     plus the run-together one. -->
 
 	<key>NSFaceIDUsageDescription</key>
 	<string>MyOS uses Face ID to unlock your life data.</string>

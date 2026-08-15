@@ -130,15 +130,23 @@ struct EventSnippet: View {
 
 /// Registered automatically once the app is installed and launched once — these
 /// show up in Siri and in the Shortcuts app with no setup.
+///
+/// `\(.applicationName)` resolves to the app name *and* every alternative name in
+/// Info.plist — which is "Catherine" here, because "MyOS" spoken aloud is a
+/// homophone of "iOS" and Siri transcribes it that way. So each phrase has to read
+/// naturally with a person's name in the slot ("Ask Catherine what's coming up"),
+/// not just with a product name ("...in MyOS"). Both forms are kept.
 struct MyOSAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: UpcomingEventsIntent(),
             phrases: [
+                "Ask \(.applicationName) what's coming up",
+                "Ask \(.applicationName) for my upcoming events",
+                "\(.applicationName) what's coming up",
                 "What's coming up in \(.applicationName)",
                 "What's next in \(.applicationName)",
-                "Upcoming events in \(.applicationName)",
-                "My next \(.applicationName) events"
+                "Upcoming events in \(.applicationName)"
             ],
             shortTitle: "Upcoming Events",
             systemImageName: "calendar")
@@ -146,9 +154,11 @@ struct MyOSAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: PastEventsIntent(),
             phrases: [
+                "Ask \(.applicationName) for my recent events",
+                "Ask \(.applicationName) what happened recently",
+                "\(.applicationName) recent events",
                 "My recent events in \(.applicationName)",
-                "Past events in \(.applicationName)",
-                "What happened recently in \(.applicationName)"
+                "Past events in \(.applicationName)"
             ],
             shortTitle: "Past Events",
             systemImageName: "clock.arrow.circlepath")
@@ -156,6 +166,9 @@ struct MyOSAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: CreateEventIntent(),
             phrases: [
+                "Ask \(.applicationName) to add an event",
+                "Tell \(.applicationName) to add an event",
+                "\(.applicationName) add an event",
                 "Add an event to \(.applicationName)",
                 "New event in \(.applicationName)",
                 "Log an event in \(.applicationName)"
