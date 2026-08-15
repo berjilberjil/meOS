@@ -10,7 +10,7 @@ import SwiftUI
 /// than showing the screen name a second time.
 struct MainView: View {
     @EnvironmentObject var state: AppState
-    @State private var tab: NavTab = .today
+    @State private var tab: NavTab = NavTab.resolveLaunch(PrefsStore.shared.launchTab.rawValue, allowed: NavTab.iosTabs)
     @State private var showSettings = false
 
     var body: some View {

@@ -33,3 +33,15 @@ enum NavTab: String, CaseIterable, Identifiable {
         }
     }
 }
+
+extension NavTab {
+    /// Tabs the iOS bottom bar can show (mac's sidebar shows every case).
+    static let iosTabs: [NavTab] = [.today, .fold, .fitness, .journal, .notes]
+
+    /// Resolve a persisted launch-tab raw value, clamped to `allowed`. Unknown
+    /// or disallowed values fall back to `.today`.
+    static func resolveLaunch(_ raw: String?, allowed: [NavTab] = NavTab.allCases) -> NavTab {
+        guard let raw, let t = NavTab(rawValue: raw), allowed.contains(t) else { return .today }
+        return t
+    }
+}

@@ -8,6 +8,7 @@ import SwiftUI
 struct FoldView: View {
     @Environment(\.openURL) private var openURL
     @State private var fold: FoldData? = FoldData.load()
+    @ObservedObject private var prefs = PrefsStore.shared
 
     private let cols = [GridItem(.adaptive(minimum: 170), spacing: 12)]
     private let setupURL = URL(string: "https://fold.money/mcp")!
@@ -17,6 +18,13 @@ struct FoldView: View {
             HStack(spacing: 8) {
                 Text("Fold").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
                 Spacer()
+                if fold != nil {
+                    Button { prefs.hideFoldNumbers.toggle() } label: {
+                        Image(systemName: prefs.hideFoldNumbers ? "eye.slash.fill" : "eye.fill")
+                    }
+                    .buttonStyle(KIconButtonStyle(size: 30, color: Palette.muted))
+                    .help(prefs.hideFoldNumbers ? "Show amounts" : "Hide amounts")
+                }
                 if fold == nil {
                     Button { openURL(setupURL) } label: { Label("Connect Fold", systemImage: "link") }
                         .buttonStyle(KPrimaryButtonStyle())
@@ -43,9 +51,9 @@ struct FoldView: View {
                         Text("Net worth").font(.system(size: 13)).foregroundStyle(Palette.muted)
                     }
                     Spacer()
-                    if f.changeValue != 0 { changeChip(f) }
+                    if f.changeValue != 0 && !prefs.hideFoldNumbers { changeChip(f) }
                 }
-                if f.history.count > 1 {
+                if f.history.count > 1 && !prefs.hideFoldNumbers {
                     Sparkline(values: f.history).frame(height: 92)
                     if !f.changeLabel.isEmpty {
                         Text("Last \(f.changeLabel)")
@@ -71,7 +79,7 @@ struct FoldView: View {
                     ForEach(f.banks) { b in
                         HStack(spacing: 8) {
                             Text(b.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.text)
-                            Text("••\(b.last4)").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                            Text("••\(prefs.hideFoldNumbers ? "••" : b.last4)").font(.system(size: 11)).foregroundStyle(Palette.faint)
                             Spacer()
                             Text(inr(b.balance)).font(.system(size: 13, weight: .semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.muted)
@@ -156,13 +164,18 @@ struct FoldView: View {
         .knRise(2)
     }
 
-    private func inr(_ v: Double) -> String {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.locale = Locale(identifier: "en_IN")
-        f.maximumFractionDigits = 0
-        return "₹" + (f.string(from: NSNumber(value: v.rounded())) ?? "0")
-    }
+    private func inr(_ v: Double) -> String { foldINR(v, hidden: prefs.hideFoldNumbers) }
+}
+
+/// Rupee formatter for the Fold dashboard (en_IN grouping). Masks to "₹ ••••"
+/// when privacy mode is on. A free function so it is unit-testable.
+func foldINR(_ v: Double, hidden: Bool) -> String {
+    if hidden { return "₹ ••••" }
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.locale = Locale(identifier: "en_IN")
+    f.maximumFractionDigits = 0
+    return "₹" + (f.string(from: NSNumber(value: v.rounded())) ?? "0")
 }
 
 /// A minimal green area sparkline (Fold-home style).

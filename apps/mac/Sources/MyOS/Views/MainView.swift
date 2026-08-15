@@ -4,7 +4,7 @@ import SwiftUI
 
 struct MainView: View {
     @EnvironmentObject var state: AppState
-    @State private var tab: NavTab = .today
+    @State private var tab: NavTab = PrefsStore.shared.launchTab
     private static let kCollapsed = "myos.sidebar.collapsed"
     @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
 
