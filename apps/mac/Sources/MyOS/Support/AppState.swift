@@ -537,7 +537,10 @@ final class AppState: ObservableObject {
         push(StateKey.nutrition, nutrition)
     }
     func addFoodToMeal(date: String, meal: MealKey, foodId: String, quantity: Double = 1) {
-        mutateLog(date) { $0.meals[meal.rawValue, default: []].append(PlanItem(foodId: foodId, quantity: quantity)) }
+        mutateLog(date) {
+            $0.meals[meal.rawValue, default: []].append(PlanItem(foodId: foodId, quantity: quantity))
+            $0.skipped.removeAll { $0 == meal.rawValue }
+        }
     }
     func setMealItemQty(date: String, meal: MealKey, itemId: String, quantity: Double) {
         mutateLog(date) {
@@ -549,6 +552,18 @@ final class AppState: ObservableObject {
     func removeMealItem(date: String, meal: MealKey, itemId: String) {
         mutateLog(date) { $0.meals[meal.rawValue]?.removeAll { $0.id == itemId } }
     }
+
+    // Plan → confirmed (tick / edit / skip). The weekly template is never mutated.
+    func mealState(_ date: String, _ meal: MealKey) -> MealLog.MealState { mealLog(date).state(meal) }
+    func tickMeal(date: String, meal: MealKey) {
+        let planned = planItems(Self.weekdayKey(date), meal)
+        mutateLog(date) { $0.tick(meal, planned: planned) }
+    }
+    func setMealItems(date: String, meal: MealKey, items: [PlanItem]) {
+        mutateLog(date) { $0.setItems(meal, items) }
+    }
+    func skipMeal(date: String, meal: MealKey)   { mutateLog(date) { $0.skip(meal) } }
+    func unskipMeal(date: String, meal: MealKey) { mutateLog(date) { $0.unskip(meal) } }
 
     /// Distinct micronutrients covered by the foods eaten on a date.
     func vitaminsCovered(_ date: String) -> [String] {
@@ -594,15 +609,18 @@ final class AppState: ObservableObject {
         nutrition.mealPlan[weekday]?[meal.rawValue]?.removeAll { $0.id == itemId }
         push(StateKey.nutrition, nutrition)
     }
-    /// Copy today's weekday meal plan into today's log (seed the day).
+    /// Copy one weekday's meal plan onto other weekdays (overwrites them).
+    func copyMealPlanDay(from: String, to weekdays: [String]) {
+        let src = mealPlan(from)
+        for wd in weekdays where wd != from {
+            nutrition.mealPlan[wd] = src.mapValues { $0.map { PlanItem(foodId: $0.foodId, quantity: $0.quantity) } }
+        }
+        push(StateKey.nutrition, nutrition)
+    }
+    /// Tick every still-unconfirmed meal from today's plan (the "log all" action).
     func applyMealPlanToToday() {
-        let plan = mealPlan(todayWeekday)
-        guard !plan.isEmpty else { return }
-        mutateLog(todayKey) { log in
-            for (mealRaw, items) in plan {
-                let existing = log.meals[mealRaw] ?? []
-                log.meals[mealRaw] = existing + items.map { PlanItem(foodId: $0.foodId, quantity: $0.quantity) }
-            }
+        for meal in MealKey.allCases where mealState(todayKey, meal) == .unconfirmed {
+            tickMeal(date: todayKey, meal: meal)
         }
     }
 
@@ -657,6 +675,23 @@ final class AppState: ObservableObject {
     }
     func removePlanExercise(weekday: String, itemId: String) {
         mutatePlan(weekday) { $0.items.removeAll { $0.id == itemId } }
+    }
+
+    // Workout day log (tick / edit / skip). The weekly template is never mutated.
+    func workoutDayLog(_ date: String) -> WorkoutDayLog { training.dayLog[date] ?? WorkoutDayLog() }
+    private func mutateDayLog(_ date: String, _ f: (inout WorkoutDayLog) -> Void) {
+        var l = training.dayLog[date] ?? WorkoutDayLog()
+        f(&l)
+        training.dayLog[date] = l
+        push(StateKey.training, training)
+    }
+    func tickWorkout(date: String, items: [PlanExercise]? = nil) { mutateDayLog(date) { $0.tick(items: items) } }
+    func skipWorkout(date: String)   { mutateDayLog(date) { $0.skip() } }
+    func unskipWorkout(date: String) { mutateDayLog(date) { $0.unskip() } }
+    /// The exercises for a date: the edited actual if present, else the weekday plan.
+    func workoutItemsForDay(_ date: String) -> [PlanExercise] {
+        if let items = workoutDayLog(date).items { return items }
+        return workoutPlan(Self.weekdayKey(date)).items
     }
     func copyWorkoutDay(from: String, to weekdays: [String]) {
         let src = workoutPlan(from)

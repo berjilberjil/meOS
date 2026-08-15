@@ -125,16 +125,55 @@ struct PlanItem: Codable, Identifiable, Hashable {
     }
 }
 
-/// A day's eating — meal key → items.
+/// A day's eating — meal key → items, plus the meals intentionally skipped that day.
 struct MealLog: Codable, Hashable {
     var meals: [String: [PlanItem]] = [:]
+    var skipped: [String] = []                       // meal raws skipped this date
     init() {}
-    enum CodingKeys: String, CodingKey { case meals }
+    enum CodingKeys: String, CodingKey { case meals, skipped }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        meals = try c.decodeIfPresent([String: [PlanItem]].self, forKey: .meals) ?? [:]
+        meals   = try c.decodeIfPresent([String: [PlanItem]].self, forKey: .meals) ?? [:]
+        skipped = try c.decodeIfPresent([String].self, forKey: .skipped) ?? []
     }
     func items(_ meal: MealKey) -> [PlanItem] { meals[meal.rawValue] ?? [] }
+}
+
+// MARK: - Plan → confirmed (pure derivation + mutation; unit-tested without AppState)
+
+extension MealLog {
+    enum MealState: Equatable, Hashable { case unconfirmed, logged, skipped }
+
+    /// Logged (has items) wins over skipped wins over unconfirmed.
+    func state(_ meal: MealKey) -> MealState {
+        if !items(meal).isEmpty { return .logged }
+        if skipped.contains(meal.rawValue) { return .skipped }
+        return .unconfirmed
+    }
+    /// Tick "ate it": copy the planned items into this meal (fresh ids), un-skip.
+    /// No-op if nothing is planned.
+    mutating func tick(_ meal: MealKey, planned: [PlanItem]) {
+        guard !planned.isEmpty else { return }
+        meals[meal.rawValue] = planned.map { PlanItem(foodId: $0.foodId, quantity: $0.quantity) }
+        skipped.removeAll { $0 == meal.rawValue }
+    }
+    /// Skip the meal: clear any logged items (so the state is unambiguous) and mark it.
+    mutating func skip(_ meal: MealKey) {
+        meals[meal.rawValue] = []
+        if !skipped.contains(meal.rawValue) { skipped.append(meal.rawValue) }
+    }
+    mutating func unskip(_ meal: MealKey) { skipped.removeAll { $0 == meal.rawValue } }
+    /// Replace a meal's logged items wholesale (editor Save); un-skips.
+    mutating func setItems(_ meal: MealKey, _ items: [PlanItem]) {
+        meals[meal.rawValue] = items
+        skipped.removeAll { $0 == meal.rawValue }
+    }
+}
+
+/// Weekday key helpers ("0"=Sun … "6"=Sat) for copy-day.
+enum WeekdayKeys {
+    static let all: [String] = (0..<7).map(String.init)
+    static func others(except day: String) -> [String] { all.filter { $0 != day } }
 }
 
 struct NutritionState: Codable, Hashable {
@@ -239,15 +278,41 @@ struct WorkoutDayPlan: Codable, Hashable {
     }
 }
 
+/// A date's workout status. `nil` items = did it as planned; non-nil = an edited
+/// actual. Mirrors the meal plan→confirmed model.
+struct WorkoutDayLog: Codable, Hashable {
+    var done: Bool = false
+    var skipped: Bool = false
+    var items: [PlanExercise]? = nil
+    init() {}
+    enum CodingKeys: String, CodingKey { case done, skipped, items }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        done    = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
+        skipped = try c.decodeIfPresent(Bool.self, forKey: .skipped) ?? false
+        items   = try c.decodeIfPresent([PlanExercise].self, forKey: .items)
+    }
+}
+
+extension WorkoutDayLog {
+    enum DayState: Equatable, Hashable { case unconfirmed, done, skipped }
+    var state: DayState { done ? .done : (skipped ? .skipped : .unconfirmed) }
+    mutating func tick(items: [PlanExercise]?) { done = true; skipped = false; self.items = items }
+    mutating func skip() { done = false; skipped = true; items = nil }
+    mutating func unskip() { skipped = false }
+}
+
 struct TrainingState: Codable, Hashable {
     var customExercises: [Exercise] = []
     var weekPlan: [String: WorkoutDayPlan] = [:]           // weekday "0".."6" → plan
+    var dayLog: [String: WorkoutDayLog] = [:]              // date → per-day status
     init() {}
-    enum CodingKeys: String, CodingKey { case customExercises, weekPlan }
+    enum CodingKeys: String, CodingKey { case customExercises, weekPlan, dayLog }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         customExercises = try c.decodeIfPresent([Exercise].self, forKey: .customExercises) ?? []
         weekPlan        = try c.decodeIfPresent([String: WorkoutDayPlan].self, forKey: .weekPlan) ?? [:]
+        dayLog          = try c.decodeIfPresent([String: WorkoutDayLog].self, forKey: .dayLog) ?? [:]
     }
 }
 
