@@ -1,186 +1,15 @@
 import SwiftUI
 
-/// The weekly workout plan — per weekday split, exercises with sets×reps, in-app
-/// GIF demos, and add/edit custom exercises. Lives in the Fitness tab's "Workout" sub.
-struct WorkoutView: View {
+/// The exercise Library — browse every exercise (seed + custom), filter by
+/// category, watch the demo GIF, and add/edit custom exercises. Planning a day
+/// happens in the weekly planner; this is the "show all / add new" surface.
+struct WorkoutLibrarySection: View {
     @EnvironmentObject var state: AppState
-    @State private var weekday: String = ""
-    @State private var picking = false
     @State private var newExercise = false
     @State private var detail: Exercise?
-
-    private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    private var plan: WorkoutDayPlan { state.workoutPlan(weekday) }
-    private var isToday: Bool { weekday == state.todayWeekday }
-
-    enum WorkoutMode: String, Hashable { case plan, exercises }
-    @State private var mode: WorkoutMode = .plan
     @State private var libQuery = ""
     @State private var libCat: WorkoutCategory?
     @FocusState private var libSearchFocused: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Segmented(options: (0..<7).map { (String($0), dayNames[$0]) }, selection: $weekday)
-                .knRise(0)
-            Segmented(options: [(WorkoutMode.plan, "Plan"), (WorkoutMode.exercises, "All exercises")], selection: $mode)
-                .knRise(1)
-
-            if mode == .plan {
-                generateRow.knRise(2)
-                dayCard.knRise(3)
-                HStack(spacing: 10) {
-                    Button { newExercise = true } label: { Label("New exercise", systemImage: "plus") }
-                        .buttonStyle(KGhostButtonStyle())
-                    Spacer()
-                    Menu {
-                        ForEach(0..<7, id: \.self) { d in
-                            if String(d) != weekday {
-                                Button("Copy to \(dayNames[d])") { state.copyWorkoutDay(from: weekday, to: [String(d)]) }
-                            }
-                        }
-                        Button("Copy to all other days") {
-                            state.copyWorkoutDay(from: weekday, to: (0..<7).map(String.init))
-                        }
-                    } label: { Label("Copy day", systemImage: "doc.on.doc") }
-                        .menuStyle(.borderlessButton)
-                        .disabled(plan.items.isEmpty)
-                }
-                .knRise(4)
-            } else {
-                exerciseLibrary.knRise(2)
-            }
-        }
-        .onAppear { if weekday.isEmpty { weekday = state.todayWeekday } }
-        .sheet(isPresented: $picking) {
-            ExercisePickerSheet { ex in state.addPlanExercise(weekday: weekday, exerciseId: ex.id) }
-                newCustom: { newExercise = true }
-        }
-        .sheet(isPresented: $newExercise) { ExerciseEditor(exercise: nil) }
-        .sheet(item: $detail) { ex in ExerciseDetailSheet(exercise: ex) }
-    }
-
-    private var generateRow: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    Image(systemName: "wand.and.stars").font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.brand)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Generate my week").font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                        Text("AI drafts a split + meal plan from your goal — then edit it.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
-                    }
-                    Spacer()
-                    Button { Task { await state.generateWeeklyPlan() } } label: {
-                        HStack(spacing: 6) {
-                            if state.planBusy { ProgressView().controlSize(.small).tint(.white) }
-                            Text(state.planBusy ? "Building…" : "Generate")
-                        }
-                    }
-                    .buttonStyle(KPrimaryButtonStyle())
-                    .disabled(state.planBusy)
-                }
-                if let s = state.planSummary {
-                    Label(s, systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(Palette.green)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let e = state.planError {
-                    Label(e, systemImage: "exclamationmark.triangle.fill").font(.system(size: 12)).foregroundStyle(Palette.amber)
-                }
-            }
-        }
-    }
-
-    private var dayCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    HStack(spacing: 7) {
-                        SectionTitle(text: fullDayName + (isToday ? " · today" : ""))
-                    }
-                    Spacer()
-                    Toggle("Rest day", isOn: Binding(get: { plan.rest },
-                                                     set: { state.setRestDay(weekday, $0) }))
-                        .toggleStyle(.switch).tint(Palette.brand)
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.muted)
-                }
-
-                if plan.rest {
-                    HStack(spacing: 8) {
-                        Image(systemName: "moon.zzz.fill").foregroundStyle(Palette.blue)
-                        Text("Rest day — recover.").font(.system(size: 13)).foregroundStyle(Palette.muted)
-                    }
-                    .padding(.vertical, 8)
-                } else {
-                    if plan.items.isEmpty {
-                        Text("No exercises yet. Add some to build this day.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
-                    }
-                    ForEach(plan.items) { item in exerciseRow(item) }
-                    Button { picking = true } label: { Label("Add exercise", systemImage: "plus.circle.fill") }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.brand))
-                }
-            }
-        }
-    }
-
-    private func exerciseRow(_ item: PlanExercise) -> some View {
-        let ex = state.exercise(item.exerciseId)
-        return HStack(spacing: 11) {
-            Button { if let ex { detail = ex } } label: {
-                ExerciseIcon(category: ex?.category ?? .core, size: 34)
-            }
-            .buttonStyle(KPressStyle())
-            VStack(alignment: .leading, spacing: 2) {
-                Text(ex?.name ?? "Unknown").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                Text("\(ex?.category.label ?? "") · \(ex?.primary ?? "")").font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
-            }
-            Spacer()
-            setsReps(item)
-            Button { state.removePlanExercise(weekday: weekday, itemId: item.id) } label: {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-            }
-            .buttonStyle(KIconButtonStyle(size: 22))
-        }
-    }
-
-    private func setsReps(_ item: PlanExercise) -> some View {
-        HStack(spacing: 10) {
-            stepper(value: item.sets, label: "sets",
-                    dec: { state.setPlanSets(weekday: weekday, itemId: item.id, sets: item.sets - 1) },
-                    inc: { state.setPlanSets(weekday: weekday, itemId: item.id, sets: item.sets + 1) })
-            Text("×").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.faint)
-            stepper(value: item.reps, label: "reps",
-                    dec: { state.setPlanReps(weekday: weekday, itemId: item.id, reps: item.reps - 1) },
-                    inc: { state.setPlanReps(weekday: weekday, itemId: item.id, reps: item.reps + 1) })
-        }
-    }
-
-    private func stepper(value: Int, label: String, dec: @escaping () -> Void, inc: @escaping () -> Void) -> some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 4) {
-                miniBtn("minus", dec)
-                Text("\(value)").font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(Palette.text).frame(minWidth: 20)
-                miniBtn("plus", inc)
-            }
-            Text(label.uppercased()).font(.system(size: 7, weight: .heavy)).tracking(0.5).foregroundStyle(Palette.faint)
-        }
-    }
-    private func miniBtn(_ icon: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon).font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.text)
-                .frame(width: 22, height: 20)
-                .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
-        }
-        .buttonStyle(KPressStyle(scale: 0.9))
-    }
-
-    private var fullDayName: String {
-        ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][Int(weekday) ?? 0]
-    }
-
-    // MARK: - All-exercises library (browse + add to the selected day)
 
     private var libResults: [Exercise] {
         let q = libQuery.lowercased().trimmingCharacters(in: .whitespaces)
@@ -190,7 +19,7 @@ struct WorkoutView: View {
         }
     }
 
-    @ViewBuilder private var exerciseLibrary: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 HStack(spacing: 8) {
@@ -209,9 +38,6 @@ struct WorkoutView: View {
                 }
                 .padding(.vertical, 1)
             }
-            Text("Tap an exercise for its demo. \"Add\" puts it on \(dayNames[Int(weekday) ?? 0]).")
-                .font(.system(size: 11)).foregroundStyle(Palette.faint)
-
             ForEach(WorkoutCategory.allCases, id: \.self) { cat in
                 let items = libResults.filter { $0.category == cat }
                 if !items.isEmpty {
@@ -227,6 +53,8 @@ struct WorkoutView: View {
                 Card { Text("No exercises match.").font(.system(size: 13)).foregroundStyle(Palette.faint) }
             }
         }
+        .sheet(isPresented: $newExercise) { ExerciseEditor(exercise: nil) }
+        .sheet(item: $detail) { ex in ExerciseDetailSheet(exercise: ex) }
     }
 
     private func libCatChip(_ c: WorkoutCategory?, _ label: String) -> some View {
@@ -253,11 +81,6 @@ struct WorkoutView: View {
                 Image(systemName: "play.circle.fill").font(.system(size: 14)).foregroundStyle(Palette.blue)
             }
             if !ex.isDefault { Text("CUSTOM").font(.system(size: 8, weight: .heavy)).foregroundStyle(Palette.brand) }
-            Button { state.addPlanExercise(weekday: weekday, exerciseId: ex.id) } label: {
-                Text("Add").font(.system(size: 12, weight: .heavy, design: .rounded))
-            }
-            .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
-            .help("Add to \(dayNames[Int(weekday) ?? 0])")
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
@@ -399,6 +222,7 @@ struct ExerciseEditor: View {
     @Environment(\.dismiss) private var dismiss
     let exercise: Exercise?
     @State private var draft: Exercise
+    @State private var showDelete = false
 
     init(exercise: Exercise?) {
         self.exercise = exercise
@@ -425,8 +249,12 @@ struct ExerciseEditor: View {
                           text: Binding(get: { draft.gifId ?? "" }, set: { draft.gifId = $0.isEmpty ? nil : $0 }))
             HStack {
                 if let exercise, !exercise.isDefault {
-                    Button("Delete", role: .destructive) { state.deleteExercise(exercise.id); dismiss() }
+                    Button("Delete") { showDelete = true }
                         .buttonStyle(KGhostButtonStyle(color: Palette.red))
+                        .holdToDelete(isPresented: $showDelete, title: "Delete \(exercise.name)?",
+                                      message: "Removes it from your exercise library.") {
+                            state.deleteExercise(exercise.id); dismiss()
+                        }
                 }
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
@@ -482,8 +310,6 @@ struct ExerciseDetailSheet: View {
                 musclesPanel.frame(maxWidth: .infinity, alignment: .leading)
             }
             #else
-            // Narrow phone widths can't fit the demo + muscle panel side by side —
-            // stack them so nothing clips horizontally.
             VStack(alignment: .leading, spacing: 16) {
                 demoView.frame(height: 240).frame(maxWidth: .infinity)
                 musclesPanel.frame(maxWidth: .infinity, alignment: .leading)
@@ -517,7 +343,6 @@ struct ExerciseDetailSheet: View {
     }
 
     private var musclesPanel: some View {
-        // Muscles worked → body highlight
         VStack(alignment: .leading, spacing: 10) {
             KFieldLabel(text: "Muscles worked")
             if exercise.muscles.isEmpty {

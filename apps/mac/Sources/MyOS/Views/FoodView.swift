@@ -1,172 +1,88 @@
 import SwiftUI
 
-/// Today's eating — macros vs targets, meals with foods, add from the library or a
-/// custom food, and a weekly meal plan. Lives inside the Fitness tab's "Food" sub.
-struct FoodView: View {
+/// The food Library — browse every food (seed + custom), filter by category, and
+/// add/edit custom foods. The "show all / add new" surface; logging happens on the
+/// Fitness Today checklist, planning in the weekly planner.
+struct FoodLibrarySection: View {
     @EnvironmentObject var state: AppState
-    @State private var addingTo: MealKey?
-    @State private var editingFood: Food?
+    @State private var query = ""
+    @State private var category: FoodCategory?
     @State private var newFood = false
-    @State private var showPlan = false
-    @State private var scanningFood = false
-    @State private var scanPayload: FoodScanPayload?
+    @State private var editingFood: Food?
+    @FocusState private var searchFocused: Bool
 
-    private var key: String { state.todayKey }
-    private var log: MealLog { state.mealLog(key) }
-    private var consumed: Macros { state.consumed(key) }
+    private var results: [Food] {
+        let q = query.lowercased().trimmingCharacters(in: .whitespaces)
+        return state.allFoods.filter { f in
+            (category == nil || f.category == category) &&
+            (q.isEmpty || f.name.lowercased().contains(q))
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            totalsCard.knRise(0)
-
-            ForEach(Array(MealKey.allCases.enumerated()), id: \.element) { idx, meal in
-                mealCard(meal).knRise(idx + 1)
-            }
-
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Button { showPlan = true } label: { Label("Weekly meal plan", systemImage: "calendar") }
-                    .buttonStyle(KSecondaryButtonStyle())
-                Button { scanningFood = true } label: { Label("Scan food photo", systemImage: "camera.viewfinder") }
-                    .buttonStyle(KSecondaryButtonStyle())
-                Button { newFood = true } label: { Label("New food", systemImage: "plus") }
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Palette.faint)
+                    TextField("", text: $query, prompt: Text("Search all foods…").foregroundColor(Palette.faint))
+                        .textFieldStyle(.plain).foregroundStyle(Palette.text).focused($searchFocused)
+                }
+                .knField(focused: searchFocused)
+                Button { newFood = true } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(KGhostButtonStyle())
             }
-            .knRise(6)
-        }
-        .sheet(item: $addingTo) { meal in
-            FoodPickerSheet(meal: meal) { food, qty in
-                state.addFoodToMeal(date: key, meal: meal, foodId: food.id, quantity: qty)
-            } newCustom: { newFood = true }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    catChip(nil, "All")
+                    ForEach(FoodCategory.allCases, id: \.self) { c in catChip(c, c.label) }
+                }
+                .padding(.vertical, 1)
+            }
+            ForEach(FoodCategory.allCases, id: \.self) { cat in
+                let items = results.filter { $0.category == cat }
+                if !items.isEmpty {
+                    Card {
+                        VStack(alignment: .leading, spacing: 8) {
+                            SectionTitle(text: "\(cat.label) · \(items.count)")
+                            ForEach(items) { f in libRow(f) }
+                        }
+                    }
+                }
+            }
+            if results.isEmpty {
+                Card { Text("No foods match.").font(.system(size: 13)).foregroundStyle(Palette.faint) }
+            }
         }
         .sheet(isPresented: $newFood) { FoodEditor(food: nil) }
         .sheet(item: $editingFood) { f in FoodEditor(food: f) }
-        .sheet(isPresented: $showPlan) { MealPlanSheet() }
-        .sheet(isPresented: $scanningFood) {
-            FoodScanSheet { summary, foods in
-                scanPayload = FoodScanPayload(summary: summary, foods: foods)
-            }
-        }
-        .sheet(item: $scanPayload) { payload in
-            FoodScanReviewSheet(summary: payload.summary, foods: payload.foods, logDate: key, defaultMeal: payload.defaultMeal)
-        }
     }
 
-    // MARK: - Totals vs targets
-
-    private var totalsCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    SectionTitle(text: "Today's macros")
-                    Spacer()
-                    if state.mealLog(key).meals.isEmpty, !state.mealPlan(state.todayWeekday).isEmpty {
-                        Button { state.applyMealPlanToToday() } label: {
-                            Label("Use my plan", systemImage: "wand.and.stars")
-                        }
-                        .buttonStyle(KGhostButtonStyle())
-                    }
-                }
-                let t = targets
-                HStack(spacing: 10) {
-                    macroMeter("Calories", consumed.calories, t?.calories, "kcal", Palette.amber)
-                    macroMeter("Protein", consumed.protein, t?.protein, "g", Palette.green)
-                    macroMeter("Carbs", consumed.carbs, t?.carbs, "g", Palette.blue)
-                    macroMeter("Fat", consumed.fats, t?.fats, "g", Palette.red)
-                }
-            }
+    private func catChip(_ c: FoodCategory?, _ label: String) -> some View {
+        let on = category == c
+        return Button { category = c } label: {
+            Text(label).font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(on ? .white : Palette.muted)
+                .padding(.horizontal, 11).padding(.vertical, 6)
+                .background(on ? Palette.brand : Palette.surface2.opacity(0.6), in: Capsule())
         }
+        .buttonStyle(KPressStyle())
+        .onHover { h in cursor(h) }
     }
 
-    /// Macro targets from the computed calorie picture (falls back to protein/cal on the profile).
-    private var targets: Macros? {
-        if let c = state.calorieTargets() {
-            return Macros(calories: Double(c.goalCalories), protein: Double(c.proteinG),
-                          carbs: Double(c.carbG), fiber: 30, fats: Double(c.fatG))
-        }
-        if let cal = state.fitnessProfile.calorieTargetKcal {
-            return Macros(calories: cal, protein: state.fitnessProfile.proteinTargetG ?? 0, carbs: 0, fiber: 0, fats: 0)
-        }
-        return nil
-    }
-
-    private func macroMeter(_ label: String, _ have: Double, _ target: Double?, _ unit: String, _ tint: Color) -> some View {
-        VStack(spacing: 6) {
-            Text("\(Int(have.rounded()))")
-                .font(.system(size: 20, weight: .heavy, design: .rounded)).monospacedDigit()
-                .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
-            if let target, target > 0 {
-                MeterBar(fraction: min(1, have / target), tint: tint, height: 6)
-                Text("of \(Int(target)) \(unit)").font(.system(size: 9)).foregroundStyle(Palette.faint)
-            } else {
-                Text(unit).font(.system(size: 9)).foregroundStyle(Palette.faint)
-            }
-            Text(label.uppercased()).font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.5)
-                .foregroundStyle(Palette.faint)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-    }
-
-    // MARK: - A meal
-
-    private func mealCard(_ meal: MealKey) -> some View {
-        let items = log.items(meal)
-        let mealMacros = items.reduce(Macros.zero) { acc, item in
-            acc + (state.food(item.foodId)?.perServing.scaled(item.quantity) ?? .zero)
-        }
-        return Card {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Label(meal.label, systemImage: meal.icon)
-                        .font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                    Spacer()
-                    if !items.isEmpty {
-                        Text("\(Int(mealMacros.calories)) kcal · \(Int(mealMacros.protein))g P")
-                            .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
-                    }
-                }
-                if items.isEmpty {
-                    Text("Nothing logged.").font(.system(size: 12)).foregroundStyle(Palette.faint)
-                }
-                ForEach(items) { item in foodRow(meal: meal, item: item) }
-                Button { addingTo = meal } label: { Label("Add food", systemImage: "plus.circle.fill") }
-                    .buttonStyle(KGhostButtonStyle(color: Palette.brand))
-            }
-        }
-    }
-
-    private func foodRow(meal: MealKey, item: PlanItem) -> some View {
-        let food = state.food(item.foodId)
-        let m = food?.perServing.scaled(item.quantity) ?? .zero
-        return HStack(spacing: 10) {
-            FoodIcon(category: food?.category ?? .other, size: 30)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(food?.name ?? "Unknown").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                Text("\(Fmt.trimKg(item.quantity)) × \(food?.servingLabel ?? "") · \(Int(m.calories)) kcal")
+    private func libRow(_ f: Food) -> some View {
+        HStack(spacing: 11) {
+            FoodIcon(category: f.category, size: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(f.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Text("\(f.servingLabel) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
                     .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
             }
-            Spacer()
-            HStack(spacing: 4) {
-                qtyBtn("minus") { state.setMealItemQty(date: key, meal: meal, itemId: item.id, quantity: item.quantity - 0.5) }
-                Text(Fmt.trimKg(item.quantity)).font(.system(size: 12, weight: .bold)).monospacedDigit()
-                    .foregroundStyle(Palette.text).frame(minWidth: 26)
-                qtyBtn("plus") { state.setMealItemQty(date: key, meal: meal, itemId: item.id, quantity: item.quantity + 0.5) }
-            }
-            Button { state.removeMealItem(date: key, meal: meal, itemId: item.id) } label: {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-            }
-            .buttonStyle(KIconButtonStyle(size: 22))
+            Spacer(minLength: 6)
+            if !f.isDefault { Text("CUSTOM").font(.system(size: 8, weight: .heavy)).foregroundStyle(Palette.brand) }
         }
-    }
-
-    private func qtyBtn(_ icon: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon).font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.text)
-                .frame(width: 24, height: 22)
-                .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
-        }
-        .buttonStyle(KPressStyle(scale: 0.9))
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture { editingFood = f }
     }
 }
 
@@ -284,6 +200,7 @@ struct FoodEditor: View {
     @Environment(\.dismiss) private var dismiss
     let food: Food?
     @State private var draft: Food
+    @State private var showDelete = false
 
     init(food: Food?) {
         self.food = food
@@ -324,8 +241,12 @@ struct FoodEditor: View {
             }
             HStack {
                 if let food, !food.isDefault {
-                    Button("Delete", role: .destructive) { state.deleteFood(food.id); dismiss() }
+                    Button("Delete") { showDelete = true }
                         .buttonStyle(KGhostButtonStyle(color: Palette.red))
+                        .holdToDelete(isPresented: $showDelete, title: "Delete \(food.name)?",
+                                      message: "Removes it from your food library.") {
+                            state.deleteFood(food.id); dismiss()
+                        }
                 }
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
@@ -350,80 +271,6 @@ struct FoodEditor: View {
         KLabeledNumberField(label: label, placeholder: "0", decimals: 1,
                             value: Binding(get: { draft.perServing[keyPath: kp] },
                                            set: { draft.perServing[keyPath: kp] = $0 ?? 0 }))
-    }
-}
-
-// MARK: - Weekly meal plan
-
-struct MealPlanSheet: View {
-    @EnvironmentObject var state: AppState
-    @Environment(\.dismiss) private var dismiss
-    @State private var weekday: String = ""
-    @State private var addingTo: MealKey?
-
-    private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Weekly meal plan").font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 28))
-            }
-            .padding(16)
-            Segmented(options: (0..<7).map { (String($0), dayNames[$0]) }, selection: $weekday)
-                .padding(.horizontal, 16)
-            Divider().overlay(Palette.border).padding(.top, 12)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(MealKey.allCases, id: \.self) { meal in mealSection(meal) }
-                }
-                .padding(16)
-            }
-            .frame(maxHeight: 460)
-        }
-        #if os(macOS)
-        .frame(width: 520)
-        #else
-        .frame(maxWidth: .infinity)
-        #endif
-        .background(Palette.elevated)
-        .onAppear { if weekday.isEmpty { weekday = state.todayWeekday } }
-        .sheet(item: $addingTo) { meal in
-            FoodPickerSheet(meal: meal, add: { food, qty in
-                state.addFoodToPlan(weekday: weekday, meal: meal, foodId: food.id, quantity: qty)
-            }, newCustom: {})
-        }
-    }
-
-    private func mealSection(_ meal: MealKey) -> some View {
-        let items = state.planItems(weekday, meal)
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(meal.label, systemImage: meal.icon)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                Spacer()
-                Button { addingTo = meal } label: { Image(systemName: "plus").font(.system(size: 12, weight: .bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 24))
-            }
-            if items.isEmpty {
-                Text("No foods planned.").font(.system(size: 12)).foregroundStyle(Palette.faint)
-            }
-            ForEach(items) { item in
-                HStack(spacing: 10) {
-                    FoodIcon(category: state.food(item.foodId)?.category ?? .other, size: 26)
-                    Text("\(Fmt.trimKg(item.quantity)) × \(state.food(item.foodId)?.name ?? "?")")
-                        .font(.system(size: 12)).foregroundStyle(Palette.text)
-                    Spacer()
-                    Button { state.removePlanItem(weekday: weekday, meal: meal, itemId: item.id) } label: {
-                        Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
-                    }
-                    .buttonStyle(KIconButtonStyle(size: 20))
-                }
-            }
-            Divider().overlay(Palette.border)
-        }
     }
 }
 
@@ -536,16 +383,18 @@ struct FoodScanReviewSheet: View {
                 Text("\(included.count) selected").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.muted)
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
-                Button("Add & log \(included.count)") {
-                    for d in included {
-                        let saved = state.addFood(d.food)
-                        state.addFoodToMeal(date: logDate, meal: d.meal, foodId: saved.id, quantity: d.quantity)
+                if included.isEmpty {
+                    Text("Select at least one.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                } else {
+                    SlideToConfirm(label: "Add & log \(included.count)", tint: Palette.brand) {
+                        for d in included {
+                            let saved = state.addFood(d.food)
+                            state.addFoodToMeal(date: logDate, meal: d.meal, foodId: saved.id, quantity: d.quantity)
+                        }
+                        dismiss()
                     }
-                    dismiss()
+                    .frame(width: 240)
                 }
-                .buttonStyle(KPrimaryButtonStyle())
-                .disabled(included.isEmpty)
-                .opacity(included.isEmpty ? 0.5 : 1)
             }
             .padding(20)
         }

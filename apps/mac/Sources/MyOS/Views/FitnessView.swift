@@ -9,12 +9,12 @@ struct FitnessView: View {
     private var fp: FitnessProfile { state.fitnessProfile }
 
     enum FitSub: String, CaseIterable, Hashable {
-        case today, food, workout, body
+        case today, plan, library, body
         var label: String {
             switch self {
             case .today: return "Today"
-            case .food: return "Food"
-            case .workout: return "Workout"
+            case .plan: return "Plan"
+            case .library: return "Library"
             case .body: return "Body"
             }
         }
@@ -32,8 +32,8 @@ struct FitnessView: View {
             Group {
                 switch sub {
                 case .today:   todayContent
-                case .food:    FoodView()
-                case .workout: WorkoutView()
+                case .plan:    WeeklyPlannerView()
+                case .library: FitnessLibraryView()
                 case .body:    BodyView()
                 }
             }
@@ -213,12 +213,7 @@ struct FitnessView: View {
         let vits = state.vitaminsCovered(state.todayKey)
         return Card {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    SectionTitle(text: "Today's nutrition")
-                    Spacer()
-                    Button { sub = .food } label: { Label("Log food", systemImage: "fork.knife") }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.brand))
-                }
+                SectionTitle(text: "Today's nutrition")
                 LazyVGrid(columns: cols, spacing: 12) {
                     macroStat("Calories", eaten.calories, t.map { Double($0.goalCalories) }, "kcal", Palette.amber)
                     macroStat("Protein", eaten.protein, t.map { Double($0.proteinG) }, "g", Palette.green)

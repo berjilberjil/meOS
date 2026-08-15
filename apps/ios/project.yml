@@ -39,6 +39,8 @@ targets:
         buildPhase: resources
       - path: ../mac/Sources/MyOS/Views/FitnessView.swift
       - path: ../mac/Sources/MyOS/Views/FitnessTodayView.swift
+      - path: ../mac/Sources/MyOS/Views/WeeklyPlannerView.swift
+      - path: ../mac/Sources/MyOS/Views/FitnessLibraryView.swift
       - path: ../mac/Sources/MyOS/Views/FoodView.swift
       - path: ../mac/Sources/MyOS/Views/WorkoutView.swift
       - path: ../mac/Sources/MyOS/Views/GIFView.swift

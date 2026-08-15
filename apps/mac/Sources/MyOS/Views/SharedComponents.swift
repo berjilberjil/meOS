@@ -262,6 +262,66 @@ struct SlideToConfirm: View {
     }
 }
 
+// MARK: - Copy a plan day to other days
+
+/// A "copy this day →" menu for the weekly planner: quick per-day items, "all
+/// other days", and a multi-select picker. Unifies the meal + workout copy-day.
+struct CopyDayMenu: View {
+    let weekday: String
+    let dayNames: [String]
+    var disabled: Bool = false
+    let copy: ([String]) -> Void
+    @State private var picking = false
+
+    var body: some View {
+        Menu {
+            ForEach(0..<7, id: \.self) { d in
+                if String(d) != weekday { Button("Copy to \(dayNames[d])") { copy([String(d)]) } }
+            }
+            Divider()
+            Button("Pick days…") { picking = true }
+            Button("Copy to all other days") { copy(WeekdayKeys.others(except: weekday)) }
+        } label: {
+            Label("Copy day", systemImage: "doc.on.doc").font(.system(size: 13, weight: .semibold))
+        }
+        .menuStyle(.borderlessButton)
+        .disabled(disabled)
+        .popover(isPresented: $picking, arrowEdge: .top) {
+            CopyDayPickerSheet(weekday: weekday, dayNames: dayNames, copy: copy)
+        }
+    }
+}
+
+/// Multi-select "copy to specific days" — a commit that overwrites the target
+/// days, so it's a slide-to-confirm rather than a plain tap.
+struct CopyDayPickerSheet: View {
+    let weekday: String
+    let dayNames: [String]
+    let copy: ([String]) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var picked: Set<String> = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Copy \(dayNames[Int(weekday) ?? 0]) to…")
+                .font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+            ForEach(WeekdayKeys.others(except: weekday), id: \.self) { d in
+                Toggle(dayNames[Int(d) ?? 0], isOn: Binding(
+                    get: { picked.contains(d) },
+                    set: { if $0 { picked.insert(d) } else { picked.remove(d) } }))
+                    .toggleStyle(.switch).tint(Palette.brand)
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.text)
+            }
+            SlideToConfirm(label: "Slide to copy", tint: Palette.brand) { copy(Array(picked)); dismiss() }
+                .opacity(picked.isEmpty ? 0.4 : 1)
+                .allowsHitTesting(!picked.isEmpty)
+        }
+        .padding(18)
+        .frame(width: 250)
+        .background(Palette.elevated)
+    }
+}
+
 // MARK: - Reusable labelled fields (shared by Settings + editors)
 
 /// Small uppercase field caption.
