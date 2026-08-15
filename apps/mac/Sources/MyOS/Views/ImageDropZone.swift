@@ -7,11 +7,11 @@ import UIKit
 import PhotosUI
 #endif
 
-/// A drop / paste / choose target for screenshots. Normalises everything to PNG
-/// base64 and hands it back via `onImages`. Reused by the Money capture card, the
-/// Portfolio tracker, and the Food scanner — the one place image input lives in
-/// MyOS. macOS supports drag-drop + paste + a file picker; iOS supports the
-/// camera (the whole point of scanning a food label on your phone) plus the
+/// A drop / paste / choose target for screenshots. Downscales + JPEG-encodes
+/// everything to base64 (small enough for the serverless upload limit) and hands
+/// it back via `onImages`. The one place image input lives in MyOS — used by the
+/// Food scanner. macOS supports drag-drop + paste + a file picker; iOS supports
+/// the camera (the whole point of scanning a food label on your phone) plus the
 /// photo library.
 struct ImageDropZone: View {
     var title: String
@@ -127,8 +127,33 @@ private struct MacImageDropZone: View {
     }
 
     private func emit(_ data: [Data]) {
-        guard !data.isEmpty else { return }
-        onImages(data.map { $0.base64EncodedString() }, "image/png")
+        // Downscale + JPEG-encode so the upload stays well under the serverless
+        // request-body limit: a full-res image as PNG base64 blows past it, and
+        // the backend then reads the truncated body as empty → a 400.
+        let jpegs = data.compactMap { Self.downscaledJPEG(fromImageData: $0) }
+        guard !jpegs.isEmpty else { return }
+        onImages(jpegs.map { $0.base64EncodedString() }, "image/jpeg")
+    }
+
+    static func downscaledJPEG(fromImageData data: Data, maxDimension: CGFloat = 1280,
+                               quality: CGFloat = 0.65) -> Data? {
+        guard let img = NSImage(data: data) else { return nil }
+        return downscaledJPEG(img, maxDimension: maxDimension, quality: quality)
+    }
+
+    static func downscaledJPEG(_ image: NSImage, maxDimension: CGFloat = 1280,
+                               quality: CGFloat = 0.65) -> Data? {
+        guard let tiff = image.tiffRepresentation, let src = NSBitmapImageRep(data: tiff) else { return nil }
+        let w = CGFloat(src.pixelsWide), h = CGFloat(src.pixelsHigh)
+        let scale = min(1, maxDimension / max(w, h))
+        let tw = max(1, Int(w * scale)), th = max(1, Int(h * scale))
+        let target = NSImage(size: NSSize(width: tw, height: th))
+        target.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        src.draw(in: NSRect(x: 0, y: 0, width: tw, height: th))
+        target.unlockFocus()
+        guard let outTiff = target.tiffRepresentation, let outRep = NSBitmapImageRep(data: outTiff) else { return nil }
+        return outRep.representation(using: .jpeg, properties: [.compressionFactor: quality])
     }
 
     // MARK: - Provider → PNG data
@@ -262,8 +287,12 @@ private struct IOSImageDropZone: View {
     }
 
     private func emit(_ data: [Data]) {
-        guard !data.isEmpty else { return }
-        onImages(data.map { $0.base64EncodedString() }, "image/png")
+        // Downscale + JPEG-encode so the upload stays well under the serverless
+        // request-body limit — a full-res camera photo as PNG base64 is far too
+        // large, and the backend reads the truncated body as empty → a 400.
+        let jpegs = data.compactMap { Self.downscaledJPEG(fromImageData: $0) }
+        guard !jpegs.isEmpty else { return }
+        onImages(jpegs.map { $0.base64EncodedString() }, "image/jpeg")
     }
 
     static func normalizedPNG(_ data: Data) -> Data? {
@@ -271,6 +300,26 @@ private struct IOSImageDropZone: View {
         return pngData(img)
     }
     static func pngData(_ image: UIImage) -> Data? { image.pngData() }
+
+    static func downscaledJPEG(fromImageData data: Data, maxDimension: CGFloat = 1280,
+                               quality: CGFloat = 0.65) -> Data? {
+        guard let img = UIImage(data: data) else { return nil }
+        return downscaledJPEG(img, maxDimension: maxDimension, quality: quality)
+    }
+
+    static func downscaledJPEG(_ image: UIImage, maxDimension: CGFloat = 1280,
+                               quality: CGFloat = 0.65) -> Data? {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return nil }
+        let scale = min(1, maxDimension / max(size.width, size.height))
+        let target = CGSize(width: size.width * scale, height: size.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let scaled = UIGraphicsImageRenderer(size: target, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: target))
+        }
+        return scaled.jpegData(compressionQuality: quality)
+    }
 }
 
 /// Thin UIImagePickerController wrapper — SwiftUI has no native camera capture view.
