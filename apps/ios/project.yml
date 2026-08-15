@@ -38,6 +38,7 @@ targets:
       - path: /Users/berjilskcript/Library/Application Support/MyOS/fold.json
         buildPhase: resources
       - path: ../mac/Sources/MyOS/Views/FitnessView.swift
+      - path: ../mac/Sources/MyOS/Views/FitnessTodayView.swift
       - path: ../mac/Sources/MyOS/Views/FoodView.swift
       - path: ../mac/Sources/MyOS/Views/WorkoutView.swift
       - path: ../mac/Sources/MyOS/Views/GIFView.swift

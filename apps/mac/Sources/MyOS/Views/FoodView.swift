@@ -47,7 +47,7 @@ struct FoodView: View {
             }
         }
         .sheet(item: $scanPayload) { payload in
-            FoodScanReviewSheet(summary: payload.summary, foods: payload.foods, logDate: key)
+            FoodScanReviewSheet(summary: payload.summary, foods: payload.foods, logDate: key, defaultMeal: payload.defaultMeal)
         }
     }
 
@@ -434,6 +434,7 @@ struct FoodScanPayload: Identifiable {
     let id = UUID()
     let summary: String
     let foods: [Food]
+    var defaultMeal: MealKey = .snacks
 }
 
 /// Drop/paste a photo of a packaged food's label (or a menu item) and let AI read
@@ -487,12 +488,14 @@ struct FoodScanReviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     let summary: String
     let logDate: String
+    let defaultMeal: MealKey
     @State private var drafts: [DraftScanFood]
 
-    init(summary: String, foods: [Food], logDate: String) {
+    init(summary: String, foods: [Food], logDate: String, defaultMeal: MealKey = .snacks) {
         self.summary = summary
         self.logDate = logDate
-        _drafts = State(initialValue: foods.map { DraftScanFood(food: $0) })
+        self.defaultMeal = defaultMeal
+        _drafts = State(initialValue: foods.map { DraftScanFood(food: $0, meal: defaultMeal) })
     }
 
     private var included: [DraftScanFood] { drafts.filter { $0.include } }
