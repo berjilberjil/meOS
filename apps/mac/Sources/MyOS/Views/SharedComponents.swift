@@ -189,6 +189,79 @@ extension View {
     }
 }
 
+// MARK: - Slide to confirm (commit actions)
+
+/// Pure drag→threshold logic for a slide-to-confirm control, split from the
+/// view so it is unit-testable without SwiftUI.
+struct SlideConfirmState {
+    var threshold: CGFloat = 0.85
+    private(set) var progress: CGFloat = 0
+    private(set) var confirmed = false
+
+    /// Update progress from the current drag translation and available travel.
+    mutating func drag(translationX: CGFloat, width: CGFloat) {
+        guard !confirmed else { return }
+        progress = min(1, max(0, translationX / max(width, 1)))
+    }
+
+    /// End the drag. Returns `true` exactly once — when released at/after the
+    /// threshold. Below threshold it snaps progress back to 0.
+    mutating func end() -> Bool {
+        guard !confirmed else { progress = 1; return false }
+        if progress >= threshold { confirmed = true; progress = 1; return true }
+        progress = 0
+        return false
+    }
+
+    mutating func reset() { progress = 0; confirmed = false }
+}
+
+/// A drag-to-commit control: drag the thumb to the end to fire `action`; snaps
+/// back if released early; fires a success haptic on commit. The commit-side
+/// counterpart to `HoldToConfirmButton` (which is destructive hold-to-delete).
+struct SlideToConfirm: View {
+    var label: String = "Slide to confirm"
+    var tint: Color = Palette.brand
+    let action: () -> Void
+
+    @State private var state = SlideConfirmState()
+    private let thumb: CGFloat = 44
+
+    var body: some View {
+        GeometryReader { geo in
+            let travel = max(1, geo.size.width - thumb)
+            ZStack(alignment: .leading) {
+                Capsule().fill(tint.opacity(0.16))
+                Text(state.confirmed ? "Confirmed" : label)
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(tint)
+                    .frame(maxWidth: .infinity)
+                Capsule().fill(tint)
+                    .frame(width: thumb + state.progress * travel)
+                Image(systemName: state.confirmed ? "checkmark" : "arrow.right")
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundStyle(Palette.bg)
+                    .frame(width: thumb, height: thumb)
+                    .offset(x: state.progress * travel)
+            }
+            .contentShape(Capsule())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { v in
+                        withAnimation(.knFast) { state.drag(translationX: v.translation.width, width: travel) }
+                    }
+                    .onEnded { _ in
+                        let fired = state.end()
+                        if fired { Haptics.success(); action() }
+                        else { withAnimation(.knFast) { } }
+                    }
+            )
+            .onHover { h in cursor(h) }
+        }
+        .frame(height: thumb)
+    }
+}
+
 // MARK: - Reusable labelled fields (shared by Settings + editors)
 
 /// Small uppercase field caption.
