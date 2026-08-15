@@ -29,6 +29,36 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Siri never transcribes the spoken app name as the literal "MyOS" — it hears
+	     "my OS" / "my iOS" / "mios". Every App Shortcut phrase embeds the
+	     ${applicationName} token, so without these the token never matches and Siri
+	     falls through to a web search. These register the spoken forms that token
+	     should also accept. -->
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>My OS</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>my oh ess</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>My iOS</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>my eye oh ess</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Mios</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>mee ohs</string>
+		</dict>
+	</array>
+	<!-- iOS rejects the install outright above three entries (MIInstallerErrorDomain
+	     132), so these three are the whole budget: the two most likely mis-hearings
+	     plus the run-together one. -->
+
 	<key>NSFaceIDUsageDescription</key>
 	<string>MyOS uses Face ID to unlock your life data.</string>
 	<key>NSCameraUsageDescription</key>
