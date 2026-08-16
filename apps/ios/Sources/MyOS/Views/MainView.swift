@@ -1,93 +1,121 @@
 import SwiftUI
 
-/// The iOS shell — a bottom tab bar (the natural mobile pattern), replacing the
-/// mac app's persistent sidebar. Every tab reuses the exact same content views
-/// and the exact same AppState/APIClient as the mac app; only the container
-/// around them is iOS-native.
-///
-/// Each content view (FoldView, FitnessView, JournalView…) already draws its
-/// own big title as its first element — so the nav bar stays hidden here rather
-/// than showing the screen name a second time.
+/// The iOS shell — custom dock with Scan raised in the center.
 struct MainView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var themeStore = ThemeStore.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab: NavTab = NavTab.resolveLaunch(PrefsStore.shared.launchTab.rawValue, allowed: NavTab.iosTabs)
+    @State private var notesTaps = 0
+    @State private var lastNotesTap = Date.distantPast
+    @State private var foldTaps = 0
+    @State private var lastFoldTap = Date.distantPast
     @State private var showSettings = false
-    @State private var lastJournalTap = Date.distantPast
 
     var body: some View {
         ZStack {
-            TabView(selection: tabBinding) {
-                page(.today) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Spacer()
-                            Button { showSettings = true } label: {
-                                Image(systemName: "gearshape.fill")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(Palette.muted)
-                                    .frame(width: 34, height: 34)
-                                    .background(Palette.surface, in: Circle())
-                            }
-                        }
-                        QuickLogBar()
-                        TodayView(go: { tab = $0 })
-                    }
-                }
-                page(.fold) { FoldView() }
-                page(.fitness) { FitnessView() }
-                page(.journal) { JournalView() }
-                page(.notes) { NotesView() }
-            }
-            .tint(Palette.brand)
+            Palette.bg.ignoresSafeArea()
 
-            // The floating mentor — same widget as mac, pinned above the tab bar.
-            VStack {
+            NavigationStack {
+                ScrollView {
+                    content
+                        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 108)
+                }
+                .background(Palette.bg.ignoresSafeArea())
+                .toolbar(.hidden, for: .navigationBar)
+            }
+            .id(tab)
+
+            VStack(spacing: 0) {
                 Spacer()
                 HStack {
                     Spacer()
-                    ChatWidget().padding(.trailing, 16).padding(.bottom, 78)
+                    ChatWidget().padding(.trailing, 16).padding(.bottom, 8)
                 }
+                IOSTabBar(
+                    tab: Binding(get: { tab }, set: { select($0) }),
+                    onScan: {
+                        UISignals.shared.openScanCamera = true
+                        select(.scan)
+                    },
+                    onSettings: { showSettings = true },
+                    onNotesTap: { tapNotes() },
+                    onFoldTap: { tapFold() }
+                )
             }
         }
-        .background(Palette.bg.ignoresSafeArea())
+        .animation(.knTheme, value: themeStore.theme.id)
+        .preferredColorScheme(themeStore.theme.colorScheme)
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .onChange(of: tab) { _, _ in Haptics.selection() }
-    }
-
-    /// Tab selection with a double-tap detector on the Journal tab: two quick
-    /// taps ask the Events screen to open a new event (see UISignals).
-    private var tabBinding: Binding<NavTab> {
-        Binding(
-            get: { tab },
-            set: { newValue in
-                if newValue == .journal {
-                    let now = Date()
-                    if now.timeIntervalSince(lastJournalTap) < 0.4 {
-                        UISignals.shared.pendingNewEvent = true
-                    }
-                    lastJournalTap = now
-                }
-                tab = newValue
-            }
-        )
-    }
-
-    /// One tab: scrollable content, re-keyed so cards replay their entrance
-    /// animation each time you switch in. No nav bar — content owns its title.
-    private func page<Content: View>(_ t: NavTab, @ViewBuilder content: @escaping () -> Content) -> some View {
-        NavigationStack {
-            ScrollView {
-                content()
-                    // Extra bottom clearance so the last row (e.g. the Fitness tab's
-                    // "Weekly meal plan / Scan food photo / New food" row) isn't
-                    // covered by the floating chat FAB + tab bar.
-                    .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 96)
-            }
-            .background(Palette.bg.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
+        .task {
+            await FavoritesBodyImporter.sync()
+            await HealthSteps.syncToday(into: state)
         }
-        .id(t)
-        .tabItem { Label(t.title, systemImage: t.icon) }
-        .tag(t)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task {
+                    await state.pullRemote()
+                    await FavoritesBodyImporter.sync()
+                    await HealthSteps.syncToday(into: state)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch tab {
+        case .today:   TodayView(go: { select($0) })
+        case .fold:    FoldView()
+        case .stuff:   BelongingsView()
+        case .scan:    ScanView()
+        case .fitness: FitnessView()
+        case .notes:   NotesView()
+        case .journal: JournalView()
+        case .events:  EventsView()
+        default:       TodayView(go: { select($0) })
+        }
+    }
+
+    private func select(_ newValue: NavTab) {
+        if newValue != tab { Haptics.selection() }
+        tab = newValue
+    }
+
+    /// 1 tap → Notes. 2 → new note. 3 → Journal. 5 → hidden notes (Face ID).
+    private func tapNotes() {
+        let now = Date()
+        if now.timeIntervalSince(lastNotesTap) < 0.55 { notesTaps += 1 } else { notesTaps = 1 }
+        lastNotesTap = now
+        select(.notes)
+        Task { @MainActor in
+            let count = notesTaps
+            try? await Task.sleep(nanoseconds: 550_000_000)
+            guard notesTaps == count else { return }
+            notesTaps = 0
+            if count >= 5 {
+                Haptics.success()
+                UISignals.shared.revealHiddenNotes = true
+            } else if count >= 3 {
+                Haptics.success()
+                select(.journal)
+            } else if count == 2 {
+                state.requestNewNote()
+            }
+        }
+    }
+
+    /// 1 tap → Fold. 2 taps → Stuff (what you own + daily cost).
+    private func tapFold() {
+        let now = Date()
+        if now.timeIntervalSince(lastFoldTap) < 0.45 { foldTaps += 1 } else { foldTaps = 1 }
+        lastFoldTap = now
+        if foldTaps >= 2 {
+            foldTaps = 0
+            Haptics.success()
+            select(.stuff)
+            return
+        }
+        select(.fold)
     }
 }

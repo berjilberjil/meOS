@@ -1,44 +1,64 @@
 import SwiftUI
 
-/// Theme picker for Settings — swatch + name per theme, tap to switch. Shared by the
-/// mac and iOS Settings screens.
+/// Theme picker — two live previews, tap to switch. Shared by mac and iOS.
+/// Selection is a critically damped color settle (see `Animation.knTheme`), not
+/// a view remount, so Dark ↔ Light interpolates from the on-screen colors.
 struct AppearanceCard: View {
+    var boxed = true
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionTitle(text: "Appearance")
-                ForEach(AppTheme.all) { theme in row(theme) }
+        let inner = VStack(alignment: .leading, spacing: 16) {
+            if boxed { SectionTitle(text: "Appearance") }
+            else {
+                Text("Dark or light. Changes everywhere, instantly.")
+                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
+            }
+            HStack(spacing: 12) {
+                ForEach(AppTheme.all) { preview($0) }
             }
         }
+        Card { inner }
     }
 
-    private func row(_ theme: AppTheme) -> some View {
+    private func preview(_ theme: AppTheme) -> some View {
         let on = themeStore.theme.id == theme.id
         return Button { state.setTheme(theme) } label: {
-            HStack(spacing: 12) {
-                HStack(spacing: -7) {
-                    swatch(theme.bg)
-                    swatch(theme.surface2)
-                    swatch(theme.brand)
+            VStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(theme.bg)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Capsule().fill(theme.brand).frame(width: 28, height: 5)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(theme.surface)
+                            .frame(height: 22)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(theme.surface2)
+                            .frame(height: 14)
+                    }
+                    .padding(10)
                 }
-                Text(theme.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
-                Spacer()
-                Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 16))
-                    .foregroundStyle(on ? Palette.brand : Palette.faint)
+                .frame(height: boxed ? 96 : 140)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(on ? theme.brand : theme.border, lineWidth: on ? 2.5 : 1)
+                )
+                HStack(spacing: 5) {
+                    Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(on ? theme.brand : Palette.faint)
+                    Text(theme.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Palette.text)
+                }
             }
-            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(KPressStyle())
+        .accessibilityAddTraits(on ? .isSelected : [])
         .onHover { h in cursor(h) }
-    }
-
-    private func swatch(_ c: Color) -> some View {
-        Circle().fill(c).frame(width: 22, height: 22)
-            .overlay(Circle().strokeBorder(Palette.border, lineWidth: 1.5))
     }
 }

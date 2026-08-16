@@ -338,18 +338,41 @@ struct SuggestResult: Codable, Hashable {
 
 // MARK: - Day spine  (key: myos.days — [date: DayPlan])
 
+/// One Today to-do. Older clients stored these as plain strings in `focus`.
+struct FocusItem: Codable, Identifiable, Hashable {
+    var id: String
+    var text: String
+    var done: Bool
+
+    init(id: String = UUID().uuidString.lowercased(), text: String, done: Bool = false) {
+        self.id = id; self.text = text; self.done = done
+    }
+}
+
 struct DayPlan: Codable, Hashable {
-    var focus: [String] = []            // 1–3 priorities for the day
+    var todos: [FocusItem] = []
     var habits: [String: Bool] = [:]    // habit name → done
 
     init() {}
 
-    enum CodingKeys: String, CodingKey { case focus, habits }
+    enum CodingKeys: String, CodingKey { case focus, todos, habits }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        focus  = try c.decodeIfPresent([String].self, forKey: .focus) ?? []
         habits = try c.decodeIfPresent([String: Bool].self, forKey: .habits) ?? [:]
+        if let items = try c.decodeIfPresent([FocusItem].self, forKey: .todos), !items.isEmpty {
+            todos = items
+        } else {
+            let legacy = try c.decodeIfPresent([String].self, forKey: .focus) ?? []
+            todos = legacy.map { FocusItem(text: $0) }
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(todos, forKey: .todos)
+        try c.encode(todos.map(\.text), forKey: .focus)
+        try c.encode(habits, forKey: .habits)
     }
 }
 
@@ -683,6 +706,8 @@ struct AppStatePayload: Codable {
     var events: [EventItem]?
     var eventTags: [EventTag]?
     var watch: [WatchItem]?
+    var belongings: BelongingsState?
+    var fold: FoldData?
 
     init() {}
 
@@ -700,6 +725,8 @@ struct AppStatePayload: Codable {
         case events         = "myos.events"
         case eventTags      = "myos.eventTags"
         case watch          = "myos.watch"
+        case belongings     = "myos.belongings"
+        case fold           = "myos.fold"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -720,6 +747,8 @@ struct AppStatePayload: Codable {
         events         = try? c.decodeIfPresent([EventItem].self, forKey: .events)
         eventTags      = try? c.decodeIfPresent([EventTag].self, forKey: .eventTags)
         watch          = try? c.decodeIfPresent([WatchItem].self, forKey: .watch)
+        belongings     = try? c.decodeIfPresent(BelongingsState.self, forKey: .belongings)
+        fold           = try? c.decodeIfPresent(FoldData.self, forKey: .fold)
     }
 }
 
@@ -755,7 +784,13 @@ struct ParseResult: Codable {
 
 struct ImageParseResult: Codable {
     let summary: String
+    let kind: String?
     let foods: [FoodItem]?
+    let object: Obj?
+    let name: String?
+    let category: String?
+    let priceInr: Double?
+    let lifeMonths: Int?
 
     struct FoodItem: Codable {
         let name: String
@@ -767,6 +802,12 @@ struct ImageParseResult: Codable {
         let fiber: Double
         let fats: Double
         let vitamins: String?
+    }
+    struct Obj: Codable {
+        let name: String
+        let needed: String
+        let why: String
+        let useful: String
     }
 }
 
@@ -785,4 +826,6 @@ enum StateKey {
     static let events         = "myos.events"
     static let eventTags      = "myos.eventTags"
     static let watch          = "myos.watch"
+    static let belongings     = "myos.belongings"
+    static let fold           = "myos.fold"
 }

@@ -29,12 +29,55 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Siri's voice trigger for this app. Every App Shortcut phrase embeds the
+	     ${applicationName} token, so the token has to be something Siri actually
+	     transcribes.
+
+	     "MyOS" is not. Spoken aloud it is a homophone of "iOS" — one of the
+	     strongest tokens in Apple's speech model — and Siri reliably transcribes it
+	     that way, then web-searches. Sound-alike alternatives ("My OS", "Mios") all
+	     collapsed into "iOS" too, so they were removed rather than kept as noise.
+
+	     "Catherine" is a proper name: phonetically distant from anything Apple
+	     reserves, and Siri nails it. Both spellings are registered because matching
+	     runs on Siri's transcribed text, and it may spell it either way.
+
+	     Hard cap of three — iOS refuses to install the app above that
+	     (MIInstallerErrorDomain 132). -->
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Catherine</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>kath rin</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Katherine</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>kath rin</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Life OS</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>life oh ess</string>
+		</dict>
+	</array>
+
 	<key>NSFaceIDUsageDescription</key>
 	<string>MyOS uses Face ID to unlock your life data.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>MyOS uses your camera to scan receipts, food labels, and portfolio screens straight into your data.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MyOS reads a photo you pick so AI can turn it into transactions, food, or holdings.</string>
+	<string>MyOS reads photos you pick and the ones you heart in Favorites so today’s body shot lands in Fitness automatically.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>MyOS saves a progress photo to your library when you tap Save.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>MyOS reads today’s step count from Apple Health so Fitness stays in sync without typing.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>MyOS reads today’s steps from your iPhone so the Fitness tab stays current.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<!-- Dev convenience: reach the localhost backend + your future HTTPS domain.

@@ -27,4 +27,23 @@ final class PrefsTests: XCTestCase {
         // events is a valid tab but not available on the iOS bottom bar
         XCTAssertEqual(NavTab.resolveLaunch("events", allowed: NavTab.iosTabs), .today)
     }
+
+    // MARK: - Appearance
+
+    func testSettingsOffersOnlyLightAndDark() {
+        XCTAssertEqual(AppTheme.all.map(\.name), ["Dark", "Light"])
+        XCTAssertEqual(AppTheme.all.count, 2)
+    }
+
+    func testLegacyMidnightMapsToDark() {
+        XCTAssertEqual(AppTheme.by(id: "midnight").id, "foldDark")
+        XCTAssertEqual(AppTheme.by(id: "foldDark").name, "Dark")
+        XCTAssertEqual(AppTheme.by(id: "light").name, "Light")
+    }
+
+    func testThemeColorSchemeMatchesAppearance() {
+        XCTAssertEqual(AppTheme.foldDark.colorScheme, .dark)
+        XCTAssertEqual(AppTheme.light.colorScheme, .light)
+        XCTAssertEqual(AppTheme.by(id: "midnight").colorScheme, .dark)
+    }
 }

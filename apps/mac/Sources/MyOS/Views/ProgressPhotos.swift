@@ -2,34 +2,9 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-// Progress photos — stored locally on disk (Application Support/MyOS/progress/),
-// one JPEG per day, NOT synced to the server (images would bloat the KV store).
-// Lets the user see how their body changes over time.
+// Mac progress-photo card. Storage lives in ProgressPhotoStore (shared with iOS).
 
-struct ProgressPhoto: Identifiable, Hashable {
-    let date: String   // yyyy-MM-dd
-    let url: URL
-    var id: String { date }
-}
-
-enum ProgressPhotoStore {
-    static let dir: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        let d = base.appendingPathComponent("MyOS/progress", isDirectory: true)
-        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
-        return d
-    }()
-
-    static func url(for date: String) -> URL { dir.appendingPathComponent("\(date).jpg") }
-
-    static func list() -> [ProgressPhoto] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        return files.filter { $0.pathExtension.lowercased() == "jpg" }
-            .map { ProgressPhoto(date: $0.deletingPathExtension().lastPathComponent, url: $0) }
-            .sorted { $0.date > $1.date }
-    }
-
+extension ProgressPhotoStore {
     /// Save an image (from a file url) as the given day's JPEG.
     @discardableResult
     static func save(from source: URL, date: String) -> Bool {
@@ -38,10 +13,8 @@ enum ProgressPhotoStore {
               let rep = NSBitmapImageRep(data: tiff),
               let jpeg = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
         else { return false }
-        do { try jpeg.write(to: url(for: date), options: .atomic); return true } catch { return false }
+        return save(jpeg: jpeg, date: date)
     }
-
-    static func delete(_ date: String) { try? FileManager.default.removeItem(at: url(for: date)) }
 }
 
 /// A card of progress photos with an add button and a viewer.
@@ -105,16 +78,17 @@ struct ProgressPhotosCard: View {
             HStack {
                 Text(Fmt.day(p.date)).font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
                 Spacer()
-                Button { ProgressPhotoStore.delete(p.date); viewing = nil; reload() } label: {
-                    Image(systemName: "trash").font(.system(size: 13))
-                }
-                .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
                 Button { viewing = nil } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
                     .buttonStyle(KIconButtonStyle(size: 30))
             }
             DiskImage(url: p.url)
                 .frame(maxWidth: 420, maxHeight: 560)
                 .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            HoldToConfirmButton(label: "Hold to delete") {
+                ProgressPhotoStore.delete(p)
+                viewing = nil
+                reload()
+            }
         }
         .padding(20).frame(width: 480)
         .background(Palette.elevated)

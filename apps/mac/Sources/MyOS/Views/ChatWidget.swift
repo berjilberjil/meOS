@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#else
+import AppKit
+#endif
 
 /// The floating mentor. A round launcher bottom-right on every screen; tap to open a
 /// chat panel that talks with full context of your data. Supports multiple
@@ -7,9 +12,12 @@ import SwiftUI
 struct ChatWidget: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var agent = AgentConfig.shared
+    @ObservedObject private var themeStore = ThemeStore.shared
     @State private var open = false
     @State private var showHistory = false
     @State private var draft = ""
+    @State private var confirmClearChat = false
+    @State private var pendingHistoryDelete: String?
     @FocusState private var inputFocused: Bool
 
     var body: some View { content }
@@ -38,8 +46,10 @@ struct ChatWidget: View {
             .onChange(of: state.pendingChatPrompt) { _, p in handlePending(p) }
             .fullScreenCover(isPresented: $open) {
                 panelBody
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Palette.bg.ignoresSafeArea())
+                    .preferredColorScheme(themeStore.theme.colorScheme)
+                    .animation(.knTheme, value: themeStore.theme.id)
             }
     }
     #endif
@@ -54,14 +64,18 @@ struct ChatWidget: View {
     // MARK: - Launcher
 
     private var launcher: some View {
-        Button { open = true; showHistory = false; inputFocused = true } label: {
+        Button {
+            open = true
+            showHistory = false
+            inputFocused = true
+            Task { await state.fetchSuggestions() }
+        } label: {
             ZStack {
-                Circle().fill(LinearGradient(colors: [Palette.brand, Palette.brandDeep],
-                                             startPoint: .top, endPoint: .bottom))
-                Image(systemName: "sparkles").font(.system(size: 22, weight: .bold)).foregroundStyle(Palette.bg)
+                Circle().fill(Palette.surface2)
+                    .overlay(Circle().strokeBorder(Palette.border, lineWidth: 1))
+                Image(systemName: "sparkles").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.muted)
             }
-            .frame(width: 56, height: 56)
-            .knShadow(true)
+            .frame(width: 40, height: 40)
             .overlay(alignment: .topTrailing) {
                 if state.chatBusy {
                     Circle().fill(Palette.amber).frame(width: 12, height: 12)
@@ -72,7 +86,8 @@ struct ChatWidget: View {
         }
         .buttonStyle(KPressStyle(scale: 0.92))
         .onHover { h in cursor(h) }
-        .help("Ask \(agent.displayName)")
+        .help("Catherine")
+        .accessibilityLabel("Catherine")
     }
 
     // MARK: - Panel
@@ -82,11 +97,17 @@ struct ChatWidget: View {
             header
             Divider().overlay(Palette.border)
             if showHistory { historyList } else { messages }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if !showHistory {
-                Divider().overlay(Palette.border)
-                inputBar
+                VStack(spacing: 0) {
+                    Divider().overlay(Palette.border)
+                    inputBar
+                }
+                .background(Palette.bg)
             }
         }
+        .onAppear { Task { await state.fetchSuggestions() } }
     }
 
     private var header: some View {
@@ -101,7 +122,7 @@ struct ChatWidget: View {
                 Text(showHistory ? "Chats" : agent.displayName)
                     .font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
                 Text(showHistory ? "\(state.chat.threads.count) conversation\(state.chat.threads.count == 1 ? "" : "s")"
-                                 : "Knows your whole app")
+                                 : "What’s happening today")
                     .font(.system(size: 10)).foregroundStyle(Palette.faint)
             }
             Spacer()
@@ -110,7 +131,11 @@ struct ChatWidget: View {
                 state.newChat(); showHistory = false; inputFocused = true
             }
             if !showHistory, let t = state.activeThread, !t.messages.isEmpty {
-                iconButton("trash", help: "Delete this chat") { state.clearChat() }
+                iconButton("trash", help: "Delete this chat") { confirmClearChat = true }
+                    .holdToDelete(isPresented: $confirmClearChat,
+                                  title: "Delete this chat?") {
+                        state.clearChat()
+                    }
             }
             iconButton("xmark", help: "Close") { open = false; showHistory = false }
         }
@@ -129,34 +154,46 @@ struct ChatWidget: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    briefing.id("briefing")
                     let msgs = state.activeThread?.messages ?? []
                     if msgs.isEmpty { emptyState }
                     ForEach(msgs) { m in bubble(m).id(m.id) }
-                    if state.chatBusy {
+                    if state.chatBusy, (msgs.last?.content.isEmpty ?? true) {
                         HStack(spacing: 6) {
                             ProgressView().controlSize(.small)
                             Text("Thinking…").font(.system(size: 12)).foregroundStyle(Palette.faint)
                         }
-                        .id("typing")
                     }
                     if let err = state.chatError {
-                        Label(err, systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 11)).foregroundStyle(Palette.amber)
+                        HStack(spacing: 8) {
+                            Label(err, systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11)).foregroundStyle(Palette.amber)
+                            Button("Retry") { Task { await state.retryLastChat() } }
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Palette.brand)
+                                .disabled(state.chatBusy)
+                        }
                     }
+                    Color.clear.frame(height: 1).id("chat-bottom")
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            #if os(iOS)
+            .scrollDismissesKeyboard(.interactively)
+            #endif
+            .onAppear { scrollDown(proxy) }
             .onChange(of: state.activeThread?.messages.count ?? 0) { _, _ in scrollDown(proxy) }
+            .onChange(of: state.activeThread?.messages.last?.content.count ?? 0) { _, _ in scrollDown(proxy) }
             .onChange(of: state.chatBusy) { _, _ in scrollDown(proxy) }
             .onChange(of: state.chat.activeID) { _, _ in scrollDown(proxy) }
+            .onChange(of: inputFocused) { _, on in if on { scrollDown(proxy) } }
         }
     }
 
     private func scrollDown(_ proxy: ScrollViewProxy) {
-        withAnimation(.knFast) {
-            if state.chatBusy { proxy.scrollTo("typing", anchor: .bottom) }
-            else { proxy.scrollTo(state.activeThread?.messages.last?.id, anchor: .bottom) }
+        DispatchQueue.main.async {
+            withAnimation(.knFast) { proxy.scrollTo("chat-bottom", anchor: .bottom) }
         }
     }
 
@@ -187,10 +224,18 @@ struct ChatWidget: View {
                     Text(preview).font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
                 }
                 Spacer()
-                Button { state.deleteChat(th.id) } label: {
+                Button { pendingHistoryDelete = th.id } label: {
                     Image(systemName: "trash").font(.system(size: 11))
                 }
                 .buttonStyle(KIconButtonStyle(size: 24, color: Palette.red))
+                .holdToDelete(
+                    isPresented: Binding(get: { pendingHistoryDelete == th.id },
+                                         set: { if !$0 { pendingHistoryDelete = nil } }),
+                    title: "Delete this chat?"
+                ) {
+                    state.deleteChat(th.id)
+                    pendingHistoryDelete = nil
+                }
             }
             .padding(.horizontal, 10).padding(.vertical, 9)
             .background(active ? Palette.brand.opacity(0.14) : Palette.surface2.opacity(0.5),
@@ -201,10 +246,48 @@ struct ChatWidget: View {
         .buttonStyle(KPressStyle())
     }
 
+    private var briefing: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("TODAY")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.7)
+                    .foregroundStyle(Palette.muted)
+                Spacer()
+                if state.suggestBusy {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            if let s = state.suggestions {
+                if !s.headline.isEmpty {
+                    Text(s.headline)
+                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(Array(s.suggestions.prefix(3).enumerated()), id: \.element.id) { _, item in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text(item.why).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    }
+                    .padding(.top, 2)
+                }
+            } else if state.suggestBusy {
+                Text("Reading your day…").font(.system(size: 14)).foregroundStyle(Palette.faint)
+            } else if let err = state.suggestError {
+                Text(err).font(.system(size: 13)).foregroundStyle(Palette.amber)
+            } else {
+                Text("Open this and I’ll tell you what’s going on.")
+                    .font(.system(size: 14)).foregroundStyle(Palette.faint)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+    }
+
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Talk to me about anything — your fitness and life, or markets, tech, content and the world. Short answers unless you ask for the long version.")
-                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+            Text("Ask me anything after that.")
+                .font(.system(size: 14)).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 7) {
                 starter("What should I focus on this week?")
@@ -243,8 +326,23 @@ struct ChatWidget: View {
                 .background(isUser ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(Palette.surface2),
                             in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .frame(maxWidth: 300, alignment: isUser ? .trailing : .leading)
+                .contextMenu {
+                    Button("Copy") { copyText(m.content) }
+                }
             if !isUser { Spacer(minLength: 40) }
         }
+    }
+
+    private func copyText(_ s: String) {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        #if os(iOS)
+        UIPasteboard.general.string = t
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(t, forType: .string)
+        #endif
+        Haptics.success()
     }
 
     /// Render light markdown (bold/italic/links) in the reply; fall back to plain.

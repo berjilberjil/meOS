@@ -6,6 +6,7 @@ import SwiftUI
 /// either device show up on both.
 struct NotesView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var signals = UISignals.shared
     @State private var query = ""
     @State private var openID: String?
     @State private var pendingDelete: Note?
@@ -26,7 +27,7 @@ struct NotesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Notes").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("Notes").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
                     .contentShape(Rectangle())
                     .onTapGesture { handleTitleTap() }
                 if revealed {
@@ -37,8 +38,6 @@ struct NotesView: View {
                         .monospacedDigit().foregroundStyle(Palette.faint)
                 }
                 Spacer()
-                Button { newNote() } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(KPrimaryButtonStyle())
             }
 
             HStack(spacing: 8) {
@@ -50,20 +49,26 @@ struct NotesView: View {
 
             if filtered.isEmpty {
                 Card {
-                    Text(state.notes.isEmpty ? "No notes yet. Tap New to capture one."
+                    Text(state.notes.isEmpty ? "No notes yet. Double-tap here to write one."
                                              : "No notes match “\(query)”.")
                         .font(.system(size: 13)).foregroundStyle(Palette.faint)
                 }
+                .onTapGesture(count: 2) { newNote() }
             } else {
                 ForEach(filtered) { noteRow($0) }
             }
         }
         .navigationDestination(item: $openID) { id in NoteEditor(id: id) }
-        .confirmationDialog("Delete this note?", isPresented: Binding(
-            get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
-        ), presenting: pendingDelete) { n in
-            Button("Delete", role: .destructive) { state.deleteNote(n.id); pendingDelete = nil }
-            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        .onAppear { consumeNewNoteRequest(); consumeRevealHidden() }
+        .onChange(of: state.pendingNewNote) { _, on in if on { consumeNewNoteRequest() } }
+        .onChange(of: signals.revealHiddenNotes) { _, on in if on { consumeRevealHidden() } }
+        .holdToDelete(
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            title: pendingDelete.map { $0.title.isEmpty ? "Delete this note?" : "Delete “\($0.title)”?" } ?? "Delete this note?",
+            message: "This can't be undone."
+        ) {
+            if let n = pendingDelete { state.deleteNote(n.id) }
+            pendingDelete = nil
         }
         .onDisappear { revealed = false; tapTimer?.cancel() }
     }
@@ -104,6 +109,18 @@ struct NotesView: View {
     }
 
     private func newNote() { openID = state.addBlockNote() }
+
+    private func consumeNewNoteRequest() {
+        guard state.pendingNewNote else { return }
+        state.pendingNewNote = false
+        newNote()
+    }
+
+    private func consumeRevealHidden() {
+        guard UISignals.shared.revealHiddenNotes else { return }
+        UISignals.shared.revealHiddenNotes = false
+        Task { await revealHidden() }
+    }
 
     /// Every tap on the title increments a counter; after a short settle window,
     /// 2 taps = new note, 5+ taps = reveal hidden (locked) notes behind Face ID.

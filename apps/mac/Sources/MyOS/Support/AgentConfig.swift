@@ -19,7 +19,7 @@ final class AgentConfig: ObservableObject {
 
     private init() {
         let d = UserDefaults.standard
-        name    = d.string(forKey: Self.kName)   ?? "Cathrine"
+        name    = Self.canonicalName(d.string(forKey: Self.kName))
         toneRaw = d.string(forKey: Self.kTone)   ?? AgentTone.blunt.rawValue
         custom  = d.string(forKey: Self.kCustom) ?? ""
     }
@@ -32,7 +32,14 @@ final class AgentConfig: ObservableObject {
     /// The name to show and send — never empty.
     var displayName: String {
         let t = name.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty ? "Cathrine" : t
+        return Self.canonicalName(t)
+    }
+
+    /// Every AI in the app is Catherine. The old default spelling is remapped.
+    static func canonicalName(_ raw: String?) -> String {
+        let t = (raw ?? "").trimmingCharacters(in: .whitespaces)
+        if t.isEmpty || t.lowercased() == "cathrine" { return "Catherine" }
+        return t
     }
 }
 

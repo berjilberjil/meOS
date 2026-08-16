@@ -12,6 +12,7 @@ import { z } from 'zod';
  */
 
 const FOOD_CATEGORIES = ['protein', 'carb', 'veg', 'dairy', 'fruit', 'drink', 'junk', 'other'] as const;
+
 const FoodItem = z.object({
   name: z.string(),
   category: z.enum(FOOD_CATEGORIES),
@@ -24,6 +25,67 @@ const FoodItem = z.object({
   vitamins: z.string().nullable()
 });
 const FoodResult = z.object({ summary: z.string(), foods: z.array(FoodItem) });
+
+const ScanObject = z.object({
+  name: z.string(),
+  needed: z.enum(['yes', 'no', 'maybe']),
+  why: z.string(),
+  useful: z.string()
+});
+const ScanResult = z.object({
+  kind: z.enum(['food', 'object']),
+  summary: z.string(),
+  foods: z.array(FoodItem),
+  object: ScanObject.nullable()
+});
+
+const BelongingResult = z.object({
+  name: z.string(),
+  category: z.string(),
+  priceInr: z.number(),
+  lifeMonths: z.number(),
+  summary: z.string()
+});
+
+function scanPrompt(context: string): string {
+  const who = context.trim()
+    ? `WHO THEY ARE (use this — you are Catherine, their personal AI):\n${context.trim().slice(0, 4000)}\n`
+    : `You are Catherine, their personal AI. You do not have a data snapshot this time — still identify the object.\n`;
+  return [
+    `You are Catherine inside MyOS. Look at this photo.`,
+    who,
+    `First decide: is the main subject edible food (a dish, a pack, a label, a menu item)?`,
+    ``,
+    `IF FOOD: kind=food, object=null. Fill foods[] with name, category, serving, macros. summary = one line of what they should eat/log.`,
+    ``,
+    `IF NOT FOOD: kind=object, foods=[]. Identify the EXACT thing. Never say "Unknown object" unless the image is blank/black/blurred beyond recognition.`,
+    `object = {`,
+    `  name: specific name (e.g. "Hydro Flask 32oz", "Anker USB-C cable", "Noise-cancelling headphones") — not "object" or "item",`,
+    `  needed: yes | no | maybe — WANTED FOR THEM, judged against THEIR life above (fitness, money, work, city, goals).`,
+    `    yes = this helps a real goal they already have.`,
+    `    no = clutter, impulse, duplicate, or fights a goal (junk spend, unused gadget).`,
+    `    maybe = could help IF they use it a certain way.`,
+    `  why: 1-2 blunt sentences. Why you said yes/no/maybe for THEM specifically. Quote a real fact from their data when you can.`,
+    `  useful: how it would actually help (or what to do instead). Concrete. Not generic.`,
+    `}.`,
+    `summary: one short sentence naming the thing + the verdict.`,
+    `Never invent a brand you cannot see. If you can see the category but not the brand, name the category clearly (e.g. "stainless steel water bottle").`
+  ].join('\n');
+}
+
+function belongingPrompt(context: string): string {
+  return [
+    `You are identifying a product someone owns so MyOS can file it in Stuff.`,
+    context.trim() ? `Available shelves: ${context.trim().slice(0, 2000)}` : '',
+    `Look at the photo. Name the exact product.`,
+    `- name: brand + product (e.g. "CMF Buds 2", "Nike Vomero 18", "Activa 6G"). Never "earbuds" alone if a brand is visible.`,
+    `- category: one shelf id from the list above (gadgets, clothes, home, books, wheels, other, or a custom id).`,
+    `- priceInr: typical India street/MRP in WHOLE rupees. Best guess. 0 only if you truly cannot estimate.`,
+    `- lifeMonths: how many months this should last before it has paid for itself (earbuds 24, phone 36, tee 12, bike 60).`,
+    `- summary: one short line, e.g. "CMF Buds 2 — about ₹2,499."`,
+    `Never invent a brand you cannot see. If you only know the type, name the type clearly.`
+  ].filter(Boolean).join('\n');
+}
 
 function foodPrompt(): string {
   return [
@@ -56,8 +118,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     : [];
   if (!images.length) throw error(400, 'No image to read');
 
-  const schema = FoodResult;
-  const prompt = foodPrompt();
+  const mode = typeof body.mode === 'string' ? body.mode : 'food';
+  const context = typeof body.context === 'string' ? body.context : '';
+  const schema = mode === 'scan' ? ScanResult : mode === 'belonging' ? BelongingResult : FoodResult;
+  const prompt = mode === 'scan' ? scanPrompt(context) : mode === 'belonging' ? belongingPrompt(context) : foodPrompt();
 
   let resolved;
   try {

@@ -1,6 +1,6 @@
-import { error } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { streamText } from 'ai';
+import { generateText } from 'ai';
 import { resolveModel } from '$lib/server/ai';
 import { mentorChatSystem } from '$lib/mentor';
 
@@ -9,6 +9,10 @@ import { mentorChatSystem } from '$lib/mentor';
  * human-readable snapshot of the user's current data (fitness / journal /
  * profile). The model answers as their blunt mentor, grounded in that snapshot.
  * Read-only: it never touches the database.
+ *
+ * Returns JSON `{ reply }` (not a token stream). Netlify's function gateway
+ * was 502-ing streamed responses; Flash-Lite is fast enough that a single
+ * buffered reply stays well under the function timeout.
  */
 
 type Msg = { role: 'user' | 'assistant'; content: string };
@@ -18,7 +22,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   const body = await request.json().catch(() => ({}));
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
-  const context = String(body.context ?? '');
+  const context = String(body.context ?? '').slice(0, 8000);
 
   // Who the assistant should be (name / tone / style) — client-editable, bounded.
   const rawAgent = body.agent && typeof body.agent === 'object' ? body.agent : {};
@@ -45,16 +49,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     throw error(503, (e as Error)?.message ?? 'AI is not configured on the server');
   }
 
+  const system = mentorChatSystem(context, persona);
+
   try {
-    const result = streamText({
+    const { text } = await generateText({
       model: resolved.model,
-      system: mentorChatSystem(context, persona),
+      system,
       messages
     });
-    // Stream the reply as plain text so the native client renders tokens as they
-    // arrive. Streaming keeps the connection alive, so long replies no longer hit
-    // the serverless function's response timeout (the old intermittent 502).
-    return result.toTextStreamResponse();
+    return json({ reply: text ?? '' });
   } catch (e) {
     throw error(502, `Could not answer that: ${(e as Error)?.message ?? 'try again'}`);
   }

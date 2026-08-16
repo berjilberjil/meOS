@@ -85,5 +85,20 @@ enum ExerciseSeed {
         ("Hook", .boxing, "Bag", "Shoulders / obliques", ["deltoids", "obliques"], "hoXt6wv", false),
         ("Uppercut", .boxing, "Bag", "Arms / core", ["biceps", "abs"], nil, false),
         ("Heavy bag round", .boxing, "Bag", "Full body / cardio", ["deltoids", "obliques", "abs"], nil, false),
+        // Home / Chennai-friendly
+        ("Surya namaskar", .cardio, "Bodyweight", "Full body", ["quadriceps", "abs", "deltoids"], nil, false),
+        ("Bodyweight squat", .legs, "Bodyweight", "Quads", ["quadriceps", "gluteal"], nil, false),
+        ("Jumping jack", .cardio, "Bodyweight", "Heart", ["calves", "deltoids"], nil, false),
+        ("Wall sit", .legs, "Bodyweight", "Quads", ["quadriceps"], nil, false),
+        ("Kettlebell swing", .legs, "Kettlebell", "Hips / back", ["gluteal", "hamstring", "lower-back"], nil, true),
+        ("Farmer carry", .legs, "Dumbbell", "Grip / core", ["forearm", "abs", "trapezius"], nil, true),
+        ("Inverted row", .back, "Bodyweight", "Mid back", ["upper-back", "biceps"], nil, false),
+        ("Band pull-apart", .shoulders, "Band", "Rear delts", ["deltoids", "upper-back"], nil, false),
+        ("Outdoor run 5k", .cardio, "Cardio", "Heart / legs", ["quadriceps", "calves"], nil, false),
+        ("Brisk walk", .cardio, "Cardio", "Heart", ["calves", "quadriceps"], nil, false),
+        ("Swimming", .cardio, "Cardio", "Full body", ["chest", "upper-back", "quadriceps"], nil, false),
+        ("Badminton", .cardio, "Cardio", "Heart / legs", ["calves", "deltoids"], nil, false),
+        ("Cycling outdoor", .cardio, "Cardio", "Legs", ["quadriceps", "calves"], nil, false),
+        ("Yoga flow", .core, "Bodyweight", "Mobility / core", ["abs", "lower-back"], nil, false),
     ]
 }

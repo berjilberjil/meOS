@@ -12,8 +12,10 @@ struct NavGlyph: View {
         Group {
             switch tab {
             case .today:   SunGlyph(s: size)
+            case .scan:    ScanGlyph(s: size)
             case .events:  CalendarGlyph(s: size)
             case .fold: CoinGlyph(s: size)
+            case .stuff: Image(systemName: "shippingbox.fill").font(.system(size: size * 0.72)).foregroundStyle(Palette.flame)
             case .fitness: DumbbellGlyph(s: size)
             case .productivity: PlayGlyph(s: size)
             case .journal: BookGlyph(s: size)
@@ -47,6 +49,20 @@ struct SunGlyph: View {
                 .fill(.white.opacity(0.5))
                 .frame(width: s * 0.14, height: s * 0.14)
                 .offset(x: -s * 0.09, y: -s * 0.09)
+        }
+    }
+}
+
+// MARK: - Scan · viewfinder
+
+struct ScanGlyph: View {
+    let s: CGFloat
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: s * 0.18, style: .continuous)
+                .strokeBorder(Palette.green, lineWidth: s * 0.08)
+                .frame(width: s * 0.78, height: s * 0.78)
+            Circle().fill(Palette.green).frame(width: s * 0.22, height: s * 0.22)
         }
     }
 }

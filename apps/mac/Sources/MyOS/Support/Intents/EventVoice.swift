@@ -1,0 +1,158 @@
+import Foundation
+
+/// What Siri says about events — selection + phrasing, with no I/O and no
+/// `AppState`. Kept pure so the whole spoken surface is unit-testable without an
+/// unlocked vault or a device. `EventIntentStore` supplies the data; the intents
+/// in `EventIntents.swift` only glue the two together.
+enum EventVoice {
+    /// Most events a single answer will read out — past that, speech stops being useful.
+    static let maxSpoken = 10
+
+    // MARK: - Day math (POSIX/gregorian, mirrors AppState's key helpers)
+
+    private static func formatter() -> DateFormatter {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }
+
+    /// Whole days between two `yyyy-MM-dd` keys — negative for the past, nil if
+    /// either key isn't a real date.
+    static func dayDelta(from todayKey: String, to dateKey: String) -> Int? {
+        let f = formatter()
+        guard let from = f.date(from: todayKey), let to = f.date(from: dateKey) else { return nil }
+        return f.calendar.dateComponents([.day], from: from, to: to).day
+    }
+
+    /// A `yyyy-MM-dd` key `n` days from another key. Test/seed helper.
+    static func key(addingDays n: Int, to dateKey: String) -> String {
+        let f = formatter()
+        guard let d = f.date(from: dateKey),
+              let moved = f.calendar.date(byAdding: .day, value: n, to: d) else { return dateKey }
+        return f.string(from: moved)
+    }
+
+    /// A `yyyy-MM-dd` key for a `Date` (what Siri hands us for a date parameter).
+    static func key(from date: Date) -> String { formatter().string(from: date) }
+
+    // MARK: - Phrasing
+
+    /// How a date sounds relative to today: "today", "tomorrow", "in 4 days",
+    /// "yesterday", "3 days ago".
+    static func relativePhrase(from todayKey: String, to dateKey: String) -> String {
+        guard let d = dayDelta(from: todayKey, to: dateKey) else { return "on an unknown date" }
+        switch d {
+        case 0:  return "today"
+        case 1:  return "tomorrow"
+        case -1: return "yesterday"
+        case let n where n > 1:  return "in \(n) days"
+        default: return "\(-d) days ago"
+        }
+    }
+
+    /// The date spelled out for a confirmation prompt: "Friday 21 August", with the
+    /// year appended whenever it isn't the current one.
+    ///
+    /// The year is the point. Siri's date grammar can resolve a phrase like "next
+    /// week Friday" to something wildly wrong, and "Friday 1 January" sounds
+    /// perfectly reasonable read aloud — "Friday 1 January 2027" does not.
+    static func spokenDate(_ dateKey: String, today todayKey: String) -> String {
+        let parse = formatter()
+        guard let d = parse.date(from: dateKey) else { return "an unknown date" }
+        let out = DateFormatter()
+        out.calendar = Calendar(identifier: .gregorian)
+        out.locale = Locale(identifier: "en_US_POSIX")
+        let sameYear = dateKey.prefix(4) == todayKey.prefix(4)
+        out.dateFormat = sameYear ? "EEEE d MMMM" : "EEEE d MMMM yyyy"
+        return out.string(from: d)
+    }
+
+    /// Is this date close enough to now to be something the user actually meant?
+    ///
+    /// A voice date parser that misfires tends to miss by years, not days, so the
+    /// window is deliberately generous — it's here to catch garbage, not to
+    /// second-guess a real plan.
+    static func isPlausible(_ dateKey: String, today todayKey: String) -> Bool {
+        guard let delta = dayDelta(from: todayKey, to: dateKey) else { return false }
+        return delta >= -366 * 3 && delta <= 366 * 5
+    }
+
+    /// Strip dictation noise off a spoken title. Siri often tacks on a full stop.
+    static func cleanTitle(_ raw: String) -> String {
+        var t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        while let last = t.last, ".!?,".contains(last) { t.removeLast() }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Selection
+
+    private static func clamp(_ limit: Int) -> Int { min(max(limit, 1), maxSpoken) }
+
+    /// Events from today onward, soonest first. Matches the Today spine's rule
+    /// (`date >= today`) so voice and screen never disagree.
+    static func upcoming(_ events: [EventItem], today: String, limit: Int) -> [EventItem] {
+        Array(events.filter { !$0.date.isEmpty && $0.date >= today }
+                    .sorted { $0.date < $1.date }
+                    .prefix(clamp(limit)))
+    }
+
+    /// Events strictly before today, most recent first.
+    static func past(_ events: [EventItem], today: String, limit: Int) -> [EventItem] {
+        Array(events.filter { !$0.date.isEmpty && $0.date < today }
+                    .sorted { $0.date > $1.date }
+                    .prefix(clamp(limit)))
+    }
+
+    // MARK: - Sentences
+
+    /// "A today, B tomorrow, and C in 4 days." — Oxford comma reads better aloud.
+    private static func join(_ parts: [String]) -> String {
+        switch parts.count {
+        case 0:  return ""
+        case 1:  return parts[0]
+        case 2:  return "\(parts[0]), and \(parts[1])"
+        default: return parts.dropLast().joined(separator: ", ") + ", and " + parts[parts.count - 1]
+        }
+    }
+
+    private static func clause(_ e: EventItem, today: String) -> String {
+        "\(e.title) \(relativePhrase(from: today, to: e.date))"
+    }
+
+    /// Speak an already-selected list of upcoming events.
+    static func spokenUpcoming(_ events: [EventItem], today: String) -> String {
+        guard !events.isEmpty else { return "Nothing coming up." }
+        return join(events.map { clause($0, today: today) }) + "."
+    }
+
+    /// Speak an already-selected list of past events.
+    static func spokenPast(_ events: [EventItem], today: String) -> String {
+        guard !events.isEmpty else { return "No past events logged." }
+        return join(events.map { clause($0, today: today) }) + "."
+    }
+
+    /// Confirmation after creating one.
+    static func spokenCreated(title: String, date: String, today: String) -> String {
+        "Added \(title) \(relativePhrase(from: today, to: date))."
+    }
+
+    /// Pick a built-in event tag from a spoken/typed title so Siri (and any
+    /// one-line capture) files the event without a follow-up. First strong
+    /// match wins; unknown language falls back to `personal`.
+    static func tagID(forTitle raw: String) -> String {
+        let t = raw.lowercased()
+        let rules: [(String, [String])] = [
+            ("travel", ["trip", "flight", "airport", "vacation", "travel", "goa", "hotel", "train"]),
+            ("family", ["dad", "mom", "mum", "birthday", "wedding", "anniversary", "family", "kids"]),
+            ("work", ["standup", "stand-up", "meeting", "office", "deadline", "interview", "sprint", "work"]),
+            ("milestone", ["graduation", "launch", "debut", "milestone"]),
+            ("reminder", ["pay", "due", "renew", "remind", "bill", "rent"])
+        ]
+        for (id, words) in rules where words.contains(where: { t.contains($0) }) {
+            return id
+        }
+        return "personal"
+    }
+}

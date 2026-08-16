@@ -58,20 +58,24 @@ struct WeeklyPlannerView: View {
     // MARK: - Generate my week (AI)
 
     private var generateRow: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    Image(systemName: "wand.and.stars").font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.brand)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Generate my week").font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                        Text("AI drafts a split + meal plan from your goal — then edit it.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
-                    }
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("AI WEEK PLAN")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.7)
+                    .foregroundStyle(Palette.muted)
+                Text("Build my meals + workouts around my goal.")
+                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                HStack(spacing: 8) {
+                    let goal = state.fitnessProfile.goal.label.uppercased()
+                    let kcal = state.calorieTargets()?.goalCalories
+                    Text(kcal == nil ? goal : "\(goal) · \(kcal!) KCAL")
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Palette.faint)
                     Spacer()
                     Button { Task { await state.generateWeeklyPlan() } } label: {
                         HStack(spacing: 6) {
                             if state.planBusy { ProgressView().controlSize(.small).tint(.white) }
-                            Text(state.planBusy ? "Building…" : "Generate")
+                            Text(state.planBusy ? "Building…" : "Generate plan")
                         }
                     }
                     .buttonStyle(KPrimaryButtonStyle())
@@ -170,7 +174,7 @@ private struct PlanMealRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            FoodIcon(category: food?.category ?? .other, size: 30)
+            FoodIcon(category: food?.category ?? .other, name: food?.name ?? "", size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(food?.name ?? "Unknown").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Text("\(food?.servingLabel ?? "") · \(Int(food?.perServing.calories ?? 0)) kcal")

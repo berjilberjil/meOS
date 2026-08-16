@@ -18,6 +18,7 @@ struct ImageDropZone: View {
     var subtitle: String
     var tint: Color = Palette.brand
     var busy: Bool = false
+    var startWithCamera: Bool = false
     /// (base64 PNGs, mediaType) — mediaType is always "image/png" here.
     var onImages: ([String], String) -> Void
 
@@ -25,7 +26,8 @@ struct ImageDropZone: View {
         #if os(macOS)
         MacImageDropZone(title: title, subtitle: subtitle, tint: tint, busy: busy, onImages: onImages)
         #else
-        IOSImageDropZone(title: title, subtitle: subtitle, tint: tint, busy: busy, onImages: onImages)
+        IOSImageDropZone(title: title, subtitle: subtitle, tint: tint, busy: busy,
+                         startWithCamera: startWithCamera, onImages: onImages)
         #endif
     }
 }
@@ -211,59 +213,62 @@ private struct MacImageDropZone: View {
 
 #else
 
-/// iOS: the camera is the point — scan a receipt, a nutrition label, a portfolio
-/// screen right where you are. The photo library covers screenshots.
+/// iOS: a big camera hero — tap the circle to shoot, or pick from the library.
+/// The old dashed empty box was not tappable after the first camera dismiss.
 private struct IOSImageDropZone: View {
     var title: String
     var subtitle: String
     var tint: Color
     var busy: Bool
+    var startWithCamera: Bool
     var onImages: ([String], String) -> Void
 
+    @ObservedObject private var signals = UISignals.shared
     @State private var showCamera = false
     @State private var pickerItems: [PhotosPickerItem] = []
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: busy ? "sparkles" : "photo.on.rectangle.angled")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(busy ? tint : Palette.muted)
-                .symbolEffect(.pulse, isActive: busy)
-                .frame(height: 30)
-
-            VStack(spacing: 3) {
-                Text(busy ? "Reading it…" : title)
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Palette.text)
-                Text(busy ? "AI is pulling out the numbers." : subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Palette.faint)
-                    .multilineTextAlignment(.center)
-            }
-
-            if !busy {
-                HStack(spacing: 8) {
-                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                        Button { showCamera = true } label: { Label("Camera", systemImage: "camera") }
-                            .buttonStyle(KSoftButtonStyle(tint: tint))
+        VStack(spacing: 16) {
+            Button { openCamera() } label: {
+                VStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(tint)
+                            .frame(width: 96, height: 96)
+                            .shadow(color: tint.opacity(0.35), radius: 16, y: 8)
+                        if busy {
+                            ProgressView().controlSize(.large).tint(.white)
+                        } else {
+                            Image(systemName: "viewfinder")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
                     }
-                    PhotosPicker(selection: $pickerItems, maxSelectionCount: 8, matching: .images) {
-                        Label("Photo library", systemImage: "photo.on.rectangle")
+                    VStack(spacing: 6) {
+                        Text(busy ? "Reading…" : title)
+                            .font(.system(size: 22, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text(busy ? "Catherine is looking at the photo." : subtitle)
+                            .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .buttonStyle(KSoftButtonStyle(tint: tint))
                 }
-            } else {
-                ProgressView().controlSize(.small).tint(tint)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 36).padding(.horizontal, 20)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                    .strokeBorder(tint.opacity(0.35), lineWidth: 1.5))
             }
+            .buttonStyle(KPressStyle())
+            .disabled(busy)
+
+            PhotosPicker(selection: $pickerItems, maxSelectionCount: 1, matching: .images) {
+                Label("Choose from library", systemImage: "photo.on.rectangle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+            .disabled(busy)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 26).padding(.horizontal, 18)
-        .background(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).fill(Palette.bg.opacity(0.5)))
-        .overlay(
-            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [7, 6]))
-                .foregroundStyle(Palette.border)
-        )
         .animation(.knNormal, value: busy)
         .onChange(of: pickerItems) { _, items in
             guard !items.isEmpty else { return }
@@ -283,7 +288,24 @@ private struct IOSImageDropZone: View {
             CameraCapture { image in
                 if let img = image, let png = Self.pngData(img) { emit([png]) }
             }
+            .ignoresSafeArea()
         }
+        .onAppear {
+            if startWithCamera || signals.openScanCamera {
+                signals.openScanCamera = false
+                openCamera()
+            }
+        }
+        .onChange(of: signals.openScanCamera) { _, on in
+            guard on else { return }
+            signals.openScanCamera = false
+            openCamera()
+        }
+    }
+
+    private func openCamera() {
+        guard !busy, UIImagePickerController.isSourceTypeAvailable(.camera) else { return }
+        showCamera = true
     }
 
     private func emit(_ data: [Data]) {

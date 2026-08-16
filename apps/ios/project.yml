@@ -7,7 +7,7 @@ options:
 settings:
   base:
     MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "4"
     SWIFT_VERSION: "5.9"
 schemes:
   MyOS:
@@ -31,12 +31,9 @@ targets:
       - path: ../mac/Sources/MyOS/Views/VaultViews.swift
       - path: ../mac/Sources/MyOS/Views/LoginView.swift
       - path: ../mac/Sources/MyOS/Views/TodayView.swift
+      - path: ../mac/Sources/MyOS/Views/ScanView.swift
       - path: ../mac/Sources/MyOS/Views/QuickLogBar.swift
       - path: ../mac/Sources/MyOS/Views/FoldView.swift
-      # Fold snapshot bundled from OUTSIDE the repo (device-local cache) so real
-      # numbers show on iPhone without putting financial data into git.
-      - path: /Users/berjilskcript/Library/Application Support/MyOS/fold.json
-        buildPhase: resources
       - path: ../mac/Sources/MyOS/Views/FitnessView.swift
       - path: ../mac/Sources/MyOS/Views/FitnessTodayView.swift
       - path: ../mac/Sources/MyOS/Views/WeeklyPlannerView.swift
@@ -57,6 +54,11 @@ targets:
       - path: ../mac/Sources/MyOS/Views/Icons.swift
       - path: ../mac/Sources/MyOS/Views/SharedComponents.swift
       - path: ../mac/Sources/MyOS/Views/ImageDropZone.swift
+      - path: ../mac/Sources/MyOS/Views/WatchLogCard.swift
+      - path: ../mac/Sources/MyOS/Views/SplashView.swift
+      - path: ../mac/Sources/MyOS/Views/BelongingsView.swift
+      - path: ../mac/Sources/MyOS/Resources/drop.wav
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.berjil.myos

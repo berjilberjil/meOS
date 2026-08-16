@@ -5,18 +5,20 @@ import SwiftUI
 /// in the app to a specific key + model. Keys are validated + stored server-side
 /// (encrypted) via `AISettingsStore`, so the setup follows the account across devices.
 struct AIProvidersCard: View {
+    var boxed = true
     @ObservedObject private var store = AISettingsStore.shared
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    SectionTitle(text: "AI providers & models")
-                    Spacer()
-                    Text("bring your own keys").font(.system(size: 10)).foregroundStyle(Palette.faint)
+        let inner = VStack(alignment: .leading, spacing: 16) {
+                if boxed {
+                    HStack {
+                        SectionTitle(text: "AI providers & models")
+                        Spacer()
+                        Text("bring your own keys").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    }
                 }
-                Text("Add keys for Gemini, Claude or OpenAI, then pick which model powers each feature. Keys are validated, encrypted and synced to your account — never stored in the app.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                Text("Add a Gemini, Claude or OpenAI key, then pick which model powers each feature.")
+                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let e = store.loadError {
@@ -48,8 +50,8 @@ struct AIProvidersCard: View {
                     ModelPickerRow(store: store, feature: nil)
                     ForEach(AIFeature.allCases) { f in ModelPickerRow(store: store, feature: f) }
                 }
-            }
         }
+        Card { inner }
         .task { await store.loadIfNeeded() }
     }
 }
@@ -82,6 +84,24 @@ private struct AddKeyForm: View {
                 }
             }
 
+            #if os(iOS)
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 5) {
+                    KFieldLabel(text: "Label")
+                    TextField("", text: $label,
+                              prompt: Text("e.g. Personal \(provider.label)").foregroundColor(Palette.faint))
+                        .textFieldStyle(.plain).font(.system(size: 16)).foregroundStyle(Palette.text)
+                        .focused($labelFocused).knField(focused: labelFocused)
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    KFieldLabel(text: "API key")
+                    SecureField("", text: $keyText,
+                                prompt: Text(provider.keyPlaceholder).foregroundColor(Palette.faint))
+                        .textFieldStyle(.plain).font(.system(size: 16)).monospaced().foregroundStyle(Palette.text)
+                        .focused($keyFocused).knField(focused: keyFocused)
+                }
+            }
+            #else
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 5) {
                     KFieldLabel(text: "Label")
@@ -100,6 +120,7 @@ private struct AddKeyForm: View {
                         .focused($keyFocused).knField(focused: keyFocused)
                 }
             }
+            #endif
 
             HStack(spacing: 12) {
                 Button { add() } label: {
@@ -140,37 +161,37 @@ private struct AIKeyRow: View {
     private var provider: AIProvider { AIProvider(rawValue: key.provider) ?? .gemini }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(provider.label)
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(provider.accent.opacity(0.18), in: Capsule())
-                .foregroundStyle(provider.accent)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(key.label).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                Text("\(key.masked)  ·  \(key.models.count) models")
-                    .font(.system(size: 11)).monospaced().foregroundStyle(Palette.faint)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Text(provider.label)
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(provider.accent.opacity(0.18), in: Capsule())
+                    .foregroundStyle(provider.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(key.label).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text("\(key.masked)  ·  \(key.models.count) models")
+                        .font(.system(size: 12)).monospaced().foregroundStyle(Palette.faint)
+                }
+                Spacer()
             }
-
-            Spacer()
-
-            Toggle("", isOn: Binding(get: { key.enabled },
-                                     set: { on in Task { await store.setEnabled(key, on) } }))
-                .labelsHidden().toggleStyle(.switch).tint(Palette.green)
-
-            Button { Task { await store.recheck(key) } } label: { Text("Check") }
-                .buttonStyle(KGhostButtonStyle())
-                .disabled(store.busy)
-
-            Button { showDelete = true } label: { Image(systemName: "trash") }
-                .buttonStyle(KIconButtonStyle(size: 15, color: Palette.faint))
-                .holdToDelete(isPresented: $showDelete,
-                              title: "Remove \(key.label)?",
-                              message: "Deletes this key from your account. Any feature using it falls back to your default.",
-                              confirmLabel: "Hold to remove") { Task { await store.delete(key) } }
+            HStack(spacing: 10) {
+                Toggle("On", isOn: Binding(get: { key.enabled },
+                                         set: { on in Task { await store.setEnabled(key, on) } }))
+                    .labelsHidden().toggleStyle(.switch).tint(Palette.green)
+                Spacer()
+                Button { Task { await store.recheck(key) } } label: { Text("Check") }
+                    .buttonStyle(KGhostButtonStyle())
+                    .disabled(store.busy)
+                Button { showDelete = true } label: { Image(systemName: "trash") }
+                    .buttonStyle(KIconButtonStyle(size: 28, color: Palette.red))
+                    .holdToDelete(isPresented: $showDelete,
+                                  title: "Remove \(key.label)?",
+                                  message: "Deletes this key from your account. Any feature using it falls back to your default.",
+                                  confirmLabel: "Hold to remove") { Task { await store.delete(key) } }
+            }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 8)
     }
 }
 

@@ -11,6 +11,7 @@ struct EventsView: View {
     @ObservedObject private var signals = UISignals.shared
     @State private var editing: EventItem?
     @State private var showNew = false
+    @State private var pendingDelete: EventItem?
 
     private var sorted: [EventItem] { state.events.sorted { $0.date > $1.date } }
     private var upcoming: [EventItem] { sorted.filter { $0.date >= state.todayKey } }
@@ -18,11 +19,18 @@ struct EventsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Events").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                Spacer()
+                Button { showNew = true } label: { Label("New", systemImage: "plus") }
+                    .buttonStyle(KPrimaryButtonStyle())
+            }
             if state.events.isEmpty {
                 Card {
-                    Text("No events yet. Double-tap the Journal tab to add a memory — a trip, a milestone, a moment.")
+                    Text("Nothing yet. Tap New to add a trip, a shoot, or any moment.")
                         .font(.system(size: 13)).foregroundStyle(Palette.faint)
                 }
+                .onTapGesture(count: 2) { showNew = true }
             } else {
                 if !upcoming.isEmpty { section("Upcoming", Array(upcoming.reversed())) }
                 if !past.isEmpty { section("Past", past) }
@@ -30,6 +38,14 @@ struct EventsView: View {
         }
         .sheet(isPresented: $showNew) { EventEditorSheet(event: nil) }
         .sheet(item: $editing) { e in EventEditorSheet(event: e) }
+        .holdToDelete(
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            title: pendingDelete.map { "Delete “\($0.title.isEmpty ? "this event" : $0.title)”?" } ?? "Delete this event?",
+            message: "This can't be undone."
+        ) {
+            if let e = pendingDelete { state.deleteEvent(e.id) }
+            pendingDelete = nil
+        }
         .onChange(of: signals.pendingNewEvent) { _, now in if now { consumeNewEvent() } }
         .onAppear { if signals.pendingNewEvent { consumeNewEvent() } }
     }
@@ -74,7 +90,7 @@ struct EventsView: View {
         }
         .buttonStyle(KPressStyle())
         .contextMenu {
-            Button(role: .destructive) { state.deleteEvent(e.id) } label: { Label("Delete", systemImage: "trash") }
+            Button(role: .destructive) { pendingDelete = e } label: { Label("Delete", systemImage: "trash") }
         }
     }
 
@@ -113,6 +129,7 @@ private struct EventEditorSheet: View {
     @State private var media: [EventMedia] = []
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var loaded = false
+    @State private var showDelete = false
 
     var body: some View {
         NavigationStack {
@@ -190,8 +207,14 @@ private struct EventEditorSheet: View {
                 }
                 if event != nil {
                     ToolbarItem(placement: .destructiveAction) {
-                        Button(role: .destructive) { if let e = event { state.deleteEvent(e.id) }; dismiss() } label: {
+                        Button(role: .destructive) { showDelete = true } label: {
                             Image(systemName: "trash")
+                        }
+                        .holdToDelete(isPresented: $showDelete,
+                                      title: "Delete this event?",
+                                      message: "This can't be undone.") {
+                            if let e = event { state.deleteEvent(e.id) }
+                            dismiss()
                         }
                     }
                 }

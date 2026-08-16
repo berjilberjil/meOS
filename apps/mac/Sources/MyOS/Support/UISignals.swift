@@ -11,4 +11,10 @@ final class UISignals: ObservableObject {
     /// Set true when the user double-taps the Journal tab; the Events screen
     /// consumes it to open a fresh event editor, then resets it.
     @Published var pendingNewEvent = false
+    /// Dock Scan tap — open the camera immediately, skip the library chooser.
+    @Published var openScanCamera = false
+    /// Five taps on Notes in the dock — reveal hidden notes (Face ID).
+    @Published var revealHiddenNotes = false
+    /// Open Journal on this `yyyy-MM-dd` (Today streak calendar tap).
+    @Published var pendingJournalDate: String?
 }
