@@ -116,8 +116,9 @@ final class AppState: ObservableObject {
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
         watch     = s.watch ?? []
         belongings = s.belongings ?? BelongingsState()
-        if let v = s.fold { fold = v }
+        if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
+        restoreFoldIfBare()
     }
 
     /// One-time purge of the removed money keys (finance / portfolio / net worth)
@@ -189,6 +190,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            healFoldSnapshot()
             startLiveSync()
             await purgeRemovedFinanceKeys()
         } catch is APIClient.VaultLockedError {
@@ -309,6 +311,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            healFoldSnapshot()
             startLiveSync()
             await purgeRemovedFinanceKeys()
         } catch {
@@ -442,7 +445,15 @@ final class AppState: ObservableObject {
         if let v = s.eventTags,      !hasPendingPush(StateKey.eventTags),      v != eventTags      { eventTags = v }
         if let v = s.watch,          !hasPendingPush(StateKey.watch),          v != watch          { watch = v }
         if let v = s.belongings,     !hasPendingPush(StateKey.belongings),     v != belongings     { belongings = v }
-        if let v = s.fold,           !hasPendingPush(StateKey.fold),           v != fold           { fold = v; FoldData.save(v) }
+        if let v = s.fold, !hasPendingPush(StateKey.fold), v != fold {
+            if FoldSnapshotBuilder.isBare(v) {
+                restoreFoldIfBare()
+                if let cur = fold, !FoldSnapshotBuilder.isBare(cur) { push(StateKey.fold, cur) }
+            } else {
+                fold = v
+                FoldData.save(v)
+            }
+        }
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }
     }
 
@@ -468,8 +479,29 @@ final class AppState: ObservableObject {
     /// gets it on the next 2s pull. Live Fold login is the source of truth.
     func ingestLocalFold() {
         guard let disk = FoldData.loadFromDisk(), disk != fold else { return }
+        if FoldSnapshotBuilder.isBare(disk) {
+            restoreFoldIfBare()
+            return
+        }
         fold = disk
         if isHydrated { push(StateKey.fold, disk) }
+    }
+
+    /// Re-upload a real snapshot so a device stuck on ₹0 can pull it back.
+    func healFoldSnapshot() {
+        restoreFoldIfBare()
+        guard isHydrated, let f = fold, !FoldSnapshotBuilder.isBare(f) else { return }
+        push(StateKey.fold, f)
+    }
+
+    func restoreFoldIfBare() {
+        let next = FoldSnapshotBuilder.resolved(
+            current: fold, disk: FoldData.loadFromDisk(), recovery: FoldData.recoverySnapshot()
+        )
+        guard next != fold else { return }
+        fold = next
+        FoldData.save(next)
+        if isHydrated { push(StateKey.fold, next) }
     }
 
     private func startFoldWatch() {
@@ -1402,15 +1434,26 @@ final class AppState: ObservableObject {
 
     func verifyFoldOTP(_ phone: String, otp: String) async -> Bool {
         foldBusy = true; foldError = nil
-        defer { foldBusy = false }
         do {
             try await FoldClient.verifyOTP(phone: phone, otp: otp)
             foldLinked = true
-            await refreshFold()
-            return fold != nil
         } catch {
             foldError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            if case FoldError.notLinked = error { foldLinked = false }
+            foldBusy = false
             return false
+        }
+        do {
+            let snap = try await FoldClient.fetchSnapshot()
+            fold = snap
+            FoldData.save(snap)
+            if isHydrated { push(StateKey.fold, snap) }
+            foldBusy = false
+            return true
+        } catch {
+            foldError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            foldBusy = false
+            return true
         }
     }
 
@@ -1419,29 +1462,37 @@ final class AppState: ObservableObject {
         foldLinked = false
     }
 
-    /// Live Fold pull when signed in; otherwise re-read the last snapshot + sync.
+    /// Live Fold pull when signed in. A failed live call must not re-read the
+    /// Aug-14 disk/sync snapshot and pretend it just refreshed.
     func refreshFold() async {
+        restoreFoldIfBare()
         foldBusy = true
         foldError = nil
         foldLinked = FoldClient.isLinked
+        var liveSucceeded = false
         if FoldClient.isLinked {
             do {
                 let snap = try await FoldClient.fetchSnapshot()
                 fold = snap
                 FoldData.save(snap)
                 if isHydrated { push(StateKey.fold, snap) }
-                foldBusy = false
-                return
+                liveSucceeded = true
             } catch {
                 foldError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 if case FoldError.notLinked = error { foldLinked = false }
             }
         }
-        ingestLocalFold()
-        await pullRemote()
-        ingestLocalFold()
+        let localBare = fold == nil || FoldSnapshotBuilder.isBare(fold!)
+        if FoldRefresh.shouldPullSync(linked: foldLinked, liveSucceeded: liveSucceeded, localBare: localBare) {
+            ingestLocalFold()
+            await pullRemote()
+            ingestLocalFold()
+        }
+        restoreFoldIfBare()
         foldBusy = false
-        if fold == nil && foldError == nil { foldError = "Connect Fold with your phone OTP to pull live numbers." }
+        if fold == nil && foldError == nil {
+            foldError = "Connect Fold with your phone OTP to pull live numbers."
+        }
     }
 
     /// Delete the active conversation (the header trash button).

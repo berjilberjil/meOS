@@ -4,11 +4,16 @@ import Foundation
 /// spends. Tokens stay on-device in the Keychain. Refresh uses the same session.
 enum FoldClient {
     private static let base = URL(string: "https://api.fold.money/api")!
+    /// Unfold uses `/api` + path. Newer Fold docs omit `/api`. OTP send works
+    /// on the first; verify 404s there, so we try both.
+    private static let roots = ["https://api.fold.money/api", "https://api.fold.money"]
     private static let kAccess = "fold.access"
     private static let kRefresh = "fold.refresh"
     private static let kUser = "fold.user"
     private static let kPhone = "fold.phone"
     private static let kDevice = "fold.deviceHash"
+    /// Fold only accepts phone/Android/iOS — `macOS` returns 422 invalid device type.
+    static let deviceType = "Android"
 
     static var isLinked: Bool { KeychainStore.loadSecret(account: kAccess) != nil }
     static var linkedPhone: String { UserDefaults.standard.string(forKey: kPhone) ?? "" }
@@ -30,9 +35,32 @@ enum FoldClient {
 
     static func verifyOTP(phone raw: String, otp: String) async throws {
         let phone = normalizePhone(raw)
-        let json = try await postJSON("/v1/auth/otp/verify", auth: false, body: [
+        let body: [String: Any] = [
             "phone": phone, "otp": otp.trimmingCharacters(in: .whitespaces)
-        ])
+        ]
+        let paths = ["/v1/auth/otp/verify", "/v1/auth/verify-otp", "/v2/auth/otp/verify"]
+        var last: Error = FoldError.http(404, "no verify route")
+        for root in roots {
+            for path in paths {
+                do {
+                    let json = try await send(path, method: "POST", auth: false, body: body, root: root)
+                    try storeSession(json, phone: phone)
+                    return
+                } catch FoldError.http(let code, _) where code == 404 || code == 405 {
+                    last = FoldError.http(code, "\(root)\(path)")
+                    continue
+                } catch {
+                    last = error
+                    if case FoldError.http(let code, _) = error, (400...499).contains(code), code != 404 {
+                        throw error
+                    }
+                }
+            }
+        }
+        throw last
+    }
+
+    private static func storeSession(_ json: [String: Any], phone: String) throws {
         let data = json["data"] as? [String: Any] ?? json
         guard let access = string(data["access_token"]) else { throw FoldError.badOTP }
         KeychainStore.saveSecret(access, account: kAccess)
@@ -48,33 +76,63 @@ enum FoldClient {
     /// Pull a fresh snapshot from Fold and map it into `FoldData`.
     static func fetchSnapshot() async throws -> FoldData {
         try await refreshIfNeeded()
-        let me = try await getJSON("/v2/users/me")
-        let uid = userID(from: me) ?? UserDefaults.standard.string(forKey: kUser) ?? ""
+        var blobs: [[String: Any]] = []
+        var uid = UserDefaults.standard.string(forKey: kUser) ?? ""
+        for path in ["/v2/users/me", "/v1/users/me"] {
+            if let me = try? await getJSONFirst(path) {
+                blobs.append(me)
+                if let id = userID(from: me) { uid = id }
+                break
+            }
+        }
         if !uid.isEmpty { UserDefaults.standard.set(uid, forKey: kUser) }
+        guard !uid.isEmpty else { throw FoldError.http(0, "Fold signed in but returned no user id.") }
 
-        var blobs: [[String: Any]] = [me]
+        var txns: [[String: Any]] = []
+        if let page = try? await fetchTransactions(uid: uid) {
+            blobs.append(page.blob)
+            txns = page.txns
+        }
         let extra = [
-            "/v1/users/\(uid)/dashboard",
-            "/v1/users/\(uid)/net-worth",
-            "/v1/users/\(uid)/networth",
+            "/v1/users/\(uid)/transactions/available_since",
             "/v1/users/\(uid)/accounts",
             "/v1/users/\(uid)/bank-accounts",
             "/v1/users/\(uid)/insights",
             "/v1/users/\(uid)/investments",
             "/v1/users/\(uid)/holdings",
+            "/v1/users/\(uid)/net-worth",
+            "/v1/users/\(uid)/dashboard",
             "/v2/users/\(uid)/dashboard"
         ]
-        for path in extra where !uid.isEmpty {
-            if let j = try? await getJSON(path) { blobs.append(j) }
+        for path in extra {
+            if let j = try? await getJSONFirst(path) { blobs.append(j) }
         }
 
-        var txns: [[String: Any]] = []
-        if !uid.isEmpty, let t = try? await getJSON("/v1/users/\(uid)/transactions?filter=all&count_by=month") {
-            blobs.append(t)
-            txns = arrayOfDicts(t["data"] ?? t, key: "transactions")
+        let previous = FoldData.load()
+        let snap = FoldSnapshotBuilder.build(blobs: blobs, transactions: txns, previous: previous)
+        if FoldSnapshotBuilder.isBare(snap) {
+            throw FoldError.http(0, "Signed in, but Fold returned no balances. Last snapshot kept.")
         }
+        return snap
+    }
 
-        return FoldSnapshotBuilder.build(blobs: blobs, transactions: txns, previous: FoldData.load())
+    /// Fold's transaction list is cursor-paged. `after` is base64 of `{8 digits},{RFC3339}`.
+    static func transactionAfterCursor(till: Date = Date()) -> String {
+        let n = Int.random(in: 10_000_000...99_999_999)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        iso.timeZone = TimeZone(secondsFromGMT: 0)
+        return Data("\(n),\(iso.string(from: till))".utf8).base64EncodedString()
+    }
+
+    static func endpointURL(_ path: String, query: [String: String] = [:], root: String? = nil) -> URL {
+        let host = root ?? base.absoluteString
+        let p = path.hasPrefix("/") ? path : "/" + path
+        var comps = URLComponents(string: host + p)!
+        if !query.isEmpty {
+            comps.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+        }
+        return comps.url!
     }
 
     // MARK: - HTTP
@@ -82,45 +140,79 @@ enum FoldClient {
     private static func refreshIfNeeded() async throws {
         guard KeychainStore.loadSecret(account: kAccess) != nil else { throw FoldError.notLinked }
         guard let refresh = KeychainStore.loadSecret(account: kRefresh) else { return }
-        guard let json = try? await postJSON("/v1/auth/tokens/refresh", auth: false, body: [
-            "refresh_token": refresh
-        ]) else { return }
-        let data = json["data"] as? [String: Any] ?? json
-        if let access = string(data["access_token"]) {
-            KeychainStore.saveSecret(access, account: kAccess)
-        }
-        if let next = string(data["refresh_token"]) {
-            KeychainStore.saveSecret(next, account: kRefresh)
+        do {
+            let json = try await postJSON("/v1/auth/tokens/refresh", auth: false, body: [
+                "refresh_token": refresh
+            ])
+            let data = json["data"] as? [String: Any] ?? json
+            if let access = string(data["access_token"]) {
+                KeychainStore.saveSecret(access, account: kAccess)
+            }
+            if let next = string(data["refresh_token"]) {
+                KeychainStore.saveSecret(next, account: kRefresh)
+            }
+        } catch FoldError.notLinked {
+            throw FoldError.notLinked
+        } catch FoldError.http(let code, _) where code == 401 || code == 403 {
+            throw FoldError.notLinked
+        } catch {
+            // Brand-new access tokens still work if Fold rejects an immediate refresh.
         }
     }
 
-    private static func getJSON(_ path: String) async throws -> [String: Any] {
-        try await send(path, method: "GET", auth: true, body: nil)
+    private static func fetchTransactions(uid: String) async throws -> (txns: [[String: Any]], blob: [String: Any]) {
+        let cal = Calendar(identifier: .gregorian)
+        let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date()))
+            ?? Date().addingTimeInterval(-40 * 86_400)
+        var all: [[String: Any]] = []
+        var after = transactionAfterCursor(till: Date())
+        var last: [String: Any] = [:]
+        for _ in 0..<8 {
+            let json = try await getJSONFirst("/v1/users/\(uid)/transactions", query: [
+                "filter": "all", "count_by": "month", "after": after
+            ])
+            last = json
+            let page = arrayOfDicts(json["data"] ?? json, key: "transactions")
+            if page.isEmpty { break }
+            all.append(contentsOf: page)
+            if let oldest = page.last,
+               let ts = date(oldest["txn_timestamp"]) ?? date(oldest["txn_date"]),
+               ts < monthStart { break }
+            let next = string((json["data"] as? [String: Any])?["after"]) ?? string(json["after"])
+            guard let next, !next.isEmpty, next != after else { break }
+            after = next
+        }
+        return (all, last)
+    }
+
+    private static func getJSON(_ path: String, query: [String: String] = [:]) async throws -> [String: Any] {
+        try await send(path, method: "GET", auth: true, body: nil, query: query)
+    }
+
+    private static func getJSONFirst(_ path: String, query: [String: String] = [:]) async throws -> [String: Any] {
+        var last: Error = FoldError.http(404, path)
+        for root in roots {
+            do { return try await send(path, method: "GET", auth: true, body: nil, query: query, root: root) }
+            catch FoldError.http(let code, _) where code == 404 { last = FoldError.http(code, "\(root)\(path)"); continue }
+            catch { last = error }
+        }
+        throw last
     }
 
     private static func postJSON(_ path: String, auth: Bool, body: [String: Any]) async throws -> [String: Any] {
         try await send(path, method: "POST", auth: auth, body: body)
     }
 
-    private static func send(_ path: String, method: String, auth: Bool, body: [String: Any]?) async throws -> [String: Any] {
-        let url: URL
-        if path.contains("?") {
-            url = URL(string: base.absoluteString + path)!
-        } else {
-            url = base.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
-        }
+    private static func send(_ path: String, method: String, auth: Bool, body: [String: Any]?, query: [String: String] = [:], root: String? = nil) async throws -> [String: Any] {
+        let url = endpointURL(path, query: query, root: root)
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("MyOS/1.0", forHTTPHeaderField: "User-Agent")
+        req.setValue("ua/unfold", forHTTPHeaderField: "User-Agent")
         req.setValue(deviceHash(), forHTTPHeaderField: "X-Device-Hash")
         req.setValue("India", forHTTPHeaderField: "X-Device-Location")
-        req.setValue("MyOS", forHTTPHeaderField: "X-Device-Name")
-        #if os(iOS)
-        req.setValue("iOS", forHTTPHeaderField: "X-Device-Type")
-        #else
-        req.setValue("macOS", forHTTPHeaderField: "X-Device-Type")
-        #endif
+        req.setValue("unfold", forHTTPHeaderField: "X-Device-Name")
+        req.setValue(Self.deviceType, forHTTPHeaderField: "X-Device-Type")
         if auth, let token = KeychainStore.loadSecret(account: kAccess) {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -131,8 +223,7 @@ enum FoldClient {
         let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
         if code == 401 { throw FoldError.notLinked }
         guard (200..<300).contains(code) else {
-            let msg = String(data: data, encoding: .utf8) ?? "HTTP \(code)"
-            throw FoldError.http(code, String(msg.prefix(180)))
+            throw FoldError.http(code, "\(path) · \(apiMessage(from: data, code: code))")
         }
         let obj = try JSONSerialization.jsonObject(with: data)
         return obj as? [String: Any] ?? ["data": obj]
@@ -145,11 +236,23 @@ enum FoldClient {
         return s
     }
 
+    /// Fold's OTP route wants E.164 (`+91…`). Unfold sends `"+91" + 10 digits`.
     static func normalizePhone(_ raw: String) -> String {
         var d = raw.filter(\.isNumber)
         if d.hasPrefix("0") { d.removeFirst() }
         if d.count == 10 { d = "91" + d }
-        return d
+        if d.hasPrefix("91"), d.count >= 12 { return "+" + d }
+        return d.isEmpty ? d : "+" + d
+    }
+
+    static func apiMessage(from data: Data, code: Int) -> String {
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let err = obj["error"] as? [String: Any], let m = string(err["message"]), !m.isEmpty {
+                return m
+            }
+            if let m = string(obj["message"]), !m.isEmpty { return m }
+        }
+        return String(data: data, encoding: .utf8).map { String($0.prefix(180)) } ?? "HTTP \(code)"
     }
 
     private static func userID(from json: [String: Any]) -> String? {
@@ -168,13 +271,52 @@ enum FoldError: LocalizedError {
         case .badPhone: return "Enter a valid Indian mobile number."
         case .badOTP: return "That OTP didn’t work."
         case .notLinked: return "Fold isn’t signed in. Connect it first."
+        case .http(_, let m) where m.lowercased().contains("invalid phone"):
+            return "Fold wants +91 and your 10-digit mobile. Try again."
         case .http(let c, let m): return "Fold \(c): \(m)"
         }
     }
 }
 
+/// Disk/sync may replace the on-screen snapshot only when this device never
+/// had a live Fold session. A failed live pull must keep the current numbers.
+enum FoldRefresh {
+    static func shouldReloadStaleSnapshot(linked: Bool, liveSucceeded: Bool) -> Bool {
+        !linked && !liveSucceeded
+    }
+
+    /// Pull Mac↔phone sync when live Fold failed and this device has nothing
+    /// real to show (the iPhone zero-wipe). A rich local snapshot stays put.
+    static func shouldPullSync(linked: Bool, liveSucceeded: Bool, localBare: Bool) -> Bool {
+        if liveSucceeded { return false }
+        if localBare { return true }
+        return !linked
+    }
+}
+
+/// Status line under the Fold dashboard. Stale disk must not read as "Live".
+enum FoldCaption {
+    static func line(asOf: String, linked: Bool, error: String?) -> String {
+        if asOf.isEmpty { return "Tap to pull latest from Fold" }
+        if linked && error == nil { return "Live Fold · \(asOf)" }
+        if !linked { return "Last snapshot · \(asOf) · Connect to refresh" }
+        return "Last snapshot · \(asOf)"
+    }
+}
+
 /// Pure mapper — blobs from Fold JSON → `FoldData`. Unit-tested.
 enum FoldSnapshotBuilder {
+    static func isBare(_ f: FoldData) -> Bool {
+        f.netWorth == 0 && f.liquid == 0 && f.investments == 0 && f.debt == 0
+            && f.spentThisMonth == 0 && f.banks.isEmpty && f.topSpends.isEmpty
+    }
+
+    static func resolved(current: FoldData?, disk: FoldData?, recovery: FoldData) -> FoldData {
+        if let c = current, !isBare(c) { return c }
+        if let d = disk, !isBare(d) { return d }
+        return recovery
+    }
+
     static func build(blobs: [[String: Any]], transactions: [[String: Any]], previous: FoldData?) -> FoldData {
         var next = previous ?? FoldData()
         let nums = collectNumbers(blobs)
@@ -212,6 +354,10 @@ enum FoldSnapshotBuilder {
             next.changePercent = first == 0 ? 0 : next.changeValue / first
             next.changeLabel = "since first point"
         }
+
+        let extracted = !nums.isEmpty || !banks.isEmpty || !spends.isEmpty
+        if !extracted, let prev = previous, !isBare(prev) { return prev }
+        if isBare(next), let prev = previous, !isBare(prev) { return prev }
 
         let fmt = DateFormatter()
         fmt.locale = Locale(identifier: "en_IN")
