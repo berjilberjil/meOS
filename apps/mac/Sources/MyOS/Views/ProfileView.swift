@@ -8,6 +8,7 @@ struct ProfileView: View {
     @EnvironmentObject var state: AppState
     @State private var isEditing = false
     @State private var weightDraft = ""
+    @State private var showRemovePhoto = false
     @FocusState private var weightFocused: Bool
 
     var body: some View {
@@ -109,9 +110,13 @@ struct ProfileView: View {
             if isEditing {
                 Button("Change photo…", action: pickPhoto)
                 if profileImage != nil {
-                    Button("Remove photo", role: .destructive) { state.updateProfile { $0.photoBase64 = "" } }
+                    Button("Remove photo", role: .destructive) { showRemovePhoto = true }
                 }
             }
+        }
+        .holdToDelete(isPresented: $showRemovePhoto, title: "Remove profile photo?",
+                      message: "Your name and details stay.") {
+            state.updateProfile { $0.photoBase64 = "" }
         }
     }
 

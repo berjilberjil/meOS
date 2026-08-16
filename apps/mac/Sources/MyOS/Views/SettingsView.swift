@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 /// versa. Destructive actions are guarded by a hold-to-confirm.
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var themeStore = ThemeStore.shared
 
     // Change-passphrase form
     @State private var newPass = ""
@@ -16,21 +17,20 @@ struct SettingsView: View {
     @State private var exportMsg: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Settings").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Settings").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
                 .knRise(0)
 
             accountCard.knRise(1)
-            securityCard.knRise(2)
-            AppearanceCard().knRise(3)
-            GeneralSettingsCard().knRise(3)
+            AppearanceCard().knRise(2)
+            GeneralSettingsCard().knRise(2)
             NotificationsCard().knRise(3)
             AgentSettingsCard().knRise(3)
             AIProvidersCard().knRise(3)
-            fitnessCard.knRise(3)
-            presetsCard.knRise(6)
-            dataCard.knRise(7)
+            securityCard.knRise(4)
+            dataCard.knRise(5)
         }
+        .animation(.knTheme, value: themeStore.theme.id)
     }
 
     // MARK: - Account
@@ -44,9 +44,9 @@ struct SettingsView: View {
                         .font(.system(size: 22)).foregroundStyle(Palette.blue)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(state.username.isEmpty ? "Signed in" : "@\(state.username)")
-                            .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
-                        Text("Your data syncs to your MyOS account.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("Signed in. Changes sync to iPhone.")
+                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
                     }
                     Spacer()
                     Button { Task { await state.refresh() } } label: { Text("Refresh") }
@@ -68,16 +68,16 @@ struct SettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 SectionTitle(text: "Security & encryption")
-                Text("Your data is end-to-end encrypted on this Mac with a key only you hold. The server and database only ever store ciphertext — a full breach reveals nothing readable.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                Text("Encrypted on this Mac. The server only stores ciphertext.")
+                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 // Export (plaintext backup / escape hatch)
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Export my data").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                        Text("A decrypted JSON backup. Keep it somewhere safe — it’s not encrypted.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        Text("Export my data").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("A decrypted JSON backup. Keep it somewhere safe.")
+                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
                     }
                     Spacer()
                     Button { exportData() } label: { Text("Export…") }
@@ -92,9 +92,9 @@ struct SettingsView: View {
                 // New recovery code
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Recovery code").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                        Text("Generate a fresh one-time code (invalidates the old one).")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        Text("Recovery code").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("A new code replaces the old one.")
+                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
                     }
                     Spacer()
                     Button { Task { await state.regenerateRecoveryCode() } } label: { Text("New code") }
@@ -104,7 +104,7 @@ struct SettingsView: View {
                 Divider().overlay(Palette.ring)
 
                 // Change passphrase
-                Text("Change passphrase").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("Change passphrase").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
                 SecureField("", text: $newPass, prompt: Text("New passphrase").foregroundColor(Palette.faint))
                     .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
                 SecureField("", text: $newPassConfirm, prompt: Text("Confirm new passphrase").foregroundColor(Palette.faint))
@@ -143,44 +143,14 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Fitness profile (same editor as the Fitness tab)
-
-    private var fitnessCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    SectionTitle(text: "Fitness profile")
-                    Spacer()
-                    Text("syncs with the Fitness tab").font(.system(size: 10)).foregroundStyle(Palette.faint)
-                }
-                FitnessProfileEditor()
-            }
-        }
-    }
-
-    // MARK: - Journal presets
-
-    private var presetsCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    SectionTitle(text: "Journal quick-add chips")
-                    Spacer()
-                    Text("shown in the Journal tab").font(.system(size: 10)).foregroundStyle(Palette.faint)
-                }
-                JournalPresetsEditor()
-            }
-        }
-    }
-
     // MARK: - Data management (reset — hold-to-confirm)
 
     private var dataCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 SectionTitle(text: "Data management")
-                Text("Resets wipe that section's data on this account. Sensitive — each needs a press-and-hold to confirm.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                Text("Hold to confirm. This can’t be undone.")
+                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 DangerResetRow(title: "Reset journal",
@@ -229,10 +199,10 @@ private struct DangerResetRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 13, weight: emphatic ? .heavy : .semibold,
+                Text(title).font(.system(size: 15, weight: emphatic ? .heavy : .semibold,
                                           design: emphatic ? .rounded : .default))
                     .foregroundStyle(emphatic ? tint : Palette.text)
-                Text(subtitle).font(.system(size: 11)).foregroundStyle(Palette.faint)
+                Text(subtitle).font(.system(size: 13)).foregroundStyle(Palette.faint)
             }
             Spacer()
             Button { show = true } label: {

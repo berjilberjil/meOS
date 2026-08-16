@@ -102,9 +102,15 @@ struct CreateEventIntent: AppIntent {
             result: .result(dialog: IntentDialog(stringLiteral:
                 "Add \(clean) on \(EventVoice.spokenDate(key, today: today))?")))
 
-        try await EventIntentStore().addEvent(title: clean, dateKey: key)
-        return .result(dialog: IntentDialog(stringLiteral:
-            EventVoice.spokenCreated(title: clean, date: key, today: today)))
+        let item = try await EventIntentStore().addEvent(title: clean, dateKey: key)
+        let tag = item.tagIDs.first.flatMap { id in
+            ["travel": "travel", "family": "family", "work": "work",
+             "personal": "personal", "milestone": "a milestone",
+             "reminder": "a reminder", "other": "other"][id]
+        } ?? "personal"
+        let spoken = EventVoice.spokenCreated(title: clean, date: key, today: today)
+            .dropLast() // strip trailing period
+        return .result(dialog: IntentDialog(stringLiteral: "\(spoken) as \(tag)."))
     }
 }
 

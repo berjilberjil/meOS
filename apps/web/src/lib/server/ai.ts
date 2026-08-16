@@ -91,11 +91,11 @@ function envFallback(feature: Feature): Resolved {
   if (!key) throw new Error('AI is not configured on the server');
   let model: string;
   if (feature === 'chat') {
-    model = env.GEMINI_CHAT_MODEL ?? 'gemini-flash-latest';
+    model = env.GEMINI_CHAT_MODEL ?? env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite';
   } else if (feature === 'plan') {
     model = env.GEMINI_REASONING_MODEL ?? env.GEMINI_MODEL ?? 'gemini-flash-latest';
   } else {
-    model = env.GEMINI_MODEL ?? 'gemini-flash-latest';
+    model = env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite';
   }
   return buildModel('gemini', key, model);
 }

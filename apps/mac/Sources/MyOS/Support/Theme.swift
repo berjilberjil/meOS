@@ -60,20 +60,12 @@ struct AppTheme: Identifiable, Hashable {
     let brand, brandDeep, green: Color
 
     static let foldDark = AppTheme(
-        id: "foldDark", name: "Fold Dark",
+        id: "foldDark", name: "Dark",
         bg: Color(hex: 0x000000), sidebar: Color(hex: 0x000000),
         surface: Color(hex: 0x151515), surface2: Color(hex: 0x242424), elevated: Color(hex: 0x1B1B1B),
         border: Color(hex: 0x242424), borderStrong: Color(hex: 0x333333), ring: Color(hex: 0x242424),
         text: Color(hex: 0xFFFFFF), muted: Color(hex: 0x9A9A9A), faint: Color(hex: 0x5E5E5E),
         brand: Color(hex: 0x1FD37A), brandDeep: Color(hex: 0x12A85E), green: Color(hex: 0x1FD37A))
-
-    static let midnight = AppTheme(
-        id: "midnight", name: "Midnight",
-        bg: Color(hex: 0x0B0F1A), sidebar: Color(hex: 0x080B14),
-        surface: Color(hex: 0x141A28), surface2: Color(hex: 0x1F2739), elevated: Color(hex: 0x18202F),
-        border: Color(hex: 0x232C40), borderStrong: Color(hex: 0x33405B), ring: Color(hex: 0x232C40),
-        text: Color(hex: 0xF3F5FA), muted: Color(hex: 0x93A0B8), faint: Color(hex: 0x5A6784),
-        brand: Color(hex: 0x6E8BFF), brandDeep: Color(hex: 0x4C63D6), green: Color(hex: 0x35D07A))
 
     static let light = AppTheme(
         id: "light", name: "Light",
@@ -83,8 +75,15 @@ struct AppTheme: Identifiable, Hashable {
         text: Color(hex: 0x0B0D12), muted: Color(hex: 0x5C6470), faint: Color(hex: 0x99A1AE),
         brand: Color(hex: 0x12B76A), brandDeep: Color(hex: 0x0E9257), green: Color(hex: 0x12B76A))
 
-    static let all: [AppTheme] = [foldDark, midnight, light]
-    static func by(id: String) -> AppTheme { all.first { $0.id == id } ?? foldDark }
+    static let all: [AppTheme] = [foldDark, light]
+    static func by(id: String) -> AppTheme {
+        if id == light.id { return light }
+        return foldDark
+    }
+
+    /// Drives system chrome (status bar, sheets, keyboards). Light is the only
+    /// light scheme; everything else — including a leftover Midnight id — is dark.
+    var colorScheme: ColorScheme { id == AppTheme.light.id ? .light : .dark }
 }
 
 /// Holds the active theme app-wide and persists the choice. Views pick up a change
@@ -95,6 +94,7 @@ final class ThemeStore: ObservableObject {
     @Published private(set) var theme: AppTheme
     private init() { theme = AppTheme.by(id: UserDefaults.standard.string(forKey: Self.key) ?? "foldDark") }
     func set(_ t: AppTheme) {
+        guard t.id != theme.id else { return }
         theme = t
         UserDefaults.standard.set(t.id, forKey: Self.key)
     }
@@ -124,6 +124,10 @@ enum Palette {
     static let purple = Color(hex: 0xB98CFF)
     static let flame  = Color(hex: 0xFF8A3D)
     static let ice    = Color(hex: 0x7FD1FF)
+    static let rose   = Color(hex: 0xFF6B9A)
+    static let teal   = Color(hex: 0x2DD4BF)
+    static let gold   = Color(hex: 0xF5C451)
+    static let coral  = Color(hex: 0xFF7A59)
 }
 
 enum Radius {
@@ -134,19 +138,38 @@ enum Radius {
     static let xl: CGFloat = 28   // dialogs / modals
 }
 
-// Motion tokens.
+// Motion tokens. Springs use Apple's designer pair (WWDC 2018): response +
+// damping ratio. Default UI is critically damped (no bounce). Bounce is only
+// for momentum-driven moves (tab pop, flick).
 enum Motion {
     static let fast   = 0.10   // interactions (hover / press)
     static let normal = 0.18   // toggles / segmented
     static let slow   = 0.28
+    /// Theme / chrome color settle — Apple "move" spring.
+    static let theme  = 0.40
+
+    static var reduceMotion: Bool {
+        #if os(iOS)
+        UIAccessibility.isReduceMotionEnabled
+        #else
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        #endif
+    }
 }
 
 extension Animation {
     static let knFast     = Animation.easeOut(duration: Motion.fast)
     static let knNormal   = Animation.easeInOut(duration: Motion.normal)
-    // A calm, barely-there settle — Fold's motion is smooth, not bouncy.
-    static let knEntrance = Animation.spring(response: 0.5, dampingFraction: 0.9)
+    // Critically damped — graceful, no overshoot (Apple default).
+    static let knEntrance = Animation.spring(response: 0.45, dampingFraction: 1.0)
+    // Slight bounce only because a tap already carried intent/momentum.
     static let knPop      = Animation.spring(response: 0.34, dampingFraction: 0.88)
+    /// Dark ↔ light. Interrupted retargets from the live color (no snap).
+    static var knTheme: Animation {
+        Motion.reduceMotion
+            ? .easeInOut(duration: 0.2)
+            : .spring(response: Motion.theme, dampingFraction: 1.0)
+    }
 }
 
 // MARK: - Elevation
@@ -155,9 +178,10 @@ extension View {
     /// Soft, layered shadow for floating surfaces. Toned down from the original
     /// 0.5/0.3 opacity + 26/14 radius, which read as too heavy.
     func knShadow(_ strong: Bool = false) -> some View {
-        shadow(color: .black.opacity(strong ? 0.4 : 0.25),
-               radius: strong ? 16 : 7,
-               x: 0, y: strong ? 8 : 3)
+        let light = ThemeStore.shared.theme.id == "light"
+        return shadow(color: light ? .clear : .black.opacity(strong ? 0.4 : 0.25),
+                      radius: light ? 0 : (strong ? 16 : 7),
+                      x: 0, y: light ? 0 : (strong ? 8 : 3))
     }
 }
 
@@ -168,6 +192,7 @@ extension View {
 struct Card<Content: View>: View {
     var padding: CGFloat = 18
     var radius: CGFloat = Radius.lg
+    @ObservedObject private var themeStore = ThemeStore.shared
     @ViewBuilder var content: Content
     var body: some View {
         content
@@ -179,6 +204,7 @@ struct Card<Content: View>: View {
                     .strokeBorder(Palette.border, lineWidth: 1)
             )
             .knShadow()
+            .animation(.knTheme, value: themeStore.theme.id)
     }
 }
 

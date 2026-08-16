@@ -71,7 +71,13 @@
 	<key>NSCameraUsageDescription</key>
 	<string>MyOS uses your camera to scan receipts, food labels, and portfolio screens straight into your data.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MyOS reads a photo you pick so AI can turn it into transactions, food, or holdings.</string>
+	<string>MyOS reads photos you pick and the ones you heart in Favorites so today’s body shot lands in Fitness automatically.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>MyOS saves a progress photo to your library when you tap Save.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>MyOS reads today’s step count from Apple Health so Fitness stays in sync without typing.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>MyOS reads today’s steps from your iPhone so the Fitness tab stays current.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<!-- Dev convenience: reach the localhost backend + your future HTTPS domain.

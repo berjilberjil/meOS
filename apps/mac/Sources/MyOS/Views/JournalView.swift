@@ -14,6 +14,7 @@ func moodStop(atX x: CGFloat, width: CGFloat) -> Int {
 
 struct JournalView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var signals = UISignals.shared
 
     @State private var viewedDate: String = AppState.dateKey(Date())
     @State private var showCalendar = false
@@ -25,7 +26,6 @@ struct JournalView: View {
     enum JSeg: String, CaseIterable, Hashable { case events, journal }
     @State private var jseg: JSeg = .events
     @State private var showPresets = false
-    @ObservedObject private var signals = UISignals.shared
     #endif
 
     var body: some View {
@@ -33,7 +33,7 @@ struct JournalView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text(jseg == .events ? "Events" : "Journal")
-                    .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                    .font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Spacer()
                 if jseg == .journal {
                     Button { showPresets = true } label: {
@@ -71,11 +71,24 @@ struct JournalView: View {
         }
         // A double-tap on the Journal tab jumps to Events so its editor can open.
         .onChange(of: signals.pendingNewEvent) { _, now in if now { jseg = .events } }
+        .onChange(of: signals.pendingJournalDate) { _, key in consumeJournalDate(key) }
+        .onAppear { consumeJournalDate(signals.pendingJournalDate) }
         #else
         VStack(alignment: .leading, spacing: 18) {
             header.knRise(0)
             dayContent
         }
+        .onChange(of: signals.pendingJournalDate) { _, key in consumeJournalDate(key) }
+        .onAppear { consumeJournalDate(signals.pendingJournalDate) }
+        #endif
+    }
+
+    private func consumeJournalDate(_ key: String?) {
+        guard let key, !key.isEmpty else { return }
+        UISignals.shared.pendingJournalDate = nil
+        viewedDate = key
+        #if os(iOS)
+        jseg = .journal
         #endif
     }
 
@@ -189,7 +202,7 @@ struct JournalView: View {
             .buttonStyle(KPressStyle())
             .help("Open calendar")
             .popover(isPresented: $showCalendar, arrowEdge: .bottom) {
-                JournalCalendar(viewedDate: $viewedDate, isPresented: $showCalendar)
+                StreakCalendar(viewedDate: $viewedDate, isPresented: $showCalendar)
                     .environmentObject(state)
             }
 
@@ -360,15 +373,21 @@ private struct StreakCard: View {
 
 // MARK: - Month calendar popover
 
-private struct JournalCalendar: View {
+/// Month grid of fire / freeze days. Compact popover on Journal; wide sheet from Today.
+struct StreakCalendar: View {
     @EnvironmentObject var state: AppState
     @Binding var viewedDate: String
     @Binding var isPresented: Bool
+    var wide: Bool = false
+    var onSelect: ((String) -> Void)? = nil
     @State private var monthAnchor: String   // first-of-month key, yyyy-MM-01
 
-    init(viewedDate: Binding<String>, isPresented: Binding<Bool>) {
+    init(viewedDate: Binding<String>, isPresented: Binding<Bool>,
+         wide: Bool = false, onSelect: ((String) -> Void)? = nil) {
         _viewedDate = viewedDate
         _isPresented = isPresented
+        self.wide = wide
+        self.onSelect = onSelect
         _monthAnchor = State(initialValue: String(viewedDate.wrappedValue.prefix(7)) + "-01")
     }
 
@@ -381,9 +400,10 @@ private struct JournalCalendar: View {
             grid
             legend
         }
-        .padding(14)
-        .frame(width: 268)
-        .background(Palette.elevated)
+        .padding(wide ? 18 : 14)
+        .frame(width: wide ? nil : 268)
+        .frame(maxWidth: wide ? .infinity : nil)
+        .background(wide ? Palette.bg : Palette.elevated)
     }
 
     /// What the flames mean — lit vs frozen.
@@ -467,7 +487,8 @@ private struct JournalCalendar: View {
         let day = state.journalStreakDay(key)
 
         return Button {
-            viewedDate = key
+            if let onSelect { onSelect(key) }
+            else { viewedDate = key }
             isPresented = false
         } label: {
             VStack(spacing: 3) {

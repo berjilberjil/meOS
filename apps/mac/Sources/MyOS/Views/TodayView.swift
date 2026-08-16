@@ -10,43 +10,83 @@ struct TodayView: View {
 
     @State private var newFocus = ""
     @FocusState private var focusFieldActive: Bool
+    @State private var pendingTodoDelete: String?
     @State private var expandedNews: Set<String> = []
+    @State private var editingMeal: MealKey?
+    @State private var showStreakCal = false
 
     private let cols = [GridItem(.adaptive(minimum: 168), spacing: 12)]
+    private let mealCols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header.knRise(0)
-
-            // KPI row
-            LazyVGrid(columns: cols, spacing: 12) {
-                StatTile(label: "Journal streak",
-                         value: "\(state.journalStreak)d",
-                         accent: Palette.brand)
-            }
-            .knRise(1)
-
-            if !state.nextEvents.isEmpty { comingUpCard.knRise(2) }
-            suggestionsCard.knRise(2)
-            newsCard.knRise(3)
+            DayMacroHero().knRise(1)
+            mealsCard.knRise(1)
+            comingUpCard.knRise(2)
+            #if os(iOS)
+            BodyPhotosCard().knRise(3)
+            #endif
+            WatchLogCard().knRise(4)
             focusCard.knRise(4)
-            habitsCard.knRise(5)
-
-            // Module snapshots
-            SectionTitle(text: "Jump back in").knRise(6)
-            LazyVGrid(columns: cols, spacing: 12) {
-                snapshot("Fitness", Palette.blue, "figure.run",
-                         line1: weightLine, line2: proteinLine) { go(.fitness) }
-                snapshot("Journal", Palette.purple, "book.closed.fill",
-                         line1: journalLine, line2: moodLine) { go(.journal) }
-                snapshot("Notes", Palette.amber, "note.text",
-                         line1: "\(state.notes.count) notes", line2: "Capture an idea") { go(.notes) }
-            }
-            .knRise(7)
+            newsCard.knRise(5)
+            #if os(macOS)
+            settingsCard.knRise(7)
+            #endif
         }
         .task {
-            if state.suggestions == nil { await state.fetchSuggestions() }
             if state.news == nil { await state.fetchNews() }
+        }
+        .sheet(item: $editingMeal) { meal in
+            MealLogEditorSheet(date: state.todayKey, meal: meal,
+                               initialItems: state.mealLog(state.todayKey).items(meal))
+        }
+        .sheet(isPresented: $showStreakCal) { streakCalendarSheet }
+    }
+
+    private var mealsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionTitle(text: "Meals")
+            LazyVGrid(columns: mealCols, spacing: 10) {
+                ForEach(MealKey.allCases) { meal in mealTile(meal) }
+            }
+        }
+    }
+
+    private func mealTile(_ meal: MealKey) -> some View {
+        let st = state.mealState(state.todayKey, meal)
+        let items = state.mealLog(state.todayKey).items(meal)
+        let names = items.compactMap { state.food($0.foodId)?.name }
+        return Button { editingMeal = meal } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: meal.icon).font(.system(size: 12, weight: .semibold))
+                    Text(meal.label).font(.system(size: 13, weight: .semibold))
+                    Spacer(minLength: 0)
+                    if st == .logged {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundStyle(Palette.green)
+                    }
+                }
+                .foregroundStyle(Palette.text)
+                Text(mealSubtitle(st, names))
+                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 28, alignment: .top)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
+        }
+        .buttonStyle(KPressStyle())
+    }
+
+    private func mealSubtitle(_ st: MealLog.MealState, _ names: [String]) -> String {
+        switch st {
+        case .logged: return names.isEmpty ? "Logged" : names.joined(separator: ", ")
+        case .skipped: return "Skipped"
+        case .unconfirmed: return names.isEmpty ? "Tap to log" : names.joined(separator: ", ")
         }
     }
 
@@ -61,9 +101,14 @@ struct TodayView: View {
                     Button { go(.events) } label: { Label("All events", systemImage: "calendar") }
                         .buttonStyle(KGhostButtonStyle())
                 }
-                ForEach(state.nextEvents) { e in
-                    Button { go(.events) } label: { eventLine(e) }
-                        .buttonStyle(KPressStyle())
+                if state.nextEvents.isEmpty {
+                    Text("Nothing coming up. Tap All events to add one.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                } else {
+                    ForEach(state.nextEvents) { e in
+                        Button { go(.events) } label: { eventLine(e) }
+                            .buttonStyle(KPressStyle())
+                    }
                 }
             }
         }
@@ -125,14 +170,7 @@ struct TodayView: View {
                     .disabled(state.newsBusy)
                 }
                 if let n = state.news, !n.items.isEmpty {
-                    HStack(alignment: .top, spacing: 18) {
-                        newsColumn("Tech", tint: Palette.purple, icon: "cpu.fill",
-                                   items: n.items.filter { techCats.contains($0.category) })
-                        Rectangle().fill(Palette.border).frame(width: 1)
-                        newsColumn("Finance", tint: Palette.green, icon: "indianrupeesign.circle.fill",
-                                   items: n.items.filter { financeCats.contains($0.category) })
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
+                    newsColumns(n)
                     Text("Surfaced with AI · Google Search · tap a story for more")
                         .font(.system(size: 9)).foregroundStyle(Palette.faint)
                 } else if state.newsBusy {
@@ -147,6 +185,24 @@ struct TodayView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func newsColumns(_ n: NewsResult) -> some View {
+        let tech = newsColumn("Tech", tint: Palette.purple, icon: "cpu.fill",
+                              items: n.items.filter { techCats.contains($0.category) })
+        let finance = newsColumn("Finance", tint: Palette.green, icon: "indianrupeesign.circle.fill",
+                                 items: n.items.filter { financeCats.contains($0.category) })
+        #if os(iOS)
+        VStack(alignment: .leading, spacing: 16) { tech; finance }
+        #else
+        HStack(alignment: .top, spacing: 18) {
+            tech
+            Rectangle().fill(Palette.border).frame(width: 1)
+            finance
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        #endif
     }
 
     private func newsColumn(_ title: String, tint: Color, icon: String, items: [NewsResult.Item]) -> some View {
@@ -358,119 +414,206 @@ struct TodayView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(greeting + ", " + state.profile.name)
-                .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
-            Text(prettyDate).font(.system(size: 13)).foregroundStyle(Palette.muted)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(greeting + ", " + state.profile.name)
+                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                Text(weekdayName)
+                    .font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                Text(prettyDate).font(.system(size: 13)).foregroundStyle(Palette.muted)
+            }
+            Spacer(minLength: 8)
+            streakChip
         }
     }
 
-    private var focusCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionTitle(text: "Today's focus")
-                let items = state.todayPlan().focus
-                if items.isEmpty {
-                    Text("What are the 1–3 things that matter today?")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+    /// `{fire|freeze} {n} days` — tap opens journal, hold opens the calendar.
+    private var streakChip: some View {
+        let n = state.journalStreak
+        let todayDone = state.journalHasContent(state.todayKey)
+        let ice = n > 0 && !todayDone
+        return Button { go(.journal) } label: {
+            HStack(spacing: 8) {
+                StreakFlame(day: ice ? .frozen : (n > 0 || todayDone ? .done : .none), size: 20)
+                Text("\(n)")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.text)
+                Text(n == 1 ? "day" : "days")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.muted)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Palette.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder((ice ? Palette.ice : Palette.flame).opacity(0.4), lineWidth: 1.5))
+        }
+        .buttonStyle(KPressStyle())
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+            Haptics.tap()
+            showStreakCal = true
+        })
+        .accessibilityLabel("Journal streak, \(n) days. Hold for calendar.")
+        .help("Tap to journal. Hold for the streak calendar.")
+    }
+
+    private var streakCalendarSheet: some View {
+        NavigationStack {
+            StreakCalendar(
+                viewedDate: .constant(state.todayKey),
+                isPresented: $showStreakCal,
+                wide: true,
+                onSelect: { key in
+                    UISignals.shared.pendingJournalDate = key
+                    showStreakCal = false
+                    go(.journal)
                 }
-                ForEach(Array(items.enumerated()), id: \.offset) { idx, item in
-                    HStack(spacing: 10) {
-                        Image(systemName: "circle").font(.system(size: 12)).foregroundStyle(Palette.brand)
-                        Text(item).font(.system(size: 14)).foregroundStyle(Palette.text)
-                        Spacer()
-                        Button {
-                            var f = items; f.remove(at: idx); state.setFocus(f)
-                        } label: {
-                            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                        }
-                        .buttonStyle(KIconButtonStyle(size: 22))
-                    }
-                }
-                if items.count < 3 {
-                    HStack(spacing: 8) {
-                        TextField("", text: $newFocus,
-                                  prompt: Text("Add a priority…").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(Palette.text)
-                            .focused($focusFieldActive)
-                            .onSubmit(addFocus)
-                        Button(action: addFocus) {
-                            Image(systemName: "arrow.up.circle.fill").font(.system(size: 18))
-                                .foregroundStyle(Palette.brand)
-                        }
-                        .buttonStyle(KPressStyle())
-                        .opacity(newFocus.isEmpty ? 0.35 : 1)
-                        .disabled(newFocus.isEmpty)
-                    }
-                    .knField(focused: focusFieldActive)
+            )
+            .padding(16)
+            #if os(iOS)
+            .navigationTitle("Streak")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showStreakCal = false }
+                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.brand)
                 }
             }
+            #endif
         }
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationBackground(Palette.bg)
+        #else
+        .frame(width: 360, height: 420)
+        #endif
     }
 
-    private var habitsCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    SectionTitle(text: "Habits")
-                    Spacer()
-                    Text("\(state.habitsDoneToday())/\(state.profile.habits.count)")
-                        .font(.system(size: 11, weight: .semibold)).monospacedDigit()
-                        .foregroundStyle(Palette.muted)
-                }
-                FlowHabits(habits: state.profile.habits,
-                           done: state.todayPlan().habits) { state.toggleHabit($0) }
-            }
-        }
-    }
-
-    private func snapshot(_ title: String, _ color: Color, _ icon: String,
-                          line1: String, line2: String, tap: @escaping () -> Void) -> some View {
-        Button(action: tap) {
-            Card(padding: 15) {
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack(spacing: 9) {
-                        Image(systemName: icon)
-                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(color)
-                            .frame(width: 20, height: 20)
-                            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+    private var productivityCard: some View {
+        let todayVideos = state.watch.filter { $0.addedAt.hasPrefix(state.todayKey) }
+        let openNotes = state.watch.filter { $0.watched && $0.takeaway.trimmingCharacters(in: .whitespaces).isEmpty }.count
+        return Button {
+            #if os(macOS)
+            go(.productivity)
+            #endif
+        } label: {
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        SectionTitle(text: "Today")
                         Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Palette.faint)
+                        Text("\(todayVideos.count)")
+                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Palette.text).monospacedDigit()
                     }
-                    Text(line1).font(.system(size: 13)).foregroundStyle(Palette.muted)
-                    Text(line2).font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    prodBar(label: "Logged", value: todayVideos.isEmpty ? 0 : 1, detail: todayVideos.isEmpty ? "No videos yet" : "\(todayVideos.count) video\(todayVideos.count == 1 ? "" : "s")")
+                    prodBar(label: "Takeaways", value: openNotes == 0 && !state.watch.isEmpty ? 1 : 0,
+                            detail: openNotes == 0 ? "Clear" : "\(openNotes) still open")
+                    Text("Same log as Productivity on Mac.")
+                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
                 }
             }
         }
         .buttonStyle(KPressStyle())
-        .knHoverLift()
     }
 
-    // Snapshot lines
-    private var weightLine: String {
-        if let w = state.fitnessDay(state.todayKey).weightKg { return "\(Fmt.trimKg(w)) kg today" }
-        return "No weight logged"
+    private func prodBar(label: String, value: Double, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.muted)
+                Spacer()
+                Text(detail).font(.system(size: 11)).foregroundStyle(Palette.faint)
+            }
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Palette.surface2).frame(height: 5)
+                    Capsule().fill(Palette.text).frame(width: max(4, g.size.width * value), height: 5)
+                }
+            }
+            .frame(height: 5)
+        }
     }
-    private var proteinLine: String {
-        let p = state.consumed(state.todayKey).protein
-        return "\(Int(p)) g protein"
+
+    private var settingsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle(text: "Look")
+            AppearanceCard()
+        }
     }
-    private var journalLine: String {
-        let e = state.journalEntry(state.todayKey)
-        let done = !e.morning.isEmpty || !e.night.isEmpty
-        return done ? "Journalled today" : "Not journalled yet"
+
+    private var focusCard: some View {
+        let items = state.todayPlan().todos
+        return Card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    SectionTitle(text: "Today's focus")
+                    Spacer()
+                    if !items.isEmpty {
+                        Text("\(items.filter(\.done).count)/\(items.count)")
+                            .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                            .foregroundStyle(Palette.faint)
+                    }
+                }
+                if items.isEmpty {
+                    Text("Add the things you need to do today. Tap to check them off.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                }
+                ForEach(items) { item in
+                    todoRow(item)
+                }
+                HStack(spacing: 8) {
+                    TextField("", text: $newFocus,
+                              prompt: Text("Add a to-do…").foregroundColor(Palette.faint))
+                        .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(Palette.text)
+                        .focused($focusFieldActive)
+                        .onSubmit(addFocus)
+                    Button(action: addFocus) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 18))
+                            .foregroundStyle(Palette.teal)
+                    }
+                    .buttonStyle(KPressStyle())
+                    .opacity(newFocus.isEmpty ? 0.35 : 1)
+                    .disabled(newFocus.isEmpty)
+                }
+                .knField(focused: focusFieldActive)
+            }
+        }
+        .holdToDelete(
+            isPresented: Binding(get: { pendingTodoDelete != nil },
+                                 set: { if !$0 { pendingTodoDelete = nil } }),
+            title: "Remove this to-do?",
+            message: "This can't be undone."
+        ) {
+            if let id = pendingTodoDelete { state.removeTodo(id) }
+            pendingTodoDelete = nil
+        }
     }
-    private var moodLine: String {
-        if let m = state.journalEntry(state.todayKey).mood { return "Mood \(m)/5" }
-        return "Log your mood"
+
+    private func todoRow(_ item: FocusItem) -> some View {
+        HStack(spacing: 10) {
+            Button { state.toggleTodo(item.id) } label: {
+                Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(item.done ? Palette.green : Palette.teal)
+            }
+            .buttonStyle(KPressStyle())
+            Text(item.text)
+                .font(.system(size: 15, weight: .medium))
+                .strikethrough(item.done, color: Palette.faint)
+                .foregroundStyle(item.done ? Palette.faint : Palette.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture { state.toggleTodo(item.id) }
+            Button { pendingTodoDelete = item.id } label: {
+                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+            }
+            .buttonStyle(KIconButtonStyle(size: 22))
+        }
     }
 
     private func addFocus() {
         let t = newFocus.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty else { return }
-        var f = state.todayPlan().focus; f.append(t); state.setFocus(f)
+        state.addTodo(t)
         newFocus = ""
     }
 
@@ -483,8 +626,12 @@ struct TodayView: View {
         default: return "Still up"
         }
     }
+    private var weekdayName: String {
+        let f = DateFormatter(); f.dateFormat = "EEEE"
+        return f.string(from: Date())
+    }
     private var prettyDate: String {
-        let f = DateFormatter(); f.dateFormat = "EEEE, d MMMM"
+        let f = DateFormatter(); f.dateFormat = "d MMMM yyyy"
         return f.string(from: Date())
     }
 }

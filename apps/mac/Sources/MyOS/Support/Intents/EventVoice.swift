@@ -137,4 +137,22 @@ enum EventVoice {
     static func spokenCreated(title: String, date: String, today: String) -> String {
         "Added \(title) \(relativePhrase(from: today, to: date))."
     }
+
+    /// Pick a built-in event tag from a spoken/typed title so Siri (and any
+    /// one-line capture) files the event without a follow-up. First strong
+    /// match wins; unknown language falls back to `personal`.
+    static func tagID(forTitle raw: String) -> String {
+        let t = raw.lowercased()
+        let rules: [(String, [String])] = [
+            ("travel", ["trip", "flight", "airport", "vacation", "travel", "goa", "hotel", "train"]),
+            ("family", ["dad", "mom", "mum", "birthday", "wedding", "anniversary", "family", "kids"]),
+            ("work", ["standup", "stand-up", "meeting", "office", "deadline", "interview", "sprint", "work"]),
+            ("milestone", ["graduation", "launch", "debut", "milestone"]),
+            ("reminder", ["pay", "due", "renew", "remind", "bill", "rent"])
+        ]
+        for (id, words) in rules where words.contains(where: { t.contains($0) }) {
+            return id
+        }
+        return "personal"
+    }
 }

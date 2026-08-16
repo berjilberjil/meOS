@@ -75,6 +75,80 @@ struct FitnessProfileEditor: View {
     }
 }
 
+// MARK: - Personal details (Settings + iPhone)
+
+/// Name, city, work, about — the facts Catherine uses. Clean, large fields.
+struct PersonDetailsEditor: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        Card {
+        VStack(alignment: .leading, spacing: 16) {
+            field("Name", name)
+            field("Age", age)
+            field("City", city)
+            field("Hometown", hometown)
+            field("Role", role)
+            field("Work", work)
+            VStack(alignment: .leading, spacing: 6) {
+                KFieldLabel(text: "About you")
+                TextEditor(text: about)
+                    .font(.system(size: 16)).foregroundStyle(Palette.text)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 120)
+                    .padding(10)
+                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(Palette.border, lineWidth: 1))
+            }
+            Text("Catherine reads this when she judges a scan or answers you.")
+                .font(.system(size: 14)).foregroundStyle(Palette.faint)
+        }
+        }
+    }
+
+    private var name: Binding<String> {
+        Binding(get: { state.profile.name }, set: { v in state.updateProfile { $0.name = v } })
+    }
+    private var city: Binding<String> {
+        Binding(get: { state.profile.city }, set: { v in state.updateProfile { $0.city = v } })
+    }
+    private var hometown: Binding<String> {
+        Binding(get: { state.profile.hometown }, set: { v in state.updateProfile { $0.hometown = v } })
+    }
+    private var role: Binding<String> {
+        Binding(get: { state.profile.role }, set: { v in state.updateProfile { $0.role = v } })
+    }
+    private var work: Binding<String> {
+        Binding(get: { state.profile.work }, set: { v in state.updateProfile { $0.work = v } })
+    }
+    private var about: Binding<String> {
+        Binding(get: { state.profile.about }, set: { v in state.updateProfile { $0.about = v } })
+    }
+    private var age: Binding<String> {
+        Binding(
+            get: { state.profile.age.map(String.init) ?? "" },
+            set: { v in state.updateProfile { $0.age = Int(v.filter(\.isNumber)) } }
+        )
+    }
+
+    private func field(_ label: String, _ text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            KFieldLabel(text: label)
+            TextField("", text: text, prompt: Text(label).foregroundColor(Palette.faint))
+                .textFieldStyle(.plain).font(.system(size: 17)).foregroundStyle(Palette.text)
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    .strokeBorder(Palette.border, lineWidth: 1))
+        }
+    }
+
+    private func num(_ label: String, _ text: Binding<String>) -> some View {
+        field(label, text)
+    }
+}
+
 // MARK: - Journal presets editor (manage the quick-add chips)
 
 /// Edit the six journal preset sets. Each section shows its chips (removable)

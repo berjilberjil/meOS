@@ -202,11 +202,20 @@ final class APIClient {
         return try decoder.decode(ParseResult.self, from: data)
     }
 
-    /// Read one or more food photos (nutrition label / product pack / menu). mode: "food".
-    func parseImage(imagesBase64: [String], mediaType: String, mode: String) async throws -> ImageParseResult {
-        let body = ImageRequest(images: imagesBase64, mediaType: mediaType, mode: mode)
+    /// Read one or more photos. mode: "food" (library) or "scan" (food vs object).
+    func parseImage(imagesBase64: [String], mediaType: String, mode: String, context: String = "") async throws -> ImageParseResult {
+        let body = ImageRequest(images: imagesBase64, mediaType: mediaType, mode: mode, context: context)
         let data = try await request("POST", "api/parse-image", body: body, using: aiSession)
         return try decoder.decode(ImageParseResult.self, from: data)
+    }
+
+    struct EventCategoryDTO: Codable { let tagId: String; let reason: String }
+
+    /// Classify a spoken/typed event into a built-in tag.
+    func categorizeEvent(title: String, date: String) async throws -> EventCategoryDTO {
+        let data = try await request("POST", "api/categorize-event",
+                                     body: ["title": title, "date": date], using: aiSession)
+        return try decoder.decode(EventCategoryDTO.self, from: data)
     }
 
     /// Mentor chat. Sends the conversation + a data snapshot + who the assistant
@@ -214,7 +223,13 @@ final class APIClient {
     func chat(messages: [ChatTurn], context: String, agent: AgentInfo) async throws -> String {
         let body = ChatRequest(messages: messages, context: context, agent: agent)
         let data = try await request("POST", "api/chat", body: body, using: aiSession)
-        return try decoder.decode(ChatReply.self, from: data).reply
+        let decoded: String
+        if let boxed = try? decoder.decode(ChatReply.self, from: data) {
+            decoded = boxed.reply
+        } else {
+            decoded = String(data: data, encoding: .utf8) ?? ""
+        }
+        return ChatText.unwrap(decoded)
     }
 
     /// Streaming mentor chat. Yields the growing reply text as tokens arrive (the
@@ -319,6 +334,7 @@ final class APIClient {
         let images: [String]
         let mediaType: String
         let mode: String
+        let context: String
     }
     struct ChatTurn: Encodable { let role: String; let content: String }
     struct AgentInfo: Encodable { let name: String; let tone: String; let custom: String }

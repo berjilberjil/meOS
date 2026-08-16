@@ -4,6 +4,7 @@ import SwiftUI
 /// opens to). Device-local via `PrefsStore`. Shared by mac + iOS; the tab list
 /// is the full set on mac and just the bottom-bar tabs on iOS.
 struct GeneralSettingsCard: View {
+    var boxed = true
     @ObservedObject private var prefs = PrefsStore.shared
 
     #if os(iOS)
@@ -13,37 +14,36 @@ struct GeneralSettingsCard: View {
     #endif
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
+        let inner = VStack(alignment: .leading, spacing: 6) {
+            if boxed {
                 SectionTitle(text: "General")
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Launch tab").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                        Text("Which screen MyOS opens to.").font(.system(size: 11)).foregroundStyle(Palette.faint)
-                    }
-                    Spacer()
-                    Menu {
-                        ForEach(options) { t in
-                            Button { prefs.launchTab = t } label: {
-                                if t == prefs.launchTab { Label(t.title, systemImage: "checkmark") }
-                                else { Text(t.title) }
-                            }
+                    .padding(.bottom, 8)
+            } else {
+                Text("Which screen opens when you launch MyOS.")
+                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                    .padding(.bottom, 8)
+            }
+            ForEach(Array(options.enumerated()), id: \.element.id) { i, t in
+                if i > 0 { Rectangle().fill(Palette.border).frame(height: 1) }
+                Button { prefs.launchTab = t } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: t.icon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(t.tint)
+                            .frame(width: 28)
+                        Text(t.title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                        Spacer()
+                        if t == prefs.launchTab {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20)).foregroundStyle(Palette.green)
                         }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: prefs.launchTab.icon).font(.system(size: 12))
-                            Text(prefs.launchTab.title).font(.system(size: 13, weight: .semibold))
-                            Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint)
-                        }
-                        .foregroundStyle(Palette.text)
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .strokeBorder(Palette.border, lineWidth: 1))
                     }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(KPressStyle())
             }
         }
+        Card { inner }
     }
 }

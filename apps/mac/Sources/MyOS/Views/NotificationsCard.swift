@@ -4,13 +4,19 @@ import SwiftUI
 /// Master toggle requests notification permission; each row has its own time and
 /// on/off. Device-local via `ReminderStore`. Shared by mac + iOS.
 struct NotificationsCard: View {
+    var boxed = true
     @ObservedObject private var store = ReminderStore.shared
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    SectionTitle(text: "Reminders")
+        let inner = VStack(alignment: .leading, spacing: 14) {
+                if boxed { SectionTitle(text: "Reminders") }
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("All reminders")
+                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("Eat, train, log weight and journal.")
+                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    }
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { store.enabled },
@@ -20,19 +26,17 @@ struct NotificationsCard: View {
                         }
                     )).labelsHidden().tint(Palette.brand)
                 }
-                Text("Daily nudges to eat, train, and log your weight + journal.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
 
                 if store.enabled {
                     ForEach(store.reminders) { r in
                         Divider().overlay(Palette.border)
-                        HStack(spacing: 10) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(r.label).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                                Text(r.body).font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                        HStack(alignment: .center, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(r.label).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                                Text(r.body).font(.system(size: 13)).foregroundStyle(Palette.faint)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            Spacer()
+                            Spacer(minLength: 8)
                             DatePicker("", selection: timeBinding(r), displayedComponents: .hourAndMinute)
                                 .labelsHidden()
                                 .disabled(!r.enabled)
@@ -44,11 +48,13 @@ struct NotificationsCard: View {
                         }
                     }
                 } else {
-                    Text("Turn on to get reminded at 6am (log), 8am, 12:30pm, 4pm (workout) and 7pm.")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    Text("Turn on to get nudged at 6am, 8am, 12:30pm, 4pm and 7pm.")
+                        .font(.system(size: 14)).foregroundStyle(Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }
+        }
+        Group {
+            if boxed { Card { inner } } else { inner }
         }
         .task { await store.refreshAuthorization() }
     }

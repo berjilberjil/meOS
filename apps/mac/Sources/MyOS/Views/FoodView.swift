@@ -60,10 +60,11 @@ struct FoodLibrarySection: View {
     private func catChip(_ c: FoodCategory?, _ label: String) -> some View {
         let on = category == c
         return Button { category = c } label: {
-            Text(label).font(.system(size: 12, weight: .heavy, design: .rounded))
-                .foregroundStyle(on ? .white : Palette.muted)
-                .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(on ? Palette.brand : Palette.surface2.opacity(0.6), in: Capsule())
+            Text(label).font(.system(size: 12, weight: on ? .semibold : .medium))
+                .foregroundStyle(on ? Palette.text : Palette.muted)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(on ? Palette.surface2 : .clear, in: Capsule())
+                .overlay(Capsule().strokeBorder(on ? Palette.borderStrong : Palette.border, lineWidth: 1))
         }
         .buttonStyle(KPressStyle())
         .onHover { h in cursor(h) }
@@ -71,11 +72,11 @@ struct FoodLibrarySection: View {
 
     private func libRow(_ f: Food) -> some View {
         HStack(spacing: 11) {
-            FoodIcon(category: f.category, size: 34)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(f.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+            FoodIcon(category: f.category, name: f.name, size: 40)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(f.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Text("\(f.servingLabel) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                    .font(.system(size: 13)).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 6)
             if !f.isDefault { Text("CUSTOM").font(.system(size: 8, weight: .heavy)).foregroundStyle(Palette.brand) }
@@ -90,24 +91,13 @@ struct FoodLibrarySection: View {
 
 struct FoodIcon: View {
     let category: FoodCategory
+    var name: String = ""
     var size: CGFloat = 30
     var body: some View {
-        Image(systemName: icon)
-            .font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(color)
+        Text(FoodGlyph.emoji(name: name, category: category))
+            .font(.system(size: size * 0.52))
             .frame(width: size, height: size)
-            .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
-    }
-    private var icon: String {
-        switch category {
-        case .protein: return "fish.fill"
-        case .carb: return "birthday.cake.fill"
-        case .veg: return "leaf.fill"
-        case .dairy: return "drop.fill"
-        case .fruit: return "applelogo"
-        case .drink: return "cup.and.saucer.fill"
-        case .junk: return "takeoutbag.and.cup.and.straw.fill"
-        case .other: return "circle.grid.2x2.fill"
-        }
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
     }
     private var color: Color {
         switch category {
@@ -161,7 +151,7 @@ struct FoodPickerSheet: View {
                     ForEach(results) { f in
                         Button { add(f, 1); dismiss() } label: {
                             HStack(spacing: 10) {
-                                FoodIcon(category: f.category, size: 30)
+                                FoodIcon(category: f.category, name: f.name, size: 30)
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(f.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
                                     Text("\(f.servingLabel) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
@@ -428,7 +418,7 @@ private struct ScanFoodRow: View {
                         .foregroundStyle(draft.include ? Palette.green : Palette.faint)
                 }
                 .buttonStyle(KPressStyle())
-                FoodIcon(category: draft.food.category, size: 28)
+                FoodIcon(category: draft.food.category, name: draft.food.name, size: 28)
                 TextField("Name", text: $draft.food.name)
                     .textFieldStyle(.plain).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
                 Spacer()

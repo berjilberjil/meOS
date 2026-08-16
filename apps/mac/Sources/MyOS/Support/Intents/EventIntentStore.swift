@@ -74,7 +74,12 @@ struct EventIntentStore {
         do { raw = try await api.fetchStateRaw() } catch { throw speakable(error) }
 
         var events = (try? api.decodePayload(fromRaw: raw))?.events ?? []
-        let item = EventItem(date: dateKey, title: title)
+        var tag = EventVoice.tagID(forTitle: title)
+        if let ai = try? await api.categorizeEvent(title: title, date: dateKey),
+           ["travel", "family", "work", "personal", "milestone", "reminder", "other"].contains(ai.tagId) {
+            tag = ai.tagId
+        }
+        let item = EventItem(date: dateKey, title: title, tagIDs: [tag], category: EventCategory(rawValue: tag) ?? .personal)
         events.append(item)
 
         do { try await api.putState(StateKey.events, events) } catch { throw speakable(error) }

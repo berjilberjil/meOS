@@ -172,4 +172,24 @@ final class EventVoiceTests: XCTestCase {
         XCTAssertFalse(EventVoice.isPlausible("1999-08-15", today: today))
         XCTAssertFalse(EventVoice.isPlausible("", today: today))
     }
+
+    // MARK: - Auto-tag from a spoken / typed title (Siri + Today capture)
+
+    func testTagIDMapsTravelFamilyWorkAndReminders() {
+        XCTAssertEqual(EventVoice.tagID(forTitle: "Goa trip next Friday"), "travel")
+        XCTAssertEqual(EventVoice.tagID(forTitle: "Dad's birthday"), "family")
+        XCTAssertEqual(EventVoice.tagID(forTitle: "Standup with the team"), "work")
+        XCTAssertEqual(EventVoice.tagID(forTitle: "Pay the electricity bill"), "reminder")
+        XCTAssertEqual(EventVoice.tagID(forTitle: "College graduation"), "milestone")
+    }
+
+    func testTagIDFallsBackToPersonal() {
+        XCTAssertEqual(EventVoice.tagID(forTitle: "Something vague"), "personal")
+        XCTAssertEqual(EventVoice.tagID(forTitle: "   "), "personal")
+    }
+
+    func testTagIDPrefersTheFirstStrongMatch() {
+        // "flight" is travel even if "meeting" also appears later.
+        XCTAssertEqual(EventVoice.tagID(forTitle: "Flight to the offsite meeting"), "travel")
+    }
 }

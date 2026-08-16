@@ -41,22 +41,18 @@ struct NotesView: View {
             if inDetail { detailView } else { browseView }
         }
         .onDisappear { persistCurrent() }   // flush + drop an untouched empty note
-        .confirmationDialog(
-            "Delete this note?",
+        .holdToDelete(
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-            presenting: pendingDelete
-        ) { note in
-            Button("Delete", role: .destructive) {
-                let wasOpen = note.id == selectedID
-                state.deleteNote(note.id)
-                recentIDs.removeAll { $0 == note.id }
-                unlocked.remove(note.id)
-                if wasOpen { selectFirstAfterDelete() }
-                pendingDelete = nil
-            }
-            Button("Cancel", role: .cancel) { pendingDelete = nil }
-        } message: { note in
-            Text(note.title.isEmpty ? "This can’t be undone." : "“\(note.title)” — this can’t be undone.")
+            title: pendingDelete.map { $0.title.isEmpty ? "Delete this note?" : "Delete “\($0.title)”?" } ?? "Delete this note?",
+            message: "This can't be undone."
+        ) {
+            guard let note = pendingDelete else { return }
+            let wasOpen = note.id == selectedID
+            state.deleteNote(note.id)
+            recentIDs.removeAll { $0 == note.id }
+            unlocked.remove(note.id)
+            if wasOpen { selectFirstAfterDelete() }
+            pendingDelete = nil
         }
     }
 
@@ -90,14 +86,19 @@ struct NotesView: View {
     private var browseHeader: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("Notes").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                .onTapGesture(count: 2) { startNew() }
+                .help("Double-click to write a note")
             if !state.notes.isEmpty {
                 Text("\(state.notes.count)")
                     .font(.system(size: 13, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             }
             Spacer()
-            Button { startNew() } label: { Label("New note", systemImage: "plus") }
-                .buttonStyle(KPrimaryButtonStyle())
+            Button("New note", action: startNew)
                 .keyboardShortcut("n", modifiers: .command)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
@@ -184,18 +185,14 @@ struct NotesView: View {
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help("All notes")
                 Text("Notes").font(.system(size: 20, weight: .bold)).foregroundStyle(Palette.text)
+                    .onTapGesture(count: 2) { startNew() }
+                    .help("Double-click to write a note")
                 if !state.notes.isEmpty {
                     Text("\(state.notes.count)")
                         .font(.system(size: 12, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(Palette.faint)
                 }
                 Spacer()
-                Button { startNew() } label: {
-                    Image(systemName: "square.and.pencil").font(.system(size: 15, weight: .medium))
-                }
-                .buttonStyle(KIconButtonStyle(size: 30, color: Palette.amber))
-                .keyboardShortcut("n", modifiers: .command)
-                .help("New note")
             }
             .padding(.horizontal, 12).padding(.top, 26).padding(.bottom, 8)
 
@@ -309,10 +306,11 @@ struct NotesView: View {
         VStack(spacing: 14) {
             NoteGlyph(s: 64).opacity(0.5)
             Text("No note selected").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.muted)
-            Button { startNew() } label: { Label("New note", systemImage: "plus") }
-                .buttonStyle(KPrimaryButtonStyle())
+            Text("Double-click Notes to write one.").font(.system(size: 12)).foregroundStyle(Palette.faint)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { startNew() }
     }
 
     private func lockedScreen(_ note: Note) -> some View {

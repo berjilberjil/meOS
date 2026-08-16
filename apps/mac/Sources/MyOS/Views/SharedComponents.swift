@@ -90,9 +90,10 @@ struct RemovableChip: View {
 
 // MARK: - Hold-to-confirm delete (two-step: open → hold)
 
-/// A press-and-hold destructive button: a bar that fills over `duration`; if the
-/// user holds to the end it fires. Releasing early cancels. Used for every
-/// sensitive delete / reset — opening the confirm is step one, holding is step two.
+/// A press-and-hold destructive button: a capsule that fills over `duration`;
+/// if the user holds to the end it fires. Releasing early cancels. Used for
+/// every sensitive delete / reset — opening the confirm is step one, holding
+/// is step two.
 struct HoldToConfirmButton: View {
     var label: String = "Hold to delete"
     var tint: Color = Palette.red
@@ -105,23 +106,21 @@ struct HoldToConfirmButton: View {
 
     var body: some View {
         GeometryReader { geo in
+            let fill = holding ? max(36, geo.size.width * progress) : geo.size.width * progress
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .fill(tint.opacity(0.16))
-                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                Capsule().fill(tint.opacity(0.16))
+                Capsule()
                     .fill(tint)
-                    .frame(width: max(0, geo.size.width * progress))
-                HStack(spacing: 7) {
-                    Image(systemName: "trash.fill").font(.system(size: 12, weight: .bold))
+                    .frame(width: fill)
+                HStack(spacing: 8) {
+                    Image(systemName: "trash.fill").font(.system(size: 15, weight: .bold))
                     Text(holding ? "Keep holding…" : label)
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(progress > 0.5 ? .white : tint)
+                .foregroundStyle(progress > 0.38 ? Color.white : tint)
                 .frame(maxWidth: .infinity)
             }
-            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                .strokeBorder(tint.opacity(0.5), lineWidth: 2))
-            .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .contentShape(Capsule())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in if !holding { start() } }
@@ -129,16 +128,21 @@ struct HoldToConfirmButton: View {
             )
             .onHover { h in cursor(h) }
         }
+        .frame(height: 56)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(label)
     }
 
     private func start() {
         holding = true
+        Haptics.tap()
         withAnimation(.linear(duration: duration)) { progress = 1 }
         fireTask?.cancel()
         fireTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
             if Task.isCancelled { return }
             holding = false
+            Haptics.warning()
             action()
         }
     }
@@ -150,42 +154,78 @@ struct HoldToConfirmButton: View {
     }
 }
 
-/// The popover body shown when a delete/reset is requested — a title, a warning
-/// line, and the hold-to-confirm bar.
+/// Compact confirm sheet / popover — icon, title, one line, fat hold capsule.
 struct HoldDeleteCard: View {
     let title: String
     var message: String = "This can't be undone."
     var confirmLabel: String = "Hold to delete"
+    var onCancel: (() -> Void)? = nil
     let onConfirm: () -> Void
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 0) {
+            ZStack {
+                Circle().fill(Palette.red.opacity(0.14))
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.red)
+            }
+            .frame(width: 64, height: 64)
+            .padding(.bottom, 16)
             Text(title)
-                .font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Palette.text)
+                .multilineTextAlignment(.center)
             Text(message)
-                .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                .font(.system(size: 15))
+                .foregroundStyle(Palette.muted)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            HoldToConfirmButton(label: confirmLabel, action: onConfirm).frame(height: 44)
-            Text("Press and hold the bar to confirm.")
-                .font(.system(size: 10)).foregroundStyle(Palette.faint)
+                .padding(.top, 6)
+                .padding(.bottom, 22)
+            HoldToConfirmButton(label: confirmLabel, action: onConfirm)
+            if let onCancel {
+                Button("Cancel", action: onCancel)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.top, 16)
+            }
         }
-        .padding(16)
-        .frame(width: 270)
-        .background(Palette.elevated)
+        .padding(.horizontal, 28)
+        .padding(.top, 12)
+        .padding(.bottom, 22)
+        .frame(maxWidth: .infinity)
+        .background(Palette.bg)
     }
 }
 
 extension View {
-    /// Attach a hold-to-confirm delete popover to a trigger view.
+    /// Attach a hold-to-confirm delete — compact sheet on iPhone, popover on Mac.
+    /// Nothing is deleted until the capsule is held to the end.
     func holdToDelete(isPresented: Binding<Bool>, title: String,
                       message: String = "This can't be undone.",
                       confirmLabel: String = "Hold to delete",
                       action: @escaping () -> Void) -> some View {
-        popover(isPresented: isPresented, arrowEdge: .top) {
-            HoldDeleteCard(title: title, message: message, confirmLabel: confirmLabel) {
+        #if os(iOS)
+        sheet(isPresented: isPresented) {
+            HoldDeleteCard(title: title, message: message, confirmLabel: confirmLabel,
+                           onCancel: { isPresented.wrappedValue = false }) {
                 action()
                 isPresented.wrappedValue = false
             }
+            .presentationDetents([.height(392)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Palette.bg)
         }
+        #else
+        popover(isPresented: isPresented, arrowEdge: .top) {
+            HoldDeleteCard(title: title, message: message, confirmLabel: confirmLabel,
+                           onCancel: { isPresented.wrappedValue = false }) {
+                action()
+                isPresented.wrappedValue = false
+            }
+            .frame(width: 328)
+            .background(Palette.elevated)
+        }
+        #endif
     }
 }
 

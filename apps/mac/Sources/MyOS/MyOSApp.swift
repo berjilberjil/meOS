@@ -4,18 +4,20 @@ import AppKit
 @main
 struct MyOSApp: App {
     @StateObject private var state = AppState()
+    @ObservedObject private var themeStore = ThemeStore.shared
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(state)
                 .frame(minWidth: 940, minHeight: 640)
-                .preferredColorScheme(.dark)
-                .tint(Palette.brand)
+                .preferredColorScheme(themeStore.theme.colorScheme)
+                .tint(themeStore.theme.brand)
+                .animation(.knTheme, value: themeStore.theme.id)
                 .task { await ReminderStore.shared.syncOnLaunch() }
-                // Force the window chrome fully black so nothing grey shows behind
-                // the traffic lights or in the (now hidden) toolbar strip.
-                .background(WindowChrome())
+                // Window chrome follows the active theme so Light doesn't sit on a
+                // forced-black titlebar (that snap was the "theme isn't switching").
+                .background(WindowChrome(themeID: themeStore.theme.id))
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1160, height: 780)
@@ -27,6 +29,8 @@ struct MyOSApp: App {
 /// transparent titlebar, black background, and no toolbar material. Without this,
 /// macOS Tahoe paints a translucent grey "glass" toolbar strip across the top.
 private struct WindowChrome: NSViewRepresentable {
+    var themeID: String
+
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         DispatchQueue.main.async { configure(v.window) }

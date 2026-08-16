@@ -4,6 +4,7 @@ import SwiftUI
 
 struct MainView: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var themeStore = ThemeStore.shared
     @State private var tab: NavTab = PrefsStore.shared.launchTab
     private static let kCollapsed = "myos.sidebar.collapsed"
     @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
@@ -29,8 +30,10 @@ struct MainView: View {
                         Group {
                             switch tab {
                             case .today:   TodayView(go: { switchTo($0) })
+                            case .scan:    ScanView()
                             case .events:  EventsView()
                             case .fold: FoldView()
+                            case .stuff: BelongingsView()
                             case .fitness: FitnessView()
                             case .productivity: ProductivityView()
                             case .journal: JournalView()
@@ -53,12 +56,14 @@ struct MainView: View {
 
                 // The AI command bar now floats at the bottom center. Trailing inset
                 // leaves room for the chat widget's corner.
-                QuickLogBar()
-                    .padding(.horizontal, 28)
-                    .frame(maxWidth: 1080)
-                    .frame(maxWidth: .infinity)
-                    .padding(.trailing, 64)
-                    .padding(.bottom, 18)
+                if tab != .today && tab != .scan {
+                    QuickLogBar()
+                        .padding(.horizontal, 28)
+                        .frame(maxWidth: 1080)
+                        .frame(maxWidth: .infinity)
+                        .padding(.trailing, 64)
+                        .padding(.bottom, 18)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Palette.bg.ignoresSafeArea())
@@ -68,11 +73,28 @@ struct MainView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.bg.ignoresSafeArea())
+        .animation(.knTheme, value: themeStore.theme.id)
         .onChange(of: tab) { _, _ in Haptics.selection() }
     }
 
+    @State private var foldTaps = 0
+    @State private var lastFoldTap = Date.distantPast
+
     private func switchTo(_ t: NavTab) {
         withAnimation(.knPop) { tab = t }
+    }
+
+    /// One click → Fold. Two quick clicks → Stuff.
+    private func tapFold() {
+        let now = Date()
+        if now.timeIntervalSince(lastFoldTap) < 0.45 { foldTaps += 1 } else { foldTaps = 1 }
+        lastFoldTap = now
+        if foldTaps >= 2 {
+            foldTaps = 0
+            switchTo(.stuff)
+        } else {
+            switchTo(.fold)
+        }
     }
 
     private var sidebar: some View {
@@ -80,7 +102,9 @@ struct MainView: View {
             sidebarHeader
 
             ForEach(NavTab.allCases) { t in
-                NavItem(tab: t, active: tab == t, collapsed: collapsed) { switchTo(t) }
+                NavItem(tab: t, active: tab == t || (t == .fold && tab == .stuff), collapsed: collapsed) {
+                    if t == .fold { tapFold() } else { switchTo(t) }
+                }
                     .padding(.horizontal, collapsed ? 10 : 8)
             }
 
@@ -179,7 +203,7 @@ private struct NavItem: View {
                     Text(tab.title.uppercased())
                         .font(.system(size: 13, weight: .heavy, design: .rounded))
                         .tracking(0.6)
-                        .foregroundStyle(active ? Palette.blue : (hover ? Palette.text : Palette.muted))
+                        .foregroundStyle(active ? tab.tint : (hover ? Palette.text : Palette.muted))
                     Spacer(minLength: 0)
                 }
             }
@@ -188,7 +212,7 @@ private struct NavItem: View {
             .background(background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .strokeBorder(active ? Palette.blue : .clear, lineWidth: 2)
+                    .strokeBorder(active ? tab.tint : .clear, lineWidth: 2)
             )
             .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         }
@@ -200,7 +224,7 @@ private struct NavItem: View {
     }
 
     private var background: Color {
-        if active { return Palette.blue.opacity(0.13) }
+        if active { return tab.tint.opacity(0.16) }
         if hover { return Palette.surface2.opacity(0.5) }
         return .clear
     }

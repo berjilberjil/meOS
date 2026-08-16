@@ -11,16 +11,7 @@ struct RootView: View {
             Palette.bg.ignoresSafeArea()
             switch state.phase {
             case .loading:
-                VStack(spacing: 16) {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(Palette.brand)
-                        .frame(width: 52, height: 52)
-                        .overlay(
-                            Image(systemName: "command")
-                                .font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
-                        )
-                    ProgressView().tint(Palette.brand)
-                }
+                SplashView()
             case .loggedOut:
                 LoginView()
             case .setup:
@@ -43,9 +34,13 @@ struct RootView: View {
             }
         }
         .fontDesign(.rounded)   // Feather-substitute: rounds all text app-wide
+        .preferredColorScheme(themeStore.theme.colorScheme)
+        .tint(themeStore.theme.brand)
+        .animation(.knTheme, value: themeStore.theme.id)
         .task { await state.bootstrap() }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background { unlocked = false }
+            if newPhase == .active { Task { await state.pullRemote() } }
         }
     }
 
@@ -72,23 +67,11 @@ struct LockView: View {
     @State private var busy = false
 
     var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "lock.fill").font(.system(size: 40)).foregroundStyle(Palette.brand)
-            Text("MyOS is locked").font(.system(size: 20, weight: .semibold)).foregroundStyle(Palette.text)
-
-            // Only surfaces once an attempt has actually been made and refused —
-            // cancelled, or a face/finger it didn't recognise.
-            if failed {
-                Button { Task { await attempt() } } label: {
-                    Text("Try again with \(BiometricLock.biometryName)")
-                }
-                .buttonStyle(KPrimaryButtonStyle())
-            } else {
-                ProgressView().tint(Palette.brand)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg.ignoresSafeArea())
+        SplashView(
+            failed: failed,
+            retryTitle: "Try again with \(BiometricLock.biometryName)",
+            onRetry: { Task { await attempt() } }
+        )
         // Runs on appear and again on every scene-phase change, so returning to an
         // already-open app re-prompts without a tap.
         .task(id: scenePhase) {

@@ -1,5 +1,8 @@
 import Foundation
 import SwiftUI
+#if os(macOS)
+import Darwin
+#endif
 
 /// Single source of truth for the native app. Mirrors fitOS's synced-store model:
 /// hydrate everything from /api/state on login, then push each changed key back
@@ -37,11 +40,18 @@ final class AppState: ObservableObject {
     @Published var profile = Profile()
     @Published var chat = ChatState()
     @Published var themeVersion = 0        // bumped on theme change to re-render app-wide
+    /// Flipped by a Notes double-tap (title / empty card / dock). NotesView consumes it.
+    @Published var pendingNewNote = false
     @Published var nutrition = NutritionState()
     @Published var training = TrainingState()
     @Published var events: [EventItem] = []
     @Published var eventTags: [EventTag] = []
     @Published var watch: [WatchItem] = []
+    @Published var belongings = BelongingsState()
+    @Published var fold: FoldData?
+    @Published var foldBusy = false
+    @Published var foldError: String?
+    @Published var foldLinked = FoldClient.isLinked
 
     // Sync status
     @Published var lastSyncError: String?
@@ -50,6 +60,13 @@ final class AppState: ObservableObject {
 
     private let api = APIClient()
     private var pushTasks: [String: Task<Void, Never>] = [:]
+    private var pushGen: [String: Int] = [:]
+    private var liveSyncTask: Task<Void, Never>?
+    private var foldWatchTask: Task<Void, Never>?
+    #if os(macOS)
+    private var foldFileWatch: DispatchSourceFileSystemObject?
+    #endif
+    private var isPulling = false
 
     init() {
         api.vault = vault
@@ -99,6 +116,9 @@ final class AppState: ObservableObject {
         eventTags = s.eventTags ?? []
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
         watch     = s.watch ?? []
+        belongings = s.belongings ?? BelongingsState()
+        if let v = s.fold { fold = v }
+        ingestLocalFold()
     }
 
     /// One-time purge of the removed money keys (finance / portfolio / net worth)
@@ -170,6 +190,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            startLiveSync()
             await purgeRemovedFinanceKeys()
         } catch is APIClient.VaultLockedError {
             phase = .locked
@@ -181,6 +202,8 @@ final class AppState: ObservableObject {
     }
 
     func logout() async {
+        stopLiveSync()
+        stopFoldWatch()
         await api.logout()
         markSession(active: false)
         api.clearCache()
@@ -191,7 +214,8 @@ final class AppState: ObservableObject {
         fitnessProfile = FitnessProfile(); journalPresets = JournalPresets()
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
-        events = []; watch = []
+        events = []; watch = []; belongings = BelongingsState()
+        fold = nil
         username = ""; isHydrated = false; lastSyncError = nil
         pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
         phase = .loggedOut
@@ -243,11 +267,12 @@ final class AppState: ObservableObject {
             (StateKey.notes, notes), (StateKey.days, days), (StateKey.profile, profile),
             (StateKey.chat, chat), (StateKey.nutrition, nutrition), (StateKey.training, training),
             (StateKey.events, events), (StateKey.eventTags, eventTags),
-            (StateKey.watch, watch)
+            (StateKey.watch, watch), (StateKey.belongings, belongings)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
         }
+        if let f = fold { try? await api.putState(StateKey.fold, f) }
     }
 
     func unlockWithPassphrase(_ passphrase: String) async {
@@ -285,6 +310,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            startLiveSync()
             await purgeRemovedFinanceKeys()
         } catch {
             vaultError = (error as? APIError)?.message ?? "Couldn't load your data after unlock."
@@ -336,32 +362,153 @@ final class AppState: ObservableObject {
         add("nutrition", nutrition); add("training", training)
         add("events", events); add("eventTags", eventTags)
         add("watch", watch)
+        add("belongings", belongings)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
-    // MARK: - Debounced push
+    // MARK: - Instant push + live pull (Mac ↔ iPhone)
 
+    /// Writes land on the server almost immediately so the other device can
+    /// pick them up on the next 2s poll. Rapid keystrokes still collapse into
+    /// one PUT via a short debounce.
     private func push(_ key: String, _ value: Encodable) {
         guard isHydrated else {
             lastSyncError = "Not synced yet — refresh before saving."
             return
         }
+        pushGen[key, default: 0] += 1
+        let gen = pushGen[key] ?? 1
         pushTasks[key]?.cancel()
         pushTasks[key] = Task { [api] in
-            try? await Task.sleep(nanoseconds: 350_000_000)
+            try? await Task.sleep(nanoseconds: 80_000_000)
             if Task.isCancelled { return }
             do {
                 try await api.putState(key, value)
-                await MainActor.run { self.lastSyncError = nil }
+                await MainActor.run {
+                    if self.pushGen[key] == gen { self.pushTasks[key] = nil }
+                    self.lastSyncError = nil
+                }
             } catch is CancellationError {
-                return                        // superseded by a newer edit — not an error
+                return
             } catch let e as URLError where e.code == .cancelled {
-                return                        // the in-flight request was replaced — ignore
+                return
             } catch {
                 let msg = (error as? APIError)?.message ?? error.localizedDescription
-                await MainActor.run { self.lastSyncError = "Couldn't save \(key): \(msg)" }
+                await MainActor.run {
+                    if self.pushGen[key] == gen { self.pushTasks[key] = nil }
+                    self.lastSyncError = "Couldn't save \(key): \(msg)"
+                }
             }
         }
+    }
+
+    private func hasPendingPush(_ key: String) -> Bool { pushTasks[key] != nil }
+
+    /// Pull remote state and apply only keys this device isn't currently writing.
+    /// Last write wins per module key — same model as the KV store.
+    func pullRemote() async {
+        if !isHydrated {
+            await hydrate()
+            if isHydrated { startLiveSync() }
+            return
+        }
+        guard vault.isUnlocked, !isPulling else { return }
+        isPulling = true
+        defer { isPulling = false }
+        do {
+            let raw = try await api.fetchStateRaw()
+            let payload = try api.decodePayload(fromRaw: raw)
+            applyRemote(payload)
+            lastHydrateError = nil
+        } catch {
+            // Stay quiet — the next tick retries. Surface only a hard hydrate miss.
+        }
+    }
+
+    /// Apply a remote snapshot without stomping an in-flight local edit.
+    private func applyRemote(_ s: AppStatePayload) {
+        if let v = s.fitness,        !hasPendingPush(StateKey.fitness),        v != fitness        { fitness = v }
+        if let v = s.fitnessProfile, !hasPendingPush(StateKey.fitnessProfile), v != fitnessProfile { fitnessProfile = v }
+        if let v = s.journal,        !hasPendingPush(StateKey.journal),        v != journal        { journal = v }
+        if let v = s.journalPresets, !hasPendingPush(StateKey.journalPresets), v != journalPresets { journalPresets = v }
+        if let v = s.notes,          !hasPendingPush(StateKey.notes),          v != notes          { notes = v }
+        if let v = s.days,           !hasPendingPush(StateKey.days),           v != days           { days = v }
+        if let v = s.profile,        !hasPendingPush(StateKey.profile),        v != profile        { profile = v }
+        // Never clobber an in-flight send — a 2s pull of the previous snapshot
+        // was landing replies on the wrong turn.
+        if let v = s.chat,           !hasPendingPush(StateKey.chat), !chatBusy, v != chat          { chat = v }
+        if let v = s.nutrition,      !hasPendingPush(StateKey.nutrition),      v != nutrition      { nutrition = v }
+        if let v = s.training,       !hasPendingPush(StateKey.training),       v != training       { training = v }
+        if let v = s.events,         !hasPendingPush(StateKey.events),         v != events         { events = v }
+        if let v = s.eventTags,      !hasPendingPush(StateKey.eventTags),      v != eventTags      { eventTags = v }
+        if let v = s.watch,          !hasPendingPush(StateKey.watch),          v != watch          { watch = v }
+        if let v = s.belongings,     !hasPendingPush(StateKey.belongings),     v != belongings     { belongings = v }
+        if let v = s.fold,           !hasPendingPush(StateKey.fold),           v != fold           { fold = v; FoldData.save(v) }
+        if eventTags.isEmpty { eventTags = EventTag.seedDefaults }
+    }
+
+    func startLiveSync() {
+        liveSyncTask?.cancel()
+        liveSyncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled else { return }
+                await self?.pullRemote()
+            }
+        }
+        startFoldWatch()
+    }
+
+    func stopLiveSync() {
+        liveSyncTask?.cancel()
+        liveSyncTask = nil
+        stopFoldWatch()
+    }
+
+    /// Pick up a new `fold.json` the moment it lands (Mac file watch + 15s poll)
+    /// and push it so the phone updates on the next 2s pull.
+    func ingestLocalFold() {
+        if let disk = FoldData.loadFromDisk(), disk != fold {
+            fold = disk
+            if isHydrated { push(StateKey.fold, disk) }
+            return
+        }
+        if fold == nil, let bundled = FoldData.loadFromBundle() {
+            fold = bundled
+        }
+    }
+
+    private func startFoldWatch() {
+        ingestLocalFold()
+        foldWatchTask?.cancel()
+        foldWatchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                guard !Task.isCancelled else { return }
+                await MainActor.run { self?.ingestLocalFold() }
+            }
+        }
+        #if os(macOS)
+        foldFileWatch?.cancel()
+        guard let dir = FoldData.fileURL?.deletingLastPathComponent() else { return }
+        let fd = open(dir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let src = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd, eventMask: [.write, .extend, .attrib, .rename, .link], queue: .main)
+        src.setEventHandler { [weak self] in self?.ingestLocalFold() }
+        src.setCancelHandler { close(fd) }
+        src.resume()
+        foldFileWatch = src
+        #endif
+    }
+
+    private func stopFoldWatch() {
+        foldWatchTask?.cancel()
+        foldWatchTask = nil
+        #if os(macOS)
+        foldFileWatch?.cancel()
+        foldFileWatch = nil
+        #endif
     }
 
     // MARK: - Date helpers
@@ -428,6 +575,25 @@ final class AppState: ObservableObject {
         } catch {
             imageError = (error as? APIError)?.message ?? error.localizedDescription
             return ("", [])
+        }
+    }
+
+    /// Camera tab: food → nutrition, anything else → keep / skip + why.
+    func analyzeScan(imagesBase64: [String], mediaType: String) async -> ScanInsight {
+        imageError = nil
+        imageBusy = true
+        defer { imageBusy = false }
+        do {
+            let r = try await api.parseImage(imagesBase64: imagesBase64, mediaType: mediaType,
+                                             mode: "scan", context: mentorContext())
+            let insight = ScanInsight.from(r)
+            if insight.failed {
+                imageError = "Catherine couldn’t read that photo. Get closer and try again."
+            }
+            return insight
+        } catch {
+            imageError = (error as? APIError)?.message ?? error.localizedDescription
+            return ScanInsight.parse(nil)
         }
     }
 
@@ -861,6 +1027,41 @@ final class AppState: ObservableObject {
         push(StateKey.notes, notes)
         return n
     }
+    func applyMentorActions(_ actions: [MentorAction]) {
+        for a in actions {
+            switch a.kind {
+            case .createEvent, .createShoot:
+                let title = a.fields["title"] ?? a.fields["name"] ?? "New event"
+                let phrase = activeThread?.messages.last(where: { $0.role == "user" })?.content ?? ""
+                let date = EventDate.resolve(raw: a.fields["date"], phrase: phrase, today: todayKey)
+                addEvent(date: date, title: title, note: a.fields["note"] ?? "",
+                         special: a.kind == .createShoot)
+            case .createNote:
+                let id = addBlockNote()
+                updateNote(id, title: a.fields["title"] ?? "Note", body: a.fields["body"] ?? "")
+            case .lockNote:
+                let q = (a.fields["title"] ?? "").lowercased()
+                if let n = notes.first(where: { q.isEmpty ? $0.locked == false : $0.title.lowercased().contains(q) }) {
+                    if !n.locked { toggleLockNote(n.id) }
+                }
+            case .addFocus:
+                guard let t = a.fields["text"] ?? a.fields["title"], !t.isEmpty else { break }
+                addTodo(t)
+            case .logFood:
+                let name = a.fields["name"] ?? a.fields["title"] ?? "Food"
+                let food = addFood(Food(name: name, category: .other,
+                                        servingLabel: a.fields["serving"] ?? "1 serving",
+                                        perServing: Macros(calories: Double(a.fields["calories"] ?? "0") ?? 0,
+                                                           protein: Double(a.fields["protein"] ?? "0") ?? 0,
+                                                           carbs: Double(a.fields["carbs"] ?? "0") ?? 0,
+                                                           fats: Double(a.fields["fats"] ?? "0") ?? 0)))
+                addFoodToMeal(date: todayKey, meal: .snacks, foodId: food.id)
+            }
+        }
+    }
+
+    func requestNewNote() { pendingNewNote = true }
+
     /// Create an empty note ready for the block editor. Returns its id.
     @discardableResult
     func addBlockNote() -> String {
@@ -913,11 +1114,40 @@ final class AppState: ObservableObject {
     // MARK: - Day spine (focus + habits)
 
     func todayPlan() -> DayPlan { days[todayKey] ?? DayPlan() }
-    func setFocus(_ items: [String]) {
-        var d = days[todayKey] ?? DayPlan()
-        d.focus = items.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    private func saveDay(_ d: DayPlan) {
         days[todayKey] = d
         push(StateKey.days, days)
+    }
+
+    func addTodo(_ text: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        var d = todayPlan()
+        d.todos.append(FocusItem(text: t))
+        saveDay(d)
+    }
+
+    func toggleTodo(_ id: String) {
+        var d = todayPlan()
+        guard let i = d.todos.firstIndex(where: { $0.id == id }) else { return }
+        d.todos[i].done.toggle()
+        saveDay(d)
+    }
+
+    func removeTodo(_ id: String) {
+        var d = todayPlan()
+        d.todos.removeAll { $0.id == id }
+        saveDay(d)
+    }
+
+    func setFocus(_ items: [String]) {
+        var d = todayPlan()
+        d.todos = items
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { FocusItem(text: $0) }
+        saveDay(d)
     }
     func toggleHabit(_ name: String) {
         var d = days[todayKey] ?? DayPlan()
@@ -985,6 +1215,8 @@ final class AppState: ObservableObject {
 
     @Published var chatBusy = false
     @Published var chatError: String?
+    /// Extra sends that arrived while a reply was still streaming.
+    private var chatQueue: [String] = []
     /// A prompt requested from elsewhere (e.g. "Ask AI" on a news story). The chat
     /// widget observes this, opens itself, and sends it.
     @Published var pendingChatPrompt: String? = nil
@@ -1029,6 +1261,24 @@ final class AppState: ObservableObject {
         if !e.wins.isEmpty { l.append("TODAY WINS: \(e.wins.joined(separator: "; ")).") }
         if !e.mistakes.isEmpty { l.append("TODAY MISTAKES: \(e.mistakes.joined(separator: "; ")).") }
 
+        let pretty = {
+            let f = DateFormatter()
+            f.calendar = Calendar(identifier: .gregorian)
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "EEEE d MMMM yyyy"
+            return f.string(from: Date())
+        }()
+        l.insert("TODAY IS \(pretty) (\(todayKey)). Current year is \(todayKey.prefix(4)). Never emit a date in a past year. date= must be YYYY-MM-DD on or after \(todayKey). For “next Wednesday” use the next Wednesday after today, not a Wednesday from 2024.", at: 0)
+
+        l.append("""
+        ACTIONS YOU CAN TAKE (append after your spoken reply, only if they asked):
+        ACTION create_event title="…" date="YYYY-MM-DD"
+        ACTION create_shoot title="…"
+        ACTION create_note title="…" body="…"
+        ACTION lock_note title="…"
+        ACTION add_focus text="…"
+        ACTION log_food name="…" calories="0" protein="0" carbs="0" fats="0"
+        """)
         return l.joined(separator: "\n")
     }
 
@@ -1047,6 +1297,7 @@ final class AppState: ObservableObject {
         chat.threads.insert(t, at: 0)
         chat.activeID = t.id
         chatError = nil
+        chatQueue = []
         if isHydrated { push(StateKey.chat, chat) }
     }
 
@@ -1076,43 +1327,137 @@ final class AppState: ObservableObject {
     /// user turn, then the reply. History persists to `myos.chat`.
     func sendChat(_ text: String) async {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, !chatBusy else { return }
+        guard !t.isEmpty else { return }
+        if chatBusy { chatQueue.append(t); return }
         chatError = nil
-        Haptics.tap()   // send feedback
+        Haptics.tap()
         let i = activeThreadIndex()
-        chat.threads[i].messages.append(ChatMessage(role: "user", content: t, at: Self.nowStamp()))
+        let already = chat.threads[i].messages.last?.role == "user"
+            && chat.threads[i].messages.last?.content == t
+        if !already {
+            chat.threads[i].messages.append(ChatMessage(role: "user", content: t, at: Self.nowStamp()))
+        }
         chat.threads[i].updatedAt = Self.nowStamp()
         if chat.threads[i].title == "New chat" { chat.threads[i].title = String(t.prefix(40)) }
         let threadID = chat.threads[i].id
+        let assistant = ChatMessage(role: "assistant", content: "", at: Self.nowStamp())
+        let assistantID = assistant.id
+        chat.threads[i].messages.append(assistant)
         if isHydrated { push(StateKey.chat, chat) }
         chatBusy = true
-        defer { chatBusy = false }
-        let turns = chat.threads[i].messages.suffix(24).map { APIClient.ChatTurn(role: $0.role, content: $0.content) }
+        let turns = chat.threads[i].messages
+            .filter { $0.id != assistantID && !$0.content.isEmpty }
+            .suffix(24)
+            .map { APIClient.ChatTurn(role: $0.role, content: $0.content) }
         let a = AgentConfig.shared
         let agent = APIClient.AgentInfo(name: a.displayName, tone: a.tone.directive,
                                         custom: a.custom.trimmingCharacters(in: .whitespacesAndNewlines))
-        // Add an assistant bubble up front and grow it as tokens stream in.
-        chat.threads[i].messages.append(ChatMessage(role: "assistant", content: "", at: Self.nowStamp()))
+
+        func writeReply(_ text: String) {
+            guard let j = chat.threads.firstIndex(where: { $0.id == threadID }),
+                  let k = chat.threads[j].messages.firstIndex(where: { $0.id == assistantID }) else { return }
+            chat.threads[j].messages[k].content = text
+            chat.threads[j].updatedAt = Self.nowStamp()
+        }
+
         do {
-            for try await full in api.chatStream(messages: turns, context: mentorContext(), agent: agent) {
-                if let j = chat.threads.firstIndex(where: { $0.id == threadID }),
-                   let k = chat.threads[j].messages.lastIndex(where: { $0.role == "assistant" }) {
-                    chat.threads[j].messages[k].content = full
-                    chat.threads[j].updatedAt = Self.nowStamp()
+            // Production chat is JSON `{ reply }` — streaming that URL 502s on Netlify.
+            var reply = ""
+            var lastError: Error?
+            for attempt in 1...2 {
+                do {
+                    reply = ChatText.unwrap(try await api.chat(messages: turns, context: mentorContext(), agent: agent))
+                    lastError = nil
+                    break
+                } catch {
+                    lastError = error
+                    let status = (error as? APIError)?.status ?? 0
+                    if attempt == 1, status >= 500 || status == -1 {
+                        try? await Task.sleep(nanoseconds: 800_000_000)
+                        continue
+                    }
+                    throw error
                 }
             }
-            Haptics.success()   // reply complete
+            if let lastError { throw lastError }
+            writeReply(reply)
+            let parsed = ChatAction.parse(reply)
+            if parsed.visible != reply { writeReply(parsed.visible) }
+            applyMentorActions(parsed.actions)
+            Haptics.success()
             if isHydrated { push(StateKey.chat, chat) }
         } catch {
             chatError = (error as? APIError)?.message ?? error.localizedDescription
-            // Drop the empty assistant bubble if nothing streamed in.
             if let j = chat.threads.firstIndex(where: { $0.id == threadID }),
-               let last = chat.threads[j].messages.last,
-               last.role == "assistant", last.content.isEmpty {
-                chat.threads[j].messages.removeLast()
+               let k = chat.threads[j].messages.firstIndex(where: { $0.id == assistantID }),
+               chat.threads[j].messages[k].content.isEmpty {
+                chat.threads[j].messages.remove(at: k)
             }
             if isHydrated { push(StateKey.chat, chat) }
         }
+        chatBusy = false
+        if let next = chatQueue.first {
+            chatQueue.removeFirst()
+            await sendChat(next)
+        }
+    }
+
+    /// Re-send the last user turn after a 502 / network miss.
+    func retryLastChat() async {
+        chatError = nil
+        guard let last = activeThread?.messages.last(where: { $0.role == "user" }) else { return }
+        await sendChat(last.content)
+    }
+
+    func sendFoldOTP(_ phone: String) async {
+        foldBusy = true; foldError = nil
+        defer { foldBusy = false }
+        do { try await FoldClient.sendOTP(phone: phone) }
+        catch { foldError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription }
+    }
+
+    func verifyFoldOTP(_ phone: String, otp: String) async -> Bool {
+        foldBusy = true; foldError = nil
+        defer { foldBusy = false }
+        do {
+            try await FoldClient.verifyOTP(phone: phone, otp: otp)
+            foldLinked = true
+            await refreshFold()
+            return fold != nil
+        } catch {
+            foldError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return false
+        }
+    }
+
+    func disconnectFold() {
+        FoldClient.unlink()
+        foldLinked = false
+    }
+
+    /// Live Fold pull when signed in; otherwise re-read the last snapshot + sync.
+    func refreshFold() async {
+        foldBusy = true
+        foldError = nil
+        foldLinked = FoldClient.isLinked
+        if FoldClient.isLinked {
+            do {
+                let snap = try await FoldClient.fetchSnapshot()
+                fold = snap
+                FoldData.save(snap)
+                if isHydrated { push(StateKey.fold, snap) }
+                foldBusy = false
+                return
+            } catch {
+                foldError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                if case FoldError.notLinked = error { foldLinked = false }
+            }
+        }
+        ingestLocalFold()
+        await pullRemote()
+        ingestLocalFold()
+        foldBusy = false
+        if fold == nil && foldError == nil { foldError = "Connect Fold with your phone OTP to pull live numbers." }
     }
 
     /// Delete the active conversation (the header trash button).
@@ -1126,8 +1471,10 @@ final class AppState: ObservableObject {
     /// Switch the app-wide colour theme. Persists the choice and forces a re-render —
     /// every screen observes AppState, so bumping this recolours the whole app.
     func setTheme(_ t: AppTheme) {
-        ThemeStore.shared.set(t)
-        themeVersion &+= 1
+        withAnimation(.knTheme) {
+            ThemeStore.shared.set(t)
+            themeVersion &+= 1
+        }
     }
 
     /// Fetch the Today "what to do now" suggestions (not persisted). Read-only, so
@@ -1178,7 +1525,8 @@ final class AppState: ObservableObject {
                   special: Bool = false, media: [EventMedia] = []) {
         let t = title.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty, !date.isEmpty else { return }
-        events.append(EventItem(date: date, title: t, tagIDs: tagIDs, note: note, media: media, special: special))
+        let tags = tagIDs.isEmpty ? [EventVoice.tagID(forTitle: t)] : tagIDs
+        events.append(EventItem(date: date, title: t, tagIDs: tags, note: note, media: media, special: special))
         push(StateKey.events, events)
     }
     func updateEvent(_ e: EventItem) {
@@ -1253,6 +1601,81 @@ final class AppState: ObservableObject {
         watch.removeAll { $0.id == id }
         push(StateKey.watch, watch)
     }
+    // MARK: - Belongings (stuff you own)
+
+    func addBelonging(_ item: BelongingItem) {
+        belongings.items.insert(item, at: 0)
+        push(StateKey.belongings, belongings)
+    }
+    func updateBelonging(_ item: BelongingItem) {
+        guard let i = belongings.items.firstIndex(where: { $0.id == item.id }) else { return }
+        belongings.items[i] = item
+        push(StateKey.belongings, belongings)
+    }
+    func deleteBelonging(_ id: String) {
+        belongings.items.removeAll { $0.id == id }
+        push(StateKey.belongings, belongings)
+    }
+    func setSalaryPaise(_ v: Int) {
+        belongings.salaryPaise = max(0, v)
+        push(StateKey.belongings, belongings)
+    }
+
+    func belongingCategories() -> [BelongingCategory] {
+        let built = BelongingKind.allCases.map(\.asCategory)
+        let extra = belongings.categories.filter { c in !built.contains(where: { $0.id == c.id }) }
+        return built + extra
+    }
+
+    func belongingCategory(for item: BelongingItem) -> BelongingCategory {
+        let id = item.categoryID.isEmpty ? item.kind.rawValue : item.categoryID
+        return belongingCategories().first { $0.id == id } ?? item.kind.asCategory
+    }
+
+    func addBelongingCategory(_ cat: BelongingCategory) {
+        let name = cat.name.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        var next = cat
+        next.name = name
+        if BelongingKind(rawValue: next.id) != nil { next.id = UUID().uuidString.lowercased() }
+        belongings.categories.removeAll { $0.id == next.id }
+        belongings.categories.append(next)
+        push(StateKey.belongings, belongings)
+    }
+
+    func deleteBelongingCategory(_ id: String) {
+        guard BelongingKind(rawValue: id) == nil else { return }
+        belongings.categories.removeAll { $0.id == id }
+        for i in belongings.items.indices where belongings.items[i].categoryID == id {
+            belongings.items[i].categoryID = BelongingKind.other.rawValue
+            belongings.items[i].kind = .other
+        }
+        push(StateKey.belongings, belongings)
+    }
+
+    /// Read a product photo into a short title / shelf / India price.
+    /// Production still treats unknown modes as food — ignore those apologies
+    /// and identify via scan instead.
+    func identifyBelonging(photoBase64: String, categoryIDs: [String]) async -> BelongingGuess? {
+        let list = categoryIDs.joined(separator: ", ")
+        if let r = try? await api.parseImage(imagesBase64: [photoBase64], mediaType: "image/jpeg",
+                                             mode: "belonging", context: list),
+           let g = BelongingGuess.from(result: r, allowed: categoryIDs) {
+            return g
+        }
+        let scanCtx = """
+        THIS IS NOT FOOD. Do not mention food. Do not write a sentence.
+        Identify the consumer product in the photo.
+        object.name = short product title only (e.g. "CMF Buds", "Nike Vomero 18"). Never "unknown".
+        object.useful = category=<id> price_inr=<rupees> life_months=<n>
+        category id must be one of: \(list)
+        price_inr = typical India MRP as a whole number.
+        """
+        guard let r = try? await api.parseImage(imagesBase64: [photoBase64], mediaType: "image/jpeg",
+                                                mode: "scan", context: scanCtx) else { return nil }
+        return BelongingGuess.from(result: r, allowed: categoryIDs)
+    }
+
     /// Best-effort AI category for a video (free model). Returns nil on any failure.
     func categorizeVideo(title: String, channel: String) async -> WatchCategory? {
         guard let cat = try? await api.categorize(title: title, channel: channel) else { return nil }
@@ -1282,5 +1705,6 @@ final class AppState: ObservableObject {
         days = [:];                    push(StateKey.days, days)
         events = [];                   push(StateKey.events, events)
         watch = [];                    push(StateKey.watch, watch)
+        belongings = BelongingsState(); push(StateKey.belongings, belongings)
     }
 }
