@@ -304,13 +304,7 @@ struct FoldData: Codable, Equatable {
         return try? JSONDecoder().decode(FoldData.self, from: d)
     }
 
-    static func loadFromBundle() -> FoldData? {
-        guard let url = Bundle.main.url(forResource: "fold", withExtension: "json"),
-              let d = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(FoldData.self, from: d)
-    }
-
-    static func load() -> FoldData? { loadFromDisk() ?? loadFromBundle() }
+    static func load() -> FoldData? { loadFromDisk() }
 
     static func save(_ data: FoldData) {
         guard let url = fileURL else { return }

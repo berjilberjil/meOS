@@ -545,26 +545,3 @@ struct KLabeledDateField: View {
         }
     }
 }
-
-/// Read-only labelled value with a hint (for fields sourced from another tab).
-struct KReadOnlyField: View {
-    let label: String
-    let value: String
-    var hint: String = ""
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            KFieldLabel(text: label)
-            HStack(spacing: 8) {
-                Text(value).font(.system(size: 13, weight: .semibold)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
-                Spacer()
-                if !hint.isEmpty { Text(hint).font(.system(size: 10)).foregroundStyle(Palette.faint) }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(Palette.surface2.opacity(0.35),
-                        in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                .strokeBorder(Palette.border, lineWidth: 1))
-        }
-    }
-}

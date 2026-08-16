@@ -220,53 +220,6 @@ struct SectionTitle: View {
     }
 }
 
-// A compact KPI tile for dashboards.
-struct StatTile: View {
-    let label: String
-    let value: String
-    var sub: String? = nil
-    var accent: Color = Palette.text
-    var body: some View {
-        Card(padding: 15) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text(label.uppercased())
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.8)
-                    .foregroundStyle(Palette.faint)
-                Text(value)
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(accent)
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                if let sub {
-                    Text(sub).font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.muted)
-                        .lineLimit(1)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - The 3D button (Duolingo signature)
-
-/// A flat bright face sitting on a solid darker edge. The face reveals `depth`
-/// px of the edge at the bottom; on press it sinks down to cover the edge — the
-/// classic Duolingo "press-down". Layout height is constant (a top/bottom pad
-/// swap), so nothing jumps.
-private struct Duo3DBackground: View {
-    var face: Color
-    var edge: Color
-    var radius: CGFloat
-    var pressed: Bool
-    var depth: CGFloat
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: radius, style: .continuous).fill(edge)
-            RoundedRectangle(cornerRadius: radius, style: .continuous).fill(face)
-                .padding(.bottom, pressed ? 0 : depth)
-        }
-    }
-}
-
 extension View {
     /// Fire a light tap when a button style transitions into the pressed state.
     func pressHaptic(_ pressed: Bool) -> some View {

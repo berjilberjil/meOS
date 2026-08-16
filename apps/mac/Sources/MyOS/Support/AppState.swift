@@ -62,7 +62,6 @@ final class AppState: ObservableObject {
     private var pushTasks: [String: Task<Void, Never>] = [:]
     private var pushGen: [String: Int] = [:]
     private var liveSyncTask: Task<Void, Never>?
-    private var foldWatchTask: Task<Void, Never>?
     #if os(macOS)
     private var foldFileWatch: DispatchSourceFileSystemObject?
     #endif
@@ -465,29 +464,16 @@ final class AppState: ObservableObject {
         stopFoldWatch()
     }
 
-    /// Pick up a new `fold.json` the moment it lands (Mac file watch + 15s poll)
-    /// and push it so the phone updates on the next 2s pull.
+    /// Pick up a new `fold.json` the moment it lands on disk and push so the phone
+    /// gets it on the next 2s pull. Live Fold login is the source of truth.
     func ingestLocalFold() {
-        if let disk = FoldData.loadFromDisk(), disk != fold {
-            fold = disk
-            if isHydrated { push(StateKey.fold, disk) }
-            return
-        }
-        if fold == nil, let bundled = FoldData.loadFromBundle() {
-            fold = bundled
-        }
+        guard let disk = FoldData.loadFromDisk(), disk != fold else { return }
+        fold = disk
+        if isHydrated { push(StateKey.fold, disk) }
     }
 
     private func startFoldWatch() {
         ingestLocalFold()
-        foldWatchTask?.cancel()
-        foldWatchTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
-                guard !Task.isCancelled else { return }
-                await MainActor.run { self?.ingestLocalFold() }
-            }
-        }
         #if os(macOS)
         foldFileWatch?.cancel()
         guard let dir = FoldData.fileURL?.deletingLastPathComponent() else { return }
@@ -503,8 +489,6 @@ final class AppState: ObservableObject {
     }
 
     private func stopFoldWatch() {
-        foldWatchTask?.cancel()
-        foldWatchTask = nil
         #if os(macOS)
         foldFileWatch?.cancel()
         foldFileWatch = nil
