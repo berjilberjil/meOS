@@ -271,21 +271,26 @@ struct SlideToConfirm: View {
     let action: () -> Void
 
     @State private var state = SlideConfirmState()
-    private let thumb: CGFloat = 44
+    /// One size everywhere — big enough for a thumb on iPhone.
+    static let height: CGFloat = 56
+    private var thumb: CGFloat { Self.height }
 
     var body: some View {
         GeometryReader { geo in
             let travel = max(1, geo.size.width - thumb)
             ZStack(alignment: .leading) {
                 Capsule().fill(tint.opacity(0.16))
-                Text(state.confirmed ? "Confirmed" : label)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                Text(state.confirmed ? "Logged" : label)
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .foregroundStyle(tint)
+                    .padding(.horizontal, thumb + 8)
                     .frame(maxWidth: .infinity)
+                    .minimumScaleFactor(0.8)
+                    .lineLimit(1)
                 Capsule().fill(tint)
                     .frame(width: thumb + state.progress * travel)
-                Image(systemName: state.confirmed ? "checkmark" : "arrow.right")
-                    .font(.system(size: 14, weight: .heavy))
+                Image(systemName: state.confirmed ? "checkmark" : "chevron.right.2")
+                    .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(Palette.bg)
                     .frame(width: thumb, height: thumb)
                     .offset(x: state.progress * travel)
@@ -311,7 +316,8 @@ struct SlideToConfirm: View {
             .onAppear { Haptics.prepare() }
             .onHover { h in cursor(h) }
         }
-        .frame(height: thumb)
+        .frame(maxWidth: .infinity)
+        .frame(height: Self.height)
     }
 }
 
@@ -370,7 +376,7 @@ struct CopyDayPickerSheet: View {
                 .allowsHitTesting(!picked.isEmpty)
         }
         .padding(18)
-        .frame(width: 250)
+        .frame(width: 300)
         .background(Palette.elevated)
     }
 }

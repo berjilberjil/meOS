@@ -259,7 +259,7 @@ struct WorkoutChecklistCard: View {
                 .font(.system(size: 12)).foregroundStyle(Palette.faint)
         } else {
             ForEach(items) { pe in exerciseRow(pe, ghost: true) }
-            SlideToConfirm(label: "Slide: done", tint: Palette.green) { state.tickWorkout(date: date) }
+            SlideToConfirm(label: "Slide to log", tint: Palette.green) { state.tickWorkout(date: date) }
         }
         HStack(spacing: 8) {
             Button(action: edit) { Label("Edit", systemImage: "pencil") }.buttonStyle(KGhostButtonStyle())
@@ -455,7 +455,6 @@ struct MealLogEditorSheet: View {
             SlideToConfirm(label: "Slide to log", tint: Palette.green) {
                 state.setMealItems(date: date, meal: meal, items: draft); dismiss()
             }
-            .frame(height: 52)
             Button("Cancel") { dismiss() }
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Palette.muted)
@@ -561,13 +560,11 @@ struct WorkoutDayEditorSheet: View {
             }
             .frame(maxHeight: 420)
             Divider().overlay(Palette.border)
-            HStack {
-                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
-                Spacer()
-                SlideToConfirm(label: "Slide to save", tint: Palette.brand) {
+            VStack(spacing: 12) {
+                SlideToConfirm(label: "Slide to log", tint: Palette.brand) {
                     state.tickWorkout(date: date, items: draft); dismiss()
                 }
-                .frame(width: 220)
+                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
             }
             .padding(16)
         }

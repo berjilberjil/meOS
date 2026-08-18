@@ -46,37 +46,12 @@ struct FitnessView: View {
     @ViewBuilder private var todayContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             FitnessTodayView().knRise(2)
-            compactActivity.knRise(3)
+            ActivityStepsCard().knRise(3)
             #if os(iOS)
             BodyPhotosCard().knRise(4)
             #endif
             settingsDisclosure.knRise(5)
         }
-    }
-
-    private var compactActivity: some View {
-        let steps = today.steps ?? 0
-        let target = state.stepsTarget
-        return Card(padding: 14) {
-            HStack(spacing: 12) {
-                Image(systemName: "figure.walk").font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.muted)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Activity").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
-                    Text("\(steps.formatted()) / \(target.formatted()) steps")
-                        .font(.system(size: 13)).monospacedDigit().foregroundStyle(Palette.faint)
-                    #if os(iOS)
-                    Text("from Apple Health").font(.system(size: 11)).foregroundStyle(Palette.faint)
-                    #endif
-                }
-                Spacer()
-                MeterBar(fraction: target > 0 ? min(1, Double(steps) / Double(target)) : 0,
-                         tint: Palette.flame, height: 6)
-                    .frame(width: 72)
-            }
-        }
-        #if os(iOS)
-        .task { await HealthSteps.syncToday(into: state) }
-        #endif
     }
 
     // MARK: - Fitness settings (goal, targets) — tucked under a disclosure
@@ -428,6 +403,37 @@ struct FitnessView: View {
                 }
             }
         }
+    }
+}
+
+/// Steps for today — used on Today and Fitness.
+struct ActivityStepsCard: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        let today = state.fitnessDay(state.todayKey)
+        let steps = today.steps ?? 0
+        let target = state.stepsTarget
+        return Card(padding: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "figure.walk").font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.muted)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Activity").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text("\(steps.formatted()) / \(target.formatted()) steps")
+                        .font(.system(size: 13)).monospacedDigit().foregroundStyle(Palette.faint)
+                    #if os(iOS)
+                    Text("from Apple Health").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    #endif
+                }
+                Spacer()
+                MeterBar(fraction: target > 0 ? min(1, Double(steps) / Double(target)) : 0,
+                         tint: Palette.flame, height: 6)
+                    .frame(width: 72)
+            }
+        }
+        #if os(iOS)
+        .task { await HealthSteps.syncToday(into: state) }
+        #endif
     }
 }
 

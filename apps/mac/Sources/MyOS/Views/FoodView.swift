@@ -369,21 +369,22 @@ struct FoodScanReviewSheet: View {
 
             Divider().overlay(Palette.border)
 
-            HStack {
-                Text("\(included.count) selected").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.muted)
-                Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+            VStack(spacing: 12) {
+                HStack {
+                    Text("\(included.count) selected").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.muted)
+                    Spacer()
+                    Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                }
                 if included.isEmpty {
-                    Text("Select at least one.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    Text("Select at least one.").font(.system(size: 13)).foregroundStyle(Palette.faint)
                 } else {
-                    SlideToConfirm(label: "Add & log \(included.count)", tint: Palette.brand) {
+                    SlideToConfirm(label: "Slide to log \(included.count)", tint: Palette.brand) {
                         for d in included {
                             let saved = state.addFood(d.food)
                             state.addFoodToMeal(date: logDate, meal: d.meal, foodId: saved.id, quantity: d.quantity)
                         }
                         dismiss()
                     }
-                    .frame(width: 240)
                 }
             }
             .padding(20)

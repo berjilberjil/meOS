@@ -105,7 +105,7 @@ struct MainView: View {
         }
     }
 
-    /// 1 tap → Fold. 2 taps → Stuff (what you own + daily cost).
+    /// 1 tap → Stuff. 2 taps → Fold (money).
     private func tapFold() {
         let now = Date()
         if now.timeIntervalSince(lastFoldTap) < 0.45 { foldTaps += 1 } else { foldTaps = 1 }
@@ -113,9 +113,9 @@ struct MainView: View {
         if foldTaps >= 2 {
             foldTaps = 0
             Haptics.success()
-            select(.stuff)
+            select(.fold)
             return
         }
-        select(.fold)
+        select(.stuff)
     }
 }

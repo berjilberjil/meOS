@@ -84,16 +84,16 @@ struct MainView: View {
         withAnimation(.knPop) { tab = t }
     }
 
-    /// One click → Fold. Two quick clicks → Stuff.
+    /// One click → Stuff. Two quick clicks → Fold (money).
     private func tapFold() {
         let now = Date()
         if now.timeIntervalSince(lastFoldTap) < 0.45 { foldTaps += 1 } else { foldTaps = 1 }
         lastFoldTap = now
         if foldTaps >= 2 {
             foldTaps = 0
-            switchTo(.stuff)
-        } else {
             switchTo(.fold)
+        } else {
+            switchTo(.stuff)
         }
     }
 

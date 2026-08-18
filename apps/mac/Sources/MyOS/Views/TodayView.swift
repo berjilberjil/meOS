@@ -13,6 +13,7 @@ struct TodayView: View {
     @State private var pendingTodoDelete: String?
     @State private var expandedNews: Set<String> = []
     @State private var editingMeal: MealKey?
+    @State private var editingWorkout = false
     @State private var showStreakCal = false
 
     private let cols = [GridItem(.adaptive(minimum: 168), spacing: 12)]
@@ -23,7 +24,9 @@ struct TodayView: View {
             header.knRise(0)
             DayMacroHero().knRise(1)
             mealsCard.knRise(1)
-            comingUpCard.knRise(2)
+            WorkoutChecklistCard(edit: { editingWorkout = true }).knRise(2)
+            ActivityStepsCard().knRise(2)
+            comingUpCard.knRise(3)
             #if os(iOS)
             BodyPhotosCard().knRise(3)
             #endif
@@ -40,6 +43,9 @@ struct TodayView: View {
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: state.todayKey, meal: meal,
                                initialItems: state.mealEditorItems(date: state.todayKey, meal: meal))
+        }
+        .sheet(isPresented: $editingWorkout) {
+            WorkoutDayEditorSheet(date: state.todayKey, initialItems: state.workoutItemsForDay(state.todayKey))
         }
         .sheet(isPresented: $showStreakCal) { streakCalendarSheet }
     }
