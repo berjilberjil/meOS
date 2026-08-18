@@ -39,7 +39,7 @@ struct TodayView: View {
         }
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: state.todayKey, meal: meal,
-                               initialItems: state.mealLog(state.todayKey).items(meal))
+                               initialItems: state.mealEditorItems(date: state.todayKey, meal: meal))
         }
         .sheet(isPresented: $showStreakCal) { streakCalendarSheet }
     }
@@ -55,7 +55,7 @@ struct TodayView: View {
 
     private func mealTile(_ meal: MealKey) -> some View {
         let st = state.mealState(state.todayKey, meal)
-        let items = state.mealLog(state.todayKey).items(meal)
+        let items = state.mealDisplayItems(date: state.todayKey, meal: meal)
         let names = items.compactMap { state.food($0.foodId)?.name }
         return Button { editingMeal = meal } label: {
             VStack(alignment: .leading, spacing: 6) {
@@ -86,7 +86,7 @@ struct TodayView: View {
         switch st {
         case .logged: return names.isEmpty ? "Logged" : names.joined(separator: ", ")
         case .skipped: return "Skipped"
-        case .unconfirmed: return names.isEmpty ? "Tap to log" : names.joined(separator: ", ")
+        case .unconfirmed: return names.isEmpty ? "Nothing planned — tap to log" : names.joined(separator: ", ")
         }
     }
 

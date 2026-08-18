@@ -394,11 +394,16 @@ final class AppState: ObservableObject {
     /// Writes land on the server almost immediately so the other device can
     /// pick them up on the next 2s poll. Rapid keystrokes still collapse into
     /// one PUT via a short debounce.
+    /// Ignore a stale GET that still has the pre-write snapshot (Netlify KV
+    /// can serve the previous value for a couple of seconds after PUT).
+    private var lastLocalWrite: [String: Date] = [:]
+
     private func push(_ key: String, _ value: Encodable) {
         guard isHydrated else {
             lastSyncError = "Not synced yet — refresh before saving."
             return
         }
+        lastLocalWrite[key] = Date()
         pushGen[key, default: 0] += 1
         let gen = pushGen[key] ?? 1
         pushTasks[key]?.cancel()
@@ -426,6 +431,10 @@ final class AppState: ObservableObject {
     }
 
     private func hasPendingPush(_ key: String) -> Bool { pushTasks[key] != nil }
+    private func wroteRecently(_ key: String, window: TimeInterval = 20) -> Bool {
+        guard let t = lastLocalWrite[key] else { return false }
+        return Date().timeIntervalSince(t) < window
+    }
 
     /// Pull remote state and apply only keys this device isn't currently writing.
     /// Last write wins per module key — same model as the KV store.
@@ -460,7 +469,8 @@ final class AppState: ObservableObject {
         // Never clobber an in-flight send — a 2s pull of the previous snapshot
         // was landing replies on the wrong turn.
         if let v = s.chat,           !hasPendingPush(StateKey.chat), !chatBusy, v != chat          { chat = v }
-        if let v = s.nutrition,      !hasPendingPush(StateKey.nutrition),      v != nutrition      { nutrition = v }
+        if let v = s.nutrition,      !hasPendingPush(StateKey.nutrition),      v != nutrition,
+           !wroteRecently(StateKey.nutrition) { nutrition = v }
         if let v = s.training,       !hasPendingPush(StateKey.training),       v != training       { training = v }
         if let v = s.events,         !hasPendingPush(StateKey.events),         v != events         { events = v }
         if let v = s.eventTags,      !hasPendingPush(StateKey.eventTags),      v != eventTags      { eventTags = v }
@@ -759,6 +769,22 @@ final class AppState: ObservableObject {
 
     // Plan → confirmed (tick / edit / skip). The weekly template is never mutated.
     func mealState(_ date: String, _ meal: MealKey) -> MealLog.MealState { mealLog(date).state(meal) }
+
+    /// What Today / the meal editor should show: the log if already logged,
+    /// otherwise today's planned foods so a tap isn't an empty sheet.
+    func mealEditorItems(date: String, meal: MealKey) -> [PlanItem] {
+        if mealState(date, meal) == .logged { return mealLog(date).items(meal) }
+        return planItems(Self.weekdayKey(date), meal)
+    }
+
+    /// Names for a meal tile — logged foods, or the day's plan when still open.
+    func mealDisplayItems(date: String, meal: MealKey) -> [PlanItem] {
+        switch mealState(date, meal) {
+        case .logged: return mealLog(date).items(meal)
+        case .skipped: return []
+        case .unconfirmed: return planItems(Self.weekdayKey(date), meal)
+        }
+    }
     func tickMeal(date: String, meal: MealKey) {
         let planned = planItems(Self.weekdayKey(date), meal)
         mutateLog(date) { $0.tick(meal, planned: planned) }
@@ -945,11 +971,11 @@ final class AppState: ObservableObject {
         return nil
     }
 
-    /// Ask the AI for a week, then write it into the workout + meal plans (name→id
-    /// matched against the library). Overwrites both weekly plans.
-    func generateWeeklyPlan() async {
+    /// Ask the AI for a week. Does **not** write it — call `confirmGeneratedPlan`
+    /// after the user confirms, so a stray tap cannot wipe a real plan.
+    func generateWeeklyPlan() async -> GeneratedPlan? {
         planError = nil; planSummary = nil
-        guard isHydrated, !planBusy else { return }
+        guard isHydrated, !planBusy else { return nil }
         planBusy = true
         defer { planBusy = false }
         let cal = calorieTargets()
@@ -961,12 +987,16 @@ final class AppState: ObservableObject {
             foods: allFoods.map { $0.name },
             exercises: allExercises.map { $0.name })
         do {
-            let plan = try await api.plan(req)
-            applyGeneratedPlan(plan)
-            planSummary = plan.summary
+            return try await api.plan(req)
         } catch {
             planError = (error as? APIError)?.message ?? error.localizedDescription
+            return nil
         }
+    }
+
+    func confirmGeneratedPlan(_ plan: GeneratedPlan) {
+        applyGeneratedPlan(plan)
+        planSummary = plan.summary
     }
 
     private func applyGeneratedPlan(_ plan: GeneratedPlan) {

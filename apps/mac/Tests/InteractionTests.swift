@@ -38,6 +38,20 @@ final class InteractionTests: XCTestCase {
         XCTAssertEqual(s.progress, 0, accuracy: 0.001)
     }
 
+    func testDragReportsNewlyCrossedTicks() {
+        var s = SlideConfirmState()
+        XCTAssertEqual(s.drag(translationX: 10, width: 100), 0)   // 0.10 — none
+        XCTAssertEqual(s.drag(translationX: 40, width: 100), 2)   // 0.40 — 0.18 + 0.36
+        XCTAssertEqual(s.drag(translationX: 40, width: 100), 0)   // same stop — no new
+        XCTAssertEqual(s.drag(translationX: 90, width: 100), 3)   // 0.54, 0.72, 0.88
+    }
+
+    func testDragBackwardsDoesNotRetick() {
+        var s = SlideConfirmState()
+        _ = s.drag(translationX: 80, width: 100)
+        XCTAssertEqual(s.drag(translationX: 20, width: 100), 0)
+    }
+
     // MARK: - Mood slider stop mapping
 
     func testMoodStopMapsPositionToOneThroughFive() {

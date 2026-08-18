@@ -104,9 +104,7 @@ struct FitnessTodayView: View {
 
     /// The editor seeds from the actual log if logged, else from today's plan.
     private func seed(_ meal: MealKey) -> [PlanItem] {
-        state.mealState(date, meal) == .logged
-            ? state.mealLog(date).items(meal)
-            : state.planItems(state.todayWeekday, meal)
+        state.mealEditorItems(date: date, meal: meal)
     }
 }
 
@@ -454,7 +452,7 @@ struct MealLogEditorSheet: View {
 
     private var footer: some View {
         VStack(spacing: 12) {
-            SlideToConfirm(label: "Slide to save", tint: Palette.green) {
+            SlideToConfirm(label: "Slide to log", tint: Palette.green) {
                 state.setMealItems(date: date, meal: meal, items: draft); dismiss()
             }
             .frame(height: 52)

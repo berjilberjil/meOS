@@ -237,11 +237,17 @@ struct SlideConfirmState {
     var threshold: CGFloat = 0.85
     private(set) var progress: CGFloat = 0
     private(set) var confirmed = false
+    static let tickStops: [CGFloat] = [0.18, 0.36, 0.54, 0.72, 0.88]
 
     /// Update progress from the current drag translation and available travel.
-    mutating func drag(translationX: CGFloat, width: CGFloat) {
-        guard !confirmed else { return }
+    /// Returns how many detent ticks were newly crossed (for haptics).
+    @discardableResult
+    mutating func drag(translationX: CGFloat, width: CGFloat) -> Int {
+        guard !confirmed else { return 0 }
+        let old = progress
         progress = min(1, max(0, translationX / max(width, 1)))
+        guard progress > old else { return 0 }
+        return Self.tickStops.filter { old < $0 && progress >= $0 }.count
     }
 
     /// End the drag. Returns `true` exactly once — when released at/after the
@@ -288,14 +294,21 @@ struct SlideToConfirm: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { v in
-                        withAnimation(.knFast) { state.drag(translationX: v.translation.width, width: travel) }
+                        let ticks: Int = {
+                            var next = state
+                            let n = next.drag(translationX: v.translation.width, width: travel)
+                            withAnimation(.knFast) { state = next }
+                            return n
+                        }()
+                        if ticks > 0 { Haptics.slideTicks(ticks) }
                     }
                     .onEnded { _ in
                         let fired = state.end()
-                        if fired { Haptics.success(); action() }
-                        else { withAnimation(.knFast) { } }
+                        if fired { Haptics.slideCommit(); action() }
+                        else { Haptics.slideCancel(); withAnimation(.knFast) { } }
                     }
             )
+            .onAppear { Haptics.prepare() }
             .onHover { h in cursor(h) }
         }
         .frame(height: thumb)

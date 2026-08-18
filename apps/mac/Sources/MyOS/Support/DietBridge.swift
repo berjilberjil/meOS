@@ -10,6 +10,11 @@ final class DietBridge {
     static let port: UInt16 = 17881
     static let tokenKey = "myos.mcp.token"
 
+    static func jsonString(_ s: String) -> String {
+        let data = (try? JSONSerialization.data(withJSONObject: s, options: .fragmentsAllowed)) ?? Data("\"\"".utf8)
+        return String(data: data, encoding: .utf8) ?? "\"\""
+    }
+
     static func token() -> String {
         let d = UserDefaults.standard
         if let t = d.string(forKey: tokenKey), !t.isEmpty { return t }
@@ -65,7 +70,10 @@ final class DietBridge {
         do {
             switch (req.method, req.path) {
             case ("GET", "/health"):
-                return HTTPRes(200, #"{"ok":true,"native":true}"#)
+                let err = state.lastSyncError ?? ""
+                return HTTPRes(200, """
+                    {"ok":true,"native":true,"hydrated":\(state.isHydrated),"sync_error":\(Self.jsonString(err))}
+                    """)
             case ("GET", "/context"):
                 return HTTPRes.json(try state.mcpContext())
             case ("GET", "/week"):

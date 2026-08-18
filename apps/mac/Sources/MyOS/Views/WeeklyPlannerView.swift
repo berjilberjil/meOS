@@ -5,7 +5,7 @@ import SwiftUI
 /// other days. Full content width (not a cramped sheet).
 struct WeeklyPlannerView: View {
     @EnvironmentObject var state: AppState
-    @State private var weekday: String = ""
+    @State private var weekday: String = String(Calendar(identifier: .gregorian).component(.weekday, from: Date()) - 1)
     enum PlanMode: String, Hashable { case meals, workouts }
     @State private var mode: PlanMode = .meals
     @State private var addingMeal: MealKey?
@@ -13,33 +13,48 @@ struct WeeklyPlannerView: View {
     @State private var newFood = false
     @State private var newExercise = false
     @State private var showClearMeals = false
+    #if os(macOS)
+    @State private var askGenerate = false
+    @State private var askApply = false
+    @State private var pendingPlan: GeneratedPlan?
+    #endif
 
     private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    /// One letter so all 7 days fit a phone-width capsule.
+    private let dayLetters = ["S", "M", "T", "W", "T", "F", "S"]
     private var workoutPlan: WorkoutDayPlan { state.workoutPlan(weekday) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            #if os(macOS)
             generateRow.knRise(0)
+            #endif
 
-            HStack {
-                Segmented(options: (0..<7).map { (String($0), dayNames[$0]) }, selection: $weekday)
-                Spacer(minLength: 8)
-                if mode == .meals {
-                    Button { showClearMeals = true } label: {
-                        Label("Clear meals", systemImage: "trash")
+            VStack(alignment: .leading, spacing: 10) {
+                Segmented(
+                    options: (0..<7).map { (String($0), dayLetters[$0]) },
+                    selection: $weekday,
+                    fillsWidth: true
+                )
+                HStack(spacing: 8) {
+                    if mode == .meals {
+                        Button { showClearMeals = true } label: {
+                            Label("Clear meals", systemImage: "trash")
+                        }
+                        .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+                        .disabled(weekMealsEmpty)
+                        .holdToDelete(isPresented: $showClearMeals,
+                                      title: "Clear the whole meal plan?",
+                                      message: "Removes every planned food Mon–Sun. Your food library and today's log stay.",
+                                      confirmLabel: "Hold to clear") {
+                            state.clearMealPlan()
+                        }
                     }
-                    .buttonStyle(KGhostButtonStyle(color: Palette.faint))
-                    .disabled(weekMealsEmpty)
-                    .holdToDelete(isPresented: $showClearMeals,
-                                  title: "Clear the whole meal plan?",
-                                  message: "Removes every planned food Mon–Sun. Your food library and today's log stay.",
-                                  confirmLabel: "Hold to clear") {
-                        state.clearMealPlan()
+                    Spacer(minLength: 0)
+                    CopyDayMenu(weekday: weekday, dayNames: dayNames, disabled: copyDisabled) { targets in
+                        if mode == .meals { state.copyMealPlanDay(from: weekday, to: targets) }
+                        else { state.copyWorkoutDay(from: weekday, to: targets) }
                     }
-                }
-                CopyDayMenu(weekday: weekday, dayNames: dayNames, disabled: copyDisabled) { targets in
-                    if mode == .meals { state.copyMealPlanDay(from: weekday, to: targets) }
-                    else { state.copyWorkoutDay(from: weekday, to: targets) }
                 }
             }
             .knRise(1)
@@ -49,7 +64,24 @@ struct WeeklyPlannerView: View {
 
             if mode == .meals { mealsColumn.knRise(3) } else { workoutColumn.knRise(3) }
         }
-        .onAppear { if weekday.isEmpty { weekday = state.todayWeekday } }
+        .onAppear { if !WeekdayKeys.all.contains(weekday) { weekday = state.todayWeekday } }
+        #if os(macOS)
+        .alert("Generate a new week?", isPresented: $askGenerate) {
+            Button("Cancel", role: .cancel) {}
+            Button("Generate draft") { Task { await runGenerate() } }
+        } message: {
+            Text("This only builds a draft. Your current meals and workouts stay until you confirm the next step.")
+        }
+        .confirmationDialog("Replace your current plan?", isPresented: $askApply, titleVisibility: .visible) {
+            Button("Keep current plan", role: .cancel) { pendingPlan = nil }
+            Button("Replace meals & workouts", role: .destructive) {
+                if let plan = pendingPlan { state.confirmGeneratedPlan(plan) }
+                pendingPlan = nil
+            }
+        } message: {
+            Text(pendingPlan?.summary ?? "This overwrites every planned meal and workout for the week.")
+        }
+        #endif
         .sheet(item: $addingMeal) { meal in
             FoodPickerSheet(meal: meal,
                             add: { f, q in state.addFoodToPlan(weekday: weekday, meal: meal, foodId: f.id, quantity: q) },
@@ -75,8 +107,9 @@ struct WeeklyPlannerView: View {
         }
     }
 
-    // MARK: - Generate my week (AI)
+    // MARK: - Generate my week (AI) — Mac only. iPhone must not draft over a real plan.
 
+    #if os(macOS)
     private var generateRow: some View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 12) {
@@ -92,7 +125,7 @@ struct WeeklyPlannerView: View {
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
                         .foregroundStyle(Palette.faint)
                     Spacer()
-                    Button { Task { await state.generateWeeklyPlan() } } label: {
+                    Button { askGenerate = true } label: {
                         HStack(spacing: 6) {
                             if state.planBusy { ProgressView().controlSize(.small).tint(.white) }
                             Text(state.planBusy ? "Building…" : "Generate plan")
@@ -112,6 +145,14 @@ struct WeeklyPlannerView: View {
             }
         }
     }
+
+    private func runGenerate() async {
+        if let plan = await state.generateWeeklyPlan() {
+            pendingPlan = plan
+            askApply = true
+        }
+    }
+    #endif
 
     // MARK: - Meals column
 
