@@ -12,6 +12,7 @@ struct WeeklyPlannerView: View {
     @State private var pickingExercise = false
     @State private var newFood = false
     @State private var newExercise = false
+    @State private var showClearMeals = false
 
     private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     private var workoutPlan: WorkoutDayPlan { state.workoutPlan(weekday) }
@@ -23,6 +24,19 @@ struct WeeklyPlannerView: View {
             HStack {
                 Segmented(options: (0..<7).map { (String($0), dayNames[$0]) }, selection: $weekday)
                 Spacer(minLength: 8)
+                if mode == .meals {
+                    Button { showClearMeals = true } label: {
+                        Label("Clear meals", systemImage: "trash")
+                    }
+                    .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+                    .disabled(weekMealsEmpty)
+                    .holdToDelete(isPresented: $showClearMeals,
+                                  title: "Clear the whole meal plan?",
+                                  message: "Removes every planned food Mon–Sun. Your food library and today's log stay.",
+                                  confirmLabel: "Hold to clear") {
+                        state.clearMealPlan()
+                    }
+                }
                 CopyDayMenu(weekday: weekday, dayNames: dayNames, disabled: copyDisabled) { targets in
                     if mode == .meals { state.copyMealPlanDay(from: weekday, to: targets) }
                     else { state.copyWorkoutDay(from: weekday, to: targets) }
@@ -53,6 +67,12 @@ struct WeeklyPlannerView: View {
         mode == .meals
             ? MealKey.allCases.allSatisfy { state.planItems(weekday, $0).isEmpty }
             : workoutPlan.items.isEmpty
+    }
+
+    private var weekMealsEmpty: Bool {
+        WeekdayKeys.all.allSatisfy { wd in
+            MealKey.allCases.allSatisfy { state.planItems(wd, $0).isEmpty }
+        }
     }
 
     // MARK: - Generate my week (AI)
