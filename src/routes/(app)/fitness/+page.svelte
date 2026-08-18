@@ -1,16 +1,15 @@
 <script lang="ts">
 	import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { openSectionFromQuery, focusSection } from '$lib/openFromQuery';
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { cn } from '$lib/utils';
 	import { todayIso } from '$lib/finance/dates';
-	import { recentFitness, addFitness, totalDuration, recentHealth, upsertHealth } from '$lib/health/logs';
-	import { kmToM, mToKm, kgToG, gToKg, hoursToMin, minToHours } from '$lib/health/units';
-	import { MOODS } from '$lib/journal/types';
+	import { recentFitness, totalDuration, recentHealth, upsertHealth } from '$lib/health/logs';
+	import { mToKm, kgToG, gToKg, minToHours } from '$lib/health/units';
 	import { getPersonal } from '$lib/profile/personal';
 	import { listFitnessPhotos, uploadFitnessPhoto, deleteFitnessPhoto } from '$lib/health/photos';
 	import WeightChart from '$lib/health/WeightChart.svelte';
@@ -21,11 +20,11 @@
 
 	const qc = useQueryClient();
 
-	// Bottom-nav quick actions: /fitness?add=workout|photo|log
+	// Bottom-nav quick actions: /fitness?add=workout|photo
 	onMount(() =>
 		openSectionFromQuery(page.url.searchParams.get('add'), {
-			workout: () => focusSection('fit-workout'),
-			log: () => focusSection('fit-log'),
+			workout: () => goto('/fitness/workouts'),
+			log: () => goto('/fitness/workouts'),
 			photo: () => focusSection('fit-photo', { click: true })
 		})
 	);
@@ -84,55 +83,6 @@
 		}
 	}
 
-	// Health "Log day"
-	let hDate = $state(todayIso());
-	let weight = $state('');
-	let sleep = $state('');
-	let water = $state('');
-	let mood = $state<string | null>(null);
-	const saveHealth = createMutation(() => ({
-		mutationFn: () =>
-			upsertHealth(hDate, {
-				weight_g: weight ? kgToG(Number(weight)) : null,
-				sleep_min: sleep ? hoursToMin(Number(sleep)) : null,
-				water_ml: water ? Number(water) : null,
-				mood
-			}),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: ['health'] });
-			weight = '';
-			sleep = '';
-			water = '';
-			mood = null;
-			toast.success('Day logged');
-		}
-	}));
-
-	// Workout log
-	let fDate = $state(todayIso());
-	let activity = $state('');
-	let duration = $state('');
-	let distance = $state('');
-	let calories = $state('');
-	const addWorkout = createMutation(() => ({
-		mutationFn: () =>
-			addFitness({
-				logged_on: fDate,
-				activity,
-				duration_min: Number(duration) || 0,
-				distance_m: distance ? kmToM(Number(distance)) : null,
-				calories: calories ? Number(calories) : null
-			}),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: ['fitness'] });
-			activity = '';
-			duration = '';
-			distance = '';
-			calories = '';
-			toast.success('Workout logged');
-		}
-	}));
-
 	const weekMin = $derived(totalDuration(fitness.data ?? [], todayIso(), 7));
 </script>
 
@@ -144,7 +94,7 @@
 			<Card.Description>Log it often and watch the trend.</Card.Description>
 		</Card.Header>
 		<Card.Content class="flex flex-col gap-4">
-			<div class="flex flex-wrap items-end gap-x-8 gap-y-2">
+			<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-8">
 				<div>
 					<div class="text-xs text-muted-foreground">Current</div>
 					<div class="text-3xl font-bold">{currentKg != null ? `${currentKg} kg` : '—'}</div>
@@ -163,8 +113,8 @@
 						</div>
 					</div>
 				{/if}
-				<div class="ml-auto flex items-end gap-2">
-					<Input type="number" step="0.1" placeholder="Today's weight kg" bind:value={quickWeight} class="w-40" />
+				<div class="flex items-end gap-2 sm:ml-auto">
+					<Input type="number" step="0.1" placeholder="Today's weight kg" bind:value={quickWeight} class="min-w-0 flex-1 sm:w-40" />
 					<Button disabled={!quickWeight || logWeight.isPending} onclick={() => logWeight.mutate()}>Log</Button>
 				</div>
 			</div>
@@ -174,7 +124,7 @@
 
 	<!-- Progress photos -->
 	<Card.Root id="fit-photo">
-		<Card.Header class="flex-row items-center justify-between">
+		<Card.Header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				<Card.Title>Progress photos</Card.Title>
 				<Card.Description>Snap one regularly to see the change.</Card.Description>
@@ -205,40 +155,11 @@
 		</Card.Content>
 	</Card.Root>
 
-	<div class="grid gap-3 sm:grid-cols-2">
-		<Card.Root>
-			<Card.Header>
-				<Card.Description>This week</Card.Description>
-				<Card.Title class="text-2xl">{weekMin} min active</Card.Title>
-			</Card.Header>
-		</Card.Root>
-		<Card.Root id="fit-log">
-			<Card.Header><Card.Title>Log day</Card.Title></Card.Header>
-			<Card.Content class="flex flex-wrap items-end gap-2">
-				<Input type="date" bind:value={hDate} class="w-40" />
-				<Input type="number" step="0.1" placeholder="Weight kg" bind:value={weight} class="w-28" />
-				<Input type="number" step="0.1" placeholder="Sleep hrs" bind:value={sleep} class="w-28" />
-				<Input type="number" placeholder="Water ml" bind:value={water} class="w-28" />
-				<div class="flex gap-1">
-					{#each MOODS as mo}
-						<button class={cn('rounded-full border px-3 py-1 text-xs capitalize', mood === mo ? 'bg-secondary' : 'border-border')} onclick={() => (mood = mood === mo ? null : mo)}>{mo}</button>
-					{/each}
-				</div>
-				<Button disabled={saveHealth.isPending} onclick={() => saveHealth.mutate()}>Save</Button>
-			</Card.Content>
-		</Card.Root>
-	</div>
-
-	<Card.Root id="fit-workout">
-		<Card.Header><Card.Title>Log workout</Card.Title></Card.Header>
-		<Card.Content class="flex flex-wrap items-end gap-2">
-			<Input type="date" bind:value={fDate} class="w-40" />
-			<Input placeholder="Activity (e.g. Run)" bind:value={activity} class="w-40" />
-			<Input type="number" placeholder="Minutes" bind:value={duration} class="w-28" />
-			<Input type="number" step="0.1" placeholder="Distance km" bind:value={distance} class="w-28" />
-			<Input type="number" placeholder="Calories" bind:value={calories} class="w-28" />
-			<Button disabled={!activity || addWorkout.isPending} onclick={() => addWorkout.mutate()}>Add</Button>
-		</Card.Content>
+	<Card.Root>
+		<Card.Header>
+			<Card.Description>This week</Card.Description>
+			<Card.Title class="text-2xl">{weekMin} min active</Card.Title>
+		</Card.Header>
 	</Card.Root>
 
 	<div class="grid gap-3 lg:grid-cols-2">

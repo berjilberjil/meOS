@@ -4,7 +4,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { todayIso } from '$lib/finance/dates';
-	import { gToKg, kgToG } from '$lib/health/units';
+	import { gToKg, kgToG, kmToM } from '$lib/health/units';
+	import { addFitness } from '$lib/health/logs';
 	import {
 		listSessions, startSession, finishSession, removeSession,
 		listSetsFor, addSet, removeSet,
@@ -104,6 +105,27 @@
 	}
 
 	const volumeKg = $derived(Math.round(sessionVolume(sessionSets) / 1000));
+
+	let activity = $state('');
+	let duration = $state('');
+	let distance = $state('');
+	const addQuick = createMutation(() => ({
+		mutationFn: () =>
+			addFitness({
+				logged_on: today,
+				activity,
+				duration_min: Number(duration) || 0,
+				distance_m: distance ? kmToM(Number(distance)) : null,
+				calories: null
+			}),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['fitness'] });
+			activity = '';
+			duration = '';
+			distance = '';
+			toast.success('Workout logged');
+		}
+	}));
 </script>
 
 <div class="flex flex-col gap-4">
@@ -178,4 +200,14 @@
 			</Card.Content>
 		</Card.Root>
 	{/if}
+
+	<Card.Root>
+		<Card.Header><Card.Title class="text-base">Quick activity</Card.Title></Card.Header>
+		<Card.Content class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+			<Input placeholder="Activity (e.g. Run)" bind:value={activity} class="sm:w-40" />
+			<Input type="number" placeholder="Minutes" bind:value={duration} class="sm:w-28" />
+			<Input type="number" step="0.1" placeholder="Distance km" bind:value={distance} class="sm:w-28" />
+			<Button disabled={!activity || addQuick.isPending} onclick={() => addQuick.mutate()}>Add</Button>
+		</Card.Content>
+	</Card.Root>
 </div>

@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
-import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
+import CalendarDays from '@lucide/svelte/icons/calendar-days';
+import ScanLine from '@lucide/svelte/icons/scan-line';
 import Wallet from '@lucide/svelte/icons/wallet';
 import NotebookPen from '@lucide/svelte/icons/notebook-pen';
 import ListChecks from '@lucide/svelte/icons/list-checks';
@@ -32,12 +33,12 @@ export interface NavItem {
 // life map read as one system (same icon per module in both places).
 // Journal / Notes / To-dos / Goals are grouped under one "Workspace" tab.
 
-/** Elevated center button. Journaling is the landing, so Dashboard is opt-in. */
+/** Elevated center button. Journaling is the landing, so Today is opt-in. */
 export const DASHBOARD: NavItem = {
 	key: 'dashboard',
 	href: '/dashboard',
-	label: 'Dashboard',
-	icon: LayoutDashboard
+	label: 'Today',
+	icon: CalendarDays
 };
 
 /** Tabs left of the elevated center button. */
@@ -74,6 +75,12 @@ export const NAV_LEFT: NavItem[] = [
 /** Tabs right of the elevated center button. */
 export const NAV_RIGHT: NavItem[] = [
 	{
+		key: 'scan',
+		href: '/scan',
+		label: 'Scan',
+		icon: ScanLine
+	},
+	{
 		key: 'fitness',
 		href: '/fitness',
 		label: 'Fitness',
@@ -83,8 +90,7 @@ export const NAV_RIGHT: NavItem[] = [
 			{ label: 'Log food', href: '/fitness/food' },
 			{ label: 'Diet plan', href: '/fitness/diet' },
 			{ label: 'Start workout', href: '/fitness/workouts' },
-			{ label: 'Add photo', href: '/fitness?add=photo' },
-			{ label: 'Add log', href: '/fitness?add=log' }
+			{ label: 'Add photo', href: '/fitness?add=photo' }
 		]
 	},
 	{

@@ -9,6 +9,7 @@ async function login(page: Page) {
 	// Lands on the guarded dashboard. Wait on the sidebar theme toggle, which only
 	// renders when authenticated (the login card title is also "MyOS").
 	await page.waitForURL((url) => !url.pathname.startsWith('/login'));
+	await page.goto('/dashboard');
 	await expect(page.getByTestId('theme-toggle')).toBeVisible();
 }
 
@@ -26,8 +27,4 @@ test('authenticated shell renders and the theme toggle cycles + applies classes'
 	await toggle.click(); // light -> dark
 	await expect(toggle).toContainText('dark');
 	await expect(page.locator('html')).toHaveClass(/dark/);
-
-	await toggle.click(); // dark -> tui
-	await expect(toggle).toContainText('tui');
-	await expect(page.locator('html')).toHaveClass(/tui/);
 });

@@ -9,6 +9,7 @@
 	function isActive(item: { href: string; match?: string[] }): boolean {
 		const p = page.url.pathname;
 		if (item.href === '/dashboard') return p === '/dashboard';
+		if (item.href === '/scan') return p === '/scan' || p.startsWith('/scan/');
 		const paths = item.match ?? [item.href];
 		return paths.some((h) => p === h || p.startsWith(h + '/'));
 	}
@@ -207,7 +208,7 @@
 		{@render navButton(item)}
 	{/each}
 
-	<!-- elevated center: Dashboard (no menu) -->
+	<!-- elevated center: Today (no menu) -->
 	<a
 		href={DASHBOARD.href}
 		class="center"
@@ -244,7 +245,7 @@
 		border-top: 1px solid var(--border);
 		background: color-mix(in oklch, var(--card) 88%, transparent);
 		backdrop-filter: blur(8px);
-		padding: 5px 3px calc(5px + env(safe-area-inset-bottom));
+		padding: 5px 2px calc(5px + env(safe-area-inset-bottom));
 		overflow: visible; /* let the elevated button + menus escape upward */
 	}
 	/* Desktop only: a floating, centered, rounded pill that tucks away until the
@@ -253,7 +254,7 @@
 		left: 50%;
 		right: auto;
 		bottom: 16px;
-		width: min(560px, calc(100% - 2rem));
+		width: min(640px, calc(100% - 2rem));
 		gap: 4px;
 		padding: 6px 12px;
 		border: 1px solid var(--border);
@@ -376,6 +377,14 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	@media (max-width: 380px) {
+		.lbl {
+			font-size: 9px;
+		}
+		.item {
+			padding-inline: 0;
+		}
 	}
 
 	/* Elevated center Dashboard button */
