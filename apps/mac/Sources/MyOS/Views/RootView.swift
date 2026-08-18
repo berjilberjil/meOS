@@ -19,11 +19,14 @@ struct RootView: View {
             case .locked:
                 VaultUnlockView()
             case .loggedIn:
-                if BiometricLock.isEnabled && !unlocked {
-                    LockView { await tryUnlock() }
-                } else {
-                    MainView()
+                Group {
+                    if BiometricLock.isEnabled && !unlocked {
+                        LockView { await tryUnlock() }
+                    } else {
+                        MainView()
+                    }
                 }
+                .onAppear { DietBridge.shared.start(state: state) }
             }
 
             // One-time recovery code — shown above any phase, after setup or a
@@ -37,7 +40,10 @@ struct RootView: View {
         .preferredColorScheme(themeStore.theme.colorScheme)
         .tint(themeStore.theme.brand)
         .animation(.knTheme, value: themeStore.theme.id)
-        .task { await state.bootstrap() }
+        .task {
+            await state.bootstrap()
+            if state.phase == .loggedIn { DietBridge.shared.start(state: state) }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background { unlocked = false }
             if newPhase == .active { Task { await state.pullRemote() } }

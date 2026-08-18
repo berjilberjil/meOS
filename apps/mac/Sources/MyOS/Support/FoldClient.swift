@@ -1,26 +1,25 @@
 import Foundation
 
-/// Live Fold Money client — phone OTP, then dashboard + accounts + this month's
-/// spends. Tokens stay on-device in the Keychain. Refresh uses the same session.
+/// Live Fold Money client — phone OTP, then whatever Fold will hand back for the
+/// dashboard. Tokens stay on-device in `FoldSession` (sealed with the vault DEK,
+/// because the ad-hoc-signed Mac app can't write the Keychain). Refresh reuses
+/// the same session.
 enum FoldClient {
     private static let base = URL(string: "https://api.fold.money/api")!
-    /// Unfold uses `/api` + path. Newer Fold docs omit `/api`. OTP send works
-    /// on the first; verify 404s there, so we try both.
-    private static let roots = ["https://api.fold.money/api", "https://api.fold.money"]
-    private static let kAccess = "fold.access"
-    private static let kRefresh = "fold.refresh"
+    /// Everything lives under `/api`. The host root 404s on every path — probed
+    /// 16 Aug 2026, `GET /v1/users/me` → 404 at the root, 401 under `/api`.
+    private static let roots = ["https://api.fold.money/api"]
     private static let kUser = "fold.user"
     private static let kPhone = "fold.phone"
     private static let kDevice = "fold.deviceHash"
     /// Fold only accepts phone/Android/iOS — `macOS` returns 422 invalid device type.
     static let deviceType = "Android"
 
-    static var isLinked: Bool { KeychainStore.loadSecret(account: kAccess) != nil }
+    static var isLinked: Bool { FoldSession.load() != nil }
     static var linkedPhone: String { UserDefaults.standard.string(forKey: kPhone) ?? "" }
 
     static func unlink() {
-        KeychainStore.deleteSecret(account: kAccess)
-        KeychainStore.deleteSecret(account: kRefresh)
+        FoldSession.clear()
         UserDefaults.standard.removeObject(forKey: kUser)
     }
 
@@ -60,60 +59,118 @@ enum FoldClient {
         throw last
     }
 
-    private static func storeSession(_ json: [String: Any], phone: String) throws {
+    /// Read a token pair out of an OTP-verify or refresh response, keeping what the
+    /// response didn't rotate.
+    static func tokens(from json: [String: Any],
+                       keeping previous: FoldSession.Tokens?) -> FoldSession.Tokens? {
         let data = json["data"] as? [String: Any] ?? json
-        guard let access = string(data["access_token"]) else { throw FoldError.badOTP }
-        KeychainStore.saveSecret(access, account: kAccess)
-        if let refresh = string(data["refresh_token"]) {
-            KeychainStore.saveSecret(refresh, account: kRefresh)
+        guard let access = string(data["access_token"]) else { return nil }
+        let uid = string(data["user_id"])
+            ?? string((data["user_meta"] as? [String: Any])?["uuid"])
+            ?? previous?.userID
+        return FoldSession.Tokens(access: access,
+                                  refresh: string(data["refresh_token"]) ?? previous?.refresh,
+                                  userID: uid,
+                                  expiresAt: expiry(data["expires_at"] ?? data["expires_in"]))
+    }
+
+    /// `expires_at` arrives as epoch seconds, epoch milliseconds, or RFC3339.
+    /// `expires_in` (rare) is a duration from now.
+    static func expiry(_ any: Any?) -> Date? {
+        if let n = number(any) {
+            if n < 31_536_000 { return Date().addingTimeInterval(n) }   // < 1 year → duration
+            return Date(timeIntervalSince1970: n > 9_999_999_999 ? n / 1000 : n)
         }
-        if let uid = string(data["user_id"]) ?? string((data["user_meta"] as? [String: Any])?["uuid"]) {
-            UserDefaults.standard.set(uid, forKey: kUser)
-        }
+        guard let s = string(any) else { return nil }
+        if let d = date(s) { return d }
+        if let n = Double(s) { return expiry(n) }
+        return nil
+    }
+
+    private static func storeSession(_ json: [String: Any], phone: String) throws {
+        guard let next = tokens(from: json, keeping: nil) else { throw FoldError.badOTP }
+        // A dropped token used to look like a clean login and then "not signed in"
+        // on the very next call. Say so instead of pretending it worked.
+        guard FoldSession.save(next) else { throw FoldError.sessionNotSaved }
+        if let uid = next.userID { UserDefaults.standard.set(uid, forKey: kUser) }
         UserDefaults.standard.set(phone, forKey: kPhone)
     }
 
     /// Pull a fresh snapshot from Fold and map it into `FoldData`.
     static func fetchSnapshot() async throws -> FoldData {
-        try await refreshIfNeeded()
+        try requireSession()
+        FoldTrace.reset()
+        // Write the trace whatever happens — the pull that failed is the one worth
+        // reading, and it used to be the one that never got logged.
+        defer { FoldTrace.writeLog() }
+        await renewSession()
         var blobs: [[String: Any]] = []
         var uid = UserDefaults.standard.string(forKey: kUser) ?? ""
+        var rejected = false
         for path in ["/v2/users/me", "/v1/users/me"] {
-            if let me = try? await getJSONFirst(path) {
+            do {
+                let me = try await getJSONFirst(path)
                 blobs.append(me)
                 if let id = userID(from: me) { uid = id }
                 break
+            } catch FoldError.notLinked {
+                rejected = true                            // 401 even after renewing
+            } catch {
+                continue
             }
         }
+        // Say "sign in again" rather than reporting an empty pull when the token
+        // is simply no longer accepted.
+        if rejected && blobs.isEmpty { throw FoldError.notLinked }
         if !uid.isEmpty { UserDefaults.standard.set(uid, forKey: kUser) }
         guard !uid.isEmpty else { throw FoldError.http(0, "Fold signed in but returned no user id.") }
 
+        // The transaction list route is the one piece we can't locate right now —
+        // `/v1/users/{id}/transactions` 404s while its own `/available_since`
+        // child 401s. Left in place so spends light up the day it answers; until
+        // then the spend tiles keep their last known values.
         var txns: [[String: Any]] = []
         if let page = try? await fetchTransactions(uid: uid) {
             blobs.append(page.blob)
             txns = page.txns
         }
+        // Only routes Fold actually serves. Probed 16 Aug 2026 — unauthenticated
+        // 401 means "exists, needs a token", plain-text `404 page not found` means
+        // the path was never registered. These 401:
+        //   /v1/users/me · /v2/users/me · /v1/users/{id}/bank_accounts
+        //   /v1/users/{id}/transactions/available_since · /v1/users/{id}/settings
+        // These 404, and used to make up most of this list (which is why a pull
+        // came back empty even when the login worked):
+        //   accounts · bank-accounts (hyphen) · insights · investments · holdings
+        //   net-worth · net_worth · dashboard · portfolio · summary · balances
+        // `bank_accounts` is identity only (uuid, masked number, fip name) — the
+        // money is on `bank_accounts/balances`. Both are needed; the builder joins
+        // them on the account id.
         let extra = [
-            "/v1/users/\(uid)/transactions/available_since",
-            "/v1/users/\(uid)/accounts",
-            "/v1/users/\(uid)/bank-accounts",
-            "/v1/users/\(uid)/insights",
-            "/v1/users/\(uid)/investments",
-            "/v1/users/\(uid)/holdings",
-            "/v1/users/\(uid)/net-worth",
-            "/v1/users/\(uid)/dashboard",
-            "/v2/users/\(uid)/dashboard"
+            "/v1/users/\(uid)/bank_accounts",
+            "/v1/users/\(uid)/bank_accounts/balances",
+            "/v1/users/\(uid)/transactions/available_since"
         ]
         for path in extra {
             if let j = try? await getJSONFirst(path) { blobs.append(j) }
         }
+        // Per-account detail, in case the balance only lives on the single-account
+        // route. Bounded — this is a dashboard, not a crawler.
+        for id in accountIDs(in: blobs).prefix(8) {
+            if let j = try? await getJSONFirst("/v1/users/\(uid)/bank_accounts/\(id)") {
+                blobs.append(j)
+            }
+        }
 
         let previous = FoldData.load()
-        let snap = FoldSnapshotBuilder.build(blobs: blobs, transactions: txns, previous: previous)
-        if FoldSnapshotBuilder.isBare(snap) {
+        let result = FoldSnapshotBuilder.outcome(blobs: blobs, transactions: txns, previous: previous)
+        // Reaching Fold isn't the same as getting numbers out of it. Without this
+        // the old snapshot was re-saved and the caption claimed "Live Fold".
+        guard result.extracted else { throw FoldError.emptyPull(FoldTrace.summary) }
+        if FoldSnapshotBuilder.isBare(result.data) {
             throw FoldError.http(0, "Signed in, but Fold returned no balances. Last snapshot kept.")
         }
-        return snap
+        return result.data
     }
 
     /// Fold's transaction list is cursor-paged. `after` is base64 of `{8 digits},{RFC3339}`.
@@ -137,26 +194,31 @@ enum FoldClient {
 
     // MARK: - HTTP
 
-    private static func refreshIfNeeded() async throws {
-        guard KeychainStore.loadSecret(account: kAccess) != nil else { throw FoldError.notLinked }
-        guard let refresh = KeychainStore.loadSecret(account: kRefresh) else { return }
-        do {
-            let json = try await postJSON("/v1/auth/tokens/refresh", auth: false, body: [
-                "refresh_token": refresh
-            ])
-            let data = json["data"] as? [String: Any] ?? json
-            if let access = string(data["access_token"]) {
-                KeychainStore.saveSecret(access, account: kAccess)
-            }
-            if let next = string(data["refresh_token"]) {
-                KeychainStore.saveSecret(next, account: kRefresh)
-            }
-        } catch FoldError.notLinked {
-            throw FoldError.notLinked
-        } catch FoldError.http(let code, _) where code == 401 || code == 403 {
-            throw FoldError.notLinked
-        } catch {
-            // Brand-new access tokens still work if Fold rejects an immediate refresh.
+    private static func requireSession() throws {
+        guard FoldSession.load() != nil else { throw FoldError.notLinked }
+    }
+
+    /// Fold's access token dies after ~15 minutes, so every pull renews first.
+    /// The route is **v2** — `/v1/auth/tokens/refresh` and every other v1 spelling
+    /// answers `404 page not found`, which is why a session went stale one pull
+    /// after sign-in. Probed 16 Aug 2026: `{}` → 400 "body must not be empty",
+    /// `{"token":…}` → 400, `{"refresh_token":…}` → 422 only on a fake value.
+    /// Renewal never throws. Renewing a token that was still valid 401'd and killed
+    /// the whole pull seconds after a good sign-in — so a failed renewal just means
+    /// "carry on with what we have"; if the token really is dead the pull's own 401
+    /// says so.
+    private static func renewSession() async {
+        guard let current = FoldSession.load(), current.needsRenewal() else { return }
+        guard let refresh = current.refresh, !refresh.isEmpty else { return }
+        // Fold rejected an unauthenticated refresh (401) even on a fresh token, so
+        // send the Bearer token with it; fall back to bare in case it's the opposite.
+        for authed in [true, false] {
+            guard let json = try? await postJSON("/v2/auth/tokens/refresh", auth: authed,
+                                                 body: ["refresh_token": refresh]),
+                  let next = tokens(from: json, keeping: current)
+            else { continue }
+            FoldSession.save(next)
+            return
         }
     }
 
@@ -213,7 +275,7 @@ enum FoldClient {
         req.setValue("India", forHTTPHeaderField: "X-Device-Location")
         req.setValue("unfold", forHTTPHeaderField: "X-Device-Name")
         req.setValue(Self.deviceType, forHTTPHeaderField: "X-Device-Type")
-        if auth, let token = KeychainStore.loadSecret(account: kAccess) {
+        if auth, let token = FoldSession.accessToken {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         if let body {
@@ -221,6 +283,9 @@ enum FoldClient {
         }
         let (data, resp) = try await URLSession.shared.data(for: req)
         let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+        FoldTrace.record(FoldTrace.line(method: method, path: path, code: code,
+                                        bytes: data.count, keys: topLevelKeys(data)))
+        if (200..<300).contains(code) { FoldTrace.recordShape(path: path, data: data) }
         if code == 401 { throw FoldError.notLinked }
         guard (200..<300).contains(code) else {
             throw FoldError.http(code, "\(path) · \(apiMessage(from: data, code: code))")
@@ -255,6 +320,42 @@ enum FoldClient {
         return String(data: data, encoding: .utf8).map { String($0.prefix(180)) } ?? "HTTP \(code)"
     }
 
+    /// The uuids of the linked accounts, read out of the `bank_accounts` response.
+    static func accountIDs(in blobs: [[String: Any]]) -> [String] {
+        var out: [String] = []
+        func walk(_ any: Any) {
+            if let d = any as? [String: Any] {
+                // Only entries that are clearly a linked account — `fip` and a
+                // masked number are what tell an account apart from a plan or a user.
+                if d["fip"] != nil || d["masked_account_number"] != nil,
+                   let id = string(d["uuid"]) ?? string(d["account_id"]), !out.contains(id) {
+                    out.append(id)
+                }
+                d.values.forEach(walk)
+            } else if let a = any as? [Any] {
+                a.forEach(walk)
+            }
+        }
+        blobs.forEach(walk)
+        return out
+    }
+
+    /// Key names only — enough to tell "wrong shape" from "wrong route" without
+    /// writing a single balance into the log.
+    private static func topLevelKeys(_ data: Data) -> [String] {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) else { return [] }
+        if let d = obj as? [String: Any] {
+            var keys = Array(d.keys)
+            if let inner = d["data"] as? [String: Any] { keys += inner.keys.map { "data.\($0)" } }
+            if let arr = d["data"] as? [[String: Any]], let first = arr.first {
+                keys += first.keys.map { "data[].\($0)" }
+            }
+            return keys
+        }
+        if let a = obj as? [[String: Any]], let first = a.first { return first.keys.map { "[].\($0)" } }
+        return []
+    }
+
     private static func userID(from json: [String: Any]) -> String? {
         let data = json["data"] as? [String: Any] ?? json
         if let u = data["user"] as? [String: Any] {
@@ -264,13 +365,87 @@ enum FoldClient {
     }
 }
 
+/// What Fold answered on the last pull — one line per call, statuses and JSON key
+/// names only. Written next to the state cache so a silent empty pull can be read
+/// back after the fact instead of re-guessed.
+enum FoldTrace {
+    private(set) static var lines: [String] = []
+
+    static func reset() { lines = [] }
+    static func record(_ line: String) { lines.append(line) }
+
+    static func line(method: String, path: String, code: Int, bytes: Int, keys: [String]) -> String {
+        let shown = keys.sorted().prefix(8).joined(separator: ",")
+        let tail = shown.isEmpty ? "" : ", keys: \(shown)"
+        return "\(method) \(path) → \(code) (\(bytes) B\(tail))"
+    }
+
+    private static let shapePrefix = "    shape "
+
+    /// For the error line on screen: routes and statuses only. The shape dumps are
+    /// hundreds of characters and belong in the log, not across the dashboard.
+    static var summary: String {
+        lines.filter { !$0.hasPrefix(shapePrefix) }
+            .map { $0.replacingOccurrences(of: ", keys:", with: " keys:") }
+            .joined(separator: " · ")
+    }
+
+    /// The shape of a response with every value replaced by its type, arrays
+    /// collapsed to their first element. Enough to write a parser against; never
+    /// enough to read a balance off.
+    static func skeleton(_ any: Any, depth: Int = 0) -> String {
+        guard depth < 6 else { return "…" }
+        switch any {
+        case let d as [String: Any]:
+            let body = d.keys.sorted().prefix(24)
+                .map { "\($0):\(skeleton(d[$0] as Any, depth: depth + 1))" }
+                .joined(separator: ",")
+            return "{\(body)}"
+        case let a as [Any]:
+            guard let first = a.first else { return "[]" }
+            return "[\(skeleton(first, depth: depth + 1))×\(a.count)]"
+        case is NSNull: return "null"
+        case let n as NSNumber:
+            return CFGetTypeID(n) == CFBooleanGetTypeID() ? "bool" : "number"
+        case is String: return "string"
+        default: return "?"
+        }
+    }
+
+    static func recordShape(path: String, data: Data) {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) else { return }
+        record("    shape \(path): \(String(skeleton(obj).prefix(1600)))")
+    }
+
+    static var logURL: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?.appendingPathComponent("MyOS/fold-debug.log")
+    }
+
+    /// Appends, so a sign-in and the pull that follows it are both readable. Kept
+    /// to the last 400 lines — this is a debugging aid, not a journal.
+    static func writeLog() {
+        guard let url = logURL, !lines.isEmpty else { return }
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        let previous = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        var all = previous.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        all += ["[\(stamp)]"] + lines
+        let body = all.suffix(400).joined(separator: "\n") + "\n"
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                 withIntermediateDirectories: true)
+        try? body.data(using: .utf8)?.write(to: url, options: .atomic)
+    }
+}
+
 enum FoldError: LocalizedError {
-    case badPhone, badOTP, notLinked, http(Int, String)
+    case badPhone, badOTP, notLinked, sessionNotSaved, emptyPull(String), http(Int, String)
     var errorDescription: String? {
         switch self {
         case .badPhone: return "Enter a valid Indian mobile number."
         case .badOTP: return "That OTP didn’t work."
         case .notLinked: return "Fold isn’t signed in. Connect it first."
+        case .sessionNotSaved: return "Fold signed in, but the session couldn’t be saved. Unlock MyOS and try again."
+        case .emptyPull(let what): return "Fold answered but sent no balances — \(what)"
         case .http(_, let m) where m.lowercased().contains("invalid phone"):
             return "Fold wants +91 and your 10-digit mobile. Try again."
         case .http(let c, let m): return "Fold \(c): \(m)"
@@ -317,7 +492,18 @@ enum FoldSnapshotBuilder {
         return recovery
     }
 
+    /// `extracted` is false when Fold was reached but nothing usable came back —
+    /// the caller must surface that instead of re-saving the old snapshot.
+    struct Outcome {
+        var data: FoldData
+        var extracted: Bool
+    }
+
     static func build(blobs: [[String: Any]], transactions: [[String: Any]], previous: FoldData?) -> FoldData {
+        outcome(blobs: blobs, transactions: transactions, previous: previous).data
+    }
+
+    static func outcome(blobs: [[String: Any]], transactions: [[String: Any]], previous: FoldData?) -> Outcome {
         var next = previous ?? FoldData()
         let nums = collectNumbers(blobs)
         if let v = nums["net_worth"] ?? nums["netWorth"] ?? nums["total_net_worth"] { next.netWorth = v }
@@ -356,15 +542,15 @@ enum FoldSnapshotBuilder {
         }
 
         let extracted = !nums.isEmpty || !banks.isEmpty || !spends.isEmpty
-        if !extracted, let prev = previous, !isBare(prev) { return prev }
-        if isBare(next), let prev = previous, !isBare(prev) { return prev }
+        if !extracted, let prev = previous, !isBare(prev) { return Outcome(data: prev, extracted: false) }
+        if isBare(next), let prev = previous, !isBare(prev) { return Outcome(data: prev, extracted: false) }
 
         let fmt = DateFormatter()
         fmt.locale = Locale(identifier: "en_IN")
         fmt.dateFormat = "d MMM yyyy, h:mm a"
         next.asOf = fmt.string(from: Date())
         next.currency = "INR"
-        return next
+        return Outcome(data: next, extracted: extracted)
     }
 
     private static func collectNumbers(_ blobs: [[String: Any]]) -> [String: Double] {
@@ -386,16 +572,53 @@ enum FoldSnapshotBuilder {
         return out
     }
 
+    /// Fold nests accounts under `data.added` / `data.subscribed` / `data.accounts`
+    /// and spells the fields several ways, so match on "does this object look like
+    /// an account" rather than on one exact shape. The marker keys keep a plan or
+    /// settings object with a name and an amount from becoming a bank.
+    private static let accountMarkers = [
+        "masked_account_number", "account_number", "account_id", "account_type",
+        "account_ref_number", "fip", "financial_information_provider", "ifsc"
+    ]
+    private static let balanceKeys = [
+        "current_balance", "balance", "available_balance", "latest_balance",
+        "closing_balance", "amount"
+    ]
+    private static let nameKeys = ["account_name", "bank_name", "display_name", "nickname", "name"]
+
+    /// `bank_accounts` gives identity and no money; `bank_accounts/balances` gives
+    /// money and no name. Collect both keyed by account id, then join — an object
+    /// carrying identity *and* balance at once still works as a special case.
     private static func collectBanks(_ blobs: [[String: Any]]) -> [FoldData.Bank] {
-        var banks: [FoldData.Bank] = []
+        var identity: [String: (name: String?, mask: String?)] = [:]
+        var balances: [String: Double] = [:]
+        var order: [String] = []
+        var loose: [FoldData.Bank] = []
+
+        func accountID(_ d: [String: Any]) -> String? {
+            string(d["account_id"]) ?? string(d["bank_account_id"]) ?? string(d["uuid"]) ?? string(d["id"])
+        }
+        func mask(_ d: [String: Any]) -> String? {
+            string(d["masked_account_number"]) ?? string(d["account_number"])
+                ?? string(d["last4"]) ?? string(d["account_ref_number"])
+        }
+
         func walk(_ any: Any) {
             if let d = any as? [String: Any] {
-                let name = string(d["account_name"]) ?? string(d["name"]) ?? string(d["bank_name"])
-                let mask = string(d["masked_account_number"]) ?? string(d["last4"]) ?? string(d["account_number"])
-                let bal = number(d["balance"]) ?? number(d["current_balance"]) ?? number(d["available_balance"])
-                if let name, let bal, !name.isEmpty {
-                    let last4 = String((mask ?? "").filter(\.isNumber).suffix(4))
-                    banks.append(FoldData.Bank(name: name, last4: last4, balance: bal))
+                let looksLikeAccount = accountMarkers.contains { d[$0] != nil }
+                let bal = balance(in: d)
+                if let id = accountID(d), looksLikeAccount || bal != nil {
+                    if identity[id] == nil && balances[id] == nil { order.append(id) }
+                    if looksLikeAccount {
+                        let existing = identity[id]
+                        identity[id] = (accountName(in: d) ?? existing?.name,
+                                        mask(d) ?? existing?.mask)
+                    }
+                    if let bal { balances[id] = bal }
+                } else if looksLikeAccount, let bal {
+                    loose.append(FoldData.Bank(name: accountName(in: d) ?? "Bank",
+                                               last4: String((mask(d) ?? "").filter(\.isNumber).suffix(4)),
+                                               balance: bal))
                 }
                 d.values.forEach(walk)
             } else if let a = any as? [Any] {
@@ -403,7 +626,40 @@ enum FoldSnapshotBuilder {
             }
         }
         blobs.forEach(walk)
-        return banks
+
+        // Only ids that actually carry money are accounts. An identity with no
+        // balance would otherwise show up as a real bank holding ₹0.
+        return order.compactMap { id in
+            guard let bal = balances[id] else { return nil }
+            let who = identity[id]
+            return FoldData.Bank(name: who?.name ?? "Bank",
+                                 last4: String((who?.mask ?? "").filter(\.isNumber).suffix(4)),
+                                 balance: bal)
+        } + loose
+    }
+
+    /// `19539.13`, `"19539.13"`, or `{ "amount": 19539.13, "currency": "INR" }`.
+    private static func balance(in d: [String: Any]) -> Double? {
+        for key in balanceKeys {
+            guard let raw = d[key] else { continue }
+            if let n = number(raw) { return n }
+            if let nested = raw as? [String: Any] {
+                if let n = number(nested["amount"]) ?? number(nested["value"]) ?? number(nested["units"]) {
+                    return n
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func accountName(in d: [String: Any]) -> String? {
+        for key in nameKeys { if let s = string(d[key]) { return s } }
+        for key in ["fip", "financial_information_provider", "bank", "institution"] {
+            if let nested = d[key] as? [String: Any],
+               let s = string(nested["name"]) ?? string(nested["display_name"]) { return s }
+            if let s = string(d[key]) { return s }
+        }
+        return nil
     }
 
     private static func banksFromTransactions(_ txns: [[String: Any]]) -> [FoldData.Bank] {

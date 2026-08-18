@@ -69,7 +69,11 @@ final class AppState: ObservableObject {
 
     init() {
         api.vault = vault
+        // Fold's tokens are sealed with the vault DEK — read it live so a lock or
+        // an unlock is picked up without anyone having to re-register the key.
+        FoldSession.keyProvider = { [vault] in vault.dek }
         restoreCachedSession()
+        DietBridge.shared.start(state: self)
     }
 
     // MARK: - Instant relaunch
@@ -89,8 +93,10 @@ final class AppState: ObservableObject {
               vault.unlockFromKeychain(username: username),
               let payload = try? api.decodePayload(fromRaw: raw) else { return }
         apply(payload)
-        isHydrated = false        // stays gated until a fresh pull confirms
+        isHydrated = true
         phase = .loggedIn
+        DietBridge.shared.start(state: self)
+        startLiveSync()
     }
 
     private func markSession(active: Bool, username: String = "") {
@@ -124,6 +130,16 @@ final class AppState: ObservableObject {
     /// One-time purge of the removed money keys (finance / portfolio / net worth)
     /// from the synced store — finance tracking now lives in Fold. Deletes the rows
     /// so the old data stops syncing to every device; runs once per device.
+    /// One-shot: `defaults write com.berjil.myos myos.clearMealPlanOnce -bool true`
+    /// then relaunch — clears the weekly meal plan after a successful hydrate.
+    private static let kClearMealPlanOnce = "myos.clearMealPlanOnce"
+    private func applyPendingMealPlanClear() {
+        let d = UserDefaults.standard
+        guard d.bool(forKey: Self.kClearMealPlanOnce) else { return }
+        d.removeObject(forKey: Self.kClearMealPlanOnce)
+        clearMealPlan()
+    }
+
     private static let kFinancePurged = "myos.finance.purged.v1"
     private func purgeRemovedFinanceKeys() async {
         let d = UserDefaults.standard
@@ -190,8 +206,10 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            applyPendingMealPlanClear()
             healFoldSnapshot()
             startLiveSync()
+            DietBridge.shared.start(state: self)
             await purgeRemovedFinanceKeys()
         } catch is APIClient.VaultLockedError {
             phase = .locked
@@ -203,6 +221,7 @@ final class AppState: ObservableObject {
     }
 
     func logout() async {
+        DietBridge.shared.stop()
         stopLiveSync()
         stopFoldWatch()
         await api.logout()
@@ -311,8 +330,10 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            applyPendingMealPlanClear()
             healFoldSnapshot()
             startLiveSync()
+            DietBridge.shared.start(state: self)
             await purgeRemovedFinanceKeys()
         } catch {
             vaultError = (error as? APIError)?.message ?? "Couldn't load your data after unlock."
@@ -458,6 +479,7 @@ final class AppState: ObservableObject {
     }
 
     func startLiveSync() {
+        DietBridge.shared.start(state: self)
         liveSyncTask?.cancel()
         liveSyncTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -797,6 +819,31 @@ final class AppState: ObservableObject {
         for wd in weekdays where wd != from {
             nutrition.mealPlan[wd] = src.mapValues { $0.map { PlanItem(foodId: $0.foodId, quantity: $0.quantity) } }
         }
+        push(StateKey.nutrition, nutrition)
+    }
+    /// Empty the weekly meal grid. Library foods stay; today's log stays.
+    func clearMealPlan() {
+        guard !nutrition.mealPlan.isEmpty else { return }
+        nutrition.mealPlan = [:]
+        push(StateKey.nutrition, nutrition)
+    }
+    func clearPlanMeal(weekday: String, meal: MealKey) {
+        nutrition.mealPlan[weekday]?[meal.rawValue] = []
+        push(StateKey.nutrition, nutrition)
+    }
+    func deleteLogItem(id: String) {
+        var log = nutrition.log
+        for (date, var day) in log {
+            for meal in MealKey.allCases {
+                day.meals[meal.rawValue]?.removeAll { $0.id == id }
+            }
+            log[date] = day
+        }
+        nutrition.log = log
+        push(StateKey.nutrition, nutrition)
+    }
+    func setPlanMeal(weekday: String, meal: MealKey, foods: [(foodId: String, quantity: Double)]) {
+        nutrition.mealPlan[weekday, default: [:]][meal.rawValue] = foods.map { PlanItem(foodId: $0.foodId, quantity: $0.quantity) }
         push(StateKey.nutrition, nutrition)
     }
     /// Tick every still-unconfirmed meal from today's plan (the "log all" action).
@@ -1436,7 +1483,8 @@ final class AppState: ObservableObject {
         foldBusy = true; foldError = nil
         do {
             try await FoldClient.verifyOTP(phone: phone, otp: otp)
-            foldLinked = true
+            FoldTrace.writeLog()          // keep the verify exchange in the trace
+            foldLinked = FoldClient.isLinked
         } catch {
             foldError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             if case FoldError.notLinked = error { foldLinked = false }
