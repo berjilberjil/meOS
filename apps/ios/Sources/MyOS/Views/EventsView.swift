@@ -12,6 +12,8 @@ struct EventsView: View {
     @State private var editing: EventItem?
     @State private var showNew = false
     @State private var pendingDelete: EventItem?
+    @State private var viewingMedia: EventMedia?
+    @State private var viewingAll: [EventMedia] = []
 
     private var sorted: [EventItem] { state.events.sorted { $0.date > $1.date } }
     private var upcoming: [EventItem] { sorted.filter { $0.date >= state.todayKey } }
@@ -38,9 +40,12 @@ struct EventsView: View {
         }
         .sheet(isPresented: $showNew) { EventEditorSheet(event: nil) }
         .sheet(item: $editing) { e in EventEditorSheet(event: e) }
+        .fullScreenCover(item: $viewingMedia) { m in
+            EventMediaViewer(media: viewingAll, start: m, onClose: { viewingMedia = nil })
+        }
         .holdToDelete(
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-            title: pendingDelete.map { "Delete “\($0.title.isEmpty ? "this event" : $0.title)”?" } ?? "Delete this event?",
+            title: pendingDelete.map { "Delete \($0.title.isEmpty ? "this event" : $0.title)?" } ?? "Delete this event?",
             message: "This can't be undone."
         ) {
             if let e = pendingDelete { state.deleteEvent(e.id) }
@@ -79,7 +84,15 @@ struct EventsView: View {
                     }
                     if !e.media.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) { ForEach(e.media) { thumb($0) } }
+                            HStack(spacing: 6) {
+                                ForEach(e.media) { m in
+                                    thumb(m)
+                                        .onTapGesture {
+                                            viewingAll = e.media
+                                            viewingMedia = m
+                                        }
+                                }
+                            }
                         }
                     }
                     if !e.note.isEmpty {

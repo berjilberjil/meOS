@@ -1,44 +1,46 @@
 #if os(iOS)
 import SwiftUI
+import PhotosUI
 import Photos
 
 /// Daily body photos on iPhone. New shots you heart in Photos → Favorites
-/// land here automatically the next time MyOS is open.
+/// land here automatically the next time MyOS is open, or add one yourself.
+/// Everything also syncs to the shared "media" storage so it shows up on Mac.
 struct BodyPhotosCard: View {
     @EnvironmentObject var state: AppState
     @State private var photos: [ProgressPhoto] = []
+    @State private var selectedDate: String = AppState.dateKey(Date())
     @State private var viewing: ProgressPhoto?
     @State private var status = ""
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var adding = false
+
+    private var photoDates: Set<String> { Set(photos.map(\.date)) }
+    private var pendingDates: Set<String> { Set(ProgressPhotoStore.pending().map(\.date)) }
+    private var photosForSelectedDay: [ProgressPhoto] { photos.filter { $0.date == selectedDate } }
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    SectionTitle(text: "Daily progress")
-                    Spacer()
-                    Text("hearted photos").font(.system(size: 10)).foregroundStyle(Palette.faint)
-                }
-                Text("Every photo you heart in Favorites lands here.")
+                header
+                Text("Every photo you heart in Favorites lands here — or add one yourself.")
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if photos.isEmpty {
-                    Text(status.isEmpty ? "No body photos yet." : status)
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(photos) { p in thumb(p) }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
+                ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
+
+                dayStrip
             }
         }
         .task { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .progressPhotosDidChange)) { _ in
             photos = ProgressPhotoStore.list()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .progressPhotosSyncDidChange)) { _ in
+            photos = ProgressPhotoStore.list()
+        }
+        .photosPicker(isPresented: $adding, selection: $pickerItem, matching: .images)
+        .onChange(of: pickerItem) { _, item in Task { await addPicked(item) } }
         .fullScreenCover(item: $viewing) { start in
             ProgressGallery(photos: photos, start: start) {
                 viewing = nil
@@ -47,19 +49,69 @@ struct BodyPhotosCard: View {
         }
     }
 
+    private var header: some View {
+        HStack {
+            SectionTitle(text: "Daily progress")
+            Spacer()
+            syncBadge
+            Button { adding = true } label: {
+                Image(systemName: "plus.circle.fill").font(.system(size: 18, weight: .semibold))
+            }
+            .buttonStyle(KIconButtonStyle(size: 30, color: Palette.teal))
+            .accessibilityLabel("Add photo")
+        }
+    }
+
+    @ViewBuilder private var syncBadge: some View {
+        if ProgressPhotoSync.isSyncing {
+            ProgressView().controlSize(.mini)
+        } else if !ProgressPhotoStore.pending().isEmpty {
+            Image(systemName: "icloud.and.arrow.up").font(.system(size: 12)).foregroundStyle(Palette.amber)
+                .accessibilityLabel("Some photos haven't uploaded yet")
+        } else if !photos.isEmpty {
+            Image(systemName: "icloud.fill").font(.system(size: 12)).foregroundStyle(Palette.teal)
+                .accessibilityLabel("All photos synced")
+        }
+    }
+
+    @ViewBuilder private var dayStrip: some View {
+        if photosForSelectedDay.isEmpty {
+            Text(photos.isEmpty ? (status.isEmpty ? "No body photos yet." : status)
+                                 : "No photo for \(Fmt.day(selectedDate)) yet.")
+                .font(.system(size: 13)).foregroundStyle(Palette.faint)
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(photosForSelectedDay) { p in thumb(p) }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
     private func thumb(_ p: ProgressPhoto) -> some View {
         Button { viewing = p } label: {
-            VStack(spacing: 6) {
-                if let ui = UIImage(contentsOfFile: p.url.path) {
-                    Image(uiImage: ui).resizable().scaledToFill()
-                        .frame(width: 132, height: 176)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                } else {
-                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .fill(Palette.surface2).frame(width: 132, height: 176)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 6) {
+                    if let ui = UIImage(contentsOfFile: p.url.path) {
+                        Image(uiImage: ui).resizable().scaledToFill()
+                            .frame(width: 132, height: 176)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    } else {
+                        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .fill(Palette.surface2).frame(width: 132, height: 176)
+                    }
+                    Text(Fmt.day(p.date)).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.faint)
                 }
-                Text(Fmt.day(p.date)).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.faint)
+                if !ProgressPhotoStore.isSynced(p.id) {
+                    Image(systemName: "icloud.and.arrow.up.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(5)
+                        .background(Palette.amber, in: Circle())
+                        .padding(6)
+                }
             }
         }
         .buttonStyle(KPressStyle())
@@ -68,11 +120,30 @@ struct BodyPhotosCard: View {
     private func reload() async {
         await FavoritesBodyImporter.sync()
         photos = ProgressPhotoStore.list()
-        if photos.isEmpty { status = "Heart today’s photo in Favorites, then come back." }
+        if photos.isEmpty { status = "Heart today’s photo in Favorites, or tap + to add one." }
+        await ProgressPhotoSync.syncAll()
+        photos = ProgressPhotoStore.list()
+    }
+
+    private func addPicked(_ item: PhotosPickerItem?) async {
+        guard let item else { return }
+        pickerItem = nil
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let ui = UIImage(data: data),
+              let jpeg = ui.jpegData(compressionQuality: 0.85)
+        else { return }
+        if ProgressPhotoStore.save(jpeg: jpeg, date: selectedDate) {
+            photos = ProgressPhotoStore.list()
+            await ProgressPhotoSync.syncAll()
+            photos = ProgressPhotoStore.list()
+        }
     }
 }
 
-/// Full-screen pager: swipe between days, pinch/double-tap to zoom, hold to delete.
+/// Full-screen pager: swipe between days, pinch/double-tap to zoom. One
+/// "Save to Photos" action; delete lives behind a confirm sheet up top so it
+/// can never be a stray tap — nothing is ever "soft-deleted", the file (and
+/// its cloud copy) is only removed once you hold to confirm.
 private struct ProgressGallery: View {
     let photos: [ProgressPhoto]
     let start: ProgressPhoto
@@ -81,6 +152,7 @@ private struct ProgressGallery: View {
     @State private var page: String
     @State private var live: [ProgressPhoto]
     @State private var saveStatus = ""
+    @State private var confirmingDelete = false
 
     init(photos: [ProgressPhoto], start: ProgressPhoto, onClose: @escaping () -> Void) {
         self.photos = photos
@@ -97,14 +169,16 @@ private struct ProgressGallery: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
+                Button { confirmingDelete = true } label: {
+                    Image(systemName: "trash").font(.system(size: 14, weight: .bold))
+                }
+                .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
+                .accessibilityLabel("Delete photo")
+
+                Spacer()
                 Text(Fmt.day(currentDate)).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
                 Spacer()
-                Button { saveCurrent() } label: {
-                    Image(systemName: saveStatus == "Saved" ? "checkmark.circle.fill" : "square.and.arrow.down")
-                        .font(.system(size: 14, weight: .bold))
-                }
-                .buttonStyle(KIconButtonStyle(size: 30, color: saveStatus == "Saved" ? Palette.green : Palette.teal))
-                .accessibilityLabel("Save to Photos")
+
                 Button(action: onClose) {
                     Image(systemName: "xmark").font(.system(size: 13, weight: .bold))
                 }
@@ -140,15 +214,32 @@ private struct ProgressGallery: View {
             .buttonStyle(KPrimaryButtonStyle(tint: Palette.teal, fullWidth: true))
             .padding(.horizontal, 20)
             .padding(.top, 8)
-
-            HoldToConfirmButton(label: "Hold to delete") {
-                deleteCurrent()
-            }
-            .frame(height: 44)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.bottom, 20)
         }
         .background(Palette.bg.ignoresSafeArea())
+        .sheet(isPresented: $confirmingDelete) {
+            deleteSheet
+                .presentationDetents([.height(230)])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var deleteSheet: some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 4) {
+                Text("Delete this photo?").font(.system(size: 16, weight: .bold)).foregroundStyle(Palette.text)
+                Text("This removes it from this device and the cloud. It can't be undone.")
+                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    .multilineTextAlignment(.center)
+            }
+            HoldToConfirmButton(label: "Hold to delete") {
+                confirmingDelete = false
+                deleteCurrent()
+            }
+            Button("Cancel") { confirmingDelete = false }
+                .buttonStyle(KGhostButtonStyle())
+        }
+        .padding(20)
     }
 
     private func saveCurrent() {
@@ -175,13 +266,15 @@ private struct ProgressGallery: View {
     }
 
     private func deleteCurrent() {
-        ProgressPhotoStore.delete(page)
+        let deletingId = page
+        ProgressPhotoStore.delete(deletingId)
         live = ProgressPhotoStore.list()
         if let next = live.first {
             page = next.id
         } else {
             onClose()
         }
+        Task { await ProgressPhotoSync.delete(id: deletingId) }
     }
 }
 
