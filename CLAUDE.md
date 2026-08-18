@@ -4,63 +4,82 @@ Private, daily-driver "operating system for my life": finance, journal, health, 
 
 Owner: **Berjil** — personal project. Commit + push as `berjilberjil <berjiljacob@gmail.com>`, GitHub `berjilberjil/MyOS` via the `github-personal` SSH remote (`git@github-personal:berjilberjil/MyOS.git`). **Never** commit as the work/`@skcript.com` identity here.
 
-## Reference (read-only)
-`/Users/berjilskcript/Documents/monorepo` ("Knol", SvelteKit) is a **read-only reference** for theme/color/animation tokens and the content-studio interaction flow. **Never modify it.** Design tokens were ported into `src/routes/layout.css`.
+## Repo structure
+
+```
+MyOS/
+├── apps/
+│   ├── mac/       # Native Swift/SwiftUI Mac app (Xcode project)
+│   ├── ios/       # Native Swift/SwiftUI iOS app (Xcode project)
+│   └── web/       # SvelteKit backend API (deployed to Netlify)
+├── supabase/      # Postgres migrations (0001–0014)
+├── mcp/           # MCP servers (diet/)
+└── scripts/       # Backend LaunchAgent installer
+```
 
 ## Stack
-SvelteKit 2 + Svelte 5 (runes) · Tailwind v4 (CSS-first, `@theme inline` in `src/routes/layout.css`, no `tailwind.config.js`) · shadcn-svelte "luma" + Bits UI · TipTap · TanStack Svelte Query · Supabase (Postgres + Auth + Storage) · Dexie (offline) · `@vite-pwa/sveltekit`. Runtime: **Bun**. Dev port **5177**.
+
+- **Mac / iOS:** Native Swift + SwiftUI, Xcode, SwiftData
+- **Backend API:** SvelteKit 2 (Netlify adapter), Supabase Postgres, Gemini AI
+- **Diet MCP:** Bun + stdio transport
+- **DB:** Supabase Postgres with RLS
 
 ## Run
+
+### Backend API (apps/web)
 ```bash
-bunx supabase start      # local backend (Docker)
-bun run dev              # http://localhost:5177
+cd apps/web
+bun install
+bun run dev              # http://localhost:5173
 ```
-Local dev owner (placeholder — change before real use): `owner@myos.local` / `ChangeMe!myos1`.
+Or install the LaunchAgent: `scripts/install-backend-agent.sh`
 
-## Desktop (macOS) + web
-One SvelteKit codebase, built as a static SPA (`adapter-static`, `ssr=false`); auth is client-side via Supabase.
-- Web dev: `bun run dev` (http://localhost:5177)
-- Mac app dev: `bun run tauri:dev` (native window; needs Rust + Xcode CLT — both installed)
-- Web build: `bun run build` → static `build/` (deploy to any static host)
-- Mac app build: `bun run tauri:build` → `src-tauri/target/release/bundle/` (`MyOS.app` + `MyOS_*.dmg`)
-- Tauri config: `src-tauri/tauri.conf.json` (window, icons, `com.berjil.myos`). Build artifacts in `src-tauri/target` (gitignored).
+### Mac app (apps/mac)
+Open `apps/mac/MyOS.xcodeproj` in Xcode, or use the command-line build.
 
-### Cross-device sync (hosted Supabase)
-Local-first per device (Dexie cache + sync queue); a hosted Supabase project is the sync hub.
+### iOS app (apps/ios)
+Open the Xcode project, or use `xcodebuild`.
+
+### Diet MCP
+```bash
+cd mcp/diet
+bun install
+bun run src/index.ts     # stdio transport
+```
+
+## Cross-device sync (hosted Supabase)
 1. Create a private Supabase cloud project.
-2. Apply migrations `0001`–`0006` (`supabase db push` to the linked project).
-3. Point `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` at the cloud project in the build env.
-4. Seed the single owner via the admin API; enable MFA. RLS already restricts all data to the owner.
-Signing in on another Mac pulls the owner's data down and caches it locally.
+2. Apply migrations `supabase/migrations/` (`supabase db push`).
+3. Point `apps/web/.env` at the cloud project.
+4. Seed the single owner via the admin API; enable MFA. RLS restricts all data to the owner.
+Signing in on another device pulls the owner's data down.
 
 ## Test / verify
 ```bash
-bun run test -- --run    # Vitest unit suite
-bun run check            # svelte-check (must be 0 errors)
-bunx playwright test     # e2e (builds + previews on :4173)
-# RLS integration tests (needs local stack). Signup is disabled, so the tests
-# create users via the admin/service_role API — both keys required:
-export SUPABASE_ANON_KEY="$(bunx supabase status -o env | grep '^ANON_KEY=' | cut -d'\"' -f2)"
-export SUPABASE_SERVICE_ROLE_KEY="$(bunx supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d'\"' -f2)"
-bun run test -- --run tests/unit/rls.test.ts tests/unit/finance-rls.test.ts
+# Backend API tests
+cd apps/web && bun run test
+
+# Mac app tests
+cd apps/mac && xcodebuild test
 ```
 
 ## Conventions
-- **Money is integer paise** everywhere (`src/lib/money.ts`). Never store float money.
 - **Privacy:** single owner. Public signup disabled. RLS `user_id = auth.uid()` on every table. Private media buckets, signed URLs only. Add RLS + a policy test for every new table.
-- **Data access** via `src/lib/data/repository.ts` (`Repository<T>` / `SupabaseRepository`) and `storage-service.ts`; offline writes go through `sync-queue.ts`.
-- **Components:** shadcn-svelte luma in `src/lib/components/ui` (`import * as Card from '$lib/components/ui/card'`). 13px-base compact UI. Three themes: light / dark / Tokyo Night (`tui`).
+- **Migrations:** every new table gets its own migration file in `supabase/migrations/`. Always include RLS policies.
 - **TDD**, frequent commits, conventional-commit messages.
 
 ## Status & roadmap
-Specs + plans in `docs/superpowers/`. Build order (each module = own brainstorm → spec → plan → build):
 
-1. ✅ **Phase 0 — Foundation** (scaffold, themes, primitives, app shell, Supabase+auth+RLS, data layer, offline sync, PWA)
-2. ✅ **Phase 1 — Finance** (accounts, transactions, 3-second quick-add, categories+budgets, recurring/subscriptions catch-up, savings goals, investments/SIPs, dashboard. `src/lib/finance/`.)
-3. ✅ **Phase 2 — Journal** (TipTap rich-text + media pipeline, mood/date, list/edit. `src/lib/journal/`.)
-4. ✅ **Phase 3 — To-dos + Goals** (priority/due todos, life goals lifecycle. `src/lib/planner/`.)
-5. ✅ **Phase 4 — Health + Fitness** (daily metrics + workouts, integer units g/m/min. `src/lib/health/`.)
-6. ✅ **Phase 5 — Notes** (rich-text notes + pin, shared TipTap editor. `src/lib/notes/`.)
-7. ✅ **Phase 6 — Mindmap life-dashboard** (SVG life map over module counts + `links`. `src/lib/mindmap/`.)
+1. ✅ **Foundation** (Supabase+auth+RLS, data layer, app shell)
+2. ✅ **Finance** (accounts, transactions, categories+budgets, recurring, goals, investments)
+3. ✅ **Journal** (rich-text + media pipeline, mood/date)
+4. ✅ **To-dos + Goals** (priority/due todos, life goals lifecycle)
+5. ✅ **Health + Fitness** (daily metrics + workouts)
+6. ✅ **Notes** (rich-text notes + pin)
+7. ✅ **Mindmap** (SVG life map, module counts + links)
+8. ✅ **Native Mac app** (SwiftUI, all modules)
+9. ✅ **Native iOS app** (SwiftUI, core modules)
+10. ✅ **Fold integration** (banking dashboard via MCP)
+11. ✅ **Diet MCP** (meal planning via stdio)
 
-**All 7 phases complete.** Migrations `0001`–`0006`. Every module: own schema+RLS, pure-logic units tested, e2e per module. Next work = polish/iterate or extend a module; follow the same brainstorm → spec → plan → build cycle. Mindmap currently shows module branches; richer entity links accumulate via the `links` table as modules write to it.
+Next work = polish/iterate or extend a module; follow the same brainstorm → spec → plan → build cycle.
