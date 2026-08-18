@@ -22,10 +22,10 @@ struct TodayView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header.knRise(0)
+            ActivityStepsCard().knRise(1)
             DayMacroHero().knRise(1)
             mealsCard.knRise(1)
             WorkoutChecklistCard(edit: { editingWorkout = true }).knRise(2)
-            ActivityStepsCard().knRise(2)
             comingUpCard.knRise(3)
             #if os(iOS)
             BodyPhotosCard().knRise(3)
