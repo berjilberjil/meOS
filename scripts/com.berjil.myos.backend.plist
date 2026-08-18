@@ -13,9 +13,9 @@
         <string>dev</string>
     </array>
 
-    <!-- Run from apps/web so vite finds the project and loads .env. -->
+    <!-- Run from apps/api so vite finds the project and loads .env. -->
     <key>WorkingDirectory</key>
-    <string>/Users/berjilskcript/Documents/Personal/MyOS/apps/web</string>
+    <string>/Users/berjilskcript/Documents/Personal/MyOS/apps/api</string>
 
     <key>EnvironmentVariables</key>
     <dict>
