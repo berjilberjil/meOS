@@ -1,8 +1,8 @@
 {
-	"mcpServers": {
-		"myos-diet": {
-			"command": "bun",
-			"args": ["run", "mcp/diet/index.ts"]
-		}
-	}
+  "mcpServers": {
+    "myos-diet": {
+      "command": "bun",
+      "args": ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/diet/src/index.ts"]
+    }
+  }
 }

@@ -10,11 +10,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"test": "vitest",
-		"mcp:diet": "bun run mcp/diet/index.ts",
-		"tauri": "tauri",
-		"tauri:dev": "tauri dev",
-		"tauri:build": "tauri build"
+		"test": "vitest"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.61.1",
@@ -24,7 +20,6 @@
 		"@tailwindcss/forms": "^0.5.11",
 		"@tailwindcss/typography": "^0.5.20",
 		"@tailwindcss/vite": "^4.3.1",
-		"@tauri-apps/cli": "^2.11.3",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.4.2",
 		"@types/node": "^26.0.1",
@@ -45,9 +40,6 @@
 		"@supabase/ssr": "^0.12.0",
 		"@supabase/supabase-js": "^2.108.2",
 		"@tanstack/svelte-query": "^6.1.35",
-		"@tauri-apps/api": "^2.4.1",
-		"@tauri-apps/plugin-haptics": "^2.3.2",
-		"@tauri-apps/plugin-notification": "^2.3.1",
 		"@tiptap/core": "^3.27.1",
 		"@tiptap/extension-bubble-menu": "^3.27.1",
 		"@tiptap/extension-details": "^3.27.1",
