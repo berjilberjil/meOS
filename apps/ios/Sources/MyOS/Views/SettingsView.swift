@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// iOS Settings — reorderable grouped list with drag handles.
+/// iOS Settings — one grouped list, same card language as Today / Fitness.
 /// Sheets are full-height so editors aren't crushed into a medium detent.
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
@@ -8,13 +8,8 @@ struct SettingsView: View {
     @AppStorage(BiometricLock.key) private var faceIDEnabled = false
     @State private var page: Page?
 
-    /// Persisted order — only the reorderable rows (not You, Lock, Sign Out).
-    @AppStorage("settings.order") private var orderJSON = ""
-
-    private static let defaultOrder: [Page] = [.appearance, .launch, .reminders, .assistant, .keys]
-
-    private enum Page: String, Identifiable, CaseIterable {
-        case you, appearance, launch, reminders, assistant, keys
+    private enum Page: String, Identifiable {
+        case you, appearance, launch, reminders, assistant, keys, reorder
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -24,6 +19,7 @@ struct SettingsView: View {
             case .reminders: return "Reminders"
             case .assistant: return "Catherine"
             case .keys: return "AI keys"
+            case .reorder: return "Reorder Today"
             }
         }
         var icon: String {
@@ -34,6 +30,7 @@ struct SettingsView: View {
             case .reminders: return "bell.fill"
             case .assistant: return "sparkles"
             case .keys: return "key.fill"
+            case .reorder: return "arrow.up.arrow.down"
             }
         }
         var tint: Color {
@@ -44,68 +41,32 @@ struct SettingsView: View {
             case .reminders: return Palette.amber
             case .assistant: return Palette.green
             case .keys: return Palette.flame
-            }
-        }
-    }
-
-    /// Decoded order, with any new pages appended at the end.
-    private var orderedPages: [Page] {
-        get {
-            guard let data = orderJSON.data(using: .utf8),
-                  let ids = try? JSONDecoder().decode([String].self, from: data) else {
-                return Self.defaultOrder
-            }
-            var pages = ids.compactMap { Page(rawValue: $0) }
-            for p in Page.allCases where p != .you && !pages.contains(p) {
-                pages.append(p)
-            }
-            return pages
-        }
-        nonmutating set {
-            let ids = newValue.map(\.rawValue)
-            if let data = try? JSONEncoder().encode(ids),
-               let json = String(data: data, encoding: .utf8) {
-                orderJSON = json
+            case .reorder: return Palette.ice
             }
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text("Settings").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
-                Spacer()
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.faint)
-                Text("Drag to reorder")
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
-            }
+            Text("Settings").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
 
             youCard
 
-            Card(padding: 6) {
-                List {
-                    ForEach(orderedPages, id: \.id) { p in
-                        rowButton(p)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Palette.surface)
-                            .moveDisabled(p == .you)
-                    }
-                    .onMove { from, to in
-                        withAnimation(.snappy) {
-                            var pages = orderedPages
-                            pages.move(fromOffsets: from, toOffset: to)
-                            orderedPages = pages
-                        }
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollDisabled(false)
-                .environment(\.editMode, .constant(.active))
+            group {
+                row(.reorder)
+                divider
+                row(.appearance)
+                divider
+                row(.launch)
+                divider
+                row(.reminders)
             }
-            .frame(height: CGFloat(orderedPages.count) * 60 + 12)
+
+            group {
+                row(.assistant)
+                divider
+                row(.keys)
+            }
 
             if BiometricLock.isAvailable { lockCard }
 
@@ -113,29 +74,6 @@ struct SettingsView: View {
         }
         .animation(.knTheme, value: themeStore.theme.id)
         .sheet(item: $page) { p in editorSheet(p) }
-    }
-
-    private func rowButton(_ p: Page) -> some View {
-        Button { page = p } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Palette.faint)
-                    .frame(width: 16)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(p.tint.opacity(0.18))
-                    Image(systemName: p.icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(p.tint)
-                }
-                .frame(width: 36, height: 36)
-                Text(p.title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.faint)
-            }
-            .padding(.horizontal, 10).padding(.vertical, 12)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(KPressStyle())
     }
 
     private var youCard: some View {
@@ -163,6 +101,35 @@ struct SettingsView: View {
             }
         }
         .buttonStyle(KPressStyle())
+    }
+
+    private func group<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        Card(padding: 6) {
+            VStack(spacing: 0) { content() }
+        }
+    }
+
+    private func row(_ p: Page) -> some View {
+        Button { page = p } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(p.tint.opacity(0.18))
+                    Image(systemName: p.icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(p.tint)
+                }
+                .frame(width: 36, height: 36)
+                Text(p.title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.faint)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(KPressStyle())
+    }
+
+    private var divider: some View {
+        Rectangle().fill(Palette.border).frame(height: 1).padding(.leading, 60)
     }
 
     private var lockCard: some View {
@@ -195,20 +162,28 @@ struct SettingsView: View {
         .padding(.top, 4)
     }
 
+    @ViewBuilder
     private func editorSheet(_ p: Page) -> some View {
         NavigationStack {
-            ScrollView {
-                Group {
-                    switch p {
-                    case .you: PersonDetailsEditor()
-                    case .appearance: AppearanceCard(boxed: false)
-                    case .launch: GeneralSettingsCard(boxed: false)
-                    case .reminders: NotificationsCard(boxed: false)
-                    case .assistant: AgentSettingsCard(boxed: false)
-                    case .keys: AIProvidersCard(boxed: false)
+            Group {
+                if p == .reorder {
+                    TodayReorderEditor()
+                } else {
+                    ScrollView {
+                        Group {
+                            switch p {
+                            case .you: PersonDetailsEditor()
+                            case .appearance: AppearanceCard(boxed: false)
+                            case .launch: GeneralSettingsCard(boxed: false)
+                            case .reminders: NotificationsCard(boxed: false)
+                            case .assistant: AgentSettingsCard(boxed: false)
+                            case .keys: AIProvidersCard(boxed: false)
+                            case .reorder: EmptyView()
+                            }
+                        }
+                        .padding(20)
                     }
                 }
-                .padding(20)
             }
             .background(Palette.bg.ignoresSafeArea())
             .navigationTitle(p.title)

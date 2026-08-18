@@ -20,19 +20,12 @@ struct TodayView: View {
     private let mealCols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
+        let sections = TodaySection.ordered()
         VStack(alignment: .leading, spacing: 18) {
             header.knRise(0)
-            ActivityStepsCard().knRise(1)
-            DayMacroHero().knRise(1)
-            mealsCard.knRise(1)
-            WorkoutChecklistCard(edit: { editingWorkout = true }).knRise(2)
-            comingUpCard.knRise(3)
-            #if os(iOS)
-            BodyPhotosCard().knRise(3)
-            #endif
-            WatchLogCard().knRise(4)
-            focusCard.knRise(4)
-            newsCard.knRise(5)
+            ForEach(Array(sections.enumerated()), id: \.element.id) { idx, section in
+                todaySection(section).knRise(idx + 1)
+            }
             #if os(macOS)
             settingsCard.knRise(7)
             #endif
@@ -48,6 +41,32 @@ struct TodayView: View {
             WorkoutDayEditorSheet(date: state.todayKey, initialItems: state.workoutItemsForDay(state.todayKey))
         }
         .sheet(isPresented: $showStreakCal) { streakCalendarSheet }
+    }
+
+    @ViewBuilder
+    private func todaySection(_ section: TodaySection) -> some View {
+        switch section {
+        case .activity:
+            ActivityStepsCard()
+        case .intake:
+            DayMacroHero()
+        case .meals:
+            mealsCard
+        case .workout:
+            WorkoutChecklistCard(edit: { editingWorkout = true })
+        case .comingUp:
+            comingUpCard
+        case .bodyPhotos:
+            #if os(iOS)
+            BodyPhotosCard()
+            #endif
+        case .watchLog:
+            WatchLogCard()
+        case .focus:
+            focusCard
+        case .news:
+            newsCard
+        }
     }
 
     private var mealsCard: some View {
