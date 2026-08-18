@@ -2,6 +2,8 @@ import Foundation
 
 extension Notification.Name {
     static let progressPhotosDidChange = Notification.Name("myos.progressPhotosDidChange")
+    /// Fired whenever a push/pull cycle finishes, so cards can refresh sync badges.
+    static let progressPhotosSyncDidChange = Notification.Name("myos.progressPhotosSyncDidChange")
 }
 
 /// One JPEG on disk. Many photos can share a calendar day.
@@ -67,8 +69,21 @@ enum ProgressPhotoStore {
         } catch { return false }
     }
 
+    /// Write bytes under an exact filename stem, used when pulling a photo that
+    /// another device already synced (its stem already encodes date + id).
+    @discardableResult
+    static func storeRemote(jpeg: Data, stem: String) -> Bool {
+        do {
+            try jpeg.write(to: url(for: stem), options: .atomic)
+            markSynced(stem)
+            NotificationCenter.default.post(name: .progressPhotosDidChange, object: stem)
+            return true
+        } catch { return false }
+    }
+
     static func delete(_ photo: ProgressPhoto) {
         try? FileManager.default.removeItem(at: photo.url)
+        unmarkSynced(photo.id)
         NotificationCenter.default.post(name: .progressPhotosDidChange, object: photo.id)
     }
 
@@ -79,6 +94,7 @@ enum ProgressPhotoStore {
             return
         }
         try? FileManager.default.removeItem(at: url(for: id))
+        unmarkSynced(id)
         NotificationCenter.default.post(name: .progressPhotosDidChange, object: id)
     }
 
@@ -92,5 +108,36 @@ enum ProgressPhotoStore {
         var s = importedIds
         s.insert(id)
         UserDefaults.standard.set(Array(s), forKey: importedKey)
+    }
+
+    // MARK: - Cloud sync status
+    // A photo is "synced" once this device has confirmed the cloud copy exists
+    // (either it uploaded it, or it just pulled it down). Purely local bookkeeping —
+    // the source of truth for what's actually in the cloud is the server.
+
+    private static let syncedKey = "myos.progress.syncedStems"
+
+    static var syncedIds: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: syncedKey) ?? [])
+    }
+
+    static func isSynced(_ id: String) -> Bool { syncedIds.contains(id) }
+
+    static func markSynced(_ id: String) {
+        var s = syncedIds
+        guard !s.contains(id) else { return }
+        s.insert(id)
+        UserDefaults.standard.set(Array(s), forKey: syncedKey)
+    }
+
+    static func unmarkSynced(_ id: String) {
+        var s = syncedIds
+        guard s.remove(id) != nil else { return }
+        UserDefaults.standard.set(Array(s), forKey: syncedKey)
+    }
+
+    /// Local photos that haven't been confirmed on the server yet.
+    static func pending() -> [ProgressPhoto] {
+        list().filter { !isSynced($0.id) }
     }
 }

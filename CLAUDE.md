@@ -11,7 +11,7 @@ MyOS/
 ├── apps/
 │   ├── mac/       # Native Swift/SwiftUI Mac app (Xcode project)
 │   ├── ios/       # Native Swift/SwiftUI iOS app (Xcode project)
-│   └── web/       # SvelteKit backend API (deployed to Netlify)
+│   └── api/       # Headless SvelteKit backend API (deployed to Netlify) — no web UI
 ├── supabase/      # Postgres migrations (0001–0014)
 ├── mcp/           # MCP servers (diet/)
 └── scripts/       # Backend LaunchAgent installer
@@ -26,9 +26,9 @@ MyOS/
 
 ## Run
 
-### Backend API (apps/web)
+### Backend API (apps/api)
 ```bash
-cd apps/web
+cd apps/api
 bun install
 bun run dev              # http://localhost:5173
 ```
@@ -50,14 +50,14 @@ bun run src/index.ts     # stdio transport
 ## Cross-device sync (hosted Supabase)
 1. Create a private Supabase cloud project.
 2. Apply migrations `supabase/migrations/` (`supabase db push`).
-3. Point `apps/web/.env` at the cloud project.
+3. Point `apps/api/.env` at the cloud project.
 4. Seed the single owner via the admin API; enable MFA. RLS restricts all data to the owner.
 Signing in on another device pulls the owner's data down.
 
 ## Test / verify
 ```bash
 # Backend API tests
-cd apps/web && bun run test
+cd apps/api && bun run test
 
 # Mac app tests
 cd apps/mac && xcodebuild test

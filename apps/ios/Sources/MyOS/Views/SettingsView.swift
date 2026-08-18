@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// iOS Settings — one grouped list, same card language as Today / Fitness.
-/// Sheets are full-height so editors aren’t crushed into a medium detent.
+/// Sheets are full-height so editors aren't crushed into a medium detent.
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var page: Page?
 
     private enum Page: String, Identifiable {
-        case you, appearance, launch, reminders, assistant, keys
+        case you, appearance, launch, reminders, assistant, keys, reorder
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -19,6 +19,7 @@ struct SettingsView: View {
             case .reminders: return "Reminders"
             case .assistant: return "Catherine"
             case .keys: return "AI keys"
+            case .reorder: return "Reorder Today"
             }
         }
         var icon: String {
@@ -29,6 +30,7 @@ struct SettingsView: View {
             case .reminders: return "bell.fill"
             case .assistant: return "sparkles"
             case .keys: return "key.fill"
+            case .reorder: return "arrow.up.arrow.down"
             }
         }
         var tint: Color {
@@ -39,6 +41,7 @@ struct SettingsView: View {
             case .reminders: return Palette.amber
             case .assistant: return Palette.green
             case .keys: return Palette.flame
+            case .reorder: return Palette.ice
             }
         }
     }
@@ -50,6 +53,8 @@ struct SettingsView: View {
             youCard
 
             group {
+                row(.reorder)
+                divider
                 row(.appearance)
                 divider
                 row(.launch)
@@ -157,20 +162,28 @@ struct SettingsView: View {
         .padding(.top, 4)
     }
 
+    @ViewBuilder
     private func editorSheet(_ p: Page) -> some View {
         NavigationStack {
-            ScrollView {
-                Group {
-                    switch p {
-                    case .you: PersonDetailsEditor()
-                    case .appearance: AppearanceCard(boxed: false)
-                    case .launch: GeneralSettingsCard(boxed: false)
-                    case .reminders: NotificationsCard(boxed: false)
-                    case .assistant: AgentSettingsCard(boxed: false)
-                    case .keys: AIProvidersCard(boxed: false)
+            Group {
+                if p == .reorder {
+                    TodayReorderEditor()
+                } else {
+                    ScrollView {
+                        Group {
+                            switch p {
+                            case .you: PersonDetailsEditor()
+                            case .appearance: AppearanceCard(boxed: false)
+                            case .launch: GeneralSettingsCard(boxed: false)
+                            case .reminders: NotificationsCard(boxed: false)
+                            case .assistant: AgentSettingsCard(boxed: false)
+                            case .keys: AIProvidersCard(boxed: false)
+                            case .reorder: EmptyView()
+                            }
+                        }
+                        .padding(20)
                     }
                 }
-                .padding(20)
             }
             .background(Palette.bg.ignoresSafeArea())
             .navigationTitle(p.title)

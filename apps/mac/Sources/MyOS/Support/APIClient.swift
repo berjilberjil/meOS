@@ -1,6 +1,6 @@
 import Foundation
 
-/// Talks to the headless SvelteKit backend (apps/web). Auth is the server's
+/// Talks to the headless SvelteKit backend (apps/api). Auth is the server's
 /// httpOnly cookie session (`myos_session`) — URLSession's shared cookie storage
 /// persists and re-sends it automatically, so there's no token to manage.
 struct APIError: LocalizedError {
@@ -262,6 +262,32 @@ final class APIClient {
     func cachedAnatomy() -> AnatomyData? {
         guard let d = try? Data(contentsOf: Self.cacheDir.appendingPathComponent("anatomy.json")) else { return nil }
         return try? decoder.decode(AnatomyData.self, from: d)
+    }
+
+    // MARK: - Body photos (progress photo cloud sync)
+
+    struct BodyPhotoDTO: Codable {
+        let id: String
+        let date: String
+        let url: String?
+        let updatedAt: String?
+    }
+
+    /// Every progress photo synced from any device, newest first.
+    func listBodyPhotos() async throws -> [BodyPhotoDTO] {
+        let data = try await request("GET", "api/body-photos")
+        return try decoder.decode([BodyPhotoDTO].self, from: data)
+    }
+
+    /// Upload (or overwrite) one progress photo to the shared "media" bucket.
+    func uploadBodyPhoto(id: String, date: String, jpeg: Data) async throws {
+        let body = ["id": id, "date": date, "dataBase64": jpeg.base64EncodedString()]
+        _ = try await request("POST", "api/body-photos", body: body, using: aiSession)
+    }
+
+    func deleteBodyPhoto(id: String) async throws {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        _ = try await request("DELETE", "api/body-photos/\(encoded)")
     }
 
     /// Generate a weekly workout + meal plan from the goal, targets and library.
