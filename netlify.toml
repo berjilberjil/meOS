@@ -1,17 +1,16 @@
-# MyOS backend deploys from apps/web.
+# Netlify deploy config for MyOS (static SPA, adapter-static).
+# Set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY in the Netlify site UI
+# (Site settings → Environment variables) — they are read at build time.
+
 [build]
-  base    = "apps/web"
-  command = "npm run build"
+  command = "bun run build"
   publish = "build"
 
 [build.environment]
   NODE_VERSION = "20"
-  # Force the Netlify SvelteKit adapter on every build (git or CLI), so a local
-  # `netlify deploy --build` can't fall back to adapter-node and ship a broken site.
-  NETLIFY = "true"
 
-# Keep the whole site out of search engines — private personal backend.
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Robots-Tag = "noindex, nofollow"
+# SPA fallback: serve index.html for client-side routes (also in static/_redirects).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

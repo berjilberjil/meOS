@@ -1,0 +1,7 @@
+[mcp_servers.myos-diet]
+command = "bun"
+# The diet MCP server lives in its own repo now (it is not part of the web app
+# build). Keep this path in sync with .mcp.json.
+args = ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/diet/src/index.ts"]
+startup_timeout_sec = 30
+enabled = true

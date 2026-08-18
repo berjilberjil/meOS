@@ -1,0 +1,78 @@
+@import './routes/layout.css';
+
+/* Mobile-first niceties: no horizontal scroll, comfortable tap, no iOS zoom. */
+html,
+body {
+	overflow-x: hidden;
+	-webkit-text-size-adjust: 100%;
+	-webkit-tap-highlight-color: transparent;
+	overscroll-behavior-y: none;
+}
+@media (max-width: 767px) {
+	/* iOS zooms in when a focused field is < 16px; keep inputs at 16px on phones. */
+	input,
+	select,
+	textarea {
+		font-size: 16px !important;
+	}
+}
+
+/* Print / "Download PDF": show only the marked region, drop app chrome. */
+@media print {
+	body * {
+		visibility: hidden;
+	}
+	.print-area,
+	.print-area * {
+		visibility: visible;
+	}
+	.print-area {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		padding: 0 0.5rem;
+	}
+	.no-print {
+		display: none !important;
+	}
+	.notes-editor {
+		border: none !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+	.notes-editor .ProseMirror {
+		min-height: 0 !important;
+	}
+	.print-only {
+		display: block !important;
+		visibility: visible;
+	}
+}
+.print-only {
+	display: none;
+}
+
+/* Dropdown menu items (used inside EditorShell's actions menu). */
+.menu-item {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 0.55rem;
+	border-radius: var(--radius-md);
+	padding: 0.45rem 0.55rem;
+	font-size: var(--text-sm);
+	color: var(--popover-foreground);
+	background: none;
+	border: none;
+	text-align: left;
+	cursor: pointer;
+}
+.menu-item:hover {
+	background: var(--accent);
+}
+.menu-item.on {
+	color: var(--primary);
+}
+.menu-item.danger:hover {
+	color: var(--destructive);
+}
