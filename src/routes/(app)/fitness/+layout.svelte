@@ -9,6 +9,7 @@
 	const tabs = [
 		{ href: '/fitness', label: 'Today' },
 		{ href: '/fitness/food', label: 'Food' },
+		{ href: '/fitness/diet', label: 'Diet' },
 		{ href: '/fitness/workouts', label: 'Workouts' },
 		{ href: '/fitness/plan', label: 'Plan' },
 		{ href: '/fitness/progress', label: 'Progress' }

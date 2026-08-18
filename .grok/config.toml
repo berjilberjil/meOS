@@ -1,0 +1,5 @@
+[mcp_servers.myos-diet]
+command = "bun"
+args = ["run", "mcp/diet/index.ts"]
+startup_timeout_sec = 30
+enabled = true
