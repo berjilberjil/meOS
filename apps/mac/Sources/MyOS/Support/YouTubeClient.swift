@@ -37,6 +37,29 @@ enum YouTube {
     /// hqdefault always exists for a valid id — the safe default thumbnail.
     static func thumbURL(_ id: String) -> String { "https://i.ytimg.com/vi/\(id)/hqdefault.jpg" }
 
+    /// A YouTube video inside whatever the iOS share sheet handed over.
+    ///
+    /// Stricter than `videoID(from:)` on purpose. That one accepts a bare id as
+    /// a courtesy, which is right for a paste field and wrong for a share sheet:
+    /// any stray twelve-character word would read as a video. Here the host has
+    /// to actually be YouTube's.
+    ///
+    /// Shares often arrive as "Video title\nhttps://youtu.be/xyz", so the link is
+    /// picked out of the surrounding text rather than the whole string being
+    /// parsed as a URL.
+    static func sharedLink(in raw: String) -> (id: String, url: String)? {
+        let whole = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = whole.split(whereSeparator: \.isWhitespace).map(String.init)
+            .first { $0.lowercased().contains("youtu") } ?? whole
+        guard let host = URLComponents(string: candidate)?.host?.lowercased(),
+              host == "youtu.be" || host.hasSuffix(".youtu.be")
+                || host == "youtube.com" || host.hasSuffix(".youtube.com")
+                || host == "youtube-nocookie.com" || host.hasSuffix(".youtube-nocookie.com"),
+              let id = videoID(from: candidate)
+        else { return nil }
+        return (id, candidate)
+    }
+
     struct Meta { let title: String; let channel: String; let thumbUrl: String }
 
     /// Fetch title/channel/thumbnail via oEmbed. Falls back to a derived thumbnail

@@ -21,6 +21,9 @@ targets:
     sources:
       # iOS-only: app entry + the tab shell + a lightweight Settings screen.
       - path: Sources
+        excludes:
+          # Belongs to the MyOSShare target, not the app.
+          - "Share/**"
       # Shared with apps/mac — the whole logic layer (AppState, APIClient,
       # models, crypto) plus every view that has no AppKit dependency. Kept as
       # ONE source of truth in apps/mac/Sources; nothing here is a copy.
@@ -45,6 +48,7 @@ targets:
       - path: ../mac/Sources/MyOS/Views/ChatWidget.swift
       - path: ../mac/Sources/MyOS/Views/AIProvidersCard.swift
       - path: ../mac/Sources/MyOS/Views/AgentSettingsCard.swift
+      - path: ../mac/Sources/MyOS/Views/MemoryCard.swift
       - path: ../mac/Sources/MyOS/Views/AppearanceCard.swift
       - path: ../mac/Sources/MyOS/Views/GeneralSettingsCard.swift
       - path: ../mac/Sources/MyOS/Views/NotificationsCard.swift
@@ -69,4 +73,31 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ACDQ327MPR
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # App Group only. NOT MyOS.entitlements — that one also asks for
+        # HealthKit, which isn't on the App ID yet and would fail to provision.
+        CODE_SIGN_ENTITLEMENTS: AppGroup.entitlements
+    dependencies:
+      - target: MyOSShare
+        embed: true
+
+  # "Share → MyOS" from YouTube. Queues the link into the App Group container;
+  # the app turns it into a Productivity entry when it next comes to the front.
+  MyOSShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/Share
+      # One source of truth, same convention as the app target — the link parser
+      # and the App Group hand-off come straight from apps/mac/Sources.
+      - path: ../mac/Sources/MyOS/Support/YouTubeClient.swift
+      - path: ../mac/Sources/MyOS/Support/ShareInbox.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.berjil.myos.Share
+        INFOPLIST_FILE: Share-Info.plist
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ACDQ327MPR
+        CODE_SIGN_ENTITLEMENTS: ShareExtension.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"

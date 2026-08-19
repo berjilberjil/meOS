@@ -54,6 +54,18 @@ enum CalMath {
     }
 }
 
+/// The reveal every "tap the calendar icon" panel uses.
+///
+/// Deliberately NOT `.move(edge: .top)`: that draws the panel outside its own
+/// slot, so on the way in it slides down over the rows above it and on the way
+/// out it smears back through them. A fade with a hair of scale from the top
+/// edge stays inside the layout, so nothing ever overlaps.
+extension AnyTransition {
+    static var knReveal: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+    }
+}
+
 /// THE MyOS calendar grid — one style used everywhere (Events, the date picker,
 /// the Productivity filter). Monday-first, compact rounded cells, green selected
 /// day, a ring on today, and a small colored dot on days that have content.
@@ -77,10 +89,17 @@ struct KMonthGrid: View {
     private var radius: CGFloat { big ? 12 : (compact ? 5 : 9) }
     private var colGap: CGFloat { big ? 6 : 0 }
 
+    /// Always a full 6x7 board. A month needs 4-6 rows depending on where it
+    /// starts, and letting the row count follow the month made the grid — and
+    /// every card hosting it — resize as you paged through, which read as a jump.
+    /// Padding to a fixed 42 cells keeps the height constant all year.
+    static let rowCount = 6
+
     private var cells: [Int?] {
         let lead = (CalMath.firstWeekday(year: year, month: month) + 6) % 7   // Monday-first offset
-        return Array(repeating: nil, count: lead)
-            + (1...CalMath.daysInMonth(year: year, month: month)).map { Optional($0) }
+        let days = (1...CalMath.daysInMonth(year: year, month: month)).map { Optional($0) }
+        let board = Array(repeating: nil, count: lead) + days
+        return board + Array(repeating: nil, count: max(0, Self.rowCount * 7 - board.count))
     }
 
     /// Header letter colour — Saturday blue, Sunday red, weekdays faint.
@@ -91,7 +110,7 @@ struct KMonthGrid: View {
     }
 
     var body: some View {
-        let rows = (cells.count + 6) / 7
+        let rows = Self.rowCount
         VStack(spacing: big ? 10 : (compact ? 3 : 6)) {
             HStack(spacing: colGap) {
                 ForEach(0..<7, id: \.self) { i in

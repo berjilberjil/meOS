@@ -405,34 +405,179 @@ struct FitnessView: View {
     }
 }
 
-/// Steps for today — used on Today and Fitness.
+/// Steps — today at a glance, with the daily record behind the calendar button.
+///
+/// Shared by Today and Fitness. Every day in the month is dotted by how close it
+/// came to the goal; tapping one reads it back and lets you correct it, which
+/// matters because only the iPhone has a pedometer — anything on the Mac is
+/// typed in.
 struct ActivityStepsCard: View {
     @EnvironmentObject var state: AppState
 
+    @State private var showCalendar = false
+    @State private var year = CalMath.cal.component(.year, from: Date())
+    @State private var month = CalMath.cal.component(.month, from: Date())
+    @State private var selected: String = AppState.dateKey(Date())
+
+    private var target: Int { state.stepsTarget }
+    private func steps(_ key: String) -> Int { state.fitness[key]?.steps ?? 0 }
+    private func fraction(_ n: Int) -> Double { target > 0 ? min(1, Double(n) / Double(target)) : 0 }
+
+    /// nil = nothing logged. Otherwise goal hit / past halfway / short — the same
+    /// green-amber-red reading the focus record uses.
+    private func dot(_ key: String) -> Color? {
+        let n = steps(key)
+        guard n > 0 else { return nil }
+        guard target > 0 else { return Palette.green }
+        let f = Double(n) / Double(target)
+        if f >= 1 { return Palette.green }
+        if f >= 0.5 { return Palette.amber }
+        return Palette.red.opacity(0.8)
+    }
+
     var body: some View {
-        let today = state.fitnessDay(state.todayKey)
-        let steps = today.steps ?? 0
-        let target = state.stepsTarget
-        return Card(padding: 14) {
-            HStack(spacing: 12) {
-                Image(systemName: "figure.walk").font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.muted)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Activity").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
-                    Text("\(steps.formatted()) / \(target.formatted()) steps")
-                        .font(.system(size: 13)).monospacedDigit().foregroundStyle(Palette.faint)
-                    #if os(iOS)
-                    Text("from Apple Health").font(.system(size: 11)).foregroundStyle(Palette.faint)
-                    #endif
+        Card(padding: 14) {
+            VStack(alignment: .leading, spacing: 12) {
+                summary
+                if showCalendar {
+                    Divider().overlay(Palette.border).padding(.top, 2)
+                    record.transition(.knReveal)
                 }
-                Spacer()
-                MeterBar(fraction: target > 0 ? min(1, Double(steps) / Double(target)) : 0,
-                         tint: Palette.flame, height: 6)
-                    .frame(width: 72)
             }
         }
         #if os(iOS)
-        .task { await HealthSteps.syncToday(into: state) }
+        .task { await HealthSteps.syncRecent(into: state) }
         #endif
+    }
+
+    // MARK: Today
+
+    private var summary: some View {
+        let n = steps(state.todayKey)
+        return HStack(spacing: 12) {
+            Image(systemName: "figure.walk").font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.muted)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Activity").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("\(n.formatted()) / \(target.formatted()) steps")
+                    .font(.system(size: 13)).monospacedDigit().foregroundStyle(Palette.faint)
+                #if os(iOS)
+                Text("from Apple Health").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                #endif
+            }
+            Spacer(minLength: 4)
+            MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6).frame(width: 72)
+            Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
+                Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
+                    .font(.system(size: 13, weight: .bold))
+            }
+            .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
+            .help(showCalendar ? "Hide the record" : "See every day")
+            .accessibilityLabel(showCalendar ? "Hide the activity calendar" : "Show the activity calendar")
+        }
+    }
+
+    // MARK: The record
+
+    private var record: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            KMonthHeader(year: year, month: month, showToday: false,
+                         onPrev: { shift(-1) }, onNext: { shift(1) })
+            KMonthGrid(year: year, month: month, selected: selected,
+                       dot: { dot($0) },
+                       onTap: { selected = $0 })
+            monthSummary
+            legend
+            dayRecap
+        }
+    }
+
+    /// Counts for the month on screen, blank days dropped so the average is over
+    /// days actually walked rather than over the calendar.
+    private var loggedInMonth: [Int] {
+        (1...CalMath.daysInMonth(year: year, month: month))
+            .map { steps(CalMath.key(year, month, $0)) }
+            .filter { $0 > 0 }
+    }
+
+    private var monthSummary: some View {
+        let logged = loggedInMonth
+        let total = logged.reduce(0, +)
+        let avg = logged.isEmpty ? 0 : total / logged.count
+        let hit = target > 0 ? logged.filter { $0 >= target }.count : 0
+        return HStack(spacing: 16) {
+            stat(total.formatted(), "total")
+            stat(avg.formatted(), "avg / day")
+            stat("\(hit)", hit == 1 ? "day at goal" : "days at goal")
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value).font(.system(size: 14, weight: .heavy, design: .rounded)).monospacedDigit()
+                .foregroundStyle(Palette.text)
+            Text(label).font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+        }
+    }
+
+    private var legend: some View {
+        HStack(spacing: 12) {
+            legendDot(Palette.green, "goal")
+            legendDot(Palette.amber, "halfway")
+            legendDot(Palette.red.opacity(0.8), "short")
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func legendDot(_ c: Color, _ label: String) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(c).frame(width: 6, height: 6)
+            Text(label).font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+        }
+    }
+
+    private var dayRecap: some View {
+        let n = steps(selected)
+        let isFuture = selected > AppState.dateKey(Date())
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Text(Fmt.day(selected))
+                    .font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Spacer(minLength: 0)
+                if target > 0 && n > 0 {
+                    Text("\(Int((Double(n) / Double(target) * 100).rounded()))% of goal")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(n >= target ? Palette.green : Palette.faint)
+                }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(n.formatted())
+                    .font(.system(size: 24, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .foregroundStyle(n > 0 ? Palette.text : Palette.faint)
+                Text("steps").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Spacer(minLength: 0)
+                if !isFuture {
+                    StepButton(icon: "minus", accent: Palette.flame) {
+                        state.setSteps(max(0, n - 500), on: selected)
+                    }
+                    StepButton(icon: "plus", accent: Palette.flame) {
+                        state.setSteps(n + 500, on: selected)
+                    }
+                }
+            }
+            MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6)
+            Text(isFuture ? "Hasn\u{2019}t happened yet."
+                          : (n > 0 ? "500 steps a tap." : "Nothing logged that day."))
+                .font(.system(size: 10)).foregroundStyle(Palette.faint)
+        }
+        // A floor so paging from a logged day to a blank one can't collapse the
+        // panel and yank every card below it up the page.
+        .frame(minHeight: 96, alignment: .top)
+    }
+
+    private func shift(_ d: Int) {
+        let (y, m) = CalMath.addMonth(year: year, month: month, delta: d)
+        withAnimation(.knFast) { year = y; month = m }
     }
 }
 

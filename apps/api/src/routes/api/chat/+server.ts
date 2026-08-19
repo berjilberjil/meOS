@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { generateText } from 'ai';
+import { generateText, jsonSchema, tool } from 'ai';
 import { resolveModel } from '$lib/server/ai';
 import { mentorChatSystem } from '$lib/mentor';
 
@@ -16,6 +16,43 @@ import { mentorChatSystem } from '$lib/mentor';
  */
 
 type Msg = { role: 'user' | 'assistant'; content: string };
+
+/** A tool declaration as the client sends it. */
+interface ToolDecl {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+/**
+ * Tools are declared by the CLIENT, not here.
+ *
+ * MyOS state is end-to-end encrypted, so this server cannot read a note even if
+ * it wanted to — every tool has to run on the device that holds the key. Letting
+ * the client ship the declarations alongside the request means the two halves
+ * can never drift apart, and the tool set can change without a redeploy.
+ *
+ * None of these get an `execute`: the SDK therefore stops at the tool call and
+ * hands it back, the app runs it locally, and the results come back as context
+ * on the next turn. That keeps the whole loop inside one plain JSON round-trip —
+ * no streaming, which is what was 502-ing on Netlify's gateway.
+ */
+function buildTools(raw: unknown) {
+  if (!Array.isArray(raw) || !raw.length) return undefined;
+  const entries = (raw as ToolDecl[])
+    .filter((t) => t && typeof t.name === 'string' && t.name.length < 64)
+    .slice(0, 24)
+    .map((t) => [
+      t.name,
+      tool({
+        description: String(t.description ?? '').slice(0, 800),
+        inputSchema: jsonSchema(
+          (t.parameters ?? { type: 'object', properties: {} }) as Parameters<typeof jsonSchema>[0]
+        )
+      })
+    ]);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
@@ -49,15 +86,32 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     throw error(503, (e as Error)?.message ?? 'AI is not configured on the server');
   }
 
-  const system = mentorChatSystem(context, persona);
+  const tools = buildTools(body.tools);
+  const system = mentorChatSystem(context, persona, Boolean(tools));
 
   try {
-    const { text } = await generateText({
+    const result = await generateText({
       model: resolved.model,
       system,
-      messages
+      messages,
+      ...(tools ? { tools } : {})
     });
-    return json({ reply: text ?? '' });
+
+    // The model wants to look something up. Hand the calls back; the app runs
+    // them against the unlocked vault and posts again with the results.
+    const calls = (result.toolCalls ?? []).map((c: Record<string, unknown>) => ({
+      id: String(c.toolCallId ?? ''),
+      name: String(c.toolName ?? ''),
+      // v5 calls it `input`; tolerate `args` so an SDK bump can't silently
+      // start sending empty arguments.
+      args: (c.input ?? c.args ?? {}) as Record<string, unknown>
+    }));
+
+    return json({
+      reply: result.text ?? '',
+      toolCalls: calls,
+      model: resolved.providerId
+    });
   } catch (e) {
     throw error(502, `Could not answer that: ${(e as Error)?.message ?? 'try again'}`);
   }

@@ -142,7 +142,7 @@ struct FocusCard: View {
                 if showCalendar {
                     Divider().overlay(Palette.border).padding(.top, 2)
                     FocusCalendarPanel()
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .transition(.knReveal)
                 }
             }
         }
@@ -549,8 +549,11 @@ struct FocusSessionView: View {
 /// partial, red logged-but-missed. Tap a day to read it back.
 struct FocusCalendarPanel: View {
     @EnvironmentObject var state: AppState
-    @State private var year = 0
-    @State private var month = 0
+    /// Seeded from today at construction. These used to start at 0/0 and get
+    /// corrected in `.onAppear`, which rendered one frame of a nonsense month
+    /// ("January 0") before snapping — a visible flash every time you opened it.
+    @State private var year = CalMath.cal.component(.year, from: Date())
+    @State private var month = CalMath.cal.component(.month, from: Date())
     @State private var selected: String = AppState.dateKey(Date())
 
     private func verdict(_ key: String) -> Color? {
@@ -571,12 +574,6 @@ struct FocusCalendarPanel: View {
                        onTap: { selected = $0 })
             legend
             dayRecap
-        }
-        .onAppear {
-            if year == 0 {
-                let c = CalMath.cal.dateComponents([.year, .month], from: Date())
-                year = c.year ?? 2026; month = c.month ?? 1
-            }
         }
     }
 
@@ -631,6 +628,9 @@ struct FocusCalendarPanel: View {
             }
         }
         .padding(.top, 2)
+        // A floor under the recap so tapping from a 6-todo day to an empty one
+        // doesn't collapse the panel and yank everything below it up the page.
+        .frame(minHeight: 96, alignment: .top)
     }
 
     private func shift(_ d: Int) {

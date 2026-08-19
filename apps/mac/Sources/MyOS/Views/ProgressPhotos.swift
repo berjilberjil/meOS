@@ -68,7 +68,7 @@ struct ProgressPhotosCard: View {
                 } else {
                     if showCalendar {
                         ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .transition(.knReveal)
                     }
                     dayStrip
                 }
@@ -103,18 +103,28 @@ struct ProgressPhotosCard: View {
         }
     }
 
+    /// One fixed height whether the day has photos or not. Photos arrive from an
+    /// async reload and the strip swaps between "all days" and "one day" as the
+    /// calendar opens — letting it size to its content meant the card (and every
+    /// card under it) jumped around while you were scrolling past.
+    private static let stripHeight: CGFloat = 150
+
     @ViewBuilder private var dayStrip: some View {
-        if stripPhotos.isEmpty {
-            Text("No photo for \(Fmt.day(selectedDate)) yet.")
-                .font(.system(size: 12)).foregroundStyle(Palette.faint)
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(stripPhotos) { p in thumb(p) }
+        Group {
+            if stripPhotos.isEmpty {
+                Text("No photo for \(Fmt.day(selectedDate)) yet.")
+                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(stripPhotos) { p in thumb(p) }
+                    }
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
             }
         }
+        .frame(height: Self.stripHeight, alignment: .topLeading)
     }
 
     /// Add photo. NSOpenPanel, not `.fileImporter` — the card already carries a

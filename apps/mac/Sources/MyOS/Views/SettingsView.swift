@@ -26,6 +26,7 @@ struct SettingsView: View {
             GeneralSettingsCard().knRise(2)
             NotificationsCard().knRise(3)
             AgentSettingsCard().knRise(3)
+            MemoryCard().knRise(3)
             AIProvidersCard().knRise(3)
             securityCard.knRise(4)
             DataManagementCard().knRise(5)

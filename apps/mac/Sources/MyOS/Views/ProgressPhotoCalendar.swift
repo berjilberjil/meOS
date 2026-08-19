@@ -62,10 +62,15 @@ struct ProgressPhotoCalendar: View {
         }
     }
 
+    /// Always six rows. A month spans 4-6 depending on where it starts, and
+    /// following that made the whole card resize as you paged — the jump the
+    /// shared `KMonthGrid` had too.
+    private static let rowCount = 6
+
     private var grid: some View {
         let cells = monthCells
         return VStack(spacing: 3) {
-            ForEach(0..<((cells.count + 6) / 7), id: \.self) { row in
+            ForEach(0..<Self.rowCount, id: \.self) { row in
                 HStack(spacing: 0) {
                     ForEach(0..<7, id: \.self) { col in
                         let i = row * 7 + col
@@ -128,8 +133,9 @@ struct ProgressPhotoCalendar: View {
         let weekday = Self.cal.component(.weekday, from: first)
         let lead = (weekday + 5) % 7
         let prefix = String(monthAnchor.prefix(8))
-        return Array(repeating: nil, count: lead)
+        let board: [String?] = Array(repeating: nil, count: lead)
             + (1...dayCount).map { prefix + String(format: "%02d", $0) }
+        return board + Array(repeating: nil, count: max(0, Self.rowCount * 7 - board.count))
     }
 
     private var monthTitle: String {
@@ -148,6 +154,6 @@ struct ProgressPhotoCalendar: View {
     private func shiftMonth(_ n: Int) {
         guard let d = AppState.date(fromKey: monthAnchor),
               let moved = Self.cal.date(byAdding: .month, value: n, to: d) else { return }
-        monthAnchor = String(AppState.dateKey(moved).prefix(7)) + "-01"
+        withAnimation(.knFast) { monthAnchor = String(AppState.dateKey(moved).prefix(7)) + "-01" }
     }
 }

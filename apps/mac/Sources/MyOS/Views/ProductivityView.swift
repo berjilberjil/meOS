@@ -14,8 +14,10 @@ struct ProductivityView: View {
     @State private var selected: WatchItem?
     @State private var dayFilter: String? = nil
     @State private var showCal = false
-    @State private var calYear = 0
-    @State private var calMonth = 0
+    /// Seeded from today — see the note in `FocusCalendarPanel`. Starting at 0/0
+    /// and fixing it in `.onAppear` flashed a bogus month on first paint.
+    @State private var calYear = CalMath.cal.component(.year, from: Date())
+    @State private var calMonth = CalMath.cal.component(.month, from: Date())
     @State private var mode: ViewMode = .log
 
     enum ViewMode: String, CaseIterable, Hashable {
@@ -64,12 +66,6 @@ struct ProductivityView: View {
             }
             .id(mode)
             .knRise(3)
-        }
-        .onAppear {
-            if calYear == 0 {
-                let c = CalMath.cal.dateComponents([.year, .month], from: Date())
-                calYear = c.year ?? 2026; calMonth = c.month ?? 1
-            }
         }
         .sheet(item: $selected) { item in WatchDetailSheet(item: item) }
     }

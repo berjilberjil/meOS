@@ -91,7 +91,12 @@ function envFallback(feature: Feature): Resolved {
   if (!key) throw new Error('AI is not configured on the server');
   let model: string;
   if (feature === 'chat') {
-    model = env.GEMINI_CHAT_MODEL ?? env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite';
+    // Chat deliberately does NOT inherit GEMINI_MODEL (the cheap classification
+    // default). It is the one feature where reasoning quality is the product —
+    // and with tools in play, picking the right tool is itself a reasoning task
+    // that the -lite tier is measurably bad at. Still free tier, still Gemini.
+    // Set GEMINI_CHAT_MODEL to override.
+    model = env.GEMINI_CHAT_MODEL ?? 'gemini-flash-latest';
   } else if (feature === 'plan') {
     model = env.GEMINI_REASONING_MODEL ?? env.GEMINI_MODEL ?? 'gemini-flash-latest';
   } else {

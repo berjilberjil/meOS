@@ -50,6 +50,7 @@ struct MainView: View {
         .task {
             await FavoritesBodyImporter.sync()
             await HealthSteps.syncToday(into: state)
+            await state.drainShareInbox()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -57,6 +58,9 @@ struct MainView: View {
                     await state.pullRemote()
                     await FavoritesBodyImporter.sync()
                     await HealthSteps.syncToday(into: state)
+                    // After the pull, so a video shared while the app was away
+                    // is appended to fresh state rather than a stale copy.
+                    await state.drainShareInbox()
                 }
             }
         }

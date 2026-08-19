@@ -47,6 +47,11 @@ final class AppState: ObservableObject {
     @Published var events: [EventItem] = []
     @Published var eventTags: [EventTag] = []
     @Published var watch: [WatchItem] = []
+    /// What Catherine remembers about him. See `Support/AI/Memory.swift`.
+    @Published var memory = MemoryState()
+    /// How the last answer was built — retrieved passages, recalled memories,
+    /// tool calls, timing. In memory only, for the debug sheet. Never logged.
+    @Published var lastTrace: CatrineTrace?
     @Published var belongings = BelongingsState()
     @Published var fold: FoldData?
     @Published var foldBusy = false
@@ -58,7 +63,9 @@ final class AppState: ObservableObject {
     @Published var lastHydrateError: String?
     private(set) var isHydrated = false
 
-    private let api = APIClient()
+    /// Internal rather than private: the AI layer lives in `Support/AI/*` as
+    /// extensions on this type, and `private` is file-scoped in Swift.
+    let api = APIClient()
     private var pushTasks: [String: Task<Void, Never>] = [:]
     private var pushGen: [String: Int] = [:]
     private var liveSyncTask: Task<Void, Never>?
@@ -121,6 +128,7 @@ final class AppState: ObservableObject {
         eventTags = s.eventTags ?? []
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
         watch     = s.watch ?? []
+        memory    = s.memory ?? MemoryState()
         belongings = s.belongings ?? BelongingsState()
         if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
@@ -234,7 +242,7 @@ final class AppState: ObservableObject {
         fitnessProfile = FitnessProfile(); journalPresets = JournalPresets()
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
-        events = []; watch = []; belongings = BelongingsState()
+        events = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
         fold = nil
         username = ""; isHydrated = false; lastSyncError = nil
         pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
@@ -287,7 +295,8 @@ final class AppState: ObservableObject {
             (StateKey.notes, notes), (StateKey.days, days), (StateKey.profile, profile),
             (StateKey.chat, chat), (StateKey.nutrition, nutrition), (StateKey.training, training),
             (StateKey.events, events), (StateKey.eventTags, eventTags),
-            (StateKey.watch, watch), (StateKey.belongings, belongings)
+            (StateKey.watch, watch), (StateKey.belongings, belongings),
+            (StateKey.memory, memory)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -385,6 +394,7 @@ final class AppState: ObservableObject {
         add("nutrition", nutrition); add("training", training)
         add("events", events); add("eventTags", eventTags)
         add("watch", watch)
+        add("memory", memory)
         add("belongings", belongings)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
@@ -398,7 +408,8 @@ final class AppState: ObservableObject {
     /// can serve the previous value for a couple of seconds after PUT).
     private var lastLocalWrite: [String: Date] = [:]
 
-    private func push(_ key: String, _ value: Encodable) {
+    // Internal, not private: the AI layer extends this type from Support/AI/*.
+    func push(_ key: String, _ value: Encodable) {
         guard isHydrated else {
             lastSyncError = "Not synced yet — refresh before saving."
             return
@@ -475,6 +486,7 @@ final class AppState: ObservableObject {
         if let v = s.events,         !hasPendingPush(StateKey.events),         v != events         { events = v }
         if let v = s.eventTags,      !hasPendingPush(StateKey.eventTags),      v != eventTags      { eventTags = v }
         if let v = s.watch,          !hasPendingPush(StateKey.watch),          v != watch          { watch = v }
+        if let v = s.memory,         !hasPendingPush(StateKey.memory),         v != memory         { memory = v }
         if let v = s.belongings,     !hasPendingPush(StateKey.belongings),     v != belongings     { belongings = v }
         if let v = s.fold, !hasPendingPush(StateKey.fold), v != fold {
             if FoldSnapshotBuilder.isBare(v) {
@@ -688,6 +700,33 @@ final class AppState: ObservableObject {
     /// from HealthKit next month — nothing else has to change for it to sync.
     func setTodaySteps(_ steps: Int?) {
         updateFitness(todayKey) { $0.steps = steps.map { max(0, $0) } }
+    }
+
+    /// Set (or clear) the step count for any day. The Mac has no pedometer, so
+    /// a day you want to correct after the fact is typed in against its key.
+    func setSteps(_ steps: Int?, on date: String) {
+        updateFitness(date) { $0.steps = steps.map { max(0, $0) } }
+    }
+
+    /// Fold a batch of pedometer readings in with ONE state push — backfilling a
+    /// week day-by-day through `updateFitness` would fire seven syncs.
+    ///
+    /// Days that already carry a count are left alone: only `authoritative`
+    /// (today, which is still counting up) gets overwritten, so a correction
+    /// typed on the Mac isn't clobbered by the next phone sync.
+    func mergeSteps(_ byDay: [String: Int], authoritative: String?) {
+        var changed = false
+        for (key, n) in byDay {
+            let existing = fitness[key]?.steps
+            let write = key == authoritative ? existing != n : (existing ?? 0) == 0
+            guard write else { continue }
+            var d = fitness[key] ?? FitnessDay()
+            d.steps = max(0, n)
+            fitness[key] = d
+            changed = true
+        }
+        guard changed else { return }
+        push(StateKey.fitness, fitness)
     }
     /// The daily step goal, defaulting to 8,000 when unset.
     var stepsTarget: Int { fitnessProfile.stepsTarget ?? 8000 }
@@ -1497,31 +1536,22 @@ final class AppState: ObservableObject {
         }
 
         do {
-            // Production chat is JSON `{ reply }` — streaming that URL 502s on Netlify.
-            var reply = ""
-            var lastError: Error?
-            for attempt in 1...2 {
-                do {
-                    reply = ChatText.unwrap(try await api.chat(messages: turns, context: mentorContext(), agent: agent))
-                    lastError = nil
-                    break
-                } catch {
-                    lastError = error
-                    let status = (error as? APIError)?.status ?? 0
-                    if attempt == 1, status >= 500 || status == -1 {
-                        try? await Task.sleep(nanoseconds: 800_000_000)
-                        continue
-                    }
-                    throw error
-                }
-            }
-            if let lastError { throw lastError }
-            writeReply(reply)
-            let parsed = ChatAction.parse(reply)
-            if parsed.visible != reply { writeReply(parsed.visible) }
+            // The bounded retrieve → tool → answer loop. See Support/AI/AgentLoop.swift.
+            let outcome = try await runCatrineTurn(query: t, turns: turns, agent: agent)
+            lastTrace = outcome.trace
+
+            // `ACTION` lines were how she acted before real tools existed. Still
+            // parsed so a model that emits one is honoured rather than leaking
+            // the markup into the chat — but tools are the path now.
+            let parsed = ChatAction.parse(outcome.reply)
+            writeReply(parsed.visible)
             applyMentorActions(parsed.actions)
             Haptics.success()
             if isHydrated { push(StateKey.chat, chat) }
+
+            // Learn from it afterwards, off the critical path — the reply is
+            // already on screen and a failure here must never surface.
+            await learnFromExchange(user: t, assistant: parsed.visible)
         } catch {
             chatError = (error as? APIError)?.message ?? error.localizedDescription
             if let j = chat.threads.firstIndex(where: { $0.id == threadID }),
@@ -1734,6 +1764,30 @@ final class AppState: ObservableObject {
     // MARK: - Productivity / watch log
 
     var sortedWatch: [WatchItem] { watch.sorted { $0.addedAt > $1.addedAt } }
+
+    /// Take everything the iOS share extension queued and log it.
+    ///
+    /// The extension only has the link — it can't reach the vault key or the
+    /// API session (see `ShareInbox`) — so the enrichment that `WatchLogCard`
+    /// does after a paste happens here instead: title, channel, thumbnail, then
+    /// the category. The item is saved before any of that so a dead network
+    /// still leaves the video in the log.
+    func drainShareInbox() async {
+        for shared in ShareInbox.drain() {
+            guard !watch.contains(where: { $0.videoId == shared.videoId }) else { continue }
+            var item = addWatchItem(WatchItem(url: shared.url, videoId: shared.videoId,
+                                              thumbUrl: YouTube.thumbURL(shared.videoId)))
+            let meta = await YouTube.fetchMeta(id: shared.videoId)
+            item.title = meta.title
+            item.channel = meta.channel
+            if !meta.thumbUrl.isEmpty { item.thumbUrl = meta.thumbUrl }
+            updateWatchItem(item)
+            if let cat = await categorizeVideo(title: meta.title, channel: meta.channel) {
+                item.category = cat
+                updateWatchItem(item)
+            }
+        }
+    }
 
     @discardableResult
     func addWatchItem(_ item: WatchItem) -> WatchItem {

@@ -34,7 +34,7 @@ struct BodyPhotosCard: View {
 
                 if showCalendar {
                     ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .transition(.knReveal)
                 }
 
                 dayStrip
@@ -90,19 +90,29 @@ struct BodyPhotosCard: View {
         }
     }
 
+    /// One fixed height whether the day has photos or not — see the note on the
+    /// Mac card. Photos land asynchronously and the strip swaps between "all
+    /// days" and "one day" when the calendar opens; sizing to content made the
+    /// Today feed jump under your thumb mid-scroll.
+    private static let stripHeight: CGFloat = 203
+
     @ViewBuilder private var dayStrip: some View {
-        if stripPhotos.isEmpty {
-            Text(photos.isEmpty ? (status.isEmpty ? "No body photos yet." : status)
-                                 : "No photo for \(Fmt.day(selectedDate)) yet.")
-                .font(.system(size: 13)).foregroundStyle(Palette.faint)
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(stripPhotos) { p in thumb(p) }
+        Group {
+            if stripPhotos.isEmpty {
+                Text(photos.isEmpty ? (status.isEmpty ? "No body photos yet." : status)
+                                     : "No photo for \(Fmt.day(selectedDate)) yet.")
+                    .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(stripPhotos) { p in thumb(p) }
+                    }
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
             }
         }
+        .frame(height: Self.stripHeight, alignment: .topLeading)
     }
 
     private func thumb(_ p: ProgressPhoto) -> some View {

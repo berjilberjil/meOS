@@ -78,7 +78,8 @@ final class APIClient {
     /// Like `request`, but sends an already-serialized JSON body verbatim. Used for
     /// uploading encrypted envelopes and the plaintext crypto meta.
     @discardableResult
-    private func requestData(_ method: String, _ path: String, bodyData: Data?) async throws -> Data {
+    private func requestData(_ method: String, _ path: String, bodyData: Data?,
+                             using session: URLSession? = nil) async throws -> Data {
         var req = URLRequest(url: Self.baseURL.appendingPathComponent(path))
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -86,7 +87,7 @@ final class APIClient {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = bodyData
         }
-        let (data, response) = try await session.data(for: req)
+        let (data, response) = try await (session ?? self.session).data(for: req)
         guard let http = response as? HTTPURLResponse else {
             throw APIError(status: -1, message: "No response from server")
         }
@@ -220,16 +221,38 @@ final class APIClient {
 
     /// Mentor chat. Sends the conversation + a data snapshot + who the assistant
     /// should be (name / tone / custom style); returns the reply.
-    func chat(messages: [ChatTurn], context: String, agent: AgentInfo) async throws -> String {
-        let body = ChatRequest(messages: messages, context: context, agent: agent)
-        let data = try await request("POST", "api/chat", body: body, using: aiSession)
-        let decoded: String
-        if let boxed = try? decoder.decode(ChatReply.self, from: data) {
-            decoded = boxed.reply
-        } else {
-            decoded = String(data: data, encoding: .utf8) ?? ""
+    /// One turn of the chat. `tools` are declared per request so the client and
+    /// the server can never disagree about what exists — see the note in
+    /// `api/chat/+server.ts`. A non-empty `toolCalls` in the answer means the
+    /// model wants a lookup before it commits to a reply.
+    ///
+    /// Hand-rolled JSON here rather than `Encodable`: tool parameter schemas are
+    /// arbitrary nested JSON, which `Codable` cannot express without a wrapper
+    /// type per tool.
+    func chat(messages: [ChatTurn], context: String, agent: AgentInfo,
+              tools: [[String: Any]] = []) async throws -> ChatAnswer {
+        var payload: [String: Any] = [
+            "messages": messages.map { ["role": $0.role, "content": $0.content] },
+            "context": context,
+            "agent": ["name": agent.name, "tone": agent.tone, "custom": agent.custom]
+        ]
+        if !tools.isEmpty { payload["tools"] = tools }
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let data = try await requestData("POST", "api/chat", bodyData: body, using: aiSession)
+
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return ChatAnswer(reply: ChatText.unwrap(String(data: data, encoding: .utf8) ?? ""),
+                              toolCalls: [], model: "")
         }
-        return ChatText.unwrap(decoded)
+        let calls = (obj["toolCalls"] as? [[String: Any]] ?? []).compactMap { raw -> ToolCall? in
+            guard let name = raw["name"] as? String, !name.isEmpty else { return nil }
+            return ToolCall(id: raw["id"] as? String ?? name,
+                            name: name,
+                            args: raw["args"] as? [String: Any] ?? [:])
+        }
+        return ChatAnswer(reply: ChatText.unwrap(obj["reply"] as? String ?? ""),
+                          toolCalls: calls,
+                          model: obj["model"] as? String ?? "")
     }
 
     /// Today's "what to do now" mentor nudge from a data snapshot.
@@ -312,8 +335,41 @@ final class APIClient {
     }
     struct ChatTurn: Encodable { let role: String; let content: String }
     struct AgentInfo: Encodable { let name: String; let tone: String; let custom: String }
-    private struct ChatRequest: Encodable { let messages: [ChatTurn]; let context: String; let agent: AgentInfo }
-    private struct ChatReply: Decodable { let reply: String }
+
+    /// One lookup the model asked for. `args` stays untyped because each tool
+    /// declares its own schema — `runCatrineTool` is what gives it meaning.
+    struct ToolCall: Equatable {
+        let id: String
+        let name: String
+        let args: [String: Any]
+
+        static func == (a: ToolCall, b: ToolCall) -> Bool { a.id == b.id && a.name == b.name }
+    }
+
+    struct ChatAnswer {
+        var reply: String
+        var toolCalls: [ToolCall]
+        var model: String
+    }
+
+    /// Candidate long-term memories pulled out of one exchange. The server
+    /// proposes; `MemoryBank.judge` disposes.
+    struct MemoryCandidateDTO: Decodable {
+        let content: String
+        let category: String
+        let importance: Int
+        let confidence: Double
+    }
+
+    func extractMemories(user: String, assistant: String,
+                         known: [String]) async throws -> [MemoryCandidateDTO] {
+        struct Body: Encodable { let user: String; let assistant: String; let known: [String] }
+        struct R: Decodable { let memories: [MemoryCandidateDTO] }
+        let data = try await request("POST", "api/memory",
+                                     body: Body(user: user, assistant: assistant, known: known),
+                                     using: aiSession)
+        return (try? decoder.decode(R.self, from: data).memories) ?? []
+    }
 
     // MARK: - AI providers & models
 

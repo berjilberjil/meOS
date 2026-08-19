@@ -725,6 +725,7 @@ struct AppStatePayload: Codable {
     var watch: [WatchItem]?
     var belongings: BelongingsState?
     var fold: FoldData?
+    var memory: MemoryState?
 
     init() {}
 
@@ -744,6 +745,7 @@ struct AppStatePayload: Codable {
         case watch          = "myos.watch"
         case belongings     = "myos.belongings"
         case fold           = "myos.fold"
+        case memory         = "myos.memory"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -766,6 +768,7 @@ struct AppStatePayload: Codable {
         watch          = try? c.decodeIfPresent([WatchItem].self, forKey: .watch)
         belongings     = try? c.decodeIfPresent(BelongingsState.self, forKey: .belongings)
         fold           = try? c.decodeIfPresent(FoldData.self, forKey: .fold)
+        memory         = try? c.decodeIfPresent(MemoryState.self, forKey: .memory)
     }
 }
 
@@ -845,4 +848,5 @@ enum StateKey {
     static let watch          = "myos.watch"
     static let belongings     = "myos.belongings"
     static let fold           = "myos.fold"
+    static let memory         = "myos.memory"
 }

@@ -15,7 +15,7 @@ struct SettingsView: View {
     private var textInset: CGFloat { tile + 14 + 12 }
 
     private enum Page: String, Identifiable {
-        case you, appearance, launch, reminders, assistant, keys, reorder, data
+        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -24,6 +24,7 @@ struct SettingsView: View {
             case .launch: return "Open on"
             case .reminders: return "Reminders"
             case .assistant: return "Catherine"
+            case .memory: return "Memory"
             case .keys: return "AI keys"
             case .reorder: return "Reorder Today"
             case .data: return "Data & resets"
@@ -36,6 +37,7 @@ struct SettingsView: View {
             case .launch: return "square.grid.2x2.fill"
             case .reminders: return "bell.fill"
             case .assistant: return "sparkles"
+            case .memory: return "brain.head.profile"
             case .keys: return "key.fill"
             case .reorder: return "arrow.up.arrow.down"
             case .data: return "trash.fill"
@@ -48,6 +50,7 @@ struct SettingsView: View {
             case .launch: return Palette.blue
             case .reminders: return Palette.amber
             case .assistant: return Palette.green
+            case .memory: return Palette.teal
             case .keys: return Palette.flame
             case .reorder: return Palette.ice
             case .data: return Palette.red
@@ -72,6 +75,7 @@ struct SettingsView: View {
 
             section("Assistant") {
                 row(.assistant); divider
+                row(.memory); divider
                 row(.keys)
             }
 
@@ -199,6 +203,7 @@ struct SettingsView: View {
                             case .launch: GeneralSettingsCard(boxed: false)
                             case .reminders: NotificationsCard(boxed: false)
                             case .assistant: AgentSettingsCard(boxed: false)
+                            case .memory: MemoryCard(boxed: false)
                             case .keys: AIProvidersCard(boxed: false)
                             case .data: DataManagementCard(boxed: false)
                             case .reorder: EmptyView()
