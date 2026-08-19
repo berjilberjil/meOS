@@ -5,3 +5,12 @@ command = "bun"
 args = ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/diet/src/index.ts"]
 startup_timeout_sec = 30
 enabled = true
+
+[mcp_servers.myos-stuff]
+command = "bun"
+# Purchases / spending. Needs native MyOS open and unlocked — the ROI maths and
+# the bill downscaling live in Swift, so there is no remote fallback here.
+# Keep this path in sync with .mcp.json.
+args = ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/stuff/src/index.ts"]
+startup_timeout_sec = 30
+enabled = true

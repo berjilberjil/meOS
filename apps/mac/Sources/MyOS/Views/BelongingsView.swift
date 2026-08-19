@@ -284,6 +284,7 @@ private struct BelongingEditor: View {
     @State private var bought = Date()
     @State private var lifeMonths = 12
     @State private var note = ""
+    @State private var link = ""
     @State private var photoBase64 = ""
     @State private var showDelete = false
     @State private var showRemovePhoto = false
@@ -352,6 +353,7 @@ private struct BelongingEditor: View {
                         Stepper("\(lifeMonths) months", value: $lifeMonths, in: 1...120)
                             .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
                     }
+                    field("Product link", $link, "https://www.amazon.in/dp/…")
                     field("Note", $note, "Optional")
                 }
                 .padding(16)
@@ -395,6 +397,7 @@ private struct BelongingEditor: View {
                     categoryID = i.categoryID.isEmpty ? i.kind.rawValue : i.categoryID
                     price = String(i.pricePaise / 100)
                     note = i.note; lifeMonths = max(1, i.lifeDays / 30)
+                    link = i.link
                     photoBase64 = i.photoBase64
                     if let d = AppState.date(fromKey: i.boughtOn) { bought = d }
                 } else {
@@ -554,6 +557,7 @@ private struct BelongingEditor: View {
         next.boughtOn = key
         next.lifeDays = lifeMonths * 30
         next.note = note
+        next.link = link.trimmingCharacters(in: .whitespacesAndNewlines)
         next.photoBase64 = photoBase64
         if item == nil { state.addBelonging(next) } else { state.updateBelonging(next) }
         dismiss()

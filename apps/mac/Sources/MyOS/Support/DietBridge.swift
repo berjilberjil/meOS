@@ -123,6 +123,26 @@ final class DietBridge {
                 let b = try req.json()
                 state.mcpSetGoals(b)
                 return HTTPRes(200, #"{"ok":true}"#)
+
+            // Stuff / spending — handlers live in StuffBridge.swift.
+            case ("GET", "/stuff"):
+                return HTTPRes.json(["items": state.mcpStuffList(
+                    q: req.query["q"] ?? "",
+                    categoryID: req.query["category"] ?? "",
+                    limit: Int(req.query["limit"] ?? "50") ?? 50,
+                    includeRetired: req.query["include_retired"] == "true")])
+            case ("GET", "/stuff/summary"):
+                return HTTPRes.json(state.mcpStuffSummary())
+            case ("GET", "/stuff/categories"):
+                return HTTPRes.json(["categories": state.mcpStuffCategories()])
+            case ("POST", "/stuff"):
+                return HTTPRes.json(["item": try state.mcpStuffAdd(try req.json())])
+            case ("POST", "/stuff/update"):
+                return HTTPRes.json(["item": try state.mcpStuffUpdate(try req.json())])
+            case ("POST", "/stuff/delete"):
+                let b = try req.json()
+                state.deleteBelonging(b["id"] as? String ?? "")
+                return HTTPRes(200, #"{"ok":true}"#)
             default:
                 return HTTPRes(404, #"{"error":"not found"}"#)
             }

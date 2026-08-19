@@ -3,6 +3,10 @@
     "myos-diet": {
       "command": "bun",
       "args": ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/diet/src/index.ts"]
+    },
+    "myos-stuff": {
+      "command": "bun",
+      "args": ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/stuff/src/index.ts"]
     }
   }
 }

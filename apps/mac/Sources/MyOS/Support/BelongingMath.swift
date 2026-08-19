@@ -62,10 +62,13 @@ struct BelongingItem: Codable, Identifiable, Hashable {
     var photoBase64: String
     /// Built-in raw value (`gadgets`) or a custom category id.
     var categoryID: String
+    /// Where it was bought — the Amazon/store product page. Empty when unknown.
+    var link: String
 
     init(id: String = UUID().uuidString.lowercased(), name: String, kind: BelongingKind,
          pricePaise: Int, boughtOn: String, lifeDays: Int? = nil, note: String = "",
-         retired: Bool = false, photoBase64: String = "", categoryID: String? = nil) {
+         retired: Bool = false, photoBase64: String = "", categoryID: String? = nil,
+         link: String = "") {
         self.id = id; self.name = name; self.kind = kind
         self.pricePaise = max(0, pricePaise)
         self.boughtOn = boughtOn
@@ -73,10 +76,11 @@ struct BelongingItem: Codable, Identifiable, Hashable {
         self.note = note; self.retired = retired
         self.photoBase64 = photoBase64
         self.categoryID = categoryID ?? kind.rawValue
+        self.link = link.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, kind, pricePaise, boughtOn, lifeDays, note, retired, photoBase64, categoryID
+        case id, name, kind, pricePaise, boughtOn, lifeDays, note, retired, photoBase64, categoryID, link
     }
 
     init(from decoder: Decoder) throws {
@@ -92,6 +96,8 @@ struct BelongingItem: Codable, Identifiable, Hashable {
         retired = try c.decodeIfPresent(Bool.self, forKey: .retired) ?? false
         photoBase64 = try c.decodeIfPresent(String.self, forKey: .photoBase64) ?? ""
         categoryID = (try? c.decodeIfPresent(String.self, forKey: .categoryID)) ?? kind.rawValue
+        // Added after the first items were saved — anything older has no link.
+        link = (try? c.decodeIfPresent(String.self, forKey: .link)) ?? ""
     }
 }
 
@@ -258,6 +264,15 @@ enum SpendHealth: String, Equatable {
 
 /// Pure ROI / daily-cost math. Price in paise.
 enum BelongingMath {
+    /// The payback window anything gets when nothing says otherwise. A gadget is
+    /// the common case and three years is this app's own gadget life.
+    static let defaultROIMonths = 36
+
+    /// Months of expected life → the `lifeDays` actually stored. 30-day months,
+    /// matching the Stuff editor's stepper exactly, so a value set by the MCP and
+    /// one set by hand round-trip to the same number.
+    static func lifeDays(months: Int) -> Int { max(1, months) * 30 }
+
     static func daysOwned(bought: String, today: String) -> Int {
         let inFmt = DateFormatter()
         inFmt.calendar = Calendar(identifier: .gregorian)
