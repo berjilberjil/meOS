@@ -24,12 +24,18 @@ struct ProgressPhotosCard: View {
     @EnvironmentObject var state: AppState
     @State private var photos: [ProgressPhoto] = []
     @State private var selectedDate: String = AppState.dateKey(Date())
-    @State private var importing = false
     @State private var viewing: ProgressPhoto?
+    /// The month grid stays folded until you ask for it; the strip below shows
+    /// every photo (newest first) while it's closed, and one day's while it's open.
+    @State private var showCalendar = false
+    @State private var dropTargeted = false
 
     private var photoDates: Set<String> { Set(photos.map(\.date)) }
     private var pendingDates: Set<String> { Set(ProgressPhotoStore.pending().map(\.date)) }
     private var photosForSelectedDay: [ProgressPhoto] { photos.filter { $0.date == selectedDate } }
+    private var stripPhotos: [ProgressPhoto] {
+        showCalendar ? photosForSelectedDay : photos.sorted { $0.date > $1.date }
+    }
 
     var body: some View {
         Card {
@@ -38,15 +44,32 @@ struct ProgressPhotosCard: View {
                     SectionTitle(text: "Progress photos")
                     Spacer()
                     syncBadge
-                    Button { importing = true } label: { Label("Add photo", systemImage: "camera.fill") }
+                    if !photos.isEmpty {
+                        Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
+                            Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .buttonStyle(KIconButtonStyle(size: 28, color: showCalendar ? Palette.brand : Palette.faint))
+                        .help(showCalendar ? "Hide the calendar" : "Pick a day")
+                    }
+                    Button { chooseFile() } label: { Label("Add photo", systemImage: "camera.fill") }
                         .buttonStyle(KGhostButtonStyle(color: Palette.brand))
                 }
                 if photos.isEmpty {
-                    Text("Add a photo to track how your body changes over time. Syncs from iPhone too.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    Text(dropTargeted ? "Drop it here."
+                                      : "Drop a photo here (or click Add) to track how your body changes over time. Syncs from iPhone too.")
+                        .font(.system(size: 13)).foregroundStyle(dropTargeted ? Palette.brand : Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 14)
+                        .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                            .foregroundStyle(dropTargeted ? Palette.brand : Palette.border))
                 } else {
-                    ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
+                    if showCalendar {
+                        ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                     dayStrip
                 }
             }
@@ -58,16 +81,9 @@ struct ProgressPhotosCard: View {
         .onReceive(NotificationCenter.default.publisher(for: .progressPhotosSyncDidChange)) { _ in
             photos = ProgressPhotoStore.list()
         }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.image]) { result in
-            if case .success(let url) = result {
-                let access = url.startAccessingSecurityScopedResource()
-                defer { if access { url.stopAccessingSecurityScopedResource() } }
-                if ProgressPhotoStore.save(from: url, date: selectedDate) {
-                    photos = ProgressPhotoStore.list()
-                    Task { await ProgressPhotoSync.syncAll() }
-                }
-            }
-        }
+        .contentShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .onDrop(of: [.fileURL, .image, .png, .jpeg, .heic], isTargeted: $dropTargeted) { handleDrop($0) }
+        .animation(.knFast, value: dropTargeted)
         .sheet(item: $viewing) { p in
             ProgressPhotoViewer(
                 start: p,
@@ -88,17 +104,57 @@ struct ProgressPhotosCard: View {
     }
 
     @ViewBuilder private var dayStrip: some View {
-        if photosForSelectedDay.isEmpty {
+        if stripPhotos.isEmpty {
             Text("No photo for \(Fmt.day(selectedDate)) yet.")
                 .font(.system(size: 12)).foregroundStyle(Palette.faint)
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(photosForSelectedDay) { p in thumb(p) }
+                    ForEach(stripPhotos) { p in thumb(p) }
                 }
                 .padding(.vertical, 2)
             }
         }
+    }
+
+    /// Add photo. NSOpenPanel, not `.fileImporter` — the card already carries a
+    /// sheet, and stacking SwiftUI presentations is what kept the picker shut.
+    private func chooseFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.image]
+        panel.message = "Choose a progress photo"
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK else { return }
+        add(panel.urls)
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard !providers.isEmpty else { return false }
+        Task { @MainActor in
+            var urls: [URL] = []
+            for p in providers {
+                let url: URL? = await withCheckedContinuation { cont in
+                    _ = p.loadObject(ofClass: URL.self) { u, _ in cont.resume(returning: u) }
+                }
+                if let url, url.isFileURL { urls.append(url) }
+            }
+            add(urls)
+        }
+        return true
+    }
+
+    private func add(_ urls: [URL]) {
+        var saved = false
+        for url in urls {
+            let access = url.startAccessingSecurityScopedResource()
+            defer { if access { url.stopAccessingSecurityScopedResource() } }
+            if ProgressPhotoStore.save(from: url, date: selectedDate) { saved = true }
+        }
+        guard saved else { return }
+        photos = ProgressPhotoStore.list()
+        Task { await ProgressPhotoSync.syncAll() }
     }
 
     private func thumb(_ p: ProgressPhoto) -> some View {

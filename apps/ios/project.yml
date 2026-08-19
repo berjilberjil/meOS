@@ -32,7 +32,6 @@ targets:
       - path: ../mac/Sources/MyOS/Views/LoginView.swift
       - path: ../mac/Sources/MyOS/Views/TodayView.swift
       - path: ../mac/Sources/MyOS/Views/ScanView.swift
-      - path: ../mac/Sources/MyOS/Views/QuickLogBar.swift
       - path: ../mac/Sources/MyOS/Views/FoldView.swift
       - path: ../mac/Sources/MyOS/Views/FitnessView.swift
       - path: ../mac/Sources/MyOS/Views/FitnessTodayView.swift

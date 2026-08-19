@@ -49,13 +49,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
         }
     }
 
-    var available: Bool {
-        #if os(iOS)
-        return true
-        #else
-        return self != .bodyPhotos
-        #endif
-    }
+    var available: Bool { true }
 
     private static let defaultOrder: [TodaySection] = [
         .activity, .intake, .meals, .workout, .comingUp, .bodyPhotos, .watchLog, .focus, .news

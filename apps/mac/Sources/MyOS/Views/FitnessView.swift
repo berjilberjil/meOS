@@ -49,6 +49,8 @@ struct FitnessView: View {
             ActivityStepsCard().knRise(3)
             #if os(iOS)
             BodyPhotosCard().knRise(4)
+            #else
+            ProgressPhotosCard().knRise(4)
             #endif
             settingsDisclosure.knRise(5)
         }
@@ -75,9 +77,6 @@ struct FitnessView: View {
                 stepsCard
                 caloriesCard
                 profileCard
-                #if os(macOS)
-                ProgressPhotosCard()
-                #endif
             }
         }
     }

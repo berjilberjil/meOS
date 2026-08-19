@@ -14,10 +14,15 @@ struct BodyPhotosCard: View {
     @State private var status = ""
     @State private var pickerItem: PhotosPickerItem?
     @State private var adding = false
+    /// The month grid is heavy; it stays folded away until you ask for it.
+    @State private var showCalendar = false
 
     private var photoDates: Set<String> { Set(photos.map(\.date)) }
     private var pendingDates: Set<String> { Set(ProgressPhotoStore.pending().map(\.date)) }
     private var photosForSelectedDay: [ProgressPhoto] { photos.filter { $0.date == selectedDate } }
+    private var stripPhotos: [ProgressPhoto] {
+        showCalendar ? photosForSelectedDay : photos.sorted { $0.date > $1.date }
+    }
 
     var body: some View {
         Card {
@@ -27,7 +32,10 @@ struct BodyPhotosCard: View {
                     .font(.system(size: 12)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
-                ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
+                if showCalendar {
+                    ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
 
                 dayStrip
             }
@@ -54,6 +62,14 @@ struct BodyPhotosCard: View {
             SectionTitle(text: "Daily progress")
             Spacer()
             syncBadge
+            Button {
+                withAnimation(.knNormal) { showCalendar.toggle() }
+            } label: {
+                Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .buttonStyle(KIconButtonStyle(size: 30, color: showCalendar ? Palette.brand : Palette.muted))
+            .accessibilityLabel(showCalendar ? "Hide calendar" : "Show calendar")
             Button { adding = true } label: {
                 Image(systemName: "plus.circle.fill").font(.system(size: 18, weight: .semibold))
             }
@@ -75,14 +91,14 @@ struct BodyPhotosCard: View {
     }
 
     @ViewBuilder private var dayStrip: some View {
-        if photosForSelectedDay.isEmpty {
+        if stripPhotos.isEmpty {
             Text(photos.isEmpty ? (status.isEmpty ? "No body photos yet." : status)
                                  : "No photo for \(Fmt.day(selectedDate)) yet.")
                 .font(.system(size: 13)).foregroundStyle(Palette.faint)
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(photosForSelectedDay) { p in thumb(p) }
+                    ForEach(stripPhotos) { p in thumb(p) }
                 }
                 .padding(.vertical, 2)
             }

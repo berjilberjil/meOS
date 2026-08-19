@@ -465,7 +465,7 @@ private struct EventEditor: View {
     @State private var uploads: [MediaUpload] = []
     @State private var showCal = false
     @State private var showTags = false
-    @State private var importing = false
+    @State private var dropTargeted = false
     @State private var mediaError: String?
     @State private var viewerMedia: EventMedia?
 
@@ -549,33 +549,49 @@ private struct EventEditor: View {
         .onAppear { load() }
         .sheet(isPresented: $showTags) { TagManagerSheet() }
         .sheet(item: $viewerMedia) { MediaViewer(media: $0) }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.image, .movie, .video],
-                      allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result { importMedia(urls) }
-        }
+        // Dropping anywhere on the editor lands in the media list, not just on the grid.
+        .onDrop(of: Self.dropTypes, isTargeted: $dropTargeted) { handleDrop($0) }
     }
+
+    /// Everything we accept from a drag: a real file (Finder, Photos export) or
+    /// raw bytes (a drag straight out of a browser or Preview).
+    private static let dropTypes: [UTType] = [.fileURL, .image, .movie, .video, .png, .jpeg, .heic]
 
     private var mediaSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            KFieldLabel(text: "Photos & videos")
+            HStack(spacing: 6) {
+                KFieldLabel(text: "Photos & videos")
+                Text(dropTargeted ? "drop to add" : "drag them in, or click Add")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .foregroundStyle(dropTargeted ? Palette.brand : Palette.faint)
+            }
             FlowLayout(spacing: 8, runSpacing: 8) {
                 ForEach(media) { m in
                     MediaThumb(media: m, size: 72, onRemove: { media.removeAll { $0.id == m.id } }, onOpen: { viewerMedia = $0 })
                 }
                 ForEach(uploads) { u in uploadTile(u) }
-                Button { importing = true } label: {
+                Button { chooseFiles() } label: {
                     VStack(spacing: 5) {
                         Image(systemName: "plus").font(.system(size: 16, weight: .bold))
                         Text("Add").font(.system(size: 10, weight: .heavy, design: .rounded))
                     }
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(dropTargeted ? Palette.brand : Palette.muted)
                     .frame(width: 72, height: 72)
                     .background(Palette.bg.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])).foregroundStyle(Palette.border))
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                        .foregroundStyle(dropTargeted ? Palette.brand : Palette.border))
                 }
                 .buttonStyle(KPressStyle())
+                .help("Choose photos or videos")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+            .background(dropTargeted ? Palette.brand.opacity(0.08) : .clear,
+                        in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .onDrop(of: Self.dropTypes, isTargeted: $dropTargeted) { handleDrop($0) }
+            .animation(.knFast, value: dropTargeted)
             if let mediaError {
                 Text(mediaError).font(.system(size: 11)).foregroundStyle(Palette.red)
             }
@@ -623,10 +639,82 @@ private struct EventEditor: View {
         .buttonStyle(KPressStyle())
     }
 
+    /// The Add button. A plain NSOpenPanel, run modally over the editor sheet —
+    /// SwiftUI's `.fileImporter` never opened from inside this nested sheet.
+    private func chooseFiles() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.image, .movie, .video]
+        panel.message = "Choose photos or videos for this memory"
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK else { return }
+        importMedia(panel.urls)
+    }
+
+    /// Resolve every dragged item to a file on disk, then run the normal import.
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard !providers.isEmpty else { return false }
+        mediaError = nil
+        Task { @MainActor in
+            var urls: [URL] = []
+            for p in providers {
+                if let u = await Self.fileURL(from: p) { urls.append(u) }
+            }
+            if urls.isEmpty {
+                mediaError = "Couldn't read what you dropped — try a file from Finder."
+            } else {
+                importMedia(urls)
+            }
+        }
+        return true
+    }
+
+    private static func fileURL(from provider: NSItemProvider) async -> URL? {
+        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            let url: URL? = await withCheckedContinuation { cont in
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in cont.resume(returning: url) }
+            }
+            if let url, url.isFileURL { return url }
+        }
+        // Raw bytes (dragged out of a browser, Photos, Preview) — spill to a temp file.
+        for type in [UTType.movie, .video, .image]
+        where provider.hasItemConformingToTypeIdentifier(type.identifier) {
+            if let url = await spill(provider, type: type) { return url }
+        }
+        return nil
+    }
+
+    /// `loadFileRepresentation`'s temp file is deleted the moment the callback
+    /// returns, so copy it somewhere we own before handing it on.
+    private static func spill(_ provider: NSItemProvider, type: UTType) async -> URL? {
+        await withCheckedContinuation { cont in
+            provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in
+                guard let url else { cont.resume(returning: nil); return }
+                let ext = url.pathExtension.isEmpty
+                    ? (type.preferredFilenameExtension ?? "dat") : url.pathExtension
+                let dest = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
+                try? FileManager.default.copyItem(at: url, to: dest)
+                cont.resume(returning: FileManager.default.fileExists(atPath: dest.path) ? dest : nil)
+            }
+        }
+    }
+
     private func importMedia(_ urls: [URL]) {
         mediaError = nil
         for url in urls {
-            let isImage = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)?.conforms(to: .image) ?? false
+            // Fall back to the extension: a temp file spilled from a drag often has
+            // no content-type resource value yet.
+            let type = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType)
+                ?? UTType(filenameExtension: url.pathExtension)
+            let isImage = type?.conforms(to: .image) ?? false
+            let isVideo = (type?.conforms(to: .movie) ?? false) || (type?.conforms(to: .video) ?? false)
+            guard isImage || isVideo else {
+                mediaError = "\(url.lastPathComponent) isn't a photo or a video."
+                continue
+            }
             let up = MediaUpload(kind: isImage ? .image : .video)
             uploads.append(up)
             let id = up.id

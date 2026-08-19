@@ -59,6 +59,8 @@ struct TodayView: View {
         case .bodyPhotos:
             #if os(iOS)
             BodyPhotosCard()
+            #else
+            ProgressPhotosCard()
             #endif
         case .watchLog:
             WatchLogCard()

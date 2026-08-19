@@ -19,7 +19,9 @@ struct MainView: View {
                 .frame(width: collapsed ? 68 : 216)
                 .animation(.knNormal, value: collapsed)
 
-            ZStack(alignment: .bottom) {
+            // A ZStack of one: the background + chat-widget overlay below hang off
+            // this container, and a Group would re-apply them per branch.
+            ZStack {
                 // Notes manages its own scrolling (its editor hosts an NSScrollView);
                 // every other tab shares the standard scrolling container.
                 if tab == .notes {
@@ -43,26 +45,15 @@ struct MainView: View {
                             }
                         }
                         // Top padding clears the hidden title bar / traffic-light zone;
-                        // the tall bottom padding keeps content clear of the floating log bar.
+                        // the bottom padding keeps content clear of the chat widget's corner.
                         // Events gets the full window width (the calendar fills the screen).
-                        .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 104)
+                        .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 72)
                         .frame(maxWidth: tab == .events ? .infinity : 1120)
                         .frame(maxWidth: .infinity)
                     }
                     // Re-key on tab so each screen's cards replay the rise-in entrance.
                     .id(tab)
                     .transition(.opacity)
-                }
-
-                // The AI command bar now floats at the bottom center. Trailing inset
-                // leaves room for the chat widget's corner.
-                if tab != .today && tab != .scan {
-                    QuickLogBar()
-                        .padding(.horizontal, 28)
-                        .frame(maxWidth: 1080)
-                        .frame(maxWidth: .infinity)
-                        .padding(.trailing, 64)
-                        .padding(.bottom, 18)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
