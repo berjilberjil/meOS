@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 /// One place to edit everything and manage the data. Every editor here writes the
 /// same state the feature tabs do, so a change in Settings shows up there and vice
-/// versa. Destructive actions are guarded by a hold-to-confirm.
+/// versa. Destructive actions are guarded by a three-step confirm (see DangerConfirm).
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
@@ -28,7 +28,7 @@ struct SettingsView: View {
             AgentSettingsCard().knRise(3)
             AIProvidersCard().knRise(3)
             securityCard.knRise(4)
-            dataCard.knRise(5)
+            DataManagementCard().knRise(5)
         }
         .animation(.knTheme, value: themeStore.theme.id)
     }
@@ -143,77 +143,4 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Data management (reset — hold-to-confirm)
-
-    private var dataCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionTitle(text: "Data management")
-                Text("Hold to confirm. This can’t be undone.")
-                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                DangerResetRow(title: "Reset journal",
-                               subtitle: "Every day's entries",
-                               confirmTitle: "Reset the journal?",
-                               confirmMessage: "Deletes all reflections, wins, mistakes, lessons and gratitude. This can't be undone.") {
-                    state.resetJournal()
-                }
-                DangerResetRow(title: "Reset notes",
-                               subtitle: "Every note",
-                               confirmTitle: "Delete all notes?",
-                               confirmMessage: "Deletes every note. This can't be undone.") {
-                    state.resetNotes()
-                }
-                DangerResetRow(title: "Reset fitness",
-                               subtitle: "Logs + fitness profile",
-                               confirmTitle: "Reset fitness data?",
-                               confirmMessage: "Deletes every logged day and clears your fitness profile. This can't be undone.") {
-                    state.resetFitness()
-                }
-                Divider().overlay(Palette.border).padding(.vertical, 2)
-                DangerResetRow(title: "Reset everything",
-                               subtitle: "All data — keeps your profile & chips",
-                               confirmTitle: "Reset ALL data?",
-                               confirmMessage: "Wipes journal, notes, fitness and your day plans. Your profile identity and journal chips are kept. This can't be undone.",
-                               tint: Palette.red, emphatic: true) {
-                    state.resetEverything()
-                }
-            }
-        }
-    }
-
-}
-
-/// A destructive reset row — label + a Reset button that opens a hold-to-confirm.
-private struct DangerResetRow: View {
-    let title: String
-    let subtitle: String
-    let confirmTitle: String
-    let confirmMessage: String
-    var tint: Color = Palette.red
-    var emphatic: Bool = false
-    let action: () -> Void
-    @State private var show = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15, weight: emphatic ? .heavy : .semibold,
-                                          design: emphatic ? .rounded : .default))
-                    .foregroundStyle(emphatic ? tint : Palette.text)
-                Text(subtitle).font(.system(size: 13)).foregroundStyle(Palette.faint)
-            }
-            Spacer()
-            Button { show = true } label: {
-                Label("Reset", systemImage: "trash")
-            }
-            .buttonStyle(KSoftButtonStyle(tint: tint))
-            .holdToDelete(isPresented: $show, title: confirmTitle, message: confirmMessage,
-                          confirmLabel: "Hold to reset") { action() }
-        }
-        .padding(.vertical, 6).padding(.horizontal, 10)
-        .background(emphatic ? tint.opacity(0.06) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-    }
 }

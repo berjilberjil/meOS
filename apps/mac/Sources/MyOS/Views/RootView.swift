@@ -41,12 +41,22 @@ struct RootView: View {
         .tint(themeStore.theme.brand)
         .animation(.knTheme, value: themeStore.theme.id)
         .task {
+            #if os(iOS)
+            SoundPlayer.open()   // cold launch — scenePhase is already .active by now
+            #endif
             await state.bootstrap()
             if state.phase == .loggedIn { DietBridge.shared.start(state: state) }
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: scenePhase) { old, newPhase in
             if newPhase == .background { unlocked = false }
             if newPhase == .active { Task { await state.pullRemote() } }
+            #if os(iOS)
+            // The app has a voice for coming and going. Only a real re-open counts —
+            // gating on `.background` keeps Control Center and the Face ID prompt
+            // (both of which only go `.inactive`) from setting it off.
+            if newPhase == .active, old == .background { SoundPlayer.open() }
+            if newPhase == .background { SoundPlayer.close() }
+            #endif
         }
     }
 

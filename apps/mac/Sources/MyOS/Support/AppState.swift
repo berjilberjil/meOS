@@ -1250,6 +1250,49 @@ final class AppState: ObservableObject {
     }
     func habitsDoneToday() -> Int { todayPlan().habits.values.filter { $0 }.count }
 
+    /// Any day's plan — the focus calendar reads history through this.
+    func plan(for key: String) -> DayPlan { days[key] ?? DayPlan() }
+
+    /// Mark done (not a toggle) — what the focus timer calls when a block ends.
+    func completeTodo(_ id: String) {
+        var d = todayPlan()
+        guard let i = d.todos.firstIndex(where: { $0.id == id }), !d.todos[i].done else { return }
+        d.todos[i].done = true
+        saveDay(d)
+    }
+
+    /// Planned focus length for one to-do, in minutes.
+    func setTodoMinutes(_ id: String, _ mins: Int) {
+        var d = todayPlan()
+        guard let i = d.todos.firstIndex(where: { $0.id == id }) else { return }
+        d.todos[i].mins = max(1, mins)
+        saveDay(d)
+    }
+
+    /// Bank the seconds a focus session actually ran.
+    func addTodoSpent(_ id: String, seconds: Int) {
+        guard seconds > 0 else { return }
+        var d = todayPlan()
+        guard let i = d.todos.firstIndex(where: { $0.id == id }) else { return }
+        d.todos[i].spent += seconds
+        saveDay(d)
+    }
+
+    /// Consecutive clean days counting back from today (rules in `FocusRecord`).
+    func focusStreak() -> Int { FocusRecord.streak(days: days) }
+
+    /// Confirm the owner's passphrase without unlocking anything. PBKDF2 runs
+    /// 600k rounds, so it goes off the main thread or the UI visibly stalls.
+    func verifyPassphrase(_ passphrase: String) async -> Bool {
+        guard !passphrase.isEmpty else { return false }
+        let v = vault
+        return await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                cont.resume(returning: v.verify(passphrase: passphrase))
+            }
+        }
+    }
+
     // MARK: - AI quick-log
 
     @Published var quickLogBusy = false

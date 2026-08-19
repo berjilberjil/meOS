@@ -51,6 +51,8 @@ targets:
       - path: ../mac/Sources/MyOS/Views/Editors.swift
       - path: ../mac/Sources/MyOS/Views/CalendarComponents.swift
       - path: ../mac/Sources/MyOS/Views/ProgressPhotoCalendar.swift
+      - path: ../mac/Sources/MyOS/Views/FocusView.swift
+      - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift
       - path: ../mac/Sources/MyOS/Views/SharedComponents.swift
       - path: ../mac/Sources/MyOS/Views/ImageDropZone.swift

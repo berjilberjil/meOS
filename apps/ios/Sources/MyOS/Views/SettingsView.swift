@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// iOS Settings — one grouped list, same card language as Today / Fitness.
+/// iOS Settings — labelled groups on the shared card surface. One rhythm
+/// throughout: 22pt between sections, a 9pt gap under each label, rows on a
+/// 4pt-inset card so the hairlines never crowd the rounded corners.
 /// Sheets are full-height so editors aren't crushed into a medium detent.
 struct SettingsView: View {
     @EnvironmentObject var state: AppState
@@ -8,8 +10,12 @@ struct SettingsView: View {
     @AppStorage(BiometricLock.key) private var faceIDEnabled = false
     @State private var page: Page?
 
+    /// Icon tile, and the divider inset that lines up with the text beside it.
+    private let tile: CGFloat = 34
+    private var textInset: CGFloat { tile + 14 + 12 }
+
     private enum Page: String, Identifiable {
-        case you, appearance, launch, reminders, assistant, keys, reorder
+        case you, appearance, launch, reminders, assistant, keys, reorder, data
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -20,6 +26,7 @@ struct SettingsView: View {
             case .assistant: return "Catherine"
             case .keys: return "AI keys"
             case .reorder: return "Reorder Today"
+            case .data: return "Data & resets"
             }
         }
         var icon: String {
@@ -31,6 +38,7 @@ struct SettingsView: View {
             case .assistant: return "sparkles"
             case .keys: return "key.fill"
             case .reorder: return "arrow.up.arrow.down"
+            case .data: return "trash.fill"
             }
         }
         var tint: Color {
@@ -42,59 +50,66 @@ struct SettingsView: View {
             case .assistant: return Palette.green
             case .keys: return Palette.flame
             case .reorder: return Palette.ice
+            case .data: return Palette.red
             }
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Settings").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+        VStack(alignment: .leading, spacing: 22) {
+            Text("Settings")
+                .font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                .padding(.leading, 2)
 
             youCard
 
-            group {
-                row(.reorder)
-                divider
-                row(.appearance)
-                divider
-                row(.launch)
-                divider
+            section("App") {
+                row(.reorder); divider
+                row(.appearance); divider
+                row(.launch); divider
                 row(.reminders)
             }
 
-            group {
-                row(.assistant)
-                divider
+            section("Assistant") {
+                row(.assistant); divider
                 row(.keys)
             }
 
-            if BiometricLock.isAvailable { lockCard }
+            if BiometricLock.isAvailable {
+                section("Security") { lockRow }
+            }
+
+            section("Data") { row(.data) }
 
             signOutButton
         }
+        .padding(.bottom, 10)
         .animation(.knTheme, value: themeStore.theme.id)
         .sheet(item: $page) { p in editorSheet(p) }
     }
 
+    // MARK: - Pieces
+
     private var youCard: some View {
         Button { page = .you } label: {
-            Card(padding: 18) {
+            Card(padding: 16) {
                 HStack(spacing: 14) {
                     ZStack {
                         Circle().fill(Palette.teal.opacity(0.18))
                         Image(systemName: "person.fill")
-                            .font(.system(size: 22, weight: .semibold)).foregroundStyle(Palette.teal)
+                            .font(.system(size: 21, weight: .semibold)).foregroundStyle(Palette.teal)
                     }
-                    .frame(width: 52, height: 52)
+                    .frame(width: 50, height: 50)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(state.profile.name.isEmpty
                              ? (state.username.isEmpty ? "You" : "@\(state.username)")
                              : state.profile.name)
-                            .font(.system(size: 18, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
                         Text(state.profile.role.isEmpty ? "Name, city, what you do" : state.profile.role)
-                            .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                            .lineLimit(1)
                     }
-                    Spacer()
+                    Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.faint)
                 }
@@ -103,63 +118,70 @@ struct SettingsView: View {
         .buttonStyle(KPressStyle())
     }
 
-    private func group<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        Card(padding: 6) {
-            VStack(spacing: 0) { content() }
+    private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            SectionTitle(text: title).padding(.leading, 4)
+            Card(padding: 4) {
+                VStack(spacing: 0) { content() }
+            }
         }
     }
 
     private func row(_ p: Page) -> some View {
         Button { page = p } label: {
             HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(p.tint.opacity(0.18))
-                    Image(systemName: p.icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(p.tint)
-                }
-                .frame(width: 36, height: 36)
-                Text(p.title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
-                Spacer()
+                iconTile(p.icon, p.tint)
+                Text(p.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(p == .data ? Palette.red : Palette.text)
+                Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.faint)
             }
-            .padding(.horizontal, 10).padding(.vertical, 12)
+            .padding(.horizontal, 12).padding(.vertical, 13)
             .contentShape(Rectangle())
         }
         .buttonStyle(KPressStyle())
     }
 
-    private var divider: some View {
-        Rectangle().fill(Palette.border).frame(height: 1).padding(.leading, 60)
+    private var lockRow: some View {
+        HStack(spacing: 14) {
+            iconTile("lock.fill", Palette.ice)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Lock with \(BiometricLock.biometryName)")
+                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("Ask every time the app opens.")
+                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+            }
+            Spacer(minLength: 8)
+            Toggle("", isOn: $faceIDEnabled).labelsHidden().tint(Palette.teal)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 11)
     }
 
-    private var lockCard: some View {
-        Card(padding: 16) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.ice.opacity(0.2))
-                    Image(systemName: "lock.fill").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.ice)
-                }
-                .frame(width: 36, height: 36)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Lock with \(BiometricLock.biometryName)")
-                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
-                    Text("Ask every time the app opens.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.muted)
-                }
-                Spacer()
-                Toggle("", isOn: $faceIDEnabled).labelsHidden().tint(Palette.teal)
-            }
+    private func iconTile(_ symbol: String, _ tint: Color) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.opacity(0.18))
+            Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundStyle(tint)
         }
+        .frame(width: tile, height: tile)
+    }
+
+    /// Starts where the row's text does, stops short of the card's rounded edge.
+    private var divider: some View {
+        Rectangle().fill(Palette.border.opacity(0.7))
+            .frame(height: 1)
+            .padding(.leading, textInset)
+            .padding(.trailing, 6)
     }
 
     private var signOutButton: some View {
         Button { Task { await state.logout() } } label: {
             Text("Sign out")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
-        .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -178,6 +200,7 @@ struct SettingsView: View {
                             case .reminders: NotificationsCard(boxed: false)
                             case .assistant: AgentSettingsCard(boxed: false)
                             case .keys: AIProvidersCard(boxed: false)
+                            case .data: DataManagementCard(boxed: false)
                             case .reorder: EmptyView()
                             }
                         }

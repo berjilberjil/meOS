@@ -121,6 +121,21 @@ final class Vault {
         try adoptUnwrapped(dekData, meta: meta)
     }
 
+    /// Is this the owner's passphrase? Derives and unwraps exactly like `unlock`
+    /// but keeps every result local — used to re-authenticate before a wipe, where
+    /// re-unlocking (and re-hydrating) would be wrong.
+    func verify(passphrase: String) -> Bool {
+        guard let meta else { return false }
+        guard let kek = try? MyOSCrypto.deriveKey(from: passphrase,
+                                                  salt: Self.b64(meta.passSalt),
+                                                  iterations: meta.iterations),
+              let dekData = try? MyOSCrypto.open(meta.wrappedByPass, key: kek,
+                                                 aad: Data("wrap:pass".utf8))
+        else { return false }
+        let key = SymmetricKey(data: dekData)
+        return (try? MyOSCrypto.open(meta.check, key: key, aad: Data("check".utf8))) == Self.checkToken
+    }
+
     private func adoptUnwrapped(_ dekData: Data, meta: CryptoMeta) throws {
         let key = SymmetricKey(data: dekData)
         // Confirm this really is the right DEK before trusting it.

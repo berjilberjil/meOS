@@ -16,6 +16,12 @@ struct ProductivityView: View {
     @State private var showCal = false
     @State private var calYear = 0
     @State private var calMonth = 0
+    @State private var mode: ViewMode = .log
+
+    enum ViewMode: String, CaseIterable, Hashable {
+        case log, calendar
+        var label: String { self == .log ? "Log" : "Calendar" }
+    }
 
     private let cols = [GridItem(.adaptive(minimum: 210), spacing: 14)]
 
@@ -30,6 +36,10 @@ struct ProductivityView: View {
         return Dictionary(grouping: items, by: { String($0.addedAt.prefix(10)) }).sorted { $0.key > $1.key }
     }
     private var daysWithVideos: Set<String> { Set(state.watch.map { String($0.addedAt.prefix(10)) }) }
+    /// Videos logged on each day, for the calendar's dots, counts and hover peek.
+    private var byDay: [String: [WatchItem]] {
+        Dictionary(grouping: categoryFiltered, by: { String($0.addedAt.prefix(10)) })
+    }
     private var toNoteCount: Int { state.watch.filter { $0.watched && $0.takeaway.trimmingCharacters(in: .whitespaces).isEmpty }.count }
 
     var body: some View {
@@ -38,12 +48,22 @@ struct ProductivityView: View {
                 Text("Productivity").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
                 Spacer()
                 Text("\(state.watch.count) videos").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                if !state.watch.isEmpty {
+                    Segmented(options: ViewMode.allCases.map { ($0, $0.label) }, selection: $mode)
+                }
             }
             .knRise(0)
 
             addCard.knRise(1)
             if !state.watch.isEmpty { filterRow.knRise(2) }
-            content.knRise(3)
+            Group {
+                switch mode {
+                case .log:      content
+                case .calendar: calendarView
+                }
+            }
+            .id(mode)
+            .knRise(3)
         }
         .onAppear {
             if calYear == 0 {
@@ -146,6 +166,90 @@ struct ProductivityView: View {
             })
         }
         .padding(12).frame(width: 288).background(Palette.elevated)
+    }
+
+    // MARK: - Calendar view
+
+    private var calendarView: some View {
+        let groups = byDay
+        let day = dayFilter ?? CalMath.todayKey()
+        return VStack(alignment: .leading, spacing: 16) {
+            Card {
+                VStack(spacing: 16) {
+                    KMonthHeader(year: calYear, month: calMonth,
+                                 onPrev: { shiftCal(-1) }, onNext: { shiftCal(1) },
+                                 onToday: {
+                                     let c = CalMath.cal.dateComponents([.year, .month], from: Date())
+                                     calYear = c.year ?? calYear; calMonth = c.month ?? calMonth
+                                     dayFilter = CalMath.todayKey()
+                                 })
+                    KMonthGrid(year: calYear, month: calMonth, selected: day, big: true,
+                               dot: { groups[$0]?.first?.category.color ?? (groups[$0] == nil ? nil : Palette.purple) },
+                               hoverCard: { key in dayPeek(groups[key]) },
+                               onTap: { key in withAnimation(.knFast) { dayFilter = key } })
+                }
+            }
+            monthSummary(groups)
+            daySection(day: day, items: groups[day] ?? [])
+        }
+    }
+
+    private func dayPeek(_ items: [WatchItem]?) -> AnyView? {
+        guard let items, !items.isEmpty else { return nil }
+        return AnyView(
+            VStack(alignment: .leading, spacing: 5) {
+                Text("\(items.count) video\(items.count == 1 ? "" : "s")")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                ForEach(items.prefix(4)) { v in
+                    Text(v.title.isEmpty ? "Untitled video" : v.title)
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.text)
+                        .lineLimit(1)
+                }
+                if items.count > 4 {
+                    Text("+\(items.count - 4) more").font(.system(size: 10)).foregroundStyle(Palette.faint)
+                }
+            }
+        )
+    }
+
+    private func monthSummary(_ groups: [String: [WatchItem]]) -> some View {
+        let prefix = String(format: "%04d-%02d", calYear, calMonth)
+        let days = groups.keys.filter { $0.hasPrefix(prefix) }
+        let count = days.reduce(0) { $0 + (groups[$1]?.count ?? 0) }
+        return HStack(spacing: 8) {
+            Text("\(count) video\(count == 1 ? "" : "s") over \(days.count) day\(days.count == 1 ? "" : "s")")
+                .font(.system(size: 12, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
+            Spacer()
+        }
+    }
+
+    private func daySection(day: String, items: [WatchItem]) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 8) {
+                Text(Fmt.day(day)).font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                if !items.isEmpty {
+                    Text("· \(items.count) video\(items.count == 1 ? "" : "s")")
+                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                }
+                Spacer()
+            }
+            if items.isEmpty {
+                Card {
+                    Text("Nothing logged on \(Fmt.day(day)). Pick another day above.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                LazyVGrid(columns: cols, spacing: 14) {
+                    ForEach(items) { item in WatchCard(item: item) { selected = item } }
+                }
+            }
+        }
+    }
+
+    private func shiftCal(_ d: Int) {
+        let (y, m) = CalMath.addMonth(year: calYear, month: calMonth, delta: d)
+        withAnimation(.knFast) { calYear = y; calMonth = m }
     }
 
     private func filterChip(_ c: WatchCategory?, label: String, color: Color) -> some View {

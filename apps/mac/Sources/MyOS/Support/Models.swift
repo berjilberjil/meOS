@@ -343,9 +343,26 @@ struct FocusItem: Codable, Identifiable, Hashable {
     var id: String
     var text: String
     var done: Bool
+    /// Planned length of one focus block, in minutes. nil = use the default.
+    var mins: Int?
+    /// Seconds actually spent on it in focus sessions, across the day.
+    var spent: Int
 
-    init(id: String = UUID().uuidString.lowercased(), text: String, done: Bool = false) {
-        self.id = id; self.text = text; self.done = done
+    init(id: String = UUID().uuidString.lowercased(), text: String, done: Bool = false,
+         mins: Int? = nil, spent: Int = 0) {
+        self.id = id; self.text = text; self.done = done; self.mins = mins; self.spent = spent
+    }
+
+    enum CodingKeys: String, CodingKey { case id, text, done, mins, spent }
+
+    /// Hand-rolled so day plans written before the timer existed still decode.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        text = try c.decode(String.self, forKey: .text)
+        done = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
+        mins = try c.decodeIfPresent(Int.self, forKey: .mins)
+        spent = try c.decodeIfPresent(Int.self, forKey: .spent) ?? 0
     }
 }
 

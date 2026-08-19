@@ -8,9 +8,6 @@ struct TodayView: View {
     @Environment(\.openURL) private var openURL
     var go: (NavTab) -> Void
 
-    @State private var newFocus = ""
-    @FocusState private var focusFieldActive: Bool
-    @State private var pendingTodoDelete: String?
     @State private var expandedNews: Set<String> = []
     @State private var editingMeal: MealKey?
     @State private var editingWorkout = false
@@ -65,7 +62,7 @@ struct TodayView: View {
         case .watchLog:
             WatchLogCard()
         case .focus:
-            focusCard
+            FocusCard()
         case .news:
             newsCard
         }
@@ -565,83 +562,6 @@ struct TodayView: View {
             SectionTitle(text: "Look")
             AppearanceCard()
         }
-    }
-
-    private var focusCard: some View {
-        let items = state.todayPlan().todos
-        return Card {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    SectionTitle(text: "Today's focus")
-                    Spacer()
-                    if !items.isEmpty {
-                        Text("\(items.filter(\.done).count)/\(items.count)")
-                            .font(.system(size: 11, weight: .semibold)).monospacedDigit()
-                            .foregroundStyle(Palette.faint)
-                    }
-                }
-                if items.isEmpty {
-                    Text("Add the things you need to do today. Tap to check them off.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
-                }
-                ForEach(items) { item in
-                    todoRow(item)
-                }
-                HStack(spacing: 8) {
-                    TextField("", text: $newFocus,
-                              prompt: Text("Add a to-do…").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(Palette.text)
-                        .focused($focusFieldActive)
-                        .onSubmit(addFocus)
-                    Button(action: addFocus) {
-                        Image(systemName: "plus.circle.fill").font(.system(size: 18))
-                            .foregroundStyle(Palette.teal)
-                    }
-                    .buttonStyle(KPressStyle())
-                    .opacity(newFocus.isEmpty ? 0.35 : 1)
-                    .disabled(newFocus.isEmpty)
-                }
-                .knField(focused: focusFieldActive)
-            }
-        }
-        .holdToDelete(
-            isPresented: Binding(get: { pendingTodoDelete != nil },
-                                 set: { if !$0 { pendingTodoDelete = nil } }),
-            title: "Remove this to-do?",
-            message: "This can't be undone."
-        ) {
-            if let id = pendingTodoDelete { state.removeTodo(id) }
-            pendingTodoDelete = nil
-        }
-    }
-
-    private func todoRow(_ item: FocusItem) -> some View {
-        HStack(spacing: 10) {
-            Button { state.toggleTodo(item.id) } label: {
-                Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(item.done ? Palette.green : Palette.teal)
-            }
-            .buttonStyle(KPressStyle())
-            Text(item.text)
-                .font(.system(size: 15, weight: .medium))
-                .strikethrough(item.done, color: Palette.faint)
-                .foregroundStyle(item.done ? Palette.faint : Palette.text)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { state.toggleTodo(item.id) }
-            Button { pendingTodoDelete = item.id } label: {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-            }
-            .buttonStyle(KIconButtonStyle(size: 22))
-        }
-    }
-
-    private func addFocus() {
-        let t = newFocus.trimmingCharacters(in: .whitespaces)
-        guard !t.isEmpty else { return }
-        state.addTodo(t)
-        newFocus = ""
     }
 
     private var greeting: String {

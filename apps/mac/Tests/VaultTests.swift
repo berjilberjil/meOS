@@ -9,6 +9,34 @@ final class VaultTests: XCTestCase {
 
     private let financeJSON = #"{"txns":[{"amount":200,"cat":"auto"}]}"#.data(using: .utf8)!
 
+    func testVerifyAcceptsOnlyTheRealPassphrase() throws {
+        // Re-auth in front of a wipe: right pass yes, anything else no.
+        let v = Vault()
+        _ = try v.setup(passphrase: "correct-pass-123")
+        XCTAssertTrue(v.verify(passphrase: "correct-pass-123"))
+        XCTAssertFalse(v.verify(passphrase: "correct-pass-124"))
+        XCTAssertFalse(v.verify(passphrase: ""))
+    }
+
+    func testVerifyDoesNotUnlockOrRelockTheVault() throws {
+        let a = Vault()
+        let (meta, _) = try a.setup(passphrase: "correct-pass-123")
+
+        // A locked device stays locked, whatever it's asked.
+        let b = Vault()
+        b.adoptMeta(meta)
+        XCTAssertTrue(b.verify(passphrase: "correct-pass-123"))
+        XCTAssertFalse(b.isUnlocked, "verify must never unlock as a side effect")
+
+        // An unlocked one stays unlocked after a wrong guess.
+        XCTAssertFalse(a.verify(passphrase: "nope"))
+        XCTAssertTrue(a.isUnlocked)
+    }
+
+    func testVerifyIsFalseWithoutMeta() {
+        XCTAssertFalse(Vault().verify(passphrase: "anything"))
+    }
+
     func testEnvelopeHidesPlaintext() throws {
         let v = Vault()
         _ = try v.setup(passphrase: "berjil-strong-pass")

@@ -49,7 +49,9 @@ struct SplashView: View {
     }
 
     private func play() {
-        SoundPlayer.drop()
+        #if os(macOS)
+        SoundPlayer.drop()   // on iOS the open/close sounds come from the scene phase
+        #endif
         withAnimation(.spring(response: 0.52, dampingFraction: 0.78)) {
             dropY = 8
             dropOpacity = 1
