@@ -46,6 +46,10 @@ struct AgentSettingsCard: View {
                     .font(.system(size: 14)).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
         }
-        Card { inner }
+        // `boxed` off means this is already a full settings PAGE on iOS, which
+        // supplies its own padding and background. Wrapping in a Card there adds
+        // a second surface and shoves the content 18pt further in than the pages
+        // that get this right — which is what made Settings look misaligned.
+        if boxed { Card { inner } } else { inner }
     }
 }

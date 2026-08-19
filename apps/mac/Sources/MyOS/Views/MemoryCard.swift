@@ -78,9 +78,15 @@ struct MemoryCard: View {
                 }
             }
         }
-        return Card { inner }
-            .sheet(item: $editing) { item in MemoryEditorSheet(item: item) }
-            .sheet(isPresented: $showTrace) { TraceSheet(trace: state.lastTrace ?? CatrineTrace()) }
+        // See the note in AgentSettingsCard: unboxed means this is already a
+        // settings page with its own padding and background.
+        return Group {
+            if boxed { Card { inner } } else { inner }
+        }
+            .sheet(item: $editing) { item in chrome(MemoryEditorSheet(item: item), width: 460) }
+            .sheet(isPresented: $showTrace) {
+                chrome(TraceSheet(trace: state.lastTrace ?? CatrineTrace()), width: 560)
+            }
             .holdToDelete(
                 isPresented: Binding(get: { pendingDelete != nil },
                                      set: { if !$0 { pendingDelete = nil } }),
@@ -90,6 +96,18 @@ struct MemoryCard: View {
                 if let id = pendingDelete { state.deleteMemory(id) }
                 pendingDelete = nil
             }
+    }
+
+    /// A sheet is a full screen on the phone and a floating panel on the Mac.
+    /// Sizing for one and letting the other inherit it is how a sheet ends up
+    /// with the wrong margins.
+    @ViewBuilder
+    private func chrome<V: View>(_ view: V, width: CGFloat) -> some View {
+        #if os(iOS)
+        view.presentationDetents([.large]).presentationBackground(Palette.bg)
+        #else
+        view.frame(width: width).background(Palette.bg)
+        #endif
     }
 
     private var searchRow: some View {
@@ -211,6 +229,19 @@ private struct MemoryEditorSheet: View {
     private var isNew: Bool { item.content.isEmpty }
 
     var body: some View {
+        ScrollView {
+            form
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .onAppear {
+            content = item.content
+            category = item.category
+            importance = item.importance
+            pinned = item.pinned
+        }
+    }
+
+    private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(isNew ? "Add a memory" : "Edit memory")
                 .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
@@ -272,14 +303,7 @@ private struct MemoryEditorSheet: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(20)
-        .frame(maxWidth: 460)
-        .background(Palette.bg)
-        .onAppear {
-            content = item.content
-            category = item.category
-            importance = item.importance
-            pinned = item.pinned
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func save() {
@@ -339,9 +363,8 @@ private struct TraceSheet: View {
                 }
             }
             .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: 560)
-        .background(Palette.bg)
     }
 
     private func stat(_ label: String, _ value: String) -> some View {
