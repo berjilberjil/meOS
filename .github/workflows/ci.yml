@@ -2,19 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
+# There is no root package.json — this is a monorepo of apps/api (SvelteKit on
+# Cloudflare Workers) plus two stdio MCP servers. Each job installs in its own
+# directory. The Swift apps are not built here: macOS runners bill at a much
+# higher rate on private repos, and `xcodebuild test` runs locally before every
+# commit anyway.
 jobs:
-  check:
-    name: Type-check & build
+  api:
+    name: API — type-check, test, build
     runs-on: ubuntu-latest
-    # Dummy values so `svelte-kit sync` emits the $env/static/public exports and
-    # the build compiles. This is only a compile check — Netlify does the real
-    # deploy with the production env vars.
-    env:
-      PUBLIC_SUPABASE_URL: https://example.supabase.co
-      PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
 
@@ -22,11 +24,40 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
 
       - name: svelte-check
         run: bun run check
 
-      - name: Build
+      # apps/api has a vitest script but no test files yet (the real suite is
+      # the 292 Swift tests). --passWithNoTests keeps this green until there
+      # are some, instead of failing on an empty run.
+      - name: Unit tests
+        run: bunx vitest run --passWithNoTests
+
+      # Catches what svelte-check cannot: SvelteKit rejects any export from a
+      # +server.ts that is not a request handler, and only the build validates
+      # the adapter and wrangler.jsonc.
+      - name: Build (Cloudflare adapter)
         run: bun run build
+
+  mcp:
+    name: MCP servers — tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [diet, stuff]
+    defaults:
+      run:
+        working-directory: mcp/${{ matrix.server }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun test
