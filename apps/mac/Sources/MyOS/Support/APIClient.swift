@@ -11,13 +11,14 @@ struct APIError: LocalizedError {
 
 final class APIClient {
     /// Default is the deployed production backend — the app always talks to the
-    /// cloud, even in local testing. Override at runtime by setting the
-    /// `myos.baseURL` UserDefaults key (e.g. back to http://localhost:5173 for
-    /// local backend work).
+    /// cloud, even in local testing. Default is the Cloudflare Worker
+    /// (Workers + D1 + R2). Override at runtime with the `myos.baseURL`
+    /// UserDefaults key — e.g. http://localhost:5173 for local backend work, or
+    /// the old Netlify host to roll back without a rebuild.
     static var baseURL: URL {
         if let s = UserDefaults.standard.string(forKey: "myos.baseURL"),
            let u = URL(string: s) { return u }
-        return URL(string: "https://myos-berjil.netlify.app")!
+        return URL(string: "https://myos-api.berjiljacob.workers.dev")!
     }
 
     private let session: URLSession
