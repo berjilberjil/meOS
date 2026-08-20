@@ -167,7 +167,7 @@ struct JournalPresets: Codable, Hashable {
     enum Seed {
         static let morning   = ["Feeling grateful", "Locked in", "Slept well", "Bit tired but going"]
         static let night     = ["Productive day", "Stayed disciplined", "Could've done better", "Wasted some time"]
-        static let wins      = ["Posted content", "Hit the gym", "Ate clean", "Deep work done", "Learned something", "Saved money"]
+        static let wins      = ["Posted content", "Hit the gym", "Ate a clean meal", "Deep work done", "Learned something", "Saved money"]
         static let mistakes  = ["Ate junk", "Skipped gym", "Slept late", "Wasted time on phone", "Overspent", "Procrastinated"]
         static let lessons   = ["Consistency beats intensity", "Show up daily", "Spend less than I earn", "Protect the mornings"]
         static let gratitude = ["Family", "Health", "The job", "Roof and food", "This journey", "Learning daily"]
@@ -176,14 +176,19 @@ struct JournalPresets: Codable, Hashable {
     enum CodingKeys: String, CodingKey { case morning, night, wins, mistakes, lessons, gratitude }
 
     // Lenient: a set saved before a section existed falls back to that seed.
+    // Reword a few outdated starter chips so existing installs pick up the fix.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         morning   = try c.decodeIfPresent([String].self, forKey: .morning) ?? Seed.morning
         night     = try c.decodeIfPresent([String].self, forKey: .night) ?? Seed.night
-        wins      = try c.decodeIfPresent([String].self, forKey: .wins) ?? Seed.wins
+        wins      = Self.rewritten(try c.decodeIfPresent([String].self, forKey: .wins) ?? Seed.wins)
         mistakes  = try c.decodeIfPresent([String].self, forKey: .mistakes) ?? Seed.mistakes
         lessons   = try c.decodeIfPresent([String].self, forKey: .lessons) ?? Seed.lessons
         gratitude = try c.decodeIfPresent([String].self, forKey: .gratitude) ?? Seed.gratitude
+    }
+
+    private static func rewritten(_ wins: [String]) -> [String] {
+        wins.map { $0 == "Ate clean" || $0 == "ate" ? "Ate a clean meal" : $0 }
     }
 }
 
@@ -592,11 +597,37 @@ struct EventMedia: Codable, Identifiable, Hashable {
     enum Kind: String, Codable, Hashable { case image, video }
     var id: String
     var kind: Kind
-    var data: String         // base64, no data: prefix. image → JPEG · video → mp4
-    var poster: String?      // video only: base64 JPEG first-frame thumbnail
+    /// Legacy inline base64. Empty once the item has moved to R2 — kept so a
+    /// device on an older build can still read events it hasn't migrated.
+    var data: String
+    var poster: String?      // legacy inline base64 JPEG thumbnail (video only)
+    /// R2 object ids for the sealed bytes. Set once migrated.
+    var r2Key: String?
+    var posterKey: String?
 
-    init(id: String = UUID().uuidString.lowercased(), kind: Kind, data: String, poster: String? = nil) {
+    init(id: String = UUID().uuidString.lowercased(), kind: Kind, data: String = "",
+         poster: String? = nil, r2Key: String? = nil, posterKey: String? = nil) {
         self.id = id; self.kind = kind; self.data = data; self.poster = poster
+        self.r2Key = r2Key; self.posterKey = posterKey
+    }
+
+    enum CodingKeys: String, CodingKey { case id, kind, data, poster, r2Key, posterKey }
+
+    /// Lenient: rows written before R2 have no keys, rows written after have no
+    /// inline data. Either shape must decode.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id        = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
+        kind      = try c.decodeIfPresent(Kind.self, forKey: .kind) ?? .image
+        data      = try c.decodeIfPresent(String.self, forKey: .data) ?? ""
+        poster    = try c.decodeIfPresent(String.self, forKey: .poster)
+        r2Key     = try c.decodeIfPresent(String.self, forKey: .r2Key)
+        posterKey = try c.decodeIfPresent(String.self, forKey: .posterKey)
+    }
+
+    /// True when the bytes are still inline and need moving to R2.
+    var needsMigration: Bool {
+        (r2Key == nil && !data.isEmpty) || (posterKey == nil && !(poster ?? "").isEmpty)
     }
 }
 

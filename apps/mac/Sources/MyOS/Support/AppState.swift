@@ -76,6 +76,7 @@ final class AppState: ObservableObject {
 
     init() {
         api.vault = vault
+        EventMediaStore.shared.configure(api: api, vault: vault)
         // Fold's tokens are sealed with the vault DEK — read it live so a lock or
         // an unlock is picked up without anyone having to re-register the key.
         FoldSession.keyProvider = { [vault] in vault.dek }
@@ -459,7 +460,11 @@ final class AppState: ObservableObject {
         isPulling = true
         defer { isPulling = false }
         do {
-            let raw = try await api.fetchStateRaw()
+            // nil = 304 Not Modified: nothing to decrypt, decode or apply.
+            guard let raw = try await api.fetchStateIfChanged() else {
+                lastHydrateError = nil
+                return
+            }
             let payload = try api.decodePayload(fromRaw: raw)
             applyRemote(payload)
             lastHydrateError = nil
@@ -500,14 +505,49 @@ final class AppState: ObservableObject {
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }
     }
 
+    /// How often to ask the server "changed?". Each tick is a conditional GET
+    /// that costs a few hundred bytes unless something actually changed, so this
+    /// is about request count, not bytes: at 2s two devices made ~86k requests a
+    /// day, which overruns a Workers free-tier daily budget on its own.
+    static let livePollInterval: UInt64 = 15_000_000_000   // 15s
+
+    /// Move any still-inline event photos/videos into R2, sealed. Runs once per
+    /// launch after unlock. Each asset is uploaded before the blob is rewritten,
+    /// so an interruption leaves un-migrated items rather than dangling keys.
+    func migrateEventMediaToR2() async {
+        guard isHydrated, let dek = vault.dek else { return }
+        guard events.contains(where: { $0.media.contains(where: \.needsMigration) }) else { return }
+
+        var next = events
+        var moved = 0
+        for i in next.indices {
+            for j in next[i].media.indices where next[i].media[j].needsMigration {
+                do {
+                    if let m = try await EventMediaStore.migrate(next[i].media[j], api: api, dek: dek) {
+                        next[i].media[j] = m
+                        moved += 1
+                    }
+                } catch {
+                    return   // network or vault trouble — keep what we have, retry next launch
+                }
+            }
+        }
+        guard moved > 0 else { return }
+        events = next
+        push(StateKey.events, events)
+    }
+
     func startLiveSync() {
         DietBridge.shared.start(state: self)
         liveSyncTask?.cancel()
         liveSyncTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                try? await Task.sleep(nanoseconds: Self.livePollInterval)
                 guard !Task.isCancelled else { return }
                 await self?.pullRemote()
+                // Cheap guard when there's nothing inline, so newly added media
+                // moves to R2 within one tick without extra wiring.
+                await self?.migrateEventMediaToR2()
             }
         }
         startFoldWatch()
@@ -957,7 +997,14 @@ final class AppState: ObservableObject {
         training.weekPlan[weekday] = p
         push(StateKey.training, training)
     }
-    func setRestDay(_ weekday: String, _ rest: Bool) { mutatePlan(weekday) { $0.rest = rest } }
+    func setRestDay(_ weekday: String, _ rest: Bool) {
+        mutatePlan(weekday) {
+            $0.rest = rest
+            // Rest means no work — keep the list empty so Plan never shows
+            // "Rest day" above a stack of exercises.
+            if rest { $0.items = [] }
+        }
+    }
     func addPlanExercise(weekday: String, exerciseId: String) {
         mutatePlan(weekday) { $0.rest = false; $0.items.append(PlanExercise(exerciseId: exerciseId)) }
     }

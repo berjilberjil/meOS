@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { sql } from '$lib/server/db';
+import { sql, nowISO } from '$lib/server/db';
 import { encryptSecret, maskKey } from '$lib/server/secrets';
 import { listModels, type ProviderId } from '$lib/server/modelCatalog';
 
@@ -17,11 +17,11 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
   const body = await request.json().catch(() => ({}));
 
   if (typeof body.label === 'string') {
-    await sql`update ai_credentials set label = ${body.label.slice(0, 60)}, updated_at = now()
+    await sql`update ai_credentials set label = ${body.label.slice(0, 60)}, updated_at = ${nowISO()}
               where id = ${id} and user_id = ${locals.user.id}`;
   }
   if (typeof body.enabled === 'boolean') {
-    await sql`update ai_credentials set enabled = ${body.enabled}, updated_at = now()
+    await sql`update ai_credentials set enabled = ${body.enabled}, updated_at = ${nowISO()}
               where id = ${id} and user_id = ${locals.user.id}`;
   }
   if (typeof body.key === 'string' && body.key.trim().length >= 8) {
@@ -29,7 +29,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
     const res = await listModels(provider, k);
     if (!res.ok) throw error(400, `Key check failed: ${res.error ?? 'invalid key'}`);
     await sql`update ai_credentials
-              set secret = ${encryptSecret(k)}, masked = ${maskKey(k)}, models = ${sql.json(res.models)}, updated_at = now()
+              set secret = ${encryptSecret(k)}, masked = ${maskKey(k)}, models = ${sql.json(res.models)}, updated_at = ${nowISO()}
               where id = ${id} and user_id = ${locals.user.id}`;
   }
 

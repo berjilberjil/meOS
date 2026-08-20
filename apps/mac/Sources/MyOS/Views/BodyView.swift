@@ -42,7 +42,7 @@ struct BodyView: View {
         VStack(alignment: .leading, spacing: 18) {
             Segmented(options: [("front", "Front"), ("back", "Back")], selection: $side).knRise(0)
             chips(a.groups, sel: selected?.id).knRise(1)
-            Card {
+            Card(padding: 12) {
                 BodyMapView(
                     bodyView: side == "front" ? a.front : a.back,
                     activeSlugs: Set(selected?.view == side ? (selected?.slugs ?? []) : []),
@@ -51,7 +51,7 @@ struct BodyView: View {
                         if let g = a.groups.first(where: { $0.view == side && $0.slugs.contains(slug) }) { selectedId = g.id }
                     }
                 )
-                .frame(height: 440).frame(maxWidth: .infinity)
+                .frame(height: 300).frame(maxWidth: .infinity)
             }.knRise(2)
             if let selected {
                 MuscleDetailCard(group: selected).knRise(3)
@@ -103,13 +103,13 @@ struct BodyMapView: View {
                 let clickable = interactiveSlugs.contains(m.slug)
                 let shape = CGPathShape(cg: m.path, box: box)
                 shape
-                    .fill(active ? Palette.brand : (clickable ? Palette.surface2 : Palette.surface2.opacity(0.45)))
-                    .overlay(shape.stroke(Palette.bg, lineWidth: 1))
+                    .fill(active ? Palette.brand : (clickable ? Palette.muted.opacity(0.55) : Palette.muted.opacity(0.28)))
+                    .overlay(shape.stroke(active ? Palette.brandDeep.opacity(0.5) : Palette.borderStrong.opacity(0.7), lineWidth: active ? 1.5 : 1))
                     .contentShape(shape)
                     .onTapGesture { if clickable { onSelect(m.slug) } }
             }
             CGPathShape(cg: outline, box: box)
-                .stroke(Palette.borderStrong, lineWidth: 1.5)
+                .stroke(Palette.text.opacity(0.45), lineWidth: 1.5)
                 .allowsHitTesting(false)
         }
         .task(id: bodyView.viewBox + "#\(bodyView.muscles.count)") { parse() }

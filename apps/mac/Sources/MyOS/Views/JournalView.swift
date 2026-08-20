@@ -144,7 +144,7 @@ struct JournalView: View {
     }
 
     @ViewBuilder private var dayContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 12) {
             StreakCard().knRise(1)
 
             moodCard.knRise(2)
@@ -291,32 +291,18 @@ private struct StreakCard: View {
 
         Card {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 7) {
-                            Text("\(info.count)")
-                                .font(.system(size: 34, weight: .bold)).monospacedDigit()
-                                .foregroundStyle(info.count > 0 ? Palette.text : Palette.faint)
-                            Text("day streak")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(info.count > 0 ? Palette.muted : Palette.faint)
-                        }
-                        Text(subtitle(count: info.count, todayDone: todayDone))
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.muted)
-                    }
-                    Spacer()
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(
-                            info.count > 0 || todayDone
-                            ? AnyShapeStyle(LinearGradient(colors: [Palette.amber, Palette.flame],
-                                                           startPoint: .top, endPoint: .bottom))
-                            : AnyShapeStyle(Palette.surface2)
-                        )
-                        .opacity(todayDone || info.count == 0 ? 1 : 0.55)
-                        .knShadow()
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text("\(info.count)")
+                        .font(.system(size: 34, weight: .bold)).monospacedDigit()
+                        .foregroundStyle(info.count > 0 ? Palette.text : Palette.faint)
+                    Text("day streak")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(info.count > 0 ? Palette.muted : Palette.faint)
+                    Spacer(minLength: 0)
                 }
+                Text(subtitle(count: info.count, todayDone: todayDone))
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.muted)
 
                 weekStrip
             }
@@ -347,13 +333,26 @@ private struct StreakCard: View {
                         if isFuture {
                             Circle().fill(Palette.surface2.opacity(0.5))
                                 .frame(width: 8, height: 8)
+                        } else if isToday && state.journalStreakDay(key) == .none {
+                            // Outline flame under today so the highlight and the
+                            // fire sit on the same column (not under yesterday).
+                            Image(systemName: "flame")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Palette.amber.opacity(0.85))
                         } else {
-                            StreakFlame(day: state.journalStreakDay(key))
+                            StreakFlame(day: state.journalStreakDay(key), size: isToday ? 16 : 14)
                         }
                     }
-                    .frame(height: 16)
+                    .frame(height: 18)
                 }
+                .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
+                .background(
+                    isToday
+                    ? Palette.amber.opacity(0.12)
+                    : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
             }
         }
         .padding(.vertical, 12).padding(.horizontal, 8)
@@ -627,14 +626,14 @@ private struct ReflectionEditor: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        Card {
+        Card(padding: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: title)
                 TextEditor(text: $text)
                     .font(.system(size: 14)).foregroundStyle(Palette.text)
                     .scrollContentBackground(.hidden)
                     .focused($focused)
-                    .frame(minHeight: 72)
+                    .frame(minHeight: 56)
                     .padding(10)
                     .background(Palette.surface2.opacity(0.6),
                                 in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -681,7 +680,7 @@ private struct JournalListCard: View {
     private var openPresets: [String] { presets.filter { !items.contains($0) } }
 
     var body: some View {
-        Card {
+        Card(padding: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: title)
                 ForEach(Array(items.enumerated()), id: \.offset) { i, item in

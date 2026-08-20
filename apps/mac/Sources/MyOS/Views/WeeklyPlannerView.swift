@@ -183,17 +183,24 @@ struct WeeklyPlannerView: View {
     // MARK: - Workout column
 
     private var workoutColumn: some View {
-        Card {
+        let isRest = workoutPlan.isRestDay
+        return Card {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
+                HStack(spacing: 10) {
                     SectionTitle(text: fullDayName)
                     Spacer()
-                    Toggle("Rest day", isOn: Binding(get: { workoutPlan.rest },
-                                                     set: { state.setRestDay(weekday, $0) }))
-                        .toggleStyle(.switch).tint(Palette.brand)
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.muted)
+                    Text(isRest ? "Rest day" : "Training")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isRest ? Palette.blue : Palette.muted)
+                    Toggle("Rest day", isOn: Binding(
+                        get: { isRest },
+                        set: { state.setRestDay(weekday, $0) }
+                    ))
+                    .toggleStyle(.switch).tint(Palette.brand)
+                    .labelsHidden()
+                    .accessibilityLabel(isRest ? "Rest day on" : "Mark as rest day")
                 }
-                if workoutPlan.rest {
+                if isRest {
                     HStack(spacing: 8) {
                         Image(systemName: "moon.zzz.fill").foregroundStyle(Palette.blue)
                         Text("Rest day — recover.").font(.system(size: 13)).foregroundStyle(Palette.muted)
@@ -261,24 +268,33 @@ private struct PlanExerciseRow: View {
     @State private var showDelete = false
 
     var body: some View {
-        HStack(spacing: 11) {
-            ExerciseIcon(category: exercise?.category ?? .core, size: 34)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(exercise?.name ?? "Unknown").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                Text("\(exercise?.category.label ?? "") · \(exercise?.primary ?? "")")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                ExerciseIcon(category: exercise?.category ?? .core, size: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(exercise?.name ?? "Unknown")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(exercise?.category.label ?? "") · \(exercise?.primary ?? "")")
+                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Button { showDelete = true } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .bold)) }
+                    .buttonStyle(KIconButtonStyle(size: 22))
+                    .holdToDelete(isPresented: $showDelete, title: "Remove \(exercise?.name ?? "exercise")?",
+                                  message: "Removes it from this day's plan.", confirmLabel: "Hold to remove") { remove() }
             }
-            Spacer()
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 stepper(item.sets, "sets", dec: setsDec, inc: setsInc)
                 Text("×").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.faint)
                 stepper(item.reps, "reps", dec: repsDec, inc: repsInc)
+                Spacer(minLength: 0)
             }
-            Button { showDelete = true } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .bold)) }
-                .buttonStyle(KIconButtonStyle(size: 22))
-                .holdToDelete(isPresented: $showDelete, title: "Remove \(exercise?.name ?? "exercise")?",
-                              message: "Removes it from this day's plan.", confirmLabel: "Hold to remove") { remove() }
+            .padding(.leading, 44)
         }
+        .padding(.vertical, 4)
     }
 
     private func stepper(_ value: Int, _ label: String, dec: @escaping () -> Void, inc: @escaping () -> Void) -> some View {

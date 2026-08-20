@@ -59,7 +59,7 @@ enum FoodSeed {
         // Dairy
         ("Curd", .dairy, "240 g", 110, 9, 12, 0, 4),
         ("Toned milk", .dairy, "240 ml", 120, 6, 11, 0, 5),
-        ("Buttermilk", .dairy, "1 glass", 40, 3, 5, 0, 1),
+        ("Buttermilk", .dairy, "240 ml", 40, 3, 5, 0, 1),
         // Fruit / snacks
         ("Banana", .fruit, "1 medium", 105, 1.3, 27, 3, 0.4),
         ("Apple", .fruit, "1 medium", 95, 0.5, 25, 4, 0.3),
@@ -87,9 +87,9 @@ enum FoodSeed {
         ("Gulab jamun", .junk, "2 pieces", 300, 4, 45, 0, 12),
         ("Soft drink", .junk, "330 ml", 139, 0, 35, 0, 0),
         // Chennai / Tamil Nadu staples that were missing
-        ("Filter coffee", .drink, "1 tumbler", 80, 2, 10, 0, 3),
-        ("Rose milk", .drink, "1 glass", 180, 4, 28, 0, 5),
-        ("Jigarthanda", .drink, "1 glass", 280, 6, 40, 0, 10),
+        ("Filter coffee", .drink, "180 ml", 80, 2, 10, 0, 3),
+        ("Rose milk", .drink, "240 ml", 180, 4, 28, 0, 5),
+        ("Jigarthanda", .drink, "240 ml", 280, 6, 40, 0, 10),
         ("Masala dosa", .carb, "1 dosa", 350, 8, 48, 4, 14),
         ("Onion dosa", .carb, "1 dosa", 180, 4, 24, 2, 7),
         ("Ghee roast dosa", .carb, "1 dosa", 320, 6, 36, 2, 16),

@@ -109,11 +109,13 @@ struct EventsView: View {
 
     private func thumb(_ m: EventMedia) -> some View {
         Group {
-            if m.kind == .image, let img = eventImage(m.data) {
+            if let img = eventImage(m) {
                 Image(uiImage: img).resizable().scaledToFill()
-            } else if m.kind == .video, let p = m.poster, let img = eventImage(p) {
-                Image(uiImage: img).resizable().scaledToFill()
-                    .overlay(Image(systemName: "play.circle.fill").font(.system(size: 18)).foregroundStyle(.white))
+                    .overlay {
+                        if m.kind == .video {
+                            Image(systemName: "play.circle.fill").font(.system(size: 18)).foregroundStyle(.white)
+                        }
+                    }
             } else {
                 Palette.surface2
             }
@@ -121,6 +123,12 @@ struct EventsView: View {
         .frame(width: 64, height: 64)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
+}
+
+/// Thumbnail for a media item, wherever its bytes live.
+@MainActor func eventImage(_ m: EventMedia) -> UIImage? {
+    guard let d = EventMediaStore.shared.poster(for: m) else { return nil }
+    return UIImage(data: d)
 }
 
 func eventImage(_ base64: String) -> UIImage? {
@@ -186,7 +194,7 @@ private struct EventEditorSheet: View {
                                 HStack(spacing: 8) {
                                     ForEach(media) { m in
                                         ZStack(alignment: .topTrailing) {
-                                            if let img = eventImage(m.data) {
+                                            if let img = eventImage(m) {
                                                 Image(uiImage: img).resizable().scaledToFill()
                                                     .frame(width: 72, height: 72)
                                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

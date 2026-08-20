@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { sql } from '$lib/server/db';
+import { sql, nowISO } from '$lib/server/db';
 import { decryptSecret } from '$lib/server/secrets';
 import { listModels, type ProviderId } from '$lib/server/modelCatalog';
 
@@ -23,7 +23,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
   const res = await listModels(rows[0].provider as ProviderId, apiKey);
   if (!res.ok) throw error(400, `Key check failed: ${res.error ?? 'invalid key'}`);
 
-  await sql`update ai_credentials set models = ${sql.json(res.models)}, updated_at = now()
+  await sql`update ai_credentials set models = ${sql.json(res.models)}, updated_at = ${nowISO()}
             where id = ${id} and user_id = ${locals.user.id}`;
   return json({ ok: true, models: res.models });
 };

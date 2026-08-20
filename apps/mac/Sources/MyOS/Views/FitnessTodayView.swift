@@ -227,7 +227,7 @@ struct WorkoutChecklistCard: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 header
-                if plan.rest && dayLog.state == .unconfirmed {
+                if plan.isRestDay && dayLog.state == .unconfirmed {
                     Text("Rest day — recover well.").font(.system(size: 13)).foregroundStyle(Palette.muted)
                 } else {
                     switch dayLog.state {

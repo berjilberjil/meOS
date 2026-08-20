@@ -693,6 +693,7 @@ enum FoldSnapshotBuilder {
             if let s = string(t["category"]) { cat = s }
             else if let d = t["category"] as? [String: Any] { cat = string(d["name"]) ?? "Other" }
             else { cat = "Other" }
+            if FoldSpend.isNonSpend(cat) { continue }
             byCat[cat, default: 0] += amt
         }
         return byCat.map { FoldData.Spend(category: $0.key, amount: $0.value) }

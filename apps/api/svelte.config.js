@@ -1,16 +1,13 @@
-import adapterNetlify from '@sveltejs/adapter-netlify';
+import adapterCloudflare from '@sveltejs/adapter-cloudflare';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-// MyOS is deployed to Netlify only (the local node backend is retired), so every
-// build uses the Netlify adapter. `npm run dev` still uses Vite's dev server and
-// doesn't touch the adapter. This avoids the reserved NETLIFY env var being
-// unset during a local `netlify deploy --build` and silently shipping adapter-node.
-
+// MyOS runs on Cloudflare Workers. The D1 and R2 bindings reach the app through
+// `event.platform.env` (see src/hooks.server.ts and lib/server/storage.ts).
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapterNetlify()
+    adapter: adapterCloudflare()
   }
 };
 
