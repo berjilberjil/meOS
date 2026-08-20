@@ -218,7 +218,8 @@ struct EventsView: View {
                             if let t = state.primaryTag(for: e) {
                                 Image(systemName: t.symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(t.color)
                             }
-                            Text(e.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                            Text(e.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                         }
                         if !e.media.isEmpty {
                             HStack(spacing: 4) {
@@ -262,7 +263,8 @@ private struct EventRow: View {
                     if event.special {
                         Image(systemName: "star.fill").font(.system(size: 11)).foregroundStyle(Palette.amber)
                     }
-                    Text(event.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                    Text(event.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     ForEach(tags) { t in tagChip(t) }
                 }
                 if !event.note.isEmpty {

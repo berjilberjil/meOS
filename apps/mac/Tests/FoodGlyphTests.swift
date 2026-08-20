@@ -18,4 +18,21 @@ final class FoodGlyphTests: XCTestCase {
         XCTAssertEqual(FoodGlyph.emoji(name: "Mystery scoop", category: .veg), "🥬")
         XCTAssertEqual(FoodGlyph.emoji(name: "Mystery scoop", category: .fruit), "🍎")
     }
+
+    func testRegionalFoodsAreDistinct() {
+        XCTAssertEqual(FoodGlyph.emoji(name: "Plain dosa", category: .carb), "🥞")
+        XCTAssertEqual(FoodGlyph.emoji(name: "Idli", category: .carb), "🍚")
+        XCTAssertEqual(FoodGlyph.emoji(name: "Sambar", category: .veg), "🫘")
+        XCTAssertEqual(FoodGlyph.emoji(name: "Cabbage poriyal", category: .veg), "🥬")
+        XCTAssertNotEqual(
+            FoodGlyph.emoji(name: "Masala dosa", category: .carb),
+            FoodGlyph.emoji(name: "Idli", category: .carb)
+        )
+    }
+
+    func testServingDisplayNormalizesGlasses() {
+        XCTAssertEqual(FoodServing.display("1 glass"), "240 ml")
+        XCTAssertEqual(FoodServing.display("1 tumbler"), "240 ml")
+        XCTAssertEqual(FoodServing.display("1 dosa"), "1 dosa")
+    }
 }

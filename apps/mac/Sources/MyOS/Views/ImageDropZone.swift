@@ -254,13 +254,19 @@ private struct IOSImageDropZone: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 36).padding(.horizontal, 20)
+                .padding(.vertical, 20).padding(.horizontal, 20)
                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                     .strokeBorder(tint.opacity(0.35), lineWidth: 1.5))
             }
             .buttonStyle(KPressStyle())
             .disabled(busy)
+
+            HStack(spacing: 10) {
+                Label("Point the camera at food, a pack, or a receipt", systemImage: "lightbulb")
+                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                Spacer(minLength: 0)
+            }
 
             PhotosPicker(selection: $pickerItems, maxSelectionCount: 1, matching: .images) {
                 Label("Choose from library", systemImage: "photo.on.rectangle")

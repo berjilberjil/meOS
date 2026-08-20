@@ -167,7 +167,7 @@ struct JournalPresets: Codable, Hashable {
     enum Seed {
         static let morning   = ["Feeling grateful", "Locked in", "Slept well", "Bit tired but going"]
         static let night     = ["Productive day", "Stayed disciplined", "Could've done better", "Wasted some time"]
-        static let wins      = ["Posted content", "Hit the gym", "Ate clean", "Deep work done", "Learned something", "Saved money"]
+        static let wins      = ["Posted content", "Hit the gym", "Ate a clean meal", "Deep work done", "Learned something", "Saved money"]
         static let mistakes  = ["Ate junk", "Skipped gym", "Slept late", "Wasted time on phone", "Overspent", "Procrastinated"]
         static let lessons   = ["Consistency beats intensity", "Show up daily", "Spend less than I earn", "Protect the mornings"]
         static let gratitude = ["Family", "Health", "The job", "Roof and food", "This journey", "Learning daily"]
@@ -176,14 +176,19 @@ struct JournalPresets: Codable, Hashable {
     enum CodingKeys: String, CodingKey { case morning, night, wins, mistakes, lessons, gratitude }
 
     // Lenient: a set saved before a section existed falls back to that seed.
+    // Reword a few outdated starter chips so existing installs pick up the fix.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         morning   = try c.decodeIfPresent([String].self, forKey: .morning) ?? Seed.morning
         night     = try c.decodeIfPresent([String].self, forKey: .night) ?? Seed.night
-        wins      = try c.decodeIfPresent([String].self, forKey: .wins) ?? Seed.wins
+        wins      = Self.rewritten(try c.decodeIfPresent([String].self, forKey: .wins) ?? Seed.wins)
         mistakes  = try c.decodeIfPresent([String].self, forKey: .mistakes) ?? Seed.mistakes
         lessons   = try c.decodeIfPresent([String].self, forKey: .lessons) ?? Seed.lessons
         gratitude = try c.decodeIfPresent([String].self, forKey: .gratitude) ?? Seed.gratitude
+    }
+
+    private static func rewritten(_ wins: [String]) -> [String] {
+        wins.map { $0 == "Ate clean" || $0 == "ate" ? "Ate a clean meal" : $0 }
     }
 }
 

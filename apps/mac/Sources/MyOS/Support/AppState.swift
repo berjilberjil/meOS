@@ -957,7 +957,14 @@ final class AppState: ObservableObject {
         training.weekPlan[weekday] = p
         push(StateKey.training, training)
     }
-    func setRestDay(_ weekday: String, _ rest: Bool) { mutatePlan(weekday) { $0.rest = rest } }
+    func setRestDay(_ weekday: String, _ rest: Bool) {
+        mutatePlan(weekday) {
+            $0.rest = rest
+            // Rest means no work — keep the list empty so Plan never shows
+            // "Rest day" above a stack of exercises.
+            if rest { $0.items = [] }
+        }
+    }
     func addPlanExercise(weekday: String, exerciseId: String) {
         mutatePlan(weekday) { $0.rest = false; $0.items.append(PlanExercise(exerciseId: exerciseId)) }
     }

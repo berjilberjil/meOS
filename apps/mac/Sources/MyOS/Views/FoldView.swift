@@ -88,24 +88,38 @@ struct FoldView: View {
                     if f.changeValue != 0 { changeChip(f) }
                 }
                 if f.history.count > 1 {
-                    Sparkline(values: f.history).frame(height: 92)
-                    if !f.changeLabel.isEmpty {
-                        Text("Last \(f.changeLabel)")
-                            .font(.system(size: 10, weight: .semibold)).tracking(0.5)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(inr(f.history.max() ?? 0))
+                                .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                                .foregroundStyle(Palette.faint)
+                            Spacer()
+                            if !f.changeLabel.isEmpty {
+                                Text(f.changeLabel)
+                                    .font(.system(size: 10, weight: .semibold)).tracking(0.3)
+                                    .foregroundStyle(Palette.faint)
+                            }
+                        }
+                        Sparkline(values: f.history).frame(height: 92)
+                        Text(inr(f.history.min() ?? 0))
+                            .font(.system(size: 10, weight: .semibold)).monospacedDigit()
                             .foregroundStyle(Palette.faint)
-                            .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
                 Divider().overlay(Palette.border)
                 HStack(spacing: 0) {
                     heroStat("Liquid", inr(f.liquid))
                     heroStat("Investments", inr(f.investments))
-                    heroStat("Spent · mo", inr(f.spentThisMonth))
+                    heroStat("This month", inr(f.spentThisMonth))
                 }
-                if f.debt > 0 || f.stocksValue > 0 || f.mfValue > 0 {
+                // Only show the stocks/MF breakdown when it adds information —
+                // identical "Investments" + "Stocks" rows are noise.
+                let showStocks = f.stocksValue > 0 && abs(f.stocksValue - f.investments) > 1
+                let showMf = f.mfValue > 0
+                if f.debt > 0 || showStocks || showMf {
                     HStack(spacing: 0) {
-                        if f.stocksValue > 0 { heroStat("Stocks", inr(f.stocksValue)) }
-                        if f.mfValue > 0 { heroStat("Mutual funds", inr(f.mfValue)) }
+                        if showStocks { heroStat("Stocks", inr(f.stocksValue)) }
+                        if showMf { heroStat("Mutual funds", inr(f.mfValue)) }
                         if f.debt > 0 { heroStat("Debt", inr(f.debt)) }
                     }
                 }
@@ -135,7 +149,7 @@ struct FoldView: View {
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     SectionTitle(text: "Top spends this month")
-                    ForEach(f.topSpends) { s in
+                    ForEach(f.topSpends.filter { !FoldSpend.isNonSpend($0.category) }) { s in
                         HStack {
                             Text(s.category).font(.system(size: 13)).foregroundStyle(Palette.text)
                             Spacer()
@@ -212,6 +226,15 @@ struct FoldView: View {
     }
 
     private func inr(_ v: Double) -> String { foldINR(v, hidden: false) }
+}
+
+/// Categories Fold may put in the debit rollup that are not real spends.
+enum FoldSpend {
+    static func isNonSpend(_ category: String) -> Bool {
+        let c = category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return c == "returns" || c == "return" || c == "refund" || c == "refunds"
+            || c == "cashback" || c == "interest" || c == "dividend"
+    }
 }
 
 /// Rupee formatter for the Fold dashboard (en_IN grouping). Masks to "₹ ••••"
@@ -323,7 +346,7 @@ struct FoldData: Codable, Equatable {
         f.liquid = 19_671.89
         f.investments = 47_545.40
         f.spentThisMonth = 39_232.30
-        f.stocksValue = 47_545.40
+        f.stocksValue = 0
         f.changeValue = -11_282.44
         f.changePercent = -0.144
         f.changeLabel = "6 months"
@@ -341,7 +364,6 @@ struct FoldData: Codable, Equatable {
         ]
         f.topSpends = [
             Spend(category: "Transport", amount: 7731.40),
-            Spend(category: "Returns", amount: 3868.00),
             Spend(category: "Food & Drinks", amount: 1765.97),
             Spend(category: "Hidden Charges", amount: 1532.50),
             Spend(category: "Shopping", amount: 1313.95)

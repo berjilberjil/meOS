@@ -47,7 +47,7 @@ struct MainView: View {
                         // Top padding clears the hidden title bar / traffic-light zone;
                         // the bottom padding keeps content clear of the chat widget's corner.
                         // Events gets the full window width (the calendar fills the screen).
-                        .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 72)
+                        .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 96)
                         .frame(maxWidth: tab == .events ? .infinity : 1120)
                         .frame(maxWidth: .infinity)
                     }
@@ -59,7 +59,7 @@ struct MainView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Palette.bg.ignoresSafeArea())
             .overlay(alignment: .bottomTrailing) {
-                ChatWidget().padding(.trailing, 20).padding(.bottom, 18)
+                ChatWidget().padding(.trailing, 20).padding(.bottom, 28)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

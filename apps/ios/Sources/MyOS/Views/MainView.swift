@@ -19,7 +19,7 @@ struct MainView: View {
             NavigationStack {
                 ScrollView {
                     content
-                        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 108)
+                        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 128)
                 }
                 .background(Palette.bg.ignoresSafeArea())
                 .toolbar(.hidden, for: .navigationBar)
@@ -30,8 +30,9 @@ struct MainView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    ChatWidget().padding(.trailing, 16).padding(.bottom, 8)
+                    ChatWidget().padding(.trailing, 14).padding(.bottom, 14)
                 }
+                .padding(.bottom, 72)
                 IOSTabBar(
                     tab: Binding(get: { tab }, set: { select($0) }),
                     onScan: {

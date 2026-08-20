@@ -75,7 +75,7 @@ struct FoodLibrarySection: View {
             FoodIcon(category: f.category, name: f.name, size: 40)
             VStack(alignment: .leading, spacing: 3) {
                 Text(f.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                Text("\(f.servingLabel) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
+                Text("\(FoodServing.display(f.servingLabel)) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
                     .font(.system(size: 13)).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 6)
@@ -154,7 +154,7 @@ struct FoodPickerSheet: View {
                                 FoodIcon(category: f.category, name: f.name, size: 30)
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(f.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                                    Text("\(f.servingLabel) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
+                                    Text("\(FoodServing.display(f.servingLabel)) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
                                         .font(.system(size: 11)).foregroundStyle(Palette.faint)
                                 }
                                 Spacer()

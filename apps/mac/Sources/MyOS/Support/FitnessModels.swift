@@ -269,6 +269,12 @@ struct PlanExercise: Codable, Identifiable, Hashable {
 struct WorkoutDayPlan: Codable, Hashable {
     var rest: Bool = false
     var items: [PlanExercise] = []
+
+    /// A day with exercises is a training day, even if a stale `rest` flag
+    /// lingered from an AI draft or an older save. The single source of truth
+    /// for "is this a rest day" — never read `rest` directly for display.
+    var isRestDay: Bool { rest && items.isEmpty }
+
     init(rest: Bool = false, items: [PlanExercise] = []) { self.rest = rest; self.items = items }
     enum CodingKeys: String, CodingKey { case rest, items }
     init(from decoder: Decoder) throws {

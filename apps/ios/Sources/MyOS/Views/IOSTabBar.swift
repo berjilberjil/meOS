@@ -60,17 +60,17 @@ struct IOSTabBar: View {
             ZStack {
                 Circle()
                     .fill(Palette.teal)
-                    .frame(width: 58, height: 58)
-                    .shadow(color: Palette.teal.opacity(0.35), radius: 10, y: 4)
+                    .frame(width: 46, height: 46)
+                    .shadow(color: Palette.teal.opacity(0.28), radius: 6, y: 2)
                 Image(systemName: "viewfinder")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.white)
             }
-            .offset(y: -18)
+            .offset(y: -10)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Scan")
-        .frame(width: 64)
+        .frame(width: 52)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onSettings() })
     }
 }
