@@ -77,3 +77,9 @@ export async function removeObjects(keys: string[]): Promise<void> {
     new DeleteObjectsCommand({ Bucket: bucket(), Delete: { Objects: keys.map((Key) => ({ Key })) } })
   );
 }
+
+/// R2 key for one sealed event photo/video. The bytes are AES-GCM ciphertext
+/// produced on-device, so an object here is opaque to the server.
+export function eventMediaKey(userId: number | string, id: string): string {
+  return `event-media/${userId}/${id}`;
+}

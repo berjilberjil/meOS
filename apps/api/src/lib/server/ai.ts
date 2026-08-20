@@ -40,16 +40,16 @@ export function ensureAiTable(): Promise<void> {
     ensured = (async () => {
       await sql`
         create table if not exists ai_credentials (
-          id         serial primary key,
+          id         integer primary key autoincrement,
           user_id    integer not null references users(id) on delete cascade,
           provider   text not null,
           label      text not null,
           secret     text not null,
           masked     text not null,
-          enabled    boolean not null default true,
-          models     jsonb not null default '[]'::jsonb,
-          created_at timestamptz not null default now(),
-          updated_at timestamptz not null default now()
+          enabled    integer not null default 1,
+          models     text not null default '[]',
+          created_at text not null default (datetime('now')),
+          updated_at text not null default (datetime('now'))
         )`;
       await sql`create index if not exists ai_credentials_user_idx on ai_credentials(user_id)`;
     })().catch((e) => {

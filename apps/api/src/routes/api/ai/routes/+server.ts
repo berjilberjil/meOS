@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { sql } from '$lib/server/db';
+import { sql, nowISO } from '$lib/server/db';
 
 /**
  * Per-feature model routing for the logged-in user. Non-secret (just references to
@@ -20,7 +20,7 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
   const value = await request.json().catch(() => ({}));
   await sql`
     insert into app_state (user_id, key, value, updated_at)
-    values (${locals.user.id}, ${KEY}, ${sql.json(value)}, now())
-    on conflict (user_id, key) do update set value = excluded.value, updated_at = now()`;
+    values (${locals.user.id}, ${KEY}, ${sql.json(value)}, ${nowISO()})
+    on conflict (user_id, key) do update set value = excluded.value, updated_at = ${nowISO()}`;
   return json({ ok: true });
 };

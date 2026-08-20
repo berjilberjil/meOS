@@ -11,7 +11,7 @@ import { sql } from '$lib/server/db';
  * a 304 they re-download the entire state — megabytes — just to be told nothing
  * changed. That is what put the project 1,254% over its egress quota.
  */
-export function stateETag(newest: string | null, count: number): string {
+function stateETag(newest: string | null, count: number): string {
   return `"${newest ? new Date(newest).getTime() : 0}-${count}"`;
 }
 
@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ locals, request, setHeaders }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
   const [meta] = await sql`
-    select max(updated_at) as newest, count(*)::int as count
+    select max(updated_at) as newest, count(*) as count
     from app_state where user_id = ${locals.user.id}`;
   const etag = stateETag(meta?.newest ?? null, Number(meta?.count ?? 0));
 
