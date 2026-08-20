@@ -42,7 +42,7 @@ struct EventMediaViewer: View {
                         Group {
                             if m.kind == .video {
                                 VideoPage(media: m)
-                            } else if let img = eventImage(m.data) {
+                            } else if let img = eventImage(m) {
                                 ZoomableImage(image: img)
                             } else {
                                 Palette.surface2
@@ -92,7 +92,7 @@ private struct VideoPage: View {
     }
 
     private func start() {
-        guard let d = Data(base64Encoded: media.data) else { failed = true; return }
+        guard let d = EventMediaStore.shared.data(for: media) else { failed = true; return }
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         do {

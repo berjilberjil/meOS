@@ -597,11 +597,37 @@ struct EventMedia: Codable, Identifiable, Hashable {
     enum Kind: String, Codable, Hashable { case image, video }
     var id: String
     var kind: Kind
-    var data: String         // base64, no data: prefix. image → JPEG · video → mp4
-    var poster: String?      // video only: base64 JPEG first-frame thumbnail
+    /// Legacy inline base64. Empty once the item has moved to R2 — kept so a
+    /// device on an older build can still read events it hasn't migrated.
+    var data: String
+    var poster: String?      // legacy inline base64 JPEG thumbnail (video only)
+    /// R2 object ids for the sealed bytes. Set once migrated.
+    var r2Key: String?
+    var posterKey: String?
 
-    init(id: String = UUID().uuidString.lowercased(), kind: Kind, data: String, poster: String? = nil) {
+    init(id: String = UUID().uuidString.lowercased(), kind: Kind, data: String = "",
+         poster: String? = nil, r2Key: String? = nil, posterKey: String? = nil) {
         self.id = id; self.kind = kind; self.data = data; self.poster = poster
+        self.r2Key = r2Key; self.posterKey = posterKey
+    }
+
+    enum CodingKeys: String, CodingKey { case id, kind, data, poster, r2Key, posterKey }
+
+    /// Lenient: rows written before R2 have no keys, rows written after have no
+    /// inline data. Either shape must decode.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id        = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
+        kind      = try c.decodeIfPresent(Kind.self, forKey: .kind) ?? .image
+        data      = try c.decodeIfPresent(String.self, forKey: .data) ?? ""
+        poster    = try c.decodeIfPresent(String.self, forKey: .poster)
+        r2Key     = try c.decodeIfPresent(String.self, forKey: .r2Key)
+        posterKey = try c.decodeIfPresent(String.self, forKey: .posterKey)
+    }
+
+    /// True when the bytes are still inline and need moving to R2.
+    var needsMigration: Bool {
+        (r2Key == nil && !data.isEmpty) || (posterKey == nil && !(poster ?? "").isEmpty)
     }
 }
 

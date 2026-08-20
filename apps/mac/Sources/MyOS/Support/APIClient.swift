@@ -131,6 +131,34 @@ final class APIClient {
         return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
+    /// Last `ETag` seen for `GET api/state`.
+    private var stateETag: String?
+
+    /// The live-sync read. Sends `If-None-Match` and returns **nil** when the
+    /// server answers `304 Not Modified`, so an unchanged poll costs a few
+    /// hundred bytes instead of the whole state. The poll runs every few seconds
+    /// on every device, so re-downloading megabytes to be told "nothing changed"
+    /// is what put the project over its egress quota.
+    func fetchStateIfChanged() async throws -> [String: Any]? {
+        var req = URLRequest(url: Self.baseURL.appendingPathComponent("api/state"))
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let stateETag { req.setValue(stateETag, forHTTPHeaderField: "If-None-Match") }
+
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError(status: -1, message: "No response from server")
+        }
+        if http.statusCode == 304 { return nil }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError(status: http.statusCode,
+                           message: Self.errorText(from: data, status: http.statusCode))
+        }
+        stateETag = http.value(forHTTPHeaderField: "ETag")
+        Self.writeCache(data, "state.json")
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
     /// Pull the plaintext crypto metadata out of a raw state map, if the account
     /// has a vault set up.
     func cryptoMeta(from raw: [String: Any]) -> CryptoMeta? {
@@ -311,6 +339,29 @@ final class APIClient {
     func deleteBodyPhoto(id: String) async throws {
         let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
         _ = try await request("DELETE", "api/body-photos/\(encoded)")
+    }
+
+    // MARK: - Event media (sealed, in R2)
+
+    /// Upload one already-sealed event photo/video. The bytes are AES-GCM
+    /// ciphertext produced on this device, so the server stores an opaque blob.
+    func uploadEventMedia(id: String, sealed: Data) async throws {
+        let body = ["id": id, "ciphertextBase64": sealed.base64EncodedString()]
+        _ = try await request("POST", "api/event-media", body: body, using: aiSession)
+    }
+
+    /// Short-lived signed download URLs for a batch of media ids.
+    func signEventMedia(ids: [String]) async throws -> [String: String] {
+        guard !ids.isEmpty else { return [:] }
+        let list = ids.joined(separator: ",")
+        let encoded = list.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? list
+        let data = try await request("GET", "api/event-media?ids=\(encoded)")
+        return (try? decoder.decode([String: String].self, from: data)) ?? [:]
+    }
+
+    func deleteEventMedia(id: String) async throws {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        _ = try await request("DELETE", "api/event-media/\(encoded)")
     }
 
     /// Generate a weekly workout + meal plan from the goal, targets and library.

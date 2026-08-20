@@ -348,6 +348,9 @@ private struct MediaThumb: View {
     var onRemove: (() -> Void)? = nil
     var onOpen: ((EventMedia) -> Void)? = nil
     @State private var hover = false
+    /// Media fetched from R2 lands asynchronously; observing the store is what
+    /// turns the placeholder into the real thumbnail.
+    @ObservedObject private var mediaStore = EventMediaStore.shared
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -384,15 +387,15 @@ private struct MediaThumb: View {
     }
 }
 
-/// Decode inline base64 media to an image / a temp file URL for playback.
+/// Resolve media to an image / a temp file URL for playback. Bytes come from
+/// `EventMediaStore` — inline base64 for un-migrated items, R2 otherwise.
 enum EventMediaIO {
-    static func image(_ m: EventMedia) -> NSImage? {
-        let b64 = m.kind == .video ? m.poster : m.data
-        guard let b64, let d = Data(base64Encoded: b64) else { return nil }
+    @MainActor static func image(_ m: EventMedia) -> NSImage? {
+        guard let d = EventMediaStore.shared.poster(for: m) else { return nil }
         return NSImage(data: d)
     }
-    static func tempURL(_ m: EventMedia) -> URL? {
-        guard let d = Data(base64Encoded: m.data) else { return nil }
+    @MainActor static func tempURL(_ m: EventMedia) -> URL? {
+        guard let d = EventMediaStore.shared.data(for: m) else { return nil }
         let ext = m.kind == .video ? "mp4" : "jpg"
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
