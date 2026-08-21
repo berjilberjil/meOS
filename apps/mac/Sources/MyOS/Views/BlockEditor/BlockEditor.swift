@@ -337,10 +337,18 @@ struct BlockEditor: NSViewRepresentable {
         }
 
         func insertImage(_ image: NSImage) {
-            guard let base64 = NoteImage.encode(image) else { return }
+            Log.media.info("insertImage: picked \(Int(image.size.width))x\(Int(image.size.height))")
+            guard let base64 = NoteImage.encode(image) else {
+                Log.media.error("insertImage: NoteImage.encode returned nil — nothing inserted")
+                return
+            }
             var doc = currentDoc()
             let (bi, _) = locate(textView?.selectedRange().location ?? 0, in: doc)
+            Log.media.info("insertImage: base64 \(base64.count) chars, into block \(bi) of \(doc.blocks.count)")
             insertMediaBlock(Block(type: .image, src: base64), after: bi, in: &doc)
+            let after = currentDoc()
+            let images = after.blocks.filter { $0.type == .image }.count
+            Log.media.info("insertImage: after render, storage holds \(images) image block(s), \(after.blocks.count) block(s) total")
         }
 
         func insertLink(_ url: URL) {

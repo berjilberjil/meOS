@@ -93,11 +93,19 @@ struct NotesView: View {
                     .font(.system(size: 13, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             }
             Spacer()
-            Button("New note", action: startNew)
-                .keyboardShortcut("n", modifiers: .command)
-                .opacity(0)
-                .frame(width: 0, height: 0)
-                .allowsHitTesting(false)
+            // A real, visible affordance. This used to be an invisible zero-sized
+            // button that existed only to register ⌘N, which left the screen with
+            // no way to create a note unless you already knew the shortcut or that
+            // double-clicking the title works.
+            Button(action: startNew) {
+                HStack(spacing: 5) {
+                    Image(systemName: "square.and.pencil").font(.system(size: 12, weight: .bold))
+                    Text("New note").font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .buttonStyle(KPrimaryButtonStyle())
+            .keyboardShortcut("n", modifiers: .command)
+            .help("New note (⌘N)")
                 .accessibilityHidden(true)
         }
     }
@@ -193,6 +201,11 @@ struct NotesView: View {
                         .foregroundStyle(Palette.faint)
                 }
                 Spacer()
+                Button(action: startNew) {
+                    Image(systemName: "square.and.pencil").font(.system(size: 13, weight: .semibold))
+                }
+                .buttonStyle(KIconButtonStyle(size: 30))
+                .help("New note (⌘N)")
             }
             .padding(.horizontal, 12).padding(.top, 26).padding(.bottom, 8)
 
@@ -200,8 +213,14 @@ struct NotesView: View {
 
             if filtered.isEmpty {
                 Spacer()
-                Text(state.notes.isEmpty ? "No notes yet." : "No matches for “\(query)”.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                VStack(spacing: 10) {
+                    Text(state.notes.isEmpty ? "No notes yet." : "No matches for “\(query)”.")
+                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    if state.notes.isEmpty {
+                        Button("Write your first note", action: startNew)
+                            .buttonStyle(KSecondaryButtonStyle())
+                    }
+                }
                 Spacer()
             } else {
                 ScrollView {
@@ -497,6 +516,8 @@ struct NotesView: View {
 
     private func saveDraft() {
         guard let id = selectedID else { return }
+        let imgs = draftDoc.blocks.filter { $0.type == .image }.count
+        Log.notes.info("persist \(id): \(draftDoc.blocks.count) block(s), \(imgs) image(s), title=\(draftTitle.isEmpty ? "<empty>" : "set")")
         state.updateNoteContent(id, title: draftTitle, doc: draftDoc)
     }
 
@@ -504,10 +525,12 @@ struct NotesView: View {
     private func persistCurrent() {
         guard let id = selectedID else { return }
         state.updateNoteContent(id, title: draftTitle, doc: draftDoc)
-        if draftTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, draftDoc.isEffectivelyEmpty {
-            state.deleteNote(id)
-            recentIDs.removeAll { $0 == id }
-        }
+        // Deliberately no auto-delete of "empty" notes here. `BlockDoc()` seeds a
+        // single empty paragraph, so a freshly created note is `isEffectivelyEmpty`
+        // from birth — this branch deleted every new note the moment you clicked
+        // away without typing, which reads as "I can't create notes". Removing an
+        // unwanted note is one click on the trash; silently destroying one the
+        // user just asked for is not recoverable.
     }
 
     private func selectFirstAfterDelete() {
