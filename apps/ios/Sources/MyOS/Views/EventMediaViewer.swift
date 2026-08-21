@@ -4,6 +4,10 @@ import AVKit
 
 /// Full-screen media viewer for event photos/videos — swipe, pinch to zoom, video playback.
 struct EventMediaViewer: View {
+    /// Event media loads from R2 asynchronously; without observing the
+    /// store the bytes land in cache and the view never re-renders — which
+    /// is exactly why thumbnails stayed grey placeholders on iPhone.
+    @ObservedObject private var mediaStore = EventMediaStore.shared
     let media: [EventMedia]
     let startID: String
     let onClose: () -> Void
@@ -65,6 +69,10 @@ struct EventMediaViewer: View {
 
 /// Single video page — writes base64 to temp file, plays via AVPlayer.
 private struct VideoPage: View {
+    /// Event media loads from R2 asynchronously; without observing the
+    /// store the bytes land in cache and the view never re-renders — which
+    /// is exactly why thumbnails stayed grey placeholders on iPhone.
+    @ObservedObject private var mediaStore = EventMediaStore.shared
     let media: EventMedia
     @State private var player: AVPlayer?
     @State private var failed = false

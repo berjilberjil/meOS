@@ -9,6 +9,10 @@ import UIKit
 struct EventsView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var signals = UISignals.shared
+    /// Event media loads from R2 asynchronously; without observing the store the
+    /// bytes land in cache and the view never re-renders — which is exactly why
+    /// thumbnails stayed grey placeholders on iPhone.
+    @ObservedObject private var mediaStore = EventMediaStore.shared
     @State private var editing: EventItem?
     @State private var showNew = false
     @State private var pendingDelete: EventItem?

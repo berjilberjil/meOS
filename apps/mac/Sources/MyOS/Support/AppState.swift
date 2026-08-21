@@ -548,6 +548,11 @@ final class AppState: ObservableObject {
                 // Cheap guard when there's nothing inline, so newly added media
                 // moves to R2 within one tick without extra wiring.
                 await self?.migrateEventMediaToR2()
+                // A media fetch that failed once (locked vault at launch, a
+                // network blip) would otherwise stay a grey placeholder until
+                // relaunch. Retrying on the tick makes it self-healing; the
+                // call returns immediately when nothing has failed.
+                await MainActor.run { EventMediaStore.shared.retryFailures() }
             }
         }
         startFoldWatch()
