@@ -41,7 +41,9 @@ install_mac() {
 install_ios() {
   banner "iPhone: transport check"
   local transport
-  transport=$(xcrun devicectl list devices -v 2>/dev/null | grep -A1 "transportType" | grep -oE "wired|network" | head -1)
+  # `|| true` matters: under `set -euo pipefail`, `head -1` closing the pipe
+  # early makes the whole pipeline fail and aborts the install for nothing.
+  transport=$(xcrun devicectl list devices -v 2>/dev/null | grep -A1 "transportType" | grep -oE "wired|network" | head -1 || true)
   print "    transport: ${transport:-unknown}"
   [[ "$transport" == "wired" ]] && print "    (tick 'Connect via network' in Xcode to drop the cable)"
 
