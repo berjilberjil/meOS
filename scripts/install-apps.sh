@@ -40,12 +40,16 @@ install_mac() {
 
 install_ios() {
   banner "iPhone: transport check"
-  local transport
-  # `|| true` matters: under `set -euo pipefail`, `head -1` closing the pipe
-  # early makes the whole pipeline fail and aborts the install for nothing.
-  transport=$(xcrun devicectl list devices -v 2>/dev/null | grep -A1 "transportType" | grep -oE "wired|network" | head -1 || true)
-  print "    transport: ${transport:-unknown}"
-  [[ "$transport" == "wired" ]] && print "    (tick 'Connect via network' in Xcode to drop the cable)"
+  # tunnelState is the signal that matters: "connected" means the wireless
+  # path is up and the cable can stay in the drawer. `|| true` because under
+  # `set -euo pipefail` a non-matching grep would abort the whole install.
+  local tunnel
+  tunnel=$(xcrun devicectl list devices -v 2>/dev/null | grep -oE "TunnelState\.[a-z]+" | head -1 || true)
+  case "$tunnel" in
+    *connected)    print "    wireless: connected — cable not required" ;;
+    *disconnected) print "    wireless: off — tick 'Connect via network' in Xcode > Devices" ;;
+    *)             print "    wireless: unknown" ;;
+  esac
 
   banner "iPhone: build"
   cd "$ROOT/apps/ios"
