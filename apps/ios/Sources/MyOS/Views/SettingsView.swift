@@ -15,10 +15,11 @@ struct SettingsView: View {
     private var textInset: CGFloat { tile + 14 + 12 }
 
     private enum Page: String, Identifiable {
-        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data
+        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data, calendar
         var id: String { rawValue }
         var title: String {
             switch self {
+            case .calendar: return "Day calendar"
             case .you: return "You"
             case .appearance: return "Look"
             case .launch: return "Open on"
@@ -32,6 +33,7 @@ struct SettingsView: View {
         }
         var icon: String {
             switch self {
+            case .calendar: return "calendar"
             case .you: return "person.fill"
             case .appearance: return "circle.lefthalf.filled"
             case .launch: return "square.grid.2x2.fill"
@@ -45,6 +47,7 @@ struct SettingsView: View {
         }
         var tint: Color {
             switch self {
+            case .calendar: return Palette.blue
             case .you: return Palette.teal
             case .appearance: return Palette.purple
             case .launch: return Palette.blue
@@ -67,6 +70,7 @@ struct SettingsView: View {
             youCard
 
             section("App") {
+                row(.calendar); divider
                 row(.reorder); divider
                 row(.appearance); divider
                 row(.launch); divider
@@ -198,6 +202,7 @@ struct SettingsView: View {
                     ScrollView {
                         Group {
                             switch p {
+                            case .calendar: DayDetailView()
                             case .you: PersonDetailsEditor()
                             case .appearance: AppearanceCard(boxed: false)
                             case .launch: GeneralSettingsCard(boxed: false)

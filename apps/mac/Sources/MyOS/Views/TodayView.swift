@@ -12,6 +12,9 @@ struct TodayView: View {
     @State private var editingMeal: MealKey?
     @State private var editingWorkout = false
     @State private var showStreakCal = false
+    /// The day the whole page is showing. Every card reads this, so the screen
+    /// is always one coherent day; swiping anywhere moves all of them together.
+    @State private var selectedDate: String = ""
 
     private let cols = [GridItem(.adaptive(minimum: 168), spacing: 12)]
     private let mealCols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
@@ -27,15 +30,17 @@ struct TodayView: View {
             settingsCard.knRise(7)
             #endif
         }
+        .dayPager(date: $selectedDate, today: state.todayKey)
+        .onAppear { if selectedDate.isEmpty { selectedDate = state.todayKey } }
         .task {
             if state.news == nil { await state.fetchNews() }
         }
         .sheet(item: $editingMeal) { meal in
-            MealLogEditorSheet(date: state.todayKey, meal: meal,
-                               initialItems: state.mealEditorItems(date: state.todayKey, meal: meal))
+            MealLogEditorSheet(date: selectedDate, meal: meal,
+                               initialItems: state.mealEditorItems(date: selectedDate, meal: meal))
         }
         .sheet(isPresented: $editingWorkout) {
-            WorkoutDayEditorSheet(date: state.todayKey, initialItems: state.workoutItemsForDay(state.todayKey))
+            WorkoutDayEditorSheet(date: selectedDate, initialItems: state.workoutItemsForDay(selectedDate))
         }
         .sheet(isPresented: $showStreakCal) { streakCalendarSheet }
     }
@@ -44,13 +49,13 @@ struct TodayView: View {
     private func todaySection(_ section: TodaySection) -> some View {
         switch section {
         case .activity:
-            ActivityStepsCard()
+            ActivityStepsCard(day: selectedDate, showsCalendar: false)
         case .intake:
-            DayMacroHero()
+            DayMacroHero(day: selectedDate)
         case .meals:
             mealsCard
         case .workout:
-            WorkoutChecklistCard(edit: { editingWorkout = true })
+            WorkoutChecklistCard(day: selectedDate, edit: { editingWorkout = true })
         case .comingUp:
             comingUpCard
         case .bodyPhotos:
@@ -60,9 +65,9 @@ struct TodayView: View {
             ProgressPhotosCard()
             #endif
         case .watchLog:
-            WatchLogCard()
+            WatchLogCard(day: selectedDate)
         case .focus:
-            FocusCard()
+            FocusCard(day: selectedDate, showsCalendar: false)
         case .news:
             newsCard
         }
@@ -78,8 +83,8 @@ struct TodayView: View {
     }
 
     private func mealTile(_ meal: MealKey) -> some View {
-        let st = state.mealState(state.todayKey, meal)
-        let items = state.mealDisplayItems(date: state.todayKey, meal: meal)
+        let st = state.mealState(selectedDate, meal)
+        let items = state.mealDisplayItems(date: selectedDate, meal: meal)
         let names = items.compactMap { state.food($0.foodId)?.name }
         return Button { editingMeal = meal } label: {
             VStack(alignment: .leading, spacing: 6) {
@@ -437,14 +442,38 @@ struct TodayView: View {
         }
     }
 
+    /// Weekday of the page's date — "Friday", or "Today"/"Yesterday" nearby.
+    private var pagedWeekdayName: String {
+        let d = selectedDate.isEmpty ? state.todayKey : selectedDate
+        if d == state.todayKey { return weekdayName }
+        return DayPaging.label(d, today: state.todayKey)
+    }
+
+    private var pagedPrettyDate: String {
+        let d = selectedDate.isEmpty ? state.todayKey : selectedDate
+        guard d != state.todayKey, let parsed = AppState.date(fromKey: d) else { return prettyDate }
+        let f = DateFormatter(); f.dateFormat = "d MMMM yyyy"
+        return f.string(from: parsed)
+    }
+
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(greeting + ", " + state.profile.name)
                     .font(.system(size: 15)).foregroundStyle(Palette.muted)
-                Text(weekdayName)
+                Text(pagedWeekdayName)
                     .font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
-                Text(prettyDate).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                HStack(spacing: 8) {
+                    Text(pagedPrettyDate).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    if selectedDate != state.todayKey {
+                        // The only affordance for getting home — the page has no
+                        // arrows by design, so leaving without one would strand you.
+                        Button("Today") { withAnimation(.knNormal) { selectedDate = state.todayKey } }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Palette.brand)
+                    }
+                }
             }
             Spacer(minLength: 8)
             streakChip

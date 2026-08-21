@@ -22,6 +22,10 @@ struct SettingsView: View {
                 .knRise(0)
 
             accountCard.knRise(1)
+            // The single calendar. Today pages by swipe for nearby days; this is
+            // where you jump somewhere far away and see the whole day at once —
+            // replacing the four per-card month grids that used to clutter Today.
+            DayDetailView().knRise(1)
             AppearanceCard().knRise(2)
             GeneralSettingsCard().knRise(2)
             NotificationsCard().knRise(3)

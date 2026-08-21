@@ -412,6 +412,11 @@ struct FitnessView: View {
 /// matters because only the iPhone has a pedometer — anything on the Mac is
 /// typed in.
 struct ActivityStepsCard: View {
+    /// The day being shown. Today unless the Today page has been swiped.
+    var day: String? = nil
+    /// Today shows one date and pages by swipe, so the per-card month grid is
+    /// redundant there. Kept for the full-screen tabs.
+    var showsCalendar: Bool = true
     @EnvironmentObject var state: AppState
 
     @State private var showCalendar = false
@@ -453,7 +458,7 @@ struct ActivityStepsCard: View {
     // MARK: Today
 
     private var summary: some View {
-        let n = steps(state.todayKey)
+        let n = steps(day ?? state.todayKey)
         return HStack(spacing: 12) {
             Image(systemName: "figure.walk").font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.muted)
             VStack(alignment: .leading, spacing: 2) {
@@ -466,6 +471,7 @@ struct ActivityStepsCard: View {
             }
             Spacer(minLength: 4)
             MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6).frame(width: 72)
+            if showsCalendar {
             Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                     .font(.system(size: 13, weight: .bold))
@@ -473,6 +479,7 @@ struct ActivityStepsCard: View {
             .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
             .help(showCalendar ? "Hide the record" : "See every day")
             .accessibilityLabel(showCalendar ? "Hide the activity calendar" : "Show the activity calendar")
+            }
         }
     }
 

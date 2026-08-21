@@ -5,7 +5,7 @@ import SwiftUI
 struct MainView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
-    @State private var tab: NavTab = PrefsStore.shared.launchTab
+    @State private var tab: NavTab = PrefsStore.shared.resolveOpeningTab()
     private static let kCollapsed = "myos.sidebar.collapsed"
     @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
 
@@ -73,6 +73,7 @@ struct MainView: View {
 
     private func switchTo(_ t: NavTab) {
         withAnimation(.knPop) { tab = t }
+        PrefsStore.shared.lastTab = t   // so reopening resumes here
     }
 
     /// One click → Stuff. Two quick clicks → Fold (money).

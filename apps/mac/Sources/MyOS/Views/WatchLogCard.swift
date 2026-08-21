@@ -8,13 +8,15 @@ import AppKit
 /// Paste a YouTube link, see today's videos. Shared by Mac Productivity and
 /// the iPhone Today tab — no AppKit.
 struct WatchLogCard: View {
+    /// The day being shown. Today unless the Today page has been swiped.
+    var day: String? = nil
     @EnvironmentObject var state: AppState
     @State private var urlInput = ""
     @State private var addError: String?
     @FocusState private var urlFocused: Bool
 
     private var todayVideos: [WatchItem] {
-        state.sortedWatch.filter { $0.addedAt.hasPrefix(state.todayKey) }
+        state.sortedWatch.filter { $0.addedAt.hasPrefix(day ?? state.todayKey) }
     }
 
     var body: some View {

@@ -54,6 +54,8 @@ targets:
       - path: ../mac/Sources/MyOS/Views/NotificationsCard.swift
       - path: ../mac/Sources/MyOS/Views/Editors.swift
       - path: ../mac/Sources/MyOS/Views/CalendarComponents.swift
+      - path: ../mac/Sources/MyOS/Views/DayPager.swift
+      - path: ../mac/Sources/MyOS/Views/DayDetailView.swift
       - path: ../mac/Sources/MyOS/Views/ProgressPhotoCalendar.swift
       - path: ../mac/Sources/MyOS/Views/FocusView.swift
       - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift

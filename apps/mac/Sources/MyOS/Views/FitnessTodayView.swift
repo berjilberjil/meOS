@@ -2,10 +2,13 @@ import SwiftUI
 
 /// Calories + macros first — intake vs target, each macro in its own colour.
 struct DayMacroHero: View {
+    /// The day being shown. Today unless the Today page has been swiped.
+    var day: String? = nil
     @EnvironmentObject var state: AppState
 
     var body: some View {
-        let eaten = state.consumed(state.todayKey)
+        let date = day ?? state.todayKey
+        let eaten = state.consumed(date)
         let t = state.calorieTargets()
         let goal = t?.goalCalories ?? Int(state.fitnessProfile.calorieTargetKcal ?? 0)
         let remain = goal > 0 ? max(0, goal - Int(eaten.calories.rounded())) : 0
@@ -215,10 +218,12 @@ struct MealChecklistCard: View {
 // MARK: - The workout checklist card
 
 struct WorkoutChecklistCard: View {
+    /// The day being shown. Today unless the Today page has been swiped.
+    var day: String? = nil
     @EnvironmentObject var state: AppState
     let edit: () -> Void
 
-    private var date: String { state.todayKey }
+    private var date: String { day ?? state.todayKey }
     private var plan: WorkoutDayPlan { state.workoutPlan(state.todayWeekday) }
     private var dayLog: WorkoutDayLog { state.workoutDayLog(date) }
     private var items: [PlanExercise] { state.workoutItemsForDay(date) }

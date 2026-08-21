@@ -5,7 +5,7 @@ struct MainView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
     @Environment(\.scenePhase) private var scenePhase
-    @State private var tab: NavTab = NavTab.resolveLaunch(PrefsStore.shared.launchTab.rawValue, allowed: NavTab.iosTabs)
+    @State private var tab: NavTab = PrefsStore.shared.resolveOpeningTab(allowed: NavTab.iosTabs)
     @State private var notesTaps = 0
     @State private var lastNotesTap = Date.distantPast
     @State private var foldTaps = 0
@@ -85,6 +85,7 @@ struct MainView: View {
     private func select(_ newValue: NavTab) {
         if newValue != tab { Haptics.selection() }
         tab = newValue
+        PrefsStore.shared.lastTab = newValue   // so reopening resumes here
     }
 
     /// 1 tap → Notes. 2 → new note. 3 → Journal. 5 → hidden notes (Face ID).

@@ -107,6 +107,11 @@ final class FocusTimer: ObservableObject {
 // MARK: - The card
 
 struct FocusCard: View {
+    /// The day being shown. Today unless the Today page has been swiped.
+    var day: String? = nil
+    /// Today shows one date and pages by swipe, so the per-card month grid is
+    /// redundant there. Kept for the full-screen tabs.
+    var showsCalendar: Bool = true
     @EnvironmentObject var state: AppState
     @ObservedObject private var timer = FocusTimer.shared
     @AppStorage("focus.defaultMinutes") private var defaultMinutes = 25
@@ -117,7 +122,7 @@ struct FocusCard: View {
     @State private var showCalendar = false
     @State private var showSession = false
 
-    private var items: [FocusItem] { state.todayPlan().todos }
+    private var items: [FocusItem] { state.plan(for: day ?? state.todayKey).todos }
     private var doneCount: Int { items.filter(\.done).count }
     private var nextUp: FocusItem? { items.first { !$0.done } }
     private var focusedSecondsToday: Int { items.reduce(0) { $0 + $1.spent } }
@@ -192,12 +197,14 @@ struct FocusCard: View {
                 Text("\(focusedSecondsToday / 60)m focused")
                     .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
             }
+            if showsCalendar {
             Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                     .font(.system(size: 13, weight: .bold))
             }
             .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
             .help(showCalendar ? "Hide the record" : "See the record")
+            }
 
             if nextUp != nil {
                 Button { startSession() } label: {
