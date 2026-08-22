@@ -12,6 +12,9 @@ struct TodayView: View {
     /// so the day must come from there. nil means this view owns it and pages
     /// itself, which is what the Mac does with a trackpad swipe.
     var externalDate: Binding<String>? = nil
+    /// Marks the header and each section as scroll targets, so a pager can keep
+    /// every day lined up on the same section. Off on Mac, which has one page.
+    var sectionAnchors = false
 
     @State private var expandedNews: Set<String> = []
     @State private var editingMeal: MealKey?
@@ -31,13 +34,16 @@ struct TodayView: View {
         if let external = externalDate { external.wrappedValue = d } else { ownDate = d }
     }
 
+    /// Identity of the header as a scroll target. Sections use their own ids.
+    static let headerAnchor = "today.header"
+
     private let cols = [GridItem(.adaptive(minimum: 168), spacing: 12)]
     private let mealCols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
         let sections = TodaySection.ordered()
         VStack(alignment: .leading, spacing: Gap.screen) {
-            header.knRise(0)
+            header.knRise(0).id(Self.headerAnchor)
             ForEach(Array(sections.enumerated()), id: \.element.id) { idx, section in
                 todaySection(section).knRise(idx + 1)
             }
@@ -45,6 +51,7 @@ struct TodayView: View {
             settingsCard.knRise(7)
             #endif
         }
+        .modifier(ScrollAnchors(enabled: sectionAnchors))
         .dayPager(date: $ownDate, today: state.todayKey, enabled: externalDate == nil)
         .onAppear { if ownDate.isEmpty { ownDate = state.todayKey } }
         .task {
@@ -623,5 +630,15 @@ struct TodayView: View {
     private var prettyDate: String {
         let f = DateFormatter(); f.dateFormat = "d MMMM yyyy"
         return f.string(from: Date())
+    }
+}
+
+/// `scrollTargetLayout` only where a pager needs it — applying it on Mac would
+/// make every card a scroll target for no reason.
+private struct ScrollAnchors: ViewModifier {
+    let enabled: Bool
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled { content.scrollTargetLayout() } else { content }
     }
 }
