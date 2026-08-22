@@ -13,9 +13,9 @@ struct FoldView: View {
     private let cols = [GridItem(.adaptive(minimum: 170), spacing: 12)]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             HStack(spacing: 8) {
-                Text("Fold").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: "Fold")
                 Spacer()
                 Button {
                     Task { await state.refreshFold() }

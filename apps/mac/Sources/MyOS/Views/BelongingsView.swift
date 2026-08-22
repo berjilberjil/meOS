@@ -19,7 +19,7 @@ struct BelongingsView: View {
     private var live: [BelongingItem] { state.belongings.items.filter { !$0.retired } }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             header
             hero
             ForEach(state.belongingCategories()) { cat in
@@ -46,7 +46,7 @@ struct BelongingsView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Stuff").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: "Stuff")
                 Text("What you own, and what it costs you.").font(.system(size: 14)).foregroundStyle(Palette.faint)
             }
             Spacer()

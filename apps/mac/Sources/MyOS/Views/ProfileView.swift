@@ -12,7 +12,7 @@ struct ProfileView: View {
     @FocusState private var weightFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             headerCard.knRise(0)
             identityCard.knRise(1)
             bodyCard.knRise(2)

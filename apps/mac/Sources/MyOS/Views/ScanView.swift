@@ -10,7 +10,7 @@ struct ScanView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Scan").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: "Scan")
                 Text("Food logs itself. Anything else — Catherine tells you if you actually want it.")
                     .font(.system(size: 16)).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)

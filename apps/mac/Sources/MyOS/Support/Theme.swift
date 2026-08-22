@@ -130,6 +130,17 @@ enum Palette {
     static let coral  = Color(hex: 0xFF7A59)
 }
 
+/// Vertical rhythm. Screens differed by a few points each — 14 here, 16 there,
+/// 18, 20, 22 — which is small enough to never look like a bug and big enough
+/// that every tab switch re-spaces the page under you. One beat, everywhere.
+enum Gap {
+    /// Between a screen's top-level blocks.
+    static let screen: CGFloat = 18
+    /// Between rows inside a card.
+    static let row: CGFloat = 12
+    static let tight: CGFloat = 8
+}
+
 enum Radius {
     static let xs: CGFloat = 8
     static let sm: CGFloat = 12   // chips / small controls
@@ -160,10 +171,11 @@ enum Motion {
 extension Animation {
     static let knFast     = Animation.easeOut(duration: Motion.fast)
     static let knNormal   = Animation.easeInOut(duration: Motion.normal)
-    // Critically damped — graceful, no overshoot (Apple default).
-    static let knEntrance = Animation.spring(response: 0.45, dampingFraction: 1.0)
-    // Slight bounce only because a tap already carried intent/momentum.
-    static let knPop      = Animation.spring(response: 0.34, dampingFraction: 0.88)
+    // Screens arrive by fading, not by moving. See `RiseIn`.
+    static let knEntrance = Animation.easeOut(duration: 0.14)
+    // No bounce, anywhere. A control that overshoots reads as loose, and the
+    // whole point of this design language is that nothing wobbles after it lands.
+    static let knPop      = Animation.spring(response: 0.26, dampingFraction: 1.0)
     /// Dark ↔ light. Interrupted retargets from the live color (no snap).
     static var knTheme: Animation {
         Motion.reduceMotion
@@ -209,6 +221,17 @@ struct Card<Content: View>: View {
 }
 
 // MARK: - Labels
+
+/// The name of a screen. Titles ran at both 24 and 28 depending on which screen
+/// you were on — sometimes both inside one file — so this is the only size.
+struct ScreenTitle: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.system(size: 28, weight: .semibold))
+            .foregroundStyle(Palette.text)
+    }
+}
 
 struct SectionTitle: View {
     let text: String
@@ -500,16 +523,21 @@ extension View {
 // MARK: - Entrance
 
 /// Staggered spring rise-in on appear — a bouncy, game-like page load.
+/// Entrance for a screen's blocks: one short fade, nothing else.
+///
+/// It used to slide each block up 14pt on a spring, staggered 45ms apart. Inside
+/// a scroll view that is a layout that is still moving when your thumb arrives —
+/// you scroll, the page is mid-cascade, and the content shifts under you. A card
+/// that is already where it will end up cannot do that. `index` is kept so the
+/// 60-odd call sites still read as an order, but nothing is staggered any more:
+/// a staggered fade is the same wobble measured in opacity.
 struct RiseIn: ViewModifier {
     var index: Int = 0
     @State private var shown = false
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 14)
-            .onAppear {
-                withAnimation(.knEntrance.delay(Double(index) * 0.045)) { shown = true }
-            }
+            .onAppear { withAnimation(.knEntrance) { shown = true } }
     }
 }
 

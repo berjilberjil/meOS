@@ -22,8 +22,8 @@ struct FitnessView: View {
     @State private var sub: FitSub = .today
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Fitness").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+        VStack(alignment: .leading, spacing: Gap.screen) {
+            ScreenTitle(text: "Fitness")
                 .knRise(0)
 
             Segmented(options: FitSub.allCases.map { ($0, $0.label) }, selection: $sub)

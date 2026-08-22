@@ -62,10 +62,27 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text("Settings")
-                .font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
-                .padding(.leading, 2)
+        // This is a sheet, so it is outside MainView's scroll container — it has
+        // to bring its own, and its own horizontal padding, or it is a fixed
+        // column of content clipped at whatever the sheet's height happens to be.
+        ScrollView {
+            groups
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+                .padding(.bottom, 40)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        .background(Palette.bg.ignoresSafeArea())
+        .presentationBackground(Palette.bg)
+        .presentationDragIndicator(.visible)
+        .animation(.knTheme, value: themeStore.theme.id)
+        .sheet(item: $page) { p in editorSheet(p) }
+    }
+
+    private var groups: some View {
+        VStack(alignment: .leading, spacing: Gap.screen) {
+            ScreenTitle(text: "Settings").padding(.leading, 2)
 
             youCard
 
@@ -91,9 +108,6 @@ struct SettingsView: View {
 
             signOutButton
         }
-        .padding(.bottom, 10)
-        .animation(.knTheme, value: themeStore.theme.id)
-        .sheet(item: $page) { p in editorSheet(p) }
     }
 
     // MARK: - Pieces
@@ -214,7 +228,7 @@ struct SettingsView: View {
                             case .reorder: EmptyView()
                             }
                         }
-                        .padding(20)
+                        .padding(.horizontal, 16).padding(.vertical, 20)
                     }
                 }
             }

@@ -16,13 +16,21 @@ struct MainView: View {
         ZStack {
             Palette.bg.ignoresSafeArea()
 
-            NavigationStack {
-                ScrollView {
-                    content
-                        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 128)
+            // No NavigationStack: nothing here pushes, and a stack whose bar is
+            // hidden re-negotiates the scroll view's safe-area inset after the
+            // first layout — which shows up as the page quietly re-seating
+            // itself while you are already scrolling.
+            Group {
+                if tab == .today {
+                    // Owns its own scrolling: one scroll view per day page.
+                    TodayPager(go: { select($0) })
+                } else {
+                    ScrollView {
+                        content
+                            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 128)
+                    }
+                    .scrollIndicators(.hidden)
                 }
-                .background(Palette.bg.ignoresSafeArea())
-                .toolbar(.hidden, for: .navigationBar)
             }
             .id(tab)
 

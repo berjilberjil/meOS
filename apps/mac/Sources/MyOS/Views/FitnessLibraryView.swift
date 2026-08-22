@@ -7,7 +7,7 @@ struct FitnessLibraryView: View {
     @State private var mode: LibMode = .foods
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             Segmented(options: [(LibMode.foods, "Foods"), (LibMode.workouts, "Workouts")], selection: $mode)
                 .knRise(0)
             Group {

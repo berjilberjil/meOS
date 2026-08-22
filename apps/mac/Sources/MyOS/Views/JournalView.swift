@@ -30,10 +30,9 @@ struct JournalView: View {
 
     var body: some View {
         #if os(iOS)
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             HStack {
-                Text(jseg == .events ? "Events" : "Journal")
-                    .font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                ScreenTitle(text: jseg == .events ? "Events" : "Journal").lineLimit(1)
                 Spacer()
                 if jseg == .journal {
                     Button { showPresets = true } label: {
@@ -112,7 +111,7 @@ struct JournalView: View {
     @ViewBuilder private var header: some View {
         #if os(iOS)
         VStack(alignment: .leading, spacing: 10) {
-            Text("Journal").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+            ScreenTitle(text: "Journal")
                 .lineLimit(1)
             HStack(spacing: 10) {
                 if !isToday {
@@ -128,7 +127,7 @@ struct JournalView: View {
         }
         #else
         HStack(spacing: 10) {
-            Text("Journal").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+            ScreenTitle(text: "Journal")
                 .lineLimit(1).layoutPriority(1)
             Spacer()
             if !isToday {

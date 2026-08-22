@@ -24,9 +24,9 @@ struct EventsView: View {
     private var past: [EventItem] { sorted.filter { $0.date < state.todayKey } }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             HStack {
-                Text("Events").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: "Events")
                 Spacer()
                 Button { showNew = true } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(KPrimaryButtonStyle())

@@ -45,9 +45,9 @@ struct ProductivityView: View {
     private var toNoteCount: Int { state.watch.filter { $0.watched && $0.takeaway.trimmingCharacters(in: .whitespaces).isEmpty }.count }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             HStack(spacing: 8) {
-                Text("Productivity").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: "Productivity")
                 Spacer()
                 Text("\(state.watch.count) videos").font(.system(size: 12)).foregroundStyle(Palette.faint)
                 if !state.watch.isEmpty {

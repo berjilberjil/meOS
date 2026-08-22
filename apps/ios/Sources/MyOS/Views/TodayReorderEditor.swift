@@ -33,7 +33,7 @@ struct TodayReorderEditor: View {
                     .listRowSeparator(.hidden)
                 }
                 .onMove { from, to in
-                    withAnimation(.snappy) {
+                    withAnimation(.knPop) {
                         sections.move(fromOffsets: from, toOffset: to)
                         TodaySection.save(sections)
                     }

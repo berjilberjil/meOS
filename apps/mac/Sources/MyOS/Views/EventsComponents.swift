@@ -39,7 +39,7 @@ struct EventsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 10) {
-                Text("Events").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: "Events")
                 Spacer()
                 Segmented(options: Mode.allCases.map { ($0, $0.label) }, selection: $mode)
                 Button { showTags = true } label: { Label("Tags", systemImage: "tag") }

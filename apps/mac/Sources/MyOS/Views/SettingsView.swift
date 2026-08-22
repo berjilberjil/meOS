@@ -17,8 +17,8 @@ struct SettingsView: View {
     @State private var exportMsg: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Settings").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+        VStack(alignment: .leading, spacing: Gap.screen) {
+            ScreenTitle(text: "Settings")
                 .knRise(0)
 
             accountCard.knRise(1)

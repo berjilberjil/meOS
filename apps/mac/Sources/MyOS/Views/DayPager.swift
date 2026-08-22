@@ -9,10 +9,15 @@ import AppKit
 /// rather than cards disagreeing with each other. Swipe left for the next day,
 /// right for the previous.
 ///
-/// The two platforms need different plumbing: on iOS a horizontal swipe is a
-/// `DragGesture`, gated on horizontal dominance so it never steals the vertical
-/// scroll. On macOS a two-finger trackpad swipe is NOT a drag — it arrives as
-/// `scrollWheel`, which SwiftUI does not surface, so an AppKit view bridges it.
+/// The two platforms need different plumbing. **iOS does not use this modifier
+/// at all** — `TodayPager` puts each day in its own page of a paged `TabView`,
+/// so UIKit's own directional lock decides between "you are scrolling" and "you
+/// are turning the page" and the two can never both win. (It used to be a
+/// `simultaneousGesture(DragGesture)` layered over the vertical scroll view;
+/// "simultaneous" is exactly what it says, so one angled flick both scrolled the
+/// page and flipped the day. That is the wobble.) On macOS a two-finger trackpad
+/// swipe is NOT a drag — it arrives as `scrollWheel`, which SwiftUI does not
+/// surface, so an AppKit view bridges it.
 @MainActor
 enum DayPaging {
     /// How far into the future paging is allowed. Past is unbounded (data only
@@ -93,37 +98,33 @@ private struct HorizontalScrollCatcher: NSViewRepresentable {
 }
 #endif
 
+#if os(macOS)
 private struct DayPagerModifier: ViewModifier {
     @Binding var date: String
     let today: String
 
     func body(content: Content) -> some View {
-        #if os(macOS)
         content.background(HorizontalScrollCatcher { delta in
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(.knFast) {
                 date = DayPaging.step(date, by: delta, today: today)
             }
         })
-        #else
-        content.simultaneousGesture(
-            DragGesture(minimumDistance: 24)
-                .onEnded { value in
-                    // Horizontal dominance gate: without this the page would
-                    // fight the vertical scroll on every slightly-angled flick.
-                    guard abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
-                    let delta = value.translation.width < 0 ? 1 : -1
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        date = DayPaging.step(date, by: delta, today: today)
-                    }
-                }
-        )
-        #endif
     }
 }
+#endif
 
 extension View {
-    /// Page `date` by day on horizontal swipe / two-finger trackpad swipe.
-    func dayPager(date: Binding<String>, today: String) -> some View {
-        modifier(DayPagerModifier(date: date, today: today))
+    /// Page `date` by day on a two-finger trackpad swipe (macOS only).
+    ///
+    /// `enabled` is false when something outside owns the day — on iOS
+    /// `TodayPager` does, and a second pager fighting it is how you get two
+    /// different answers to "which day am I on".
+    @ViewBuilder
+    func dayPager(date: Binding<String>, today: String, enabled: Bool = true) -> some View {
+        #if os(macOS)
+        if enabled { modifier(DayPagerModifier(date: date, today: today)) } else { self }
+        #else
+        self
+        #endif
     }
 }

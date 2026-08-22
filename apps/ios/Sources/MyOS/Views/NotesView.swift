@@ -25,9 +25,9 @@ struct NotesView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Notes").font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: "Notes")
                     .contentShape(Rectangle())
                     .onTapGesture { handleTitleTap() }
                 if revealed {
@@ -47,15 +47,19 @@ struct NotesView: View {
             }
             .knField()
 
-            if filtered.isEmpty {
-                Card {
-                    Text(state.notes.isEmpty ? "No notes yet. Double-tap here to write one."
-                                             : "No notes match “\(query)”.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+            // Rows are a list, not screen blocks — they get the row beat, not
+            // the screen one, or the page reads as eight separate sections.
+            VStack(alignment: .leading, spacing: Gap.row) {
+                if filtered.isEmpty {
+                    Card {
+                        Text(state.notes.isEmpty ? "No notes yet. Double-tap here to write one."
+                                                 : "No notes match “\(query)”.")
+                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    }
+                    .onTapGesture(count: 2) { newNote() }
+                } else {
+                    ForEach(filtered) { noteRow($0) }
                 }
-                .onTapGesture(count: 2) { newNote() }
-            } else {
-                ForEach(filtered) { noteRow($0) }
             }
         }
         .navigationDestination(item: $openID) { id in NoteEditor(id: id) }

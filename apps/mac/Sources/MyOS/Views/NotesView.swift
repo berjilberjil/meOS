@@ -85,7 +85,7 @@ struct NotesView: View {
 
     private var browseHeader: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("Notes").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+            ScreenTitle(text: "Notes")
                 .onTapGesture(count: 2) { startNew() }
                 .help("Double-click to write a note")
             if !state.notes.isEmpty {

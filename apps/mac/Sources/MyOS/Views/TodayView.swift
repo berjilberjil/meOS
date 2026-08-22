@@ -7,21 +7,36 @@ struct TodayView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.openURL) private var openURL
     var go: (NavTab) -> Void
+    /// Set when something outside owns which day is on screen — on iOS
+    /// `TodayPager` gives each day its own page (and its own scroll position),
+    /// so the day must come from there. nil means this view owns it and pages
+    /// itself, which is what the Mac does with a trackpad swipe.
+    var externalDate: Binding<String>? = nil
 
     @State private var expandedNews: Set<String> = []
     @State private var editingMeal: MealKey?
     @State private var editingWorkout = false
     @State private var showStreakCal = false
+    /// The day this page is showing when nobody outside is driving it.
+    @State private var ownDate: String = ""
+
     /// The day the whole page is showing. Every card reads this, so the screen
-    /// is always one coherent day; swiping anywhere moves all of them together.
-    @State private var selectedDate: String = ""
+    /// is always one coherent day rather than cards disagreeing.
+    private var selectedDate: String {
+        let d = externalDate?.wrappedValue ?? ownDate
+        return d.isEmpty ? state.todayKey : d
+    }
+
+    private func setDate(_ d: String) {
+        if let external = externalDate { external.wrappedValue = d } else { ownDate = d }
+    }
 
     private let cols = [GridItem(.adaptive(minimum: 168), spacing: 12)]
     private let mealCols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
         let sections = TodaySection.ordered()
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: Gap.screen) {
             header.knRise(0)
             ForEach(Array(sections.enumerated()), id: \.element.id) { idx, section in
                 todaySection(section).knRise(idx + 1)
@@ -30,8 +45,8 @@ struct TodayView: View {
             settingsCard.knRise(7)
             #endif
         }
-        .dayPager(date: $selectedDate, today: state.todayKey)
-        .onAppear { if selectedDate.isEmpty { selectedDate = state.todayKey } }
+        .dayPager(date: $ownDate, today: state.todayKey, enabled: externalDate == nil)
+        .onAppear { if ownDate.isEmpty { ownDate = state.todayKey } }
         .task {
             if state.news == nil { await state.fetchNews() }
         }
@@ -444,13 +459,13 @@ struct TodayView: View {
 
     /// Weekday of the page's date — "Friday", or "Today"/"Yesterday" nearby.
     private var pagedWeekdayName: String {
-        let d = selectedDate.isEmpty ? state.todayKey : selectedDate
+        let d = selectedDate
         if d == state.todayKey { return weekdayName }
         return DayPaging.label(d, today: state.todayKey)
     }
 
     private var pagedPrettyDate: String {
-        let d = selectedDate.isEmpty ? state.todayKey : selectedDate
+        let d = selectedDate
         guard d != state.todayKey, let parsed = AppState.date(fromKey: d) else { return prettyDate }
         let f = DateFormatter(); f.dateFormat = "d MMMM yyyy"
         return f.string(from: parsed)
@@ -461,14 +476,13 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(greeting + ", " + state.profile.name)
                     .font(.system(size: 15)).foregroundStyle(Palette.muted)
-                Text(pagedWeekdayName)
-                    .font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                ScreenTitle(text: pagedWeekdayName)
                 HStack(spacing: 8) {
                     Text(pagedPrettyDate).font(.system(size: 13)).foregroundStyle(Palette.muted)
                     if selectedDate != state.todayKey {
                         // The only affordance for getting home — the page has no
                         // arrows by design, so leaving without one would strand you.
-                        Button("Today") { withAnimation(.knNormal) { selectedDate = state.todayKey } }
+                        Button("Today") { withAnimation(.knNormal) { setDate(state.todayKey) } }
                             .buttonStyle(.plain)
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(Palette.brand)
