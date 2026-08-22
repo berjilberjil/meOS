@@ -230,6 +230,10 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal, 16).padding(.vertical, 20)
                     }
+                    .scrollIndicators(.hidden)
+                    // Age and the API key use the number pad / no return key, so
+                    // dragging the page is the way back out of them.
+                    .scrollDismissesKeyboard(.interactively)
                 }
             }
             .background(Palette.bg.ignoresSafeArea())

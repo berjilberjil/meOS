@@ -60,6 +60,7 @@ targets:
       - path: ../mac/Sources/MyOS/Views/FocusView.swift
       - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift
+      - path: ../mac/Sources/MyOS/Views/SettingsKit.swift
       - path: ../mac/Sources/MyOS/Views/SharedComponents.swift
       - path: ../mac/Sources/MyOS/Views/ImageDropZone.swift
       - path: ../mac/Sources/MyOS/Views/WatchLogCard.swift

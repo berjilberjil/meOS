@@ -11,10 +11,6 @@ struct AppearanceCard: View {
     var body: some View {
         let inner = VStack(alignment: .leading, spacing: 16) {
             if boxed { SectionTitle(text: "Appearance") }
-            else {
-                Text("Dark or light. Changes everywhere, instantly.")
-                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
-            }
             HStack(spacing: 12) {
                 ForEach(AppTheme.all) { preview($0) }
             }
@@ -23,43 +19,65 @@ struct AppearanceCard: View {
         // supplies its own padding and background. Wrapping in a Card there adds
         // a second surface and shoves the content 18pt further in than the pages
         // that get this right — which is what made Settings look misaligned.
-        if boxed { Card { inner } } else { inner }
+        if boxed {
+            Card { inner }
+        } else {
+            SettingsPage {
+                SettingsIntro(text: "Dark or light. Changes everywhere, instantly.")
+                inner
+            }
+        }
     }
 
     private func preview(_ theme: AppTheme) -> some View {
         let on = themeStore.theme.id == theme.id
         return Button { state.setTheme(theme) } label: {
-            VStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+            VStack(spacing: 11) {
+                ZStack(alignment: .bottomTrailing) {
+                    // A miniature of the app rather than three grey bars: a
+                    // title, a hero card, two rows. You are choosing a look, so
+                    // the preview should look like the thing.
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(theme.bg)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Capsule().fill(theme.brand).frame(width: 28, height: 5)
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 5) {
+                            Capsule().fill(theme.brand).frame(width: 26, height: 5)
+                            Capsule().fill(theme.border).frame(width: 12, height: 5)
+                        }
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(theme.surface)
-                            .frame(height: 22)
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(theme.surface2)
-                            .frame(height: 14)
+                            .frame(maxHeight: .infinity)
+                        HStack(spacing: 6) {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous).fill(theme.surface2)
+                            RoundedRectangle(cornerRadius: 5, style: .continuous).fill(theme.surface2)
+                        }
+                        .frame(height: 16)
                     }
-                    .padding(10)
+                    .padding(11)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                    if on {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(theme.brand)
+                            .background(Circle().fill(theme.bg).padding(2))
+                            .padding(9)
+                            .transition(.opacity)
+                    }
                 }
-                .frame(height: boxed ? 96 : 140)
+                .frame(height: boxed ? 96 : nil)
+                .aspectRatio(boxed ? nil : 0.82, contentMode: .fit)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(on ? theme.brand : theme.border, lineWidth: on ? 2.5 : 1)
                 )
-                HStack(spacing: 5) {
-                    Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(on ? theme.brand : Palette.faint)
-                    Text(theme.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Palette.text)
-                }
+                Text(theme.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(on ? Palette.text : Palette.muted)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
+            .animation(.knFast, value: on)
         }
         .buttonStyle(KPressStyle())
         .accessibilityAddTraits(on ? .isSelected : [])

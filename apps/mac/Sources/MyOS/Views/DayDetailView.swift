@@ -14,15 +14,21 @@ struct DayDetailView: View {
     @State private var selected: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Card {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionTitle(text: "Pick a day")
+        VStack(alignment: .leading, spacing: Gap.screen) {
+            // No "Pick a day" caption: the month header already says which month
+            // you are in, and the grid is unmistakably a date picker. The line
+            // cost a row of height on a screen whose whole job is to leave room
+            // for the day underneath it.
+            Card(padding: 14) {
+                VStack(alignment: .leading, spacing: 10) {
                     KMonthHeader(year: year, month: month, showToday: true,
                                  onPrev: { shift(-1) }, onNext: { shift(1) },
                                  onToday: { jumpToToday() })
                     KMonthGrid(year: year, month: month, selected: selected,
-                               onTap: { key in withAnimation(.knNormal) { selected = key } })
+                               onTap: { key in
+                                   Haptics.selection()
+                                   withAnimation(.knFast) { selected = key }
+                               })
                 }
             }
 
@@ -34,14 +40,23 @@ struct DayDetailView: View {
     // MARK: The day
 
     private var daySummary: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: Gap.row) {
+            // The date is the heading for everything under it, so it is typed
+            // like one — the relative label rides along as a pill rather than
+            // competing as a second piece of text.
+            HStack(alignment: .firstTextBaseline, spacing: 9) {
                 Text(prettyDate(selected))
                     .font(.system(size: 20, weight: .semibold)).foregroundStyle(Palette.text)
-                Text(DayPaging.label(selected, today: state.todayKey))
-                    .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(DayPaging.label(selected, today: state.todayKey).uppercased())
+                    .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .foregroundStyle(Palette.brand)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Palette.brand.opacity(0.14), in: Capsule())
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 2)
 
             ActivityStepsCard(day: selected, showsCalendar: false)
             DayMacroHero(day: selected)

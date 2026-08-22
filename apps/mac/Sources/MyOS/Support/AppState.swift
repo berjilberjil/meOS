@@ -618,12 +618,47 @@ final class AppState: ObservableObject {
 
     // MARK: - Date helpers
 
+    /// The gregorian calendar these keys are defined in, kept between calls and
+    /// rebuilt only if the device changes timezone.
+    ///
+    /// Every one of these helpers used to build a fresh `DateFormatter`, which
+    /// is one of the more expensive objects in Foundation. They are called from
+    /// view bodies — the Today pager alone derives 128 day keys per render, and
+    /// a journal streak walks a key per day — so the formatters were being
+    /// allocated in their thousands while a finger was on the screen.
+    /// `yyyy-MM-dd` is a fixed machine format; parsed by hand it is arithmetic.
+    private static var cachedCalendar = Calendar(identifier: .gregorian)
+    private static var cachedZone = TimeZone.current
+    static var dayCalendar: Calendar {
+        let zone = TimeZone.current
+        if zone != cachedZone {
+            cachedZone = zone
+            var c = Calendar(identifier: .gregorian)
+            c.timeZone = zone
+            cachedCalendar = c
+        }
+        return cachedCalendar
+    }
+
     static func dateKey(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
+        let c = dayCalendar.dateComponents([.year, .month, .day], from: date)
+        return key(c.year ?? 1970, c.month ?? 1, c.day ?? 1)
+    }
+
+    private static func key(_ y: Int, _ m: Int, _ d: Int) -> String {
+        "\(y)-\(m < 10 ? "0" : "")\(m)-\(d < 10 ? "0" : "")\(d)"
+    }
+
+    /// `yyyy-MM-dd` → its three numbers, or nil if it isn't one.
+    private static func parts(_ key: String) -> DateComponents? {
+        let f = key.split(separator: "-")
+        guard f.count == 3, f[0].count == 4,
+              let y = Int(f[0]), let m = Int(f[1]), let d = Int(f[2]),
+              (1...12).contains(m), (1...31).contains(d)
+        else { return nil }
+        var c = DateComponents()
+        c.year = y; c.month = m; c.day = d
+        return c
     }
     static func nowStamp() -> String {
         let f = DateFormatter()
@@ -638,21 +673,16 @@ final class AppState: ObservableObject {
     /// Timezone-stable day math on a `yyyy-MM-dd` key (POSIX/gregorian — never
     /// `Calendar.current` for key strings).
     static func addDays(_ n: Int, to key: String) -> String {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        guard let d = f.date(from: key),
-              let moved = f.calendar.date(byAdding: .day, value: n, to: d) else { return key }
-        return f.string(from: moved)
+        let cal = dayCalendar
+        guard let c = parts(key),
+              let d = cal.date(from: c),
+              let moved = cal.date(byAdding: .day, value: n, to: d) else { return key }
+        return dateKey(moved)
     }
-    /// Parse a `yyyy-MM-dd` key back to a Date (same POSIX/gregorian path).
+    /// Parse a `yyyy-MM-dd` key back to a Date (same gregorian path).
     static func date(fromKey key: String) -> Date? {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.date(from: key)
+        guard let c = parts(key) else { return nil }
+        return dayCalendar.date(from: c)
     }
 
     // MARK: - AI: food photo reading

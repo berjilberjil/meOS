@@ -15,14 +15,7 @@ struct GeneralSettingsCard: View {
 
     var body: some View {
         let inner = VStack(alignment: .leading, spacing: 6) {
-            if boxed {
-                SectionTitle(text: "General")
-                    .padding(.bottom, 8)
-            } else {
-                Text("Which screen opens when you launch MyOS.")
-                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
-                    .padding(.bottom, 8)
-            }
+            SectionTitle(text: "General").padding(.bottom, 8)
             ForEach(Array(options.enumerated()), id: \.element.id) { i, t in
                 if i > 0 { Rectangle().fill(Palette.border).frame(height: 1) }
                 Button { prefs.launchTab = t } label: {
@@ -44,10 +37,22 @@ struct GeneralSettingsCard: View {
                 .buttonStyle(KPressStyle())
             }
         }
-        // `boxed` off means this is already a full settings PAGE on iOS, which
-        // supplies its own padding and background. Wrapping in a Card there adds
-        // a second surface and shoves the content 18pt further in than the pages
-        // that get this right — which is what made Settings look misaligned.
-        if boxed { Card { inner } } else { inner }
+        if boxed {
+            Card { inner }
+        } else {
+            SettingsPage {
+                SettingsIntro(text: "Which screen opens when you launch MyOS.")
+                SettingsGroup {
+                    ForEach(Array(options.enumerated()), id: \.element.id) { i, t in
+                        if i > 0 { SettingsDivider() }
+                        SettingsPickRow(title: t.title, icon: t.icon, tint: t.tint,
+                                        selected: t == prefs.launchTab) {
+                            Haptics.selection()
+                            prefs.launchTab = t
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -77,35 +77,116 @@ struct FitnessProfileEditor: View {
 
 // MARK: - Personal details (Settings + iPhone)
 
-/// Name, city, work, about — the facts Catherine uses. Clean, large fields.
+/// Settings → You. The facts Catherine works from.
+///
+/// This used to be seven full-width boxes stacked down the screen, which is a
+/// registration form, not a profile. It reads as who you are first — name, what
+/// you do, where you are — and the same facts are editable underneath as label /
+/// value rows, so a filled-in profile is something you skim rather than a column
+/// of inputs. Every field and binding is unchanged.
 struct PersonDetailsEditor: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
-        Card {
-        VStack(alignment: .leading, spacing: 16) {
-            field("Name", name)
-            field("Age", age)
-            field("City", city)
-            field("Hometown", hometown)
-            field("Role", role)
-            field("Work", work)
-            VStack(alignment: .leading, spacing: 6) {
-                KFieldLabel(text: "About you")
-                TextEditor(text: about)
-                    .font(.system(size: 16)).foregroundStyle(Palette.text)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 120)
-                    .padding(10)
-                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(Palette.border, lineWidth: 1))
+        SettingsPage {
+            identity
+
+            SettingsGroup(title: "Identity") {
+                SettingsFieldRow(label: "Name", placeholder: "Your name", text: name)
+                SettingsDivider(inset: SettingsMetrics.plainInset)
+                SettingsFieldRow(label: "Age", placeholder: "—", numeric: true, text: age)
+                SettingsDivider(inset: SettingsMetrics.plainInset)
+                SettingsFieldRow(label: "City", placeholder: "Where you live", text: city)
+                SettingsDivider(inset: SettingsMetrics.plainInset)
+                SettingsFieldRow(label: "Hometown", placeholder: "Where you're from", text: hometown)
             }
-            Text("Catherine reads this when she judges a scan or answers you.")
-                .font(.system(size: 14)).foregroundStyle(Palette.faint)
-        }
+
+            SettingsGroup(title: "Work") {
+                SettingsFieldRow(label: "Role", placeholder: "What you do", text: role)
+                SettingsDivider(inset: SettingsMetrics.plainInset)
+                SettingsFieldRow(label: "Work", placeholder: "Where you do it", text: work)
+            }
+
+            SettingsGroup(title: "About",
+                          footer: "Catherine reads this when she judges a scan or answers you.") {
+                SettingsTextArea(
+                    placeholder: "A few lines — what you’re building, what you care about, anything she should hold on to.",
+                    text: about)
+            }
         }
     }
+
+    // MARK: Who you are
+
+    private var identity: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle().fill(Palette.teal.opacity(0.18))
+                Text(initials)
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Palette.teal)
+            }
+            .frame(width: 64, height: 64)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(displayName)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(hasName ? Palette.text : Palette.faint)
+                    .lineLimit(2).minimumScaleFactor(0.75)
+                if !workLine.isEmpty {
+                    Text(workLine)
+                        .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                        .lineLimit(1).truncationMode(.tail)
+                }
+                if !placeLine.isEmpty {
+                    Text(placeLine)
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .lineLimit(1).truncationMode(.tail)
+                }
+                if workLine.isEmpty && placeLine.isEmpty {
+                    Text("Fill this in and she stops guessing.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var hasName: Bool { !state.profile.name.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    private var displayName: String {
+        let n = state.profile.name.trimmingCharacters(in: .whitespaces)
+        if !n.isEmpty { return n }
+        return state.username.isEmpty ? "Add your name" : "@\(state.username)"
+    }
+
+    private var initials: String {
+        let letters = state.profile.name
+            .split(separator: " ").prefix(2)
+            .compactMap { $0.first }
+            .map(String.init).joined().uppercased()
+        return letters.isEmpty ? "·" : letters
+    }
+
+    /// "Opportunist · SKCRIPT" — either half alone is fine.
+    private var workLine: String {
+        [state.profile.role, state.profile.work]
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
+
+    /// Where you are, and where you are from when that is somewhere else.
+    private var placeLine: String {
+        let city = state.profile.city.trimmingCharacters(in: .whitespaces)
+        let home = state.profile.hometown.trimmingCharacters(in: .whitespaces)
+        if city.isEmpty { return home }
+        if home.isEmpty || home.caseInsensitiveCompare(city) == .orderedSame { return city }
+        return "\(city) · from \(home)"
+    }
+
+    // MARK: Bindings (unchanged)
 
     private var name: Binding<String> {
         Binding(get: { state.profile.name }, set: { v in state.updateProfile { $0.name = v } })
@@ -130,22 +211,6 @@ struct PersonDetailsEditor: View {
             get: { state.profile.age.map(String.init) ?? "" },
             set: { v in state.updateProfile { $0.age = Int(v.filter(\.isNumber)) } }
         )
-    }
-
-    private func field(_ label: String, _ text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            KFieldLabel(text: label)
-            TextField("", text: text, prompt: Text(label).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 17)).foregroundStyle(Palette.text)
-                .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .strokeBorder(Palette.border, lineWidth: 1))
-        }
-    }
-
-    private func num(_ label: String, _ text: Binding<String>) -> some View {
-        field(label, text)
     }
 }
 

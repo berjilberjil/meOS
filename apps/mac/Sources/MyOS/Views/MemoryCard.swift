@@ -33,18 +33,101 @@ struct MemoryCard: View {
     }
 
     var body: some View {
-        let inner = VStack(alignment: .leading, spacing: 14) {
-            if boxed {
-                HStack {
-                    SectionTitle(text: "Memory")
-                    Spacer()
-                    Text(state.memory.items.isEmpty ? "nothing yet"
-                                                    : "\(state.memory.items.count) remembered")
-                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+        Group {
+            if boxed { Card { boxedInner } } else { page }
+        }
+            .sheet(item: $editing) { item in chrome(MemoryEditorSheet(item: item), width: 460) }
+            .sheet(isPresented: $showTrace) {
+                chrome(TraceSheet(trace: state.lastTrace ?? CatrineTrace()), width: 560)
+            }
+            .holdToDelete(
+                isPresented: Binding(get: { pendingDelete != nil },
+                                     set: { if !$0 { pendingDelete = nil } }),
+                title: "Forget this?",
+                message: "Catherine stops using it from the next message. This can't be undone."
+            ) {
+                if let id = pendingDelete { state.deleteMemory(id) }
+                pendingDelete = nil
+            }
+    }
+
+    // MARK: - Phone: a page
+
+    private var page: some View {
+        VStack(alignment: .leading, spacing: Gap.screen) {
+            SettingsIntro(text: "What Catherine has learned about you. She uses only what’s relevant to each message — edit or delete anything that’s wrong.")
+
+            if !state.memory.items.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    searchRow
+                    categoryRow
                 }
             }
 
-            Text("What Catherine has learned about you. She uses only what's relevant to each message — edit or delete anything that's wrong.")
+            if shown.isEmpty {
+                emptyState
+            } else {
+                VStack(alignment: .leading, spacing: SettingsMetrics.labelGap) {
+                    SectionTitle(text: shown.count == 1 ? "1 memory" : "\(shown.count) memories")
+                        .padding(.leading, 4)
+                    VStack(spacing: 8) { ForEach(shown) { row($0) } }
+                }
+            }
+
+            actions
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(state.memory.items.isEmpty ? "Nothing remembered yet" : "Nothing matches that")
+                .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+            Text(state.memory.items.isEmpty
+                 ? "Tell her something durable — “remember that my main project is MyOS” — or add one by hand."
+                 : "Try a different word, or clear the filter.")
+                .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Palette.surface2.opacity(0.5),
+                    in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+    }
+
+    private var actions: some View {
+        VStack(spacing: 10) {
+            Button { editing = MemoryItem(content: "", source: .manual) } label: {
+                Label("Add a memory", systemImage: "plus.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
+
+            if state.lastTrace != nil {
+                Button { showTrace = true } label: {
+                    Label("What the last answer was built from", systemImage: "waveform.path.ecg")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(KGhostButtonStyle())
+            }
+        }
+    }
+
+    // MARK: - Mac: a card
+
+    private var boxedInner: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                SectionTitle(text: "Memory")
+                Spacer()
+                Text(state.memory.items.isEmpty ? "nothing yet"
+                                                : "\(state.memory.items.count) remembered")
+                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+            }
+
+            Text("What Catherine has learned about you. She uses only what’s relevant to each message — edit or delete anything that’s wrong.")
                 .font(.system(size: 13)).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -52,7 +135,7 @@ struct MemoryCard: View {
 
             if shown.isEmpty {
                 Text(state.memory.items.isEmpty
-                     ? "Nothing yet. Tell her something durable — \"remember that my main project is MyOS\" — or add one by hand."
+                     ? "Nothing yet. Tell her something durable — “remember that my main project is MyOS” — or add one by hand."
                      : "Nothing matches that.")
                     .font(.system(size: 13)).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
@@ -78,24 +161,6 @@ struct MemoryCard: View {
                 }
             }
         }
-        // See the note in AgentSettingsCard: unboxed means this is already a
-        // settings page with its own padding and background.
-        return Group {
-            if boxed { Card { inner } } else { inner }
-        }
-            .sheet(item: $editing) { item in chrome(MemoryEditorSheet(item: item), width: 460) }
-            .sheet(isPresented: $showTrace) {
-                chrome(TraceSheet(trace: state.lastTrace ?? CatrineTrace()), width: 560)
-            }
-            .holdToDelete(
-                isPresented: Binding(get: { pendingDelete != nil },
-                                     set: { if !$0 { pendingDelete = nil } }),
-                title: "Forget this?",
-                message: "Catherine stops using it from the next message. This can't be undone."
-            ) {
-                if let id = pendingDelete { state.deleteMemory(id) }
-                pendingDelete = nil
-            }
     }
 
     /// A sheet is a full screen on the phone and a floating panel on the Mac.
@@ -116,7 +181,7 @@ struct MemoryCard: View {
                 .foregroundStyle(Palette.faint)
             TextField("", text: $query,
                       prompt: Text("Search what she remembers…").foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.system(size: 15)).foregroundStyle(Palette.text)
                 .focused($searchFocused)
             if !query.isEmpty {
                 Button { query = "" } label: {
@@ -151,51 +216,60 @@ struct MemoryCard: View {
         .buttonStyle(KPressStyle())
     }
 
+    /// What she remembers reads first; where it came from and what you can do
+    /// about it sit underneath, in that order.
     private func row(_ m: MemoryItem) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: m.category.icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Palette.teal)
-                .frame(width: 18)
-                .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: m.category.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Palette.teal)
+                    .frame(width: 18)
+                    .padding(.top, 3)
                 Text(m.content)
-                    .font(.system(size: 14)).foregroundStyle(Palette.text)
+                    .font(.system(size: 15)).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 6) {
-                    tag(m.category.label, Palette.teal)
-                    if m.importance >= 4 { tag("important", Palette.amber) }
-                    // Where it came from matters: something inferred from chat
-                    // deserves more suspicion than something you typed.
-                    if m.source == .extracted {
-                        tag(m.confidence < 0.85 ? "learned · unsure" : "learned", Palette.muted)
-                    }
-                    Spacer(minLength: 0)
+                if m.pinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.amber)
+                        .padding(.top, 4)
                 }
             }
 
-            Button { togglePin(m) } label: {
-                Image(systemName: m.pinned ? "pin.fill" : "pin")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(m.pinned ? Palette.amber : Palette.faint)
-            }
-            .buttonStyle(KIconButtonStyle(size: 24))
-            .help(m.pinned ? "Always in context" : "Pin so it's always in context")
+            HStack(spacing: 6) {
+                tag(m.category.label, Palette.teal)
+                if m.importance >= 4 { tag("important", Palette.amber) }
+                // Where it came from matters: something inferred from chat
+                // deserves more suspicion than something you typed.
+                if m.source == .extracted {
+                    tag(m.confidence < 0.85 ? "learned · unsure" : "learned", Palette.muted)
+                }
+                Spacer(minLength: 8)
 
-            Button { editing = m } label: {
-                Image(systemName: "pencil").font(.system(size: 11, weight: .bold))
-            }
-            .buttonStyle(KIconButtonStyle(size: 24))
+                Button { togglePin(m) } label: {
+                    Image(systemName: m.pinned ? "pin.slash" : "pin")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(m.pinned ? Palette.amber : Palette.faint)
+                }
+                .buttonStyle(KIconButtonStyle(size: 30))
+                .help(m.pinned ? "Stop always including it" : "Pin so it's always in context")
 
-            Button { pendingDelete = m.id } label: {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                Button { editing = m } label: {
+                    Image(systemName: "pencil").font(.system(size: 12, weight: .bold))
+                }
+                .buttonStyle(KIconButtonStyle(size: 30))
+                .help("Edit")
+
+                Button { pendingDelete = m.id } label: {
+                    Image(systemName: "trash").font(.system(size: 11, weight: .bold))
+                }
+                .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
+                .help("Forget this")
             }
-            .buttonStyle(KIconButtonStyle(size: 24))
         }
-        .padding(10)
-        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .padding(.horizontal, 12).padding(.vertical, 11)
+        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
     private func tag(_ text: String, _ tint: Color) -> some View {

@@ -4,61 +4,93 @@ import SwiftUI
 /// them (which lists their real models), enable/disable them, and route each feature
 /// in the app to a specific key + model. Keys are validated + stored server-side
 /// (encrypted) via `AISettingsStore`, so the setup follows the account across devices.
+///
+/// On the phone this is three questions in order — which provider, what is the key,
+/// and what should use it — rather than one dense column. Nothing about validation
+/// or storage changed.
 struct AIProvidersCard: View {
     var boxed = true
     @ObservedObject private var store = AISettingsStore.shared
 
     var body: some View {
-        let inner = VStack(alignment: .leading, spacing: 16) {
-                if boxed {
-                    HStack {
-                        SectionTitle(text: "AI providers & models")
-                        Spacer()
-                        Text("bring your own keys").font(.system(size: 12)).foregroundStyle(Palette.faint)
-                    }
-                }
-                Text("Add a Gemini, Claude or OpenAI key, then pick which model powers each feature.")
-                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let e = store.loadError {
-                    HStack {
-                        Label(e, systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12)).foregroundStyle(Palette.amber)
-                        Spacer()
-                        Button("Retry") { Task { await store.load() } }.buttonStyle(KGhostButtonStyle())
-                    }
-                }
-
-                AddKeyForm(store: store)
-
-                if !store.keys.isEmpty {
-                    Divider().overlay(Palette.border)
-                    VStack(spacing: 4) {
-                        ForEach(store.keys) { key in AIKeyRow(store: store, key: key) }
-                    }
-                }
-
-                Divider().overlay(Palette.border)
-                VStack(alignment: .leading, spacing: 6) {
-                    KFieldLabel(text: "Route features to models")
-                    if store.enabledKeys.isEmpty {
-                        Text("Add and enable a key above to route features. Until then everything uses the server default.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    ModelPickerRow(store: store, feature: nil)
-                    ForEach(AIFeature.allCases) { f in ModelPickerRow(store: store, feature: f) }
-                }
-        }
-        // `boxed` off means this is already a full settings PAGE on iOS, which
-        // supplies its own padding and background. Wrapping in a Card there adds
-        // a second surface and shoves the content 18pt further in than the pages
-        // that get this right — which is what made Settings look misaligned.
         Group {
-            if boxed { Card { inner } } else { inner }
+            if boxed { Card { boxedInner } } else { page }
         }
         .task { await store.loadIfNeeded() }
+    }
+
+    // MARK: - Phone: a page
+
+    private var page: some View {
+        SettingsPage {
+            SettingsIntro(text: "Add a Gemini, Claude or OpenAI key, then pick which model powers each feature.")
+
+            if let e = store.loadError {
+                SettingsNotice(text: e, actionLabel: "Retry") { Task { await store.load() } }
+            }
+
+            AddKeyForm(store: store, boxed: false)
+
+            if !store.keys.isEmpty {
+                SettingsGroup(title: "Your keys") {
+                    ForEach(Array(store.keys.enumerated()), id: \.element.id) { i, key in
+                        if i > 0 { SettingsDivider(inset: SettingsMetrics.plainInset) }
+                        AIKeyRow(store: store, key: key, boxed: false)
+                    }
+                }
+            }
+
+            SettingsGroup(title: "Route features to models",
+                          footer: store.enabledKeys.isEmpty
+                          ? "Add and enable a key above to route features. Until then everything uses the server default."
+                          : nil) {
+                ModelPickerRow(store: store, feature: nil, boxed: false)
+                ForEach(Array(AIFeature.allCases.enumerated()), id: \.element.id) { _, f in
+                    SettingsDivider(inset: SettingsMetrics.plainInset)
+                    ModelPickerRow(store: store, feature: f, boxed: false)
+                }
+            }
+        }
+    }
+
+    // MARK: - Mac: a card
+
+    private var boxedInner: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                SectionTitle(text: "AI providers & models")
+                Spacer()
+                Text("bring your own keys").font(.system(size: 12)).foregroundStyle(Palette.faint)
+            }
+            Text("Add a Gemini, Claude or OpenAI key, then pick which model powers each feature.")
+                .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let e = store.loadError {
+                SettingsNotice(text: e, actionLabel: "Retry") { Task { await store.load() } }
+            }
+
+            AddKeyForm(store: store, boxed: true)
+
+            if !store.keys.isEmpty {
+                Divider().overlay(Palette.border)
+                VStack(spacing: 4) {
+                    ForEach(store.keys) { key in AIKeyRow(store: store, key: key, boxed: true) }
+                }
+            }
+
+            Divider().overlay(Palette.border)
+            VStack(alignment: .leading, spacing: 6) {
+                KFieldLabel(text: "Route features to models")
+                if store.enabledKeys.isEmpty {
+                    Text("Add and enable a key above to route features. Until then everything uses the server default.")
+                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ModelPickerRow(store: store, feature: nil, boxed: true)
+                ForEach(AIFeature.allCases) { f in ModelPickerRow(store: store, feature: f, boxed: true) }
+            }
+        }
     }
 }
 
@@ -66,6 +98,7 @@ struct AIProvidersCard: View {
 
 private struct AddKeyForm: View {
     @ObservedObject var store: AISettingsStore
+    var boxed = true
     @Environment(\.openURL) private var openURL
     @State private var provider: AIProvider = .gemini
     @State private var label = ""
@@ -78,6 +111,67 @@ private struct AddKeyForm: View {
     }
 
     var body: some View {
+        if boxed { macForm } else { phoneForm }
+    }
+
+    // MARK: Phone
+
+    private var phoneForm: some View {
+        VStack(alignment: .leading, spacing: SettingsMetrics.labelGap) {
+            SectionTitle(text: "Add an AI provider").padding(.leading, 4)
+
+            Card(padding: 4) {
+                VStack(spacing: 0) {
+                    HStack {
+                        Segmented(options: AIProvider.allCases.map { ($0, $0.label) },
+                                  selection: $provider)
+                    }
+                    .padding(.horizontal, SettingsMetrics.rowPadH)
+                    .padding(.vertical, 10)
+
+                    if let url = provider.getKeyURL {
+                        SettingsDivider(inset: SettingsMetrics.plainInset)
+                        SettingsRow(title: "Get a \(provider.label) key",
+                                    subtitle: "Opens \(url.host ?? "the provider") in Safari.",
+                                    action: { openURL(url) }) {
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.faint)
+                        }
+                    }
+
+                    SettingsDivider(inset: SettingsMetrics.plainInset)
+                    SettingsFieldRow(label: "Label",
+                                     placeholder: "Personal \(provider.label)",
+                                     text: $label)
+                    SettingsDivider(inset: SettingsMetrics.plainInset)
+                    SettingsFieldRow(label: "API key",
+                                     placeholder: provider.keyPlaceholder,
+                                     monospaced: true, secure: true,
+                                     text: $keyText)
+                }
+            }
+
+            Button { add() } label: {
+                HStack(spacing: 8) {
+                    if store.busy { ProgressView().controlSize(.small).tint(.white) }
+                    Text(store.busy ? "Checking…" : "Check & add")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(KPrimaryButtonStyle())
+            .disabled(!canAdd)
+            .opacity(canAdd ? 1 : 0.5)
+            .padding(.top, 2)
+
+            if let err = store.actionError {
+                SettingsNotice(text: err)
+            }
+        }
+    }
+
+    // MARK: Mac
+
+    private var macForm: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Segmented(options: AIProvider.allCases.map { ($0, $0.label) }, selection: $provider)
@@ -90,24 +184,6 @@ private struct AddKeyForm: View {
                 }
             }
 
-            #if os(iOS)
-            VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 5) {
-                    KFieldLabel(text: "Label")
-                    TextField("", text: $label,
-                              prompt: Text("e.g. Personal \(provider.label)").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 16)).foregroundStyle(Palette.text)
-                        .focused($labelFocused).knField(focused: labelFocused)
-                }
-                VStack(alignment: .leading, spacing: 5) {
-                    KFieldLabel(text: "API key")
-                    SecureField("", text: $keyText,
-                                prompt: Text(provider.keyPlaceholder).foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 16)).monospaced().foregroundStyle(Palette.text)
-                        .focused($keyFocused).knField(focused: keyFocused)
-                }
-            }
-            #else
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 5) {
                     KFieldLabel(text: "Label")
@@ -126,7 +202,6 @@ private struct AddKeyForm: View {
                         .focused($keyFocused).knField(focused: keyFocused)
                 }
             }
-            #endif
 
             HStack(spacing: 12) {
                 Button { add() } label: {
@@ -137,12 +212,11 @@ private struct AddKeyForm: View {
                 }
                 .buttonStyle(KPrimaryButtonStyle())
                 .disabled(!canAdd)
+                Spacer(minLength: 0)
+            }
 
-                if let err = store.actionError {
-                    Label(err, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11)).foregroundStyle(Palette.amber)
-                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                }
+            if let err = store.actionError {
+                SettingsNotice(text: err)
             }
         }
     }
@@ -162,13 +236,14 @@ private struct AddKeyForm: View {
 private struct AIKeyRow: View {
     @ObservedObject var store: AISettingsStore
     let key: APIClient.AIKeyDTO
+    var boxed = true
     @State private var showDelete = false
 
     private var provider: AIProvider { AIProvider(rawValue: key.provider) ?? .gemini }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Text(provider.label)
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .padding(.horizontal, 8).padding(.vertical, 4)
@@ -176,16 +251,18 @@ private struct AIKeyRow: View {
                     .foregroundStyle(provider.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(key.label).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                        .lineLimit(1)
                     Text("\(key.masked)  ·  \(key.models.count) models")
                         .font(.system(size: 12)).monospaced().foregroundStyle(Palette.faint)
+                        .lineLimit(1)
                 }
-                Spacer()
-            }
-            HStack(spacing: 10) {
-                Toggle("On", isOn: Binding(get: { key.enabled },
+                Spacer(minLength: 6)
+                Toggle("", isOn: Binding(get: { key.enabled },
                                          set: { on in Task { await store.setEnabled(key, on) } }))
-                    .labelsHidden().toggleStyle(.switch).tint(Palette.green)
-                Spacer()
+                    .labelsHidden().tint(Palette.green)
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
                 Button { Task { await store.recheck(key) } } label: { Text("Check") }
                     .buttonStyle(KGhostButtonStyle())
                     .disabled(store.busy)
@@ -197,7 +274,8 @@ private struct AIKeyRow: View {
                                   confirmLabel: "Hold to remove") { Task { await store.delete(key) } }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.horizontal, boxed ? 0 : SettingsMetrics.rowPadH)
+        .padding(.vertical, boxed ? 8 : 12)
     }
 }
 
@@ -206,6 +284,7 @@ private struct AIKeyRow: View {
 private struct ModelPickerRow: View {
     @ObservedObject var store: AISettingsStore
     let feature: AIFeature?   // nil = the default route
+    var boxed = true
 
     private var candidates: [APIClient.AIKeyDTO] {
         store.enabledKeys.filter { key in
@@ -224,17 +303,20 @@ private struct ModelPickerRow: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(feature?.label ?? "Default (everything else)")
-                    .font(.system(size: 13, weight: feature == nil ? .bold : .regular))
+                Text(feature?.label ?? "Everything else")
+                    .font(.system(size: boxed ? 13 : 15,
+                                  weight: feature == nil ? .bold : .semibold))
                     .foregroundStyle(Palette.text)
                 if let note = feature?.note {
-                    Text(note).font(.system(size: 10)).foregroundStyle(Palette.faint)
+                    Text(note).font(.system(size: boxed ? 10 : 11)).foregroundStyle(Palette.faint)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer()
+            Spacer(minLength: 8)
             menu
         }
-        .padding(.vertical, 5)
+        .padding(.horizontal, boxed ? 0 : SettingsMetrics.rowPadH)
+        .padding(.vertical, boxed ? 5 : 11)
     }
 
     @ViewBuilder private var menu: some View {
@@ -277,7 +359,7 @@ private struct ModelPickerRow: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .frame(maxWidth: 280, alignment: .trailing)
+            .frame(maxWidth: 200, alignment: .trailing)
         }
     }
 }

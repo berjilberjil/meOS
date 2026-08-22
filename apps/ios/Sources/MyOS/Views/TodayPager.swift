@@ -7,7 +7,7 @@ import SwiftUI
 /// view. "Simultaneous" is literal — an angled flick scrolled the page *and*
 /// flipped the day, and because the day change swapped every card inside the
 /// same scroll view while keeping the same offset, you also landed somewhere
-/// you had not scrolled to. That is the wobble.
+/// you had not scrolled to.
 ///
 /// A paged `TabView` hands the conflict to UIKit, which resolves it the way
 /// every Apple app does: the first few points of the drag decide the axis and
@@ -15,9 +15,12 @@ import SwiftUI
 /// `ScrollView`, a day change cannot move your scroll position — each day
 /// simply remembers where it was.
 ///
-/// Pages are cheap: only the current page and its two neighbours build a real
-/// `TodayView`, so swiping never waits on a build, and the ~100 pages you are
-/// not looking at cost one `Color.clear` each.
+/// **Everything here is about not doing work mid-swipe.** UIKit asks for the
+/// neighbouring page the instant a drag begins, so anything expensive in a
+/// page's first render is felt as the page turn hesitating. Hence: the day list
+/// is built once and kept (deriving it per render meant 128 date conversions a
+/// pass), a page you have already visited is never torn back down, and pages
+/// you have not been near cost one `Color.clear` each.
 struct TodayPager: View {
     @EnvironmentObject var state: AppState
     var go: (NavTab) -> Void
@@ -27,14 +30,20 @@ struct TodayPager: View {
     private static let backDays = 120
 
     @State private var day = AppState.dateKey(Date())
+    @State private var days: [String] = []
+    /// Index of every day, so finding the current page is a lookup rather than
+    /// a scan of the whole window on each render.
+    @State private var index: [String: Int] = [:]
+    /// Pages that have been built. Kept built: rebuilding a day you are swiping
+    /// back to is the one hitch a pager can least afford.
+    @State private var visited: Set<String> = []
 
     var body: some View {
-        let days = self.days
-        let current = days.firstIndex(of: day) ?? Self.backDays
+        let current = index[day] ?? Self.backDays
 
         TabView(selection: $day) {
-            ForEach(Array(days.enumerated()), id: \.element) { index, date in
-                page(date, live: abs(index - current) <= 1)
+            ForEach(days, id: \.self) { date in
+                page(date, live: abs((index[date] ?? 0) - current) <= 1 || visited.contains(date))
                     .tag(date)
             }
         }
@@ -44,19 +53,33 @@ struct TodayPager: View {
         // the page failing to draw rather than as polish.
         .environment(\.knEntrances, false)
         .background(Palette.bg.ignoresSafeArea())
-        // The day list is anchored to "today", so it has to move when midnight
+        .onAppear(perform: rebuildWindow)
+        // The window is anchored to "today", so it has to move when midnight
         // does — otherwise the page you are on quietly becomes yesterday's.
-        .onChange(of: state.todayKey) { _, today in
-            // `self.days`, not the `days` captured above — that one is still
-            // anchored to yesterday at the moment this fires.
-            if !self.days.contains(day) { day = today }
+        .onChange(of: state.todayKey) { _, _ in rebuildWindow() }
+        .onChange(of: day) { _, now in
+            visited.insert(now)
+            trimVisited(around: now)
         }
     }
 
     /// today − backDays … today + DayPaging.maxForwardDays.
-    private var days: [String] {
+    private func rebuildWindow() {
         let today = state.todayKey
-        return (-Self.backDays...DayPaging.maxForwardDays).map { AppState.addDays($0, to: today) }
+        let window = (-Self.backDays...DayPaging.maxForwardDays).map { AppState.addDays($0, to: today) }
+        guard window != days else { return }
+        days = window
+        index = Dictionary(uniqueKeysWithValues: window.enumerated().map { ($0.element, $0.offset) })
+        if index[day] == nil { day = today }
+        visited.insert(day)
+    }
+
+    /// Keeping every page you ever opened would grow without bound over a long
+    /// session; a fortnight either side covers any realistic back-and-forth.
+    private func trimVisited(around date: String) {
+        guard let here = index[date], visited.count > 32 else { return }
+        visited = visited.filter { abs((index[$0] ?? 0) - here) <= 14 }
+        visited.insert(date)
     }
 
     @ViewBuilder
