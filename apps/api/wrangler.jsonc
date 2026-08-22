@@ -19,5 +19,8 @@
       "binding": "MEDIA",
       "bucket_name": "myos-media"
     }
-  ]
+  ],
+  // Deepgram Aura synthesises Catrine's voice. Free within the 10,000
+  // neuron/day allowance; src/lib/server/voiceBudget.ts caps it below that.
+  "ai": { "binding": "AI" }
 }
