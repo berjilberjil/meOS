@@ -402,6 +402,16 @@ final class APIClient {
         let mode: String
         let context: String
     }
+    // MARK: - Voice
+
+    /// Synthesise ONE sentence. Throws `APIError(status: 429)` when today's free
+    /// allowance is spent — the caller treats that as "use the on-device voice",
+    /// not as a failure.
+    func speak(text: String, speaker: String) async throws -> Data {
+        let body = try JSONSerialization.data(withJSONObject: ["text": text, "speaker": speaker])
+        return try await requestData("POST", "api/voice/speak", bodyData: body, using: aiSession)
+    }
+
     struct ChatTurn: Encodable { let role: String; let content: String }
     struct AgentInfo: Encodable { let name: String; let tone: String; let custom: String }
 
