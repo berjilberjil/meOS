@@ -61,11 +61,15 @@ install_ios() {
   # `generic/platform=iOS` skips all of that, and the app lands on the phone as
   # "Not Verified" in Settings > VPN & Device Management. Generic is only a
   # fallback so that a phone which is away costs you the install, not the build.
-  local dest="generic/platform=iOS"
-  if device_present; then
-    dest="id=$DEVICE"
-  else
-    print "    phone away — building generic; it may need a manual Verify on the phone"
+  # Wait for the phone BEFORE building, not after. A generic build installs
+  # fine and then sits on the phone as "Not Verified", so waiting to build the
+  # right thing beats building the wrong thing quickly.
+  local dest="id=$DEVICE"
+  if ! device_present; then
+    wait_for_device || {
+      dest="generic/platform=iOS"
+      print "    building generic — the app WILL need a manual Verify on the phone"
+    }
   fi
   xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Release \
              -destination "$dest" -derivedDataPath build \
@@ -88,8 +92,26 @@ ios_profile_expiry() {
   rm -f "$plist"
 }
 
+# The phone only has to be on the same LAN — the install goes over the local
+# network, so a Wi-Fi with no internet is still fine for this.
+wait_for_device() {
+  (( WAIT_MINS == 0 )) && return 1
+  print "    waiting up to ${WAIT_MINS}m for the phone to join this Wi-Fi…"
+  local deadline=$(( $(date +%s) + WAIT_MINS * 60 ))
+  while (( $(date +%s) < deadline )); do
+    if device_present; then print "    phone is here"; return 0; fi
+    sleep 10
+  done
+  return 1
+}
+
 device_present() {
-  xcrun devicectl list devices 2>/dev/null | grep -q "$DEVICE.*available"
+  # "unavailable" contains "available", so matching the word is not enough —
+  # this check claimed the phone was there every time it was not, and the build
+  # then failed on a destination that could not be resolved.
+  local line
+  line=$(xcrun devicectl list devices 2>/dev/null | grep "$DEVICE" || true)
+  [[ -n "$line" && "$line" != *unavailable* ]]
 }
 
 # Says which of the three things is wrong, instead of "unavailable".
