@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import PhotosUI
+#endif
 
 // Reusable editor blocks shared by the primary tabs and Settings, so a value
 // edited in either place writes the same underlying state and stays in sync.
@@ -86,6 +89,10 @@ struct FitnessProfileEditor: View {
 /// of inputs. Every field and binding is unchanged.
 struct PersonDetailsEditor: View {
     @EnvironmentObject var state: AppState
+    #if os(iOS)
+    @State private var picking = false
+    @State private var picked: PhotosPickerItem?
+    #endif
 
     var body: some View {
         SettingsPage {
@@ -114,19 +121,34 @@ struct PersonDetailsEditor: View {
                     text: about)
             }
         }
+        #if os(iOS)
+        .photosPicker(isPresented: $picking, selection: $picked, matching: .images)
+        .onChange(of: picked) { _, item in Task { await usePicked(item) } }
+        #endif
     }
+
+    #if os(iOS)
+    /// Downscaled to 320px before it goes anywhere: the profile rides inside the
+    /// synced state blob, and a full camera frame in there would be felt on
+    /// every sync, not just this screen.
+    private func usePicked(_ item: PhotosPickerItem?) async {
+        guard let item else { return }
+        defer { picked = nil }
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let small = MediaJPEG.downscale(data, maxSide: 320, quality: 0.8)
+        else { return }
+        state.updateProfile { $0.photoBase64 = small.base64EncodedString() }
+        Haptics.success()
+    }
+    #endif
+
+    private var hasPhoto: Bool { !state.profile.photoBase64.isEmpty }
 
     // MARK: Who you are
 
     private var identity: some View {
         HStack(spacing: 16) {
-            ZStack {
-                Circle().fill(Palette.teal.opacity(0.18))
-                Text(initials)
-                    .font(.system(size: 23, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Palette.teal)
-            }
-            .frame(width: 64, height: 64)
+            avatarButton
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayName)
@@ -151,6 +173,55 @@ struct PersonDetailsEditor: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 4)
+    }
+
+    /// Tap to set a photo. Once there is one, tapping offers to replace or
+    /// remove it — a photo you cannot get rid of is a trap.
+    @ViewBuilder
+    private var avatarButton: some View {
+        #if os(iOS)
+        if hasPhoto {
+            Menu {
+                Button { picking = true } label: { Label("Change photo", systemImage: "photo") }
+                Button(role: .destructive) {
+                    state.updateProfile { $0.photoBase64 = "" }
+                } label: { Label("Remove photo", systemImage: "trash") }
+            } label: { avatar }
+        } else {
+            Button { picking = true } label: { avatar }
+                .buttonStyle(KPressStyle())
+        }
+        #else
+        avatar
+        #endif
+    }
+
+    private var avatar: some View {
+        ZStack {
+            Circle().fill(Palette.teal.opacity(0.18))
+            if let photo = MediaJPEG.image(fromBase64: state.profile.photoBase64) {
+                photo.resizable().scaledToFill()
+            } else {
+                Text(initials)
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Palette.teal)
+            }
+        }
+        .frame(width: 64, height: 64)
+        .clipShape(Circle())
+        #if os(iOS)
+        .overlay(alignment: .bottomTrailing) {
+            // Without this the avatar looks like decoration rather than a control.
+            Image(systemName: "camera.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Palette.text)
+                .frame(width: 22, height: 22)
+                .background(Palette.surface2, in: Circle())
+                .overlay(Circle().strokeBorder(Palette.bg, lineWidth: 2))
+                .offset(x: 2, y: 2)
+        }
+        .accessibilityLabel(hasPhoto ? "Change profile photo" : "Add a profile photo")
+        #endif
     }
 
     private var hasName: Bool { !state.profile.name.trimmingCharacters(in: .whitespaces).isEmpty }

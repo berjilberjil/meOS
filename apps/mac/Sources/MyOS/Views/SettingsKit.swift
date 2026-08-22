@@ -280,3 +280,23 @@ struct SettingsNotice: View {
             .strokeBorder(tint.opacity(0.28), lineWidth: 1))
     }
 }
+
+/// Reports how tall a sheet's content actually is, so the sheet can be that
+/// tall instead of always taking the whole screen.
+struct SheetContentHeight: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+extension View {
+    /// Measures this view and publishes its height as `SheetContentHeight`.
+    func measuringSheetHeight() -> some View {
+        background(
+            GeometryReader { geo in
+                Color.clear.preference(key: SheetContentHeight.self, value: geo.size.height)
+            }
+        )
+    }
+}

@@ -8,6 +8,9 @@ import SwiftUI
 struct TodayReorderEditor: View {
     @State private var sections: [TodaySection] = TodaySection.ordered()
 
+    /// Row height plus its separator — the list frame is derived from this.
+    private static let rowHeight: CGFloat = 53
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Drag to reorder the Today page.")
@@ -23,7 +26,7 @@ struct TodayReorderEditor: View {
                             .foregroundStyle(Palette.text)
                         Spacer(minLength: 0)
                     }
-                    .frame(height: 52)
+                    .frame(height: Self.rowHeight - 1)
                     .listRowBackground(Palette.surface)
                     .listRowSeparatorTint(Palette.border.opacity(0.7))
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -39,6 +42,10 @@ struct TodayReorderEditor: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .environment(\.editMode, .constant(.active))
+            // A List is greedy, which would make this sheet full height whatever
+            // is in it. Asking for exactly the rows lets the sheet be the size of
+            // the list — capped, so a longer list scrolls instead of overflowing.
+            .frame(height: min(CGFloat(sections.count) * Self.rowHeight, 520))
         }
     }
 }

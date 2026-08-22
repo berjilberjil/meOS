@@ -9,6 +9,10 @@ struct SettingsView: View {
     @ObservedObject private var themeStore = ThemeStore.shared
     @AppStorage(BiometricLock.key) private var faceIDEnabled = false
     @State private var page: Page?
+    /// How tall the open sub-page's content is. A screen with two theme
+    /// previews on it has no business covering the whole display, so the sheet
+    /// is only as tall as what it contains — see `detents`.
+    @State private var sheetHeight: CGFloat = 0
 
     /// Icon tile, and the divider inset that lines up with the text beside it.
     private let tile: CGFloat = 34
@@ -78,6 +82,7 @@ struct SettingsView: View {
         .presentationDragIndicator(.visible)
         .animation(.knTheme, value: themeStore.theme.id)
         .sheet(item: $page) { p in editorSheet(p) }
+        .onChange(of: page) { _, now in if now == nil { sheetHeight = 0 } }
     }
 
     private var groups: some View {
@@ -229,6 +234,7 @@ struct SettingsView: View {
                             }
                         }
                         .padding(.horizontal, 16).padding(.vertical, 20)
+                        .measuringSheetHeight()
                     }
                     .scrollIndicators(.hidden)
                     // Age and the API key use the number pad / no return key, so
@@ -248,7 +254,28 @@ struct SettingsView: View {
         }
         .preferredColorScheme(themeStore.theme.colorScheme)
         .animation(.knTheme, value: themeStore.theme.id)
-        .presentationDetents([.large])
+        .onPreferenceChange(SheetContentHeight.self) { h in
+            guard h > 0 else { return }
+            sheetHeight = min(h + Self.sheetChrome, Self.sheetCap)
+        }
+        .presentationDetents(detents)
+        .presentationDragIndicator(.visible)
+        // Scrolling a short page should not drag the sheet taller.
+        .presentationContentInteraction(.scrolls)
         .presentationBackground(Palette.bg)
+    }
+
+    /// Nav bar + the sheet's own top inset + the home indicator. Measured
+    /// content is only the content.
+    private static let sheetChrome: CGFloat = 112
+    private static var sheetCap: CGFloat { UIScreen.main.bounds.height * 0.92 }
+
+    /// Content height as the resting detent, with `.large` still available so a
+    /// page you want more room on can be dragged up. A page that already needs
+    /// the full screen just gets `.large` — offering both would be one detent
+    /// pretending to be two.
+    private var detents: Set<PresentationDetent> {
+        guard sheetHeight > 0, sheetHeight < Self.sheetCap - 1 else { return [.large] }
+        return [.height(sheetHeight), .large]
     }
 }
