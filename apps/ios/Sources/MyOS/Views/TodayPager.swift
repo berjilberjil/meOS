@@ -39,6 +39,10 @@ struct TodayPager: View {
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+        // Turning the page is not arriving on a screen. Without this every card
+        // on the incoming day fades up from zero as it slides in, which reads as
+        // the page failing to draw rather than as polish.
+        .environment(\.knEntrances, false)
         .background(Palette.bg.ignoresSafeArea())
         // The day list is anchored to "today", so it has to move when midnight
         // does — otherwise the page you are on quietly becomes yesterday's.

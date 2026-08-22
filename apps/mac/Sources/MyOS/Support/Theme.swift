@@ -533,11 +533,24 @@ extension View {
 /// a staggered fade is the same wobble measured in opacity.
 struct RiseIn: ViewModifier {
     var index: Int = 0
+    @Environment(\.knEntrances) private var entrances
     @State private var shown = false
     func body(content: Content) -> some View {
         content
-            .opacity(shown ? 1 : 0)
-            .onAppear { withAnimation(.knEntrance) { shown = true } }
+            .opacity(entrances ? (shown ? 1 : 0) : 1)
+            .onAppear { if entrances { withAnimation(.knEntrance) { shown = true } } }
+    }
+}
+
+private struct KnEntrancesKey: EnvironmentKey { static let defaultValue = true }
+
+extension EnvironmentValues {
+    /// False where blocks are not *arriving*. A paged day is the case that
+    /// matters: turning the page is not an entrance, so fading nine cards up
+    /// from zero every time you swipe reads as the page failing to draw.
+    var knEntrances: Bool {
+        get { self[KnEntrancesKey.self] }
+        set { self[KnEntrancesKey.self] = newValue }
     }
 }
 

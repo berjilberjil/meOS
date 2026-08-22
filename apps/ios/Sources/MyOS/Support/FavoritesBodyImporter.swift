@@ -7,7 +7,14 @@ import UIKit
 /// Every hearted shot is imported — multiple photos per day all show.
 @MainActor
 enum FavoritesBodyImporter {
+    /// Guarded because `fetchFavorites()` is a main-actor PHAsset fetch: two
+    /// overlapping calls are two library scans blocking the same thread.
+    private static var running = false
+
     static func sync() async {
+        guard !running else { return }
+        running = true
+        defer { running = false }
         FavoritesWatcher.shared.start()
         let ok = await requestAccess()
         guard ok else { return }

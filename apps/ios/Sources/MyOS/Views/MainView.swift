@@ -56,23 +56,28 @@ struct MainView: View {
         .animation(.knTheme, value: themeStore.theme.id)
         .preferredColorScheme(themeStore.theme.colorScheme)
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .task {
-            await FavoritesBodyImporter.sync()
-            await HealthSteps.syncToday(into: state)
-            await state.drainShareInbox()
-        }
+        // Every heavy import lives here, not in the cards. Today is paged by
+        // day, so a card-level `.task` runs once per live page — i.e. three
+        // times, and again on every swipe.
+        .task { await refreshFeeds() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task {
                     await state.pullRemote()
-                    await FavoritesBodyImporter.sync()
-                    await HealthSteps.syncToday(into: state)
-                    // After the pull, so a video shared while the app was away
-                    // is appended to fresh state rather than a stale copy.
-                    await state.drainShareInbox()
+                    await refreshFeeds()
                 }
             }
         }
+    }
+
+    /// Photos, steps and anything shared in from outside. `drainShareInbox`
+    /// runs last so a video shared while the app was away is appended to fresh
+    /// state rather than a stale copy.
+    private func refreshFeeds() async {
+        await FavoritesBodyImporter.sync()
+        await ProgressPhotoSync.syncAll()
+        await HealthSteps.syncRecent(into: state)
+        await state.drainShareInbox()
     }
 
     @ViewBuilder

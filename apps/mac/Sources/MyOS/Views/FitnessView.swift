@@ -450,9 +450,10 @@ struct ActivityStepsCard: View {
                 }
             }
         }
-        #if os(iOS)
-        .task { await HealthSteps.syncRecent(into: state) }
-        #endif
+        // No `.task` here on purpose. This card is on the Today page, which is
+        // paged by day — so a per-card task means seven serial main-actor
+        // CoreMotion queries per live page, fired while you are mid-swipe.
+        // `MainView` runs the backfill once at launch and once per foreground.
     }
 
     // MARK: Today

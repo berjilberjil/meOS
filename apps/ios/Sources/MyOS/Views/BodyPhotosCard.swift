@@ -40,7 +40,14 @@ struct BodyPhotosCard: View {
                 dayStrip
             }
         }
-        .task { await reload() }
+        // Reads the store and nothing else. Importing from Favorites and the
+        // cloud sync used to run from here, which on the paged Today screen
+        // meant a main-actor PHAsset fetch per day page, during the swipe.
+        // `MainView` owns both now.
+        .task {
+            photos = ProgressPhotoStore.list()
+            if photos.isEmpty { status = "Heart today’s photo in Favorites, or tap + to add one." }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .progressPhotosDidChange)) { _ in
             photos = ProgressPhotoStore.list()
         }
@@ -105,7 +112,7 @@ struct BodyPhotosCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
+                    LazyHStack(spacing: 12) {
                         ForEach(stripPhotos) { p in thumb(p) }
                     }
                     .padding(.vertical, 2)
@@ -119,15 +126,11 @@ struct BodyPhotosCard: View {
         Button { viewing = p } label: {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 6) {
-                    if let ui = UIImage(contentsOfFile: p.url.path) {
-                        Image(uiImage: ui).resizable().scaledToFill()
-                            .frame(width: 132, height: 176)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                    } else {
+                    ThumbImage(url: p.url, key: p.id, width: 132, height: 176) {
                         RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .fill(Palette.surface2).frame(width: 132, height: 176)
+                            .fill(Palette.surface2)
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     Text(Fmt.day(p.date)).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.faint)
                 }
                 if !ProgressPhotoStore.isSynced(p.id) {
@@ -141,14 +144,6 @@ struct BodyPhotosCard: View {
             }
         }
         .buttonStyle(KPressStyle())
-    }
-
-    private func reload() async {
-        await FavoritesBodyImporter.sync()
-        photos = ProgressPhotoStore.list()
-        if photos.isEmpty { status = "Heart today’s photo in Favorites, or tap + to add one." }
-        await ProgressPhotoSync.syncAll()
-        photos = ProgressPhotoStore.list()
     }
 
     private func addPicked(_ item: PhotosPickerItem?) async {

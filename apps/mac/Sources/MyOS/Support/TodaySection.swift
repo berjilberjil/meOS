@@ -57,7 +57,20 @@ enum TodaySection: String, CaseIterable, Identifiable {
 
     static let storageKey = "today.sectionOrder"
 
+    /// Decoded once. `ordered()` is called from `TodayView.body`, which SwiftUI
+    /// re-runs on every state change — and with Today paged by day there are
+    /// three of those on screen at once. A UserDefaults read plus a JSON decode
+    /// per pass is work happening exactly while a finger is moving.
+    private static var cachedOrder: [TodaySection]?
+
     static func ordered() -> [TodaySection] {
+        if let cachedOrder { return cachedOrder }
+        let result = decodeOrder()
+        cachedOrder = result
+        return result
+    }
+
+    private static func decodeOrder() -> [TodaySection] {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let ids = try? JSONDecoder().decode([String].self, from: data) else {
             return defaultOrder
@@ -70,6 +83,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
     }
 
     static func save(_ sections: [TodaySection]) {
+        cachedOrder = sections.filter(\.available)
         let ids = sections.map(\.rawValue)
         if let data = try? JSONEncoder().encode(ids) {
             UserDefaults.standard.set(data, forKey: storageKey)
