@@ -56,14 +56,40 @@ install_ios() {
   banner "iPhone: build"
   cd "$ROOT/apps/ios"
   xcodegen generate >/dev/null
-  # `generic/platform=iOS` builds a device slice without a device attached, so a
-  # phone that is off the network costs you the install, not the build.
+  # Build AT the device whenever it is reachable. Targeting the real device is
+  # what lets automatic signing register it and settle the trust handshake;
+  # `generic/platform=iOS` skips all of that, and the app lands on the phone as
+  # "Not Verified" in Settings > VPN & Device Management. Generic is only a
+  # fallback so that a phone which is away costs you the install, not the build.
+  local dest="generic/platform=iOS"
+  if device_present; then
+    dest="id=$DEVICE"
+  else
+    print "    phone away — building generic; it may need a manual Verify on the phone"
+  fi
   xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Release \
-             -destination "generic/platform=iOS" -derivedDataPath build \
+             -destination "$dest" -derivedDataPath build \
              -allowProvisioningUpdates build >/dev/null
 
   banner "iPhone: install"
   ios_install_waiting
+  ios_profile_expiry
+}
+
+# This is a free personal team, so the profile lasts 7 days and the app simply
+# stops launching when it lapses. Better to see the date than to be surprised.
+ios_profile_expiry() {
+  local plist=/tmp/myos-profile.plist
+  security cms -D -i build/Build/Products/Release-iphoneos/MyOS.app/embedded.mobileprovision \
+    >"$plist" 2>/dev/null || return 0
+  local exp
+  exp=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$plist" 2>/dev/null || true)
+  [[ -n "$exp" ]] && print "    signing profile good until: $exp"
+  rm -f "$plist"
+}
+
+device_present() {
+  xcrun devicectl list devices 2>/dev/null | grep -q "$DEVICE.*available"
 }
 
 # Says which of the three things is wrong, instead of "unavailable".
