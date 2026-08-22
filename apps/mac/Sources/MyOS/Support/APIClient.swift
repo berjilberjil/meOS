@@ -21,6 +21,23 @@ final class APIClient {
         return URL(string: "https://myos-api.berjiljacob.workers.dev")!
     }
 
+    /// Join a relative API path onto `baseURL`. `appendingPathComponent` treats
+    /// the whole string as one path component, so it escapes a `?` to `%3F` —
+    /// which sent `api/event-media?ids=…` to a path that does not exist. The 404
+    /// blacklisted the media, and every event photo that had moved to R2 stayed a
+    /// grey box on any device that had not uploaded it itself. The query is split
+    /// off and set as a query, so a path still gets escaped and a query does not.
+    static func url(for path: String) -> URL {
+        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let base = baseURL.appendingPathComponent(String(parts[0]))
+        guard parts.count > 1, !parts[1].isEmpty,
+              var c = URLComponents(url: base, resolvingAgainstBaseURL: false) else { return base }
+        // Callers percent-encode their own values; encoding again would turn a
+        // `%20` into `%2520`.
+        c.percentEncodedQuery = String(parts[1])
+        return c.url ?? base
+    }
+
     private let session: URLSession
     /// AI calls (parse / vision / advice) can take longer than a state read —
     /// Gemini vision on a screenshot, or the weekly reasoning model. Give them room.
@@ -55,7 +72,7 @@ final class APIClient {
     @discardableResult
     private func request(_ method: String, _ path: String, body: Encodable? = nil,
                          using session: URLSession? = nil) async throws -> Data {
-        var req = URLRequest(url: Self.baseURL.appendingPathComponent(path))
+        var req = URLRequest(url: Self.url(for: path))
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body {
@@ -81,7 +98,7 @@ final class APIClient {
     @discardableResult
     private func requestData(_ method: String, _ path: String, bodyData: Data?,
                              using session: URLSession? = nil) async throws -> Data {
-        var req = URLRequest(url: Self.baseURL.appendingPathComponent(path))
+        var req = URLRequest(url: Self.url(for: path))
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         if let bodyData {
@@ -141,7 +158,7 @@ final class APIClient {
     /// on every device, so re-downloading megabytes to be told "nothing changed"
     /// is what put the project over its egress quota.
     func fetchStateIfChanged() async throws -> [String: Any]? {
-        var req = URLRequest(url: Self.baseURL.appendingPathComponent("api/state"))
+        var req = URLRequest(url: Self.url(for: "api/state"))
         req.httpMethod = "GET"
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         if let stateETag { req.setValue(stateETag, forHTTPHeaderField: "If-None-Match") }

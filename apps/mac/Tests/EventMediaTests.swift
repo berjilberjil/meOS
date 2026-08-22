@@ -53,3 +53,35 @@ final class EventMediaCodingTests: XCTestCase {
         XCTAssertFalse(EventMedia(kind: .image).needsMigration)
     }
 }
+
+/// Every API call goes through one URL join. `appendingPathComponent` treats the
+/// whole string as a path component, so it percent-escapes a `?` — which silently
+/// turned the one call that carries a query, `signEventMedia`, into a request for
+/// a path that does not exist. The 404 blacklisted the media, and every event
+/// photo that had moved to R2 rendered as a grey box on any device that had not
+/// uploaded it itself.
+final class APIURLJoinTests: XCTestCase {
+    func testQueryStringSurvivesTheJoin() {
+        let u = APIClient.url(for: "api/event-media?ids=abc-123,def-456")
+        XCTAssertEqual(u.path, "/api/event-media")
+        XCTAssertEqual(u.query, "ids=abc-123,def-456")
+        XCTAssertFalse(u.absoluteString.contains("%3F"))
+    }
+
+    func testPlainPathIsUnchanged() {
+        XCTAssertEqual(APIClient.url(for: "api/me").path, "/api/me")
+        XCTAssertNil(APIClient.url(for: "api/me").query)
+    }
+
+    /// The caller already percent-encodes the value, so the join must not encode
+    /// it a second time and turn `%20` into `%2520`.
+    func testAlreadyEncodedQueryIsNotDoubleEncoded() {
+        let u = APIClient.url(for: "api/event-media?ids=a%20b")
+        XCTAssertEqual(u.query, "ids=a%20b")
+    }
+
+    /// A path component that itself needs escaping still gets it.
+    func testPathComponentIsStillEscaped() {
+        XCTAssertFalse(APIClient.url(for: "api/event-media/a b").absoluteString.contains(" "))
+    }
+}
