@@ -20,10 +20,19 @@ import { reserveVoiceChars } from '$lib/server/voiceBudget';
 /** One sentence. Longer than this means the client failed to chunk. */
 const MAX_TEXT = 400;
 
-/** Aura's speakers. Catrine defaults to `athena`. */
+/**
+ * Aura-2's speakers, verbatim from the model schema. Note this is NOT Aura-1's
+ * list — `angus`, `perseus`, `helios` and `stella` do not exist here, and
+ * passing one would fail synthesis and silently drop Catrine to the fallback
+ * voice. Catrine defaults to `athena`.
+ */
 const SPEAKERS = new Set([
-  'angus', 'asteria', 'arcas', 'orion', 'orpheus',
-  'athena', 'luna', 'zeus', 'perseus', 'helios', 'hera', 'stella'
+  'amalthea', 'andromeda', 'apollo', 'arcas', 'aries', 'asteria', 'athena',
+  'atlas', 'aurora', 'callista', 'cora', 'cordelia', 'delia', 'draco',
+  'electra', 'harmonia', 'helena', 'hera', 'hermes', 'hyperion', 'iris',
+  'janus', 'juno', 'jupiter', 'luna', 'mars', 'minerva', 'neptune',
+  'odysseus', 'ophelia', 'orion', 'orpheus', 'pandora', 'phoebe', 'pluto',
+  'saturn', 'thalia', 'theia', 'vesta', 'zeus'
 ]);
 
 /** The Workers AI binding, cast at the call site the way `hooks.server.ts` casts DB. */
