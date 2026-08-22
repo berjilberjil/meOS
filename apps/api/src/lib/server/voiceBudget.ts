@@ -1,3 +1,5 @@
+import { nowISO, sql } from './db';
+
 /**
  * The hard stop that keeps voice free.
  *
@@ -30,4 +32,59 @@ export function budgetDecision(
   const left = Math.max(0, cap - used);
   if (request > left) return { allowed: false, remaining: left };
   return { allowed: true, remaining: left - request };
+}
+
+
+// One idempotent DDL per server process, mirroring `ensureAiTable` in ai.ts —
+// so a fresh local D1 works without a manual migration step.
+let ensured: Promise<void> | null = null;
+function ensureVoiceTable(): Promise<void> {
+  if (!ensured) {
+    ensured = (async () => {
+      await sql`
+        create table if not exists voice_budget (
+          user_id    integer not null,
+          day        text not null,
+          chars      integer not null default 0,
+          updated_at text not null,
+          primary key (user_id, day)
+        )`;
+    })().catch((e) => {
+      ensured = null; // let a later request retry
+      throw e;
+    });
+  }
+  return ensured;
+}
+
+/**
+ * Spend `chars` of today's allowance, or refuse.
+ *
+ * Read-then-write rather than a single atomic statement: this is a single-user
+ * app and the caller is one phone speaking one sentence at a time, so the race
+ * window is theoretical. The all-or-nothing rule in `budgetDecision` means the
+ * worst case of a lost update is a few hundred characters of overspend against
+ * a cap that already sits below the free allowance.
+ */
+export async function reserveVoiceChars(
+  userId: number,
+  chars: number
+): Promise<{ allowed: boolean; remaining: number }> {
+  await ensureVoiceTable();
+  const now = nowISO();
+  const day = utcDayKey(now);
+
+  const rows = await sql`
+    select chars from voice_budget where user_id = ${userId} and day = ${day}`;
+  const used = rows.length ? Number(rows[0].chars) : 0;
+
+  const decision = budgetDecision(used, chars);
+  if (!decision.allowed) return decision;
+
+  await sql`
+    insert into voice_budget (user_id, day, chars, updated_at)
+    values (${userId}, ${day}, ${used + chars}, ${now})
+    on conflict (user_id, day) do update set chars = excluded.chars, updated_at = excluded.updated_at`;
+
+  return decision;
 }

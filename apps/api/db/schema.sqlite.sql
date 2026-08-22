@@ -47,3 +47,11 @@ create table if not exists ai_credentials (
   updated_at text not null default (datetime('now'))
 );
 create index if not exists ai_credentials_user_idx on ai_credentials(user_id);
+
+create table if not exists voice_budget (
+  user_id    integer not null references users(id) on delete cascade,
+  day        text not null,
+  chars      integer not null default 0,
+  updated_at text not null,
+  primary key (user_id, day)
+);

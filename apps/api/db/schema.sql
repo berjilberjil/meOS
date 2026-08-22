@@ -44,3 +44,13 @@ create table if not exists ai_credentials (
   updated_at timestamptz not null default now()
 );
 create index if not exists ai_credentials_user_idx on ai_credentials(user_id);
+
+-- Characters of speech synthesised per user per UTC day. This is the hard stop
+-- that keeps voice free: the Worker refuses before reaching a billable neuron.
+create table if not exists voice_budget (
+  user_id    integer not null references users(id) on delete cascade,
+  day        text not null,          -- 'YYYY-MM-DD', UTC
+  chars      integer not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, day)
+);
