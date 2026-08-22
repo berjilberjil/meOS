@@ -7,8 +7,12 @@ import SwiftUI
 /// and bounded reasoning are identical whether he typed or spoke. Voice is an
 /// I/O change, not a brain change.
 struct VoiceCallView: View {
+    /// Called when he ends the call. The call is a screen INSIDE the chat
+    /// widget's cover, not its own presentation, so it cannot use `dismiss` —
+    /// that would tear down the whole widget instead of returning to the chat.
+    let onEnd: () -> Void
+
     @EnvironmentObject private var state: AppState
-    @Environment(\.dismiss) private var dismiss
     @StateObject private var listener = SpeechListener()
     @ObservedObject private var agent = AgentConfig.shared
 
@@ -106,7 +110,7 @@ struct VoiceCallView: View {
     }
 
     private var endButton: some View {
-        Button("End") { dismiss() }
+        Button("End") { onEnd() }
             .buttonStyle(KSecondaryButtonStyle())
             .knRise(3)
     }

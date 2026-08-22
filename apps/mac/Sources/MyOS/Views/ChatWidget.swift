@@ -20,12 +20,11 @@ struct ChatWidget: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var agent = AgentConfig.shared
     @ObservedObject private var themeStore = ThemeStore.shared
-    @State private var open = false
+    @State private var pres = ChatPresentation()
     @State private var showHistory = false
     @State private var draft = ""
     @State private var confirmClearChat = false
     @State private var pendingHistoryDelete: String?
-    @State private var showCall = false
     @FocusState private var inputFocused: Bool
 
     var body: some View { content }
@@ -33,10 +32,10 @@ struct ChatWidget: View {
     #if os(macOS)
     private var content: some View {
         ZStack(alignment: .bottomTrailing) {
-            if open { macPanel.transition(.move(edge: .bottom).combined(with: .opacity)) }
+            if pres.open { macPanel.transition(.move(edge: .bottom).combined(with: .opacity)) }
             else { launcher.transition(.scale.combined(with: .opacity)) }
         }
-        .animation(.knPop, value: open)
+        .animation(.knPop, value: pres.open)
         .onChange(of: state.pendingChatPrompt) { _, p in handlePending(p) }
     }
 
@@ -52,24 +51,29 @@ struct ChatWidget: View {
     private var content: some View {
         launcher
             .onChange(of: state.pendingChatPrompt) { _, p in handlePending(p) }
-            .fullScreenCover(isPresented: $open) {
-                panelBody
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Palette.bg.ignoresSafeArea())
-                    .preferredColorScheme(themeStore.theme.colorScheme)
-                    .animation(.knTheme, value: themeStore.theme.id)
-            }
-            .fullScreenCover(isPresented: $showCall) {
-                VoiceCallView()
-                    .environmentObject(state)
-                    .preferredColorScheme(themeStore.theme.colorScheme)
+            // ONE cover. Starting a call swaps its contents; a second
+            // `.fullScreenCover` on this same view would silently never open,
+            // because the button that triggers it lives inside this one.
+            .fullScreenCover(isPresented: $pres.open) {
+                Group {
+                    if pres.screen == .call {
+                        VoiceCallView(onEnd: { pres.endCall() })
+                            .environmentObject(state)
+                    } else {
+                        panelBody
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Palette.bg.ignoresSafeArea())
+                .preferredColorScheme(themeStore.theme.colorScheme)
+                .animation(.knTheme, value: themeStore.theme.id)
             }
     }
     #endif
 
     private func handlePending(_ p: String?) {
         guard let p, !p.isEmpty else { return }
-        open = true; showHistory = false
+        pres.openChat(); showHistory = false
         state.pendingChatPrompt = nil
         Task { await state.sendChat(p) }
     }
@@ -78,7 +82,7 @@ struct ChatWidget: View {
 
     private var launcher: some View {
         Button {
-            open = true
+            pres.openChat()
             showHistory = false
             inputFocused = true
             Task { await state.fetchSuggestions() }
@@ -142,7 +146,7 @@ struct ChatWidget: View {
             #if os(iOS)
             // Mac is deliberately excluded: hardened runtime + empty entitlements
             // means it cannot open the microphone. See the voice spec, Risks.
-            iconButton("phone.fill", help: "Talk") { showCall = true }
+            iconButton("phone.fill", help: "Talk") { pres.startCall() }
             #endif
             iconButton("clock.arrow.circlepath", help: "History") { showHistory.toggle() }
             iconButton("square.and.pencil", help: "New chat") {
@@ -155,7 +159,7 @@ struct ChatWidget: View {
                         state.clearChat()
                     }
             }
-            iconButton("xmark", help: "Close") { open = false; showHistory = false }
+            iconButton("xmark", help: "Close") { pres.close(); showHistory = false }
         }
         .padding(.horizontal, 14).padding(.vertical, 11)
     }
