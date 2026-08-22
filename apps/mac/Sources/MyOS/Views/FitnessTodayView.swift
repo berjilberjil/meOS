@@ -224,7 +224,10 @@ struct WorkoutChecklistCard: View {
     let edit: () -> Void
 
     private var date: String { day ?? state.todayKey }
-    private var plan: WorkoutDayPlan { state.workoutPlan(state.todayWeekday) }
+    /// The plan for **the day being shown**. This used to read
+    /// `state.todayWeekday` while `items` read the paged date, so swiping to
+    /// another day showed today's rest-day banner over that day's exercises.
+    private var plan: WorkoutDayPlan { state.workoutPlan(AppState.weekdayKey(date)) }
     private var dayLog: WorkoutDayLog { state.workoutDayLog(date) }
     private var items: [PlanExercise] { state.workoutItemsForDay(date) }
 
@@ -233,7 +236,11 @@ struct WorkoutChecklistCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 header
                 if plan.isRestDay && dayLog.state == .unconfirmed {
-                    Text("Rest day — recover well.").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    HStack(spacing: 8) {
+                        Image(systemName: "moon.zzz.fill").foregroundStyle(Palette.blue)
+                        Text("Rest day — no workout scheduled.")
+                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    }
                 } else {
                     switch dayLog.state {
                     case .unconfirmed: unconfirmedBody
@@ -591,35 +598,16 @@ private struct DraftExerciseRow: View {
     @Binding var item: PlanExercise
     let exercise: Exercise?
     let remove: () -> Void
-    @State private var showDelete = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            ExerciseIcon(category: exercise?.category ?? .core, size: 30)
-            Text(exercise?.name ?? "Exercise").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-            Spacer()
-            HStack(spacing: 6) {
-                qtyBtn("minus") { item.sets = max(1, item.sets - 1) }
-                Text("\(item.sets)").font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.text).frame(minWidth: 16)
-                qtyBtn("plus") { item.sets += 1 }
-                Text("×").font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
-                qtyBtn("minus") { item.reps = max(1, item.reps - 1) }
-                Text("\(item.reps)").font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.text).frame(minWidth: 18)
-                qtyBtn("plus") { item.reps += 1 }
-            }
-            Button { showDelete = true } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .bold)) }
-                .buttonStyle(KIconButtonStyle(size: 22))
-                .holdToDelete(isPresented: $showDelete, title: "Remove \(exercise?.name ?? "exercise")?",
-                              message: "Removes it from today's workout.", confirmLabel: "Hold to remove") { remove() }
-        }
-    }
-
-    private func qtyBtn(_ icon: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon).font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.text)
-                .frame(width: 22, height: 20)
-                .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
-        }
-        .buttonStyle(KPressStyle(scale: 0.9))
+        ExercisePlanRow(
+            name: exercise?.name ?? "Exercise",
+            subtitle: [exercise?.category.label, exercise?.primary].compactMap { $0 }
+                .filter { !$0.isEmpty }.joined(separator: " · "),
+            category: exercise?.category ?? .core,
+            sets: item.sets, reps: item.reps,
+            onSets: { item.sets = max(1, $0) },
+            onReps: { item.reps = max(1, $0) },
+            remove: remove)
     }
 }

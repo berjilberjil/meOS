@@ -38,6 +38,30 @@ struct AIProvidersCard: View {
                         AIKeyRow(store: store, key: key, boxed: false)
                     }
                 }
+            } else if !store.loaded {
+                SettingsGroup {
+                    HStack(spacing: 10) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading your keys…")
+                            .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, SettingsMetrics.rowPadH)
+                    .padding(.vertical, 14)
+                }
+            } else if store.loadError == nil {
+                SettingsGroup {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("No keys yet")
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("Add one above and Catherine runs on it. Until then everything uses the server default.")
+                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, SettingsMetrics.rowPadH)
+                    .padding(.vertical, 14)
+                }
             }
 
             SettingsGroup(title: "Route features to models",
@@ -241,6 +265,13 @@ private struct AIKeyRow: View {
 
     private var provider: AIProvider { AIProvider(rawValue: key.provider) ?? .gemini }
 
+    /// Says whether the key is actually usable, not just that it exists.
+    private var status: String {
+        if !key.enabled { return "\(key.masked)  ·  off" }
+        if key.models.isEmpty { return "\(key.masked)  ·  not checked yet" }
+        return "\(key.masked)  ·  \(key.models.count) models"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -250,9 +281,15 @@ private struct AIKeyRow: View {
                     .background(provider.accent.opacity(0.18), in: Capsule())
                     .foregroundStyle(provider.accent)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(key.label).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
-                        .lineLimit(1)
-                    Text("\(key.masked)  ·  \(key.models.count) models")
+                    HStack(spacing: 5) {
+                        if key.enabled && !key.models.isEmpty {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12)).foregroundStyle(Palette.green)
+                        }
+                        Text(key.label).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                            .lineLimit(1)
+                    }
+                    Text(status)
                         .font(.system(size: 12)).monospaced().foregroundStyle(Palette.faint)
                         .lineLimit(1)
                 }

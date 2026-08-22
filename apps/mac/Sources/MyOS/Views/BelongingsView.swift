@@ -103,10 +103,14 @@ struct BelongingsView: View {
                     heroStat("Year", BelongingINR.format(year), Palette.purple)
                     heroStat("Items", "\(live.count)", Palette.amber)
                 }
+                // Below the line: this is a setting the summary is measured
+                // against, not another number in the summary.
+                Rectangle().fill(Palette.border.opacity(0.7)).frame(height: 1)
+                    .padding(.top, 2)
                 HStack(spacing: 10) {
                     Text("Salary")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Palette.muted)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.faint)
                     TextField("40000", text: $salaryDraft)
                         .textFieldStyle(.plain)
                         .font(.system(size: 16, weight: .semibold)).monospacedDigit()
@@ -349,7 +353,7 @@ private struct BelongingEditor: View {
                             .labelsHidden().tint(selectedCat.color)
                     }
                     VStack(alignment: .leading, spacing: 6) {
-                        KFieldLabel(text: "Use it this long to call it paid off")
+                        KFieldLabel(text: "Payoff period")
                         Stepper("\(lifeMonths) months", value: $lifeMonths, in: 1...120)
                             .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
                     }

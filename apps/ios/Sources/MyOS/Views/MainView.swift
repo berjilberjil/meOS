@@ -38,7 +38,9 @@ struct MainView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    ChatWidget().padding(.trailing, 14).padding(.bottom, 14)
+                    ChatWidget()
+                        .padding(.trailing, ChatWidget.edgeInset)
+                        .padding(.bottom, ChatWidget.edgeInset)
                 }
                 .padding(.bottom, 72)
                 IOSTabBar(

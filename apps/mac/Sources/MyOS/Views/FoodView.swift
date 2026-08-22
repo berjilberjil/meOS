@@ -72,16 +72,17 @@ struct FoodLibrarySection: View {
 
     private func libRow(_ f: Food) -> some View {
         HStack(spacing: 11) {
-            FoodIcon(category: f.category, name: f.name, size: 40)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(f.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                Text("\(FoodServing.display(f.servingLabel)) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
-                    .font(.system(size: 13)).foregroundStyle(Palette.faint).lineLimit(1)
+            FoodIcon(category: f.category, name: f.name, size: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(f.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Text("\(FoodServing.display(f.servingLabel)) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g protein")
+                    .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 6)
-            if !f.isDefault { Text("CUSTOM").font(.system(size: 8, weight: .heavy)).foregroundStyle(Palette.brand) }
+            if !f.isDefault { Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint) }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
+        .frame(minHeight: 44)          // still a comfortable tap target
         .contentShape(Rectangle())
         .onTapGesture { editingFood = f }
     }
@@ -159,7 +160,7 @@ struct FoodPickerSheet: View {
                                 }
                                 Spacer()
                                 if !f.isDefault {
-                                    Text("CUSTOM").font(.system(size: 8, weight: .heavy)).foregroundStyle(Palette.brand)
+                                    Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint)
                                 }
                                 Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.brand)
                             }

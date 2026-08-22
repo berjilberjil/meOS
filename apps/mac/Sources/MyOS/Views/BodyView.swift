@@ -42,7 +42,9 @@ struct BodyView: View {
         VStack(alignment: .leading, spacing: 18) {
             Segmented(options: [("front", "Front"), ("back", "Back")], selection: $side).knRise(0)
             chips(a.groups, sel: selected?.id).knRise(1)
-            Card(padding: 12) {
+            // The figure is the point of this screen; it used to sit small in
+            // the middle of a tall card.
+            Card(padding: 10) {
                 BodyMapView(
                     bodyView: side == "front" ? a.front : a.back,
                     activeSlugs: Set(selected?.view == side ? (selected?.slugs ?? []) : []),
@@ -51,7 +53,7 @@ struct BodyView: View {
                         if let g = a.groups.first(where: { $0.view == side && $0.slugs.contains(slug) }) { selectedId = g.id }
                     }
                 )
-                .frame(height: 300).frame(maxWidth: .infinity)
+                .frame(height: 390).frame(maxWidth: .infinity)
             }.knRise(2)
             if let selected {
                 MuscleDetailCard(group: selected).knRise(3)
@@ -184,7 +186,10 @@ struct ActivationList: View {
                     HStack {
                         SectionTitle(text: "Best builders")
                         Spacer()
-                        Text("ranked by activation").font(.system(size: 10)).foregroundStyle(Palette.faint)
+                        // These come from a reference dataset, not from
+                        // anything measured on you — the caption says so rather
+                        // than letting "96%" imply a lab.
+                        Text("reference ranking").font(.system(size: 10)).foregroundStyle(Palette.faint)
                     }
                     ForEach(Array(rows.enumerated()), id: \.offset) { i, r in
                         Button { demo = r.ex } label: { row(i, r.ex, r.percent) }.buttonStyle(KPressStyle())

@@ -168,8 +168,8 @@ struct FitnessView: View {
                         .strokeBorder(weightFocused ? Palette.brand : Palette.border, lineWidth: 2))
                     Button("Log", action: saveWeight).buttonStyle(KPrimaryButtonStyle())
                         .disabled(Double(weightInput.trimmingCharacters(in: .whitespaces)) == nil)
-                    StepButton(icon: "minus", accent: Palette.blue) { bumpWeight(-0.5) }
-                    StepButton(icon: "plus", accent: Palette.blue) { bumpWeight(0.5) }
+                    KStepButton(icon: "minus", accent: Palette.blue) { bumpWeight(-0.5) }
+                    KStepButton(icon: "plus", accent: Palette.blue) { bumpWeight(0.5) }
                     Spacer()
                 }
                 recentWeightsInline
@@ -216,14 +216,21 @@ struct FitnessView: View {
         let vits = state.vitaminsCovered(state.todayKey)
         return Card {
             VStack(alignment: .leading, spacing: 14) {
-                SectionTitle(text: "Today's nutrition")
-                LazyVGrid(columns: cols, spacing: 12) {
-                    macroStat("Calories", eaten.calories, t.map { Double($0.goalCalories) }, "kcal", Palette.amber)
-                    macroStat("Protein", eaten.protein, t.map { Double($0.proteinG) }, "g", Palette.green)
-                    macroStat("Carbs", eaten.carbs, t.map { Double($0.carbG) }, "g", Palette.blue)
-                    macroStat("Fiber", eaten.fiber, 30, "g", Palette.purple)
-                    macroStat("Fats", eaten.fats, t.map { Double($0.fatG) }, "g", Palette.red)
-                    waterStat
+                // Rows, not a grid of cards inside a card. Same six numbers,
+                // same accent colours, roughly a third less visual weight —
+                // container-on-container was the noisiest thing in the app.
+                VStack(spacing: 0) {
+                    macroRow("Calories", eaten.calories, t.map { Double($0.goalCalories) }, "kcal", Palette.amber)
+                    macroDivider
+                    macroRow("Protein", eaten.protein, t.map { Double($0.proteinG) }, "g", Palette.green)
+                    macroDivider
+                    macroRow("Carbs", eaten.carbs, t.map { Double($0.carbG) }, "g", Palette.blue)
+                    macroDivider
+                    macroRow("Fiber", eaten.fiber, 30, "g", Palette.purple)
+                    macroDivider
+                    macroRow("Fats", eaten.fats, t.map { Double($0.fatG) }, "g", Palette.red)
+                    macroDivider
+                    waterRow
                 }
                 if !vits.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
@@ -241,39 +248,63 @@ struct FitnessView: View {
         }
     }
 
-    private func macroStat(_ label: String, _ have: Double, _ target: Double?, _ unit: String, _ tint: Color) -> some View {
-        Card(padding: 13) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text(label.uppercased()).font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6).foregroundStyle(Palette.faint)
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("\(Int(have.rounded()))").font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit().foregroundStyle(tint)
-                    Text(unit).font(.system(size: 10)).foregroundStyle(Palette.muted)
-                }
-                if let target, target > 0 {
-                    MeterBar(fraction: min(1, have / target), tint: tint, height: 6)
-                    Text("of \(Int(target)) \(unit)").font(.system(size: 9)).foregroundStyle(Palette.faint)
-                }
-            }
-        }
+    private var macroDivider: some View {
+        Rectangle().fill(Palette.border.opacity(0.7)).frame(height: 1)
     }
 
-    private var waterStat: some View {
-        let ml = today.waterMl ?? 0
-        let target = max(1, fp.waterTargetMl ?? 3000)   // a 0-L goal must not NaN the meter
-        return Card(padding: 13) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text("WATER").font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6).foregroundStyle(Palette.faint)
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(Fmt.trimKg(ml / 1000)).font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit().foregroundStyle(Palette.blue)
-                    Text("L").font(.system(size: 10)).foregroundStyle(Palette.muted)
-                }
-                MeterBar(fraction: min(1, ml / target), tint: Palette.blue, height: 6)
-                HStack(spacing: 6) {
-                    StepButton(icon: "minus", accent: Palette.blue) { state.updateFitness(state.todayKey) { $0.waterMl = max(0, ml - 250) } }
-                    StepButton(icon: "plus", accent: Palette.blue) { state.updateFitness(state.todayKey) { $0.waterMl = ml + 250 } }
+    /// Name on the left in its accent, the number on the right, the bar under
+    /// both. The accent stays on the label and the meter — it never becomes the
+    /// background of anything.
+    private func macroRow(_ label: String, _ have: Double, _ target: Double?, _ unit: String, _ tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(label.uppercased())
+                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .foregroundStyle(tint)
+                Spacer(minLength: 8)
+                Text("\(Int(have.rounded()))")
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .monospacedDigit().foregroundStyle(Palette.text)
+                if let target, target > 0 {
+                    Text("/ \(Int(target)) \(unit)").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                } else {
+                    Text(unit).font(.system(size: 12)).foregroundStyle(Palette.faint)
                 }
             }
+            if let target, target > 0 {
+                MeterBar(fraction: min(1, have / target), tint: tint, height: 5)
+            }
         }
+        .padding(.vertical, 11)
+    }
+
+    private var waterRow: some View {
+        let ml = today.waterMl ?? 0
+        let target = max(1, fp.waterTargetMl ?? 3000)   // a 0-L goal must not NaN the meter
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("WATER")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .foregroundStyle(Palette.blue)
+                Spacer(minLength: 8)
+                Text(Fmt.trimKg(ml / 1000))
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .monospacedDigit().foregroundStyle(Palette.text)
+                Text("/ \(Fmt.trimKg(target / 1000)) L").font(.system(size: 12)).foregroundStyle(Palette.faint)
+            }
+            MeterBar(fraction: min(1, ml / target), tint: Palette.blue, height: 5)
+            HStack(spacing: 6) {
+                KStepButton(icon: "minus", accent: Palette.blue) {
+                    state.updateFitness(state.todayKey) { $0.waterMl = max(0, ml - 250) }
+                }
+                KStepButton(icon: "plus", accent: Palette.blue) {
+                    state.updateFitness(state.todayKey) { $0.waterMl = ml + 250 }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 2)
+        }
+        .padding(.vertical, 11)
     }
 
     private var profileCard: some View {
@@ -375,8 +406,8 @@ struct FitnessView: View {
                     Text(note).font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.faint)
                 }
                 HStack(spacing: 8) {
-                    StepButton(icon: "minus", accent: accent) { set((value ?? 0) - step) }
-                    StepButton(icon: "plus", accent: accent) { set((value ?? 0) + step) }
+                    KStepButton(icon: "minus", accent: accent) { set((value ?? 0) - step) }
+                    KStepButton(icon: "plus", accent: accent) { set((value ?? 0) + step) }
                 }
             }
         }
@@ -565,10 +596,10 @@ struct ActivityStepsCard: View {
                 Text("steps").font(.system(size: 11)).foregroundStyle(Palette.muted)
                 Spacer(minLength: 0)
                 if !isFuture {
-                    StepButton(icon: "minus", accent: Palette.flame) {
+                    KStepButton(icon: "minus", accent: Palette.flame) {
                         state.setSteps(max(0, n - 500), on: selected)
                     }
-                    StepButton(icon: "plus", accent: Palette.flame) {
+                    KStepButton(icon: "plus", accent: Palette.flame) {
                         state.setSteps(n + 500, on: selected)
                     }
                 }
@@ -590,21 +621,3 @@ struct ActivityStepsCard: View {
 }
 
 /// A +/- stepper with hover + press feedback.
-private struct StepButton: View {
-    let icon: String
-    let accent: Color
-    let action: () -> Void
-    @State private var hover = false
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon).font(.system(size: 12, weight: .bold)).foregroundStyle(accent)
-                .frame(width: 34, height: 28)
-                .background(hover ? accent.opacity(0.14) : Palette.surface2,
-                            in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-        }
-        .buttonStyle(KPressStyle(scale: 0.92))
-        .onHover { h in hover = h; cursor(h) }
-        .animation(.knFast, value: hover)
-    }
-}

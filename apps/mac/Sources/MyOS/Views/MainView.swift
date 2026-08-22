@@ -59,7 +59,9 @@ struct MainView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Palette.bg.ignoresSafeArea())
             .overlay(alignment: .bottomTrailing) {
-                ChatWidget().padding(.trailing, 20).padding(.bottom, 28)
+                ChatWidget()
+                        .padding(.trailing, ChatWidget.edgeInset)
+                        .padding(.bottom, ChatWidget.edgeInset)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

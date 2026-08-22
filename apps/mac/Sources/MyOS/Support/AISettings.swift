@@ -86,7 +86,7 @@ final class AISettingsStore: ObservableObject {
             loaded = true
             loadError = nil
         } catch {
-            loadError = Self.msg(error)
+            loadError = Self.msg(error, .loading)
         }
     }
 
@@ -99,7 +99,7 @@ final class AISettingsStore: ObservableObject {
             keys.append(added)
             return true
         } catch {
-            actionError = Self.msg(error)
+            actionError = Self.msg(error, .checking)
             return false
         }
     }
@@ -123,7 +123,7 @@ final class AISettingsStore: ObservableObject {
             let models = try await api.aiCheckKey(id: key.id)
             if let i = keys.firstIndex(where: { $0.id == key.id }) { keys[i].models = models }
         } catch {
-            actionError = Self.msg(error)
+            actionError = Self.msg(error, .checking)
         }
     }
 
@@ -179,7 +179,40 @@ final class AISettingsStore: ObservableObject {
         }
     }
 
-    static func msg(_ error: Error) -> String {
-        (error as? APIError)?.message ?? error.localizedDescription
+    /// What the person was trying to do — so the message can say something
+    /// about *that* rather than about the failure's internals.
+    enum Doing {
+        case loading   // reading saved keys and routes back
+        case checking  // validating a key with its provider
+        case saving    // anything else this store writes
+    }
+
+    /// Turns an error into a sentence someone can act on.
+    ///
+    /// This used to end in `error.localizedDescription`, which for a
+    /// `DecodingError` is "The data couldn't be read because it isn't in the
+    /// correct format." That sentence sat in the middle of the AI keys setup
+    /// screen: it describes our JSON parser, tells the reader nothing they can
+    /// do, and reads like a crash. Framework prose never reaches the UI now.
+    static func msg(_ error: Error, _ doing: Doing = .saving) -> String {
+        // The server writes its messages for people — always prefer them.
+        if let api = error as? APIError, !api.message.isEmpty { return api.message }
+
+        if let url = error as? URLError {
+            switch url.code {
+            case .notConnectedToInternet, .dataNotAllowed:
+                return "No internet connection."
+            case .timedOut:
+                return "The server didn't respond. Try again."
+            default:
+                return "Couldn't reach MyOS. Check your connection."
+            }
+        }
+
+        switch doing {
+        case .loading:  return "Couldn't load your AI settings. Try again."
+        case .checking: return "Couldn't validate this key. Check the key and try again."
+        case .saving:   return "That didn't save. Try again."
+        }
     }
 }

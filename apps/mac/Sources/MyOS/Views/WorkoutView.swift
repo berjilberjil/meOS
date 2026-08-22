@@ -80,9 +80,10 @@ struct WorkoutLibrarySection: View {
             if ex.gifId != nil {
                 Image(systemName: "play.circle.fill").font(.system(size: 14)).foregroundStyle(Palette.blue)
             }
-            if !ex.isDefault { Text("CUSTOM").font(.system(size: 8, weight: .heavy)).foregroundStyle(Palette.brand) }
+            if !ex.isDefault { Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint) }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
+        .frame(minHeight: 44)          // still a comfortable tap target
         .contentShape(Rectangle())
         .onTapGesture { detail = ex }
     }
@@ -181,7 +182,7 @@ struct ExercisePickerSheet: View {
                                 if ex.gifId != nil {
                                     Image(systemName: "play.circle.fill").font(.system(size: 13)).foregroundStyle(Palette.blue)
                                 }
-                                if !ex.isDefault { Text("CUSTOM").font(.system(size: 8, weight: .heavy)).foregroundStyle(Palette.brand) }
+                                if !ex.isDefault { Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint) }
                                 Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.brand)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 7).contentShape(Rectangle())

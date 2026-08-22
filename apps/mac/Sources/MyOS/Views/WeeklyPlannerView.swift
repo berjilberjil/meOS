@@ -186,12 +186,18 @@ struct WeeklyPlannerView: View {
         let isRest = workoutPlan.isRestDay
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    SectionTitle(text: fullDayName)
-                    Spacer()
-                    Text(isRest ? "Rest day" : "Training")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isRest ? Palette.blue : Palette.muted)
+                // One statement about the day, not two. It used to print
+                // "Rest day" beside a Training toggle beside a list of
+                // exercises, and you had to work out which one was true.
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        SectionTitle(text: fullDayName)
+                        Text(isRest ? "Rest day" : muscleSummary)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(isRest ? Palette.blue : Palette.text)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
                     Toggle("Rest day", isOn: Binding(
                         get: { isRest },
                         set: { state.setRestDay(weekday, $0) }
@@ -203,7 +209,7 @@ struct WeeklyPlannerView: View {
                 if isRest {
                     HStack(spacing: 8) {
                         Image(systemName: "moon.zzz.fill").foregroundStyle(Palette.blue)
-                        Text("Rest day — recover.").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text("No workout scheduled.").font(.system(size: 13)).foregroundStyle(Palette.muted)
                     }
                     .padding(.vertical, 6)
                 } else {
@@ -212,13 +218,15 @@ struct WeeklyPlannerView: View {
                             .font(.system(size: 13)).foregroundStyle(Palette.faint)
                     }
                     ForEach(workoutPlan.items) { item in
-                        PlanExerciseRow(
-                            item: item,
-                            exercise: state.exercise(item.exerciseId),
-                            setsDec: { state.setPlanSets(weekday: weekday, itemId: item.id, sets: item.sets - 1) },
-                            setsInc: { state.setPlanSets(weekday: weekday, itemId: item.id, sets: item.sets + 1) },
-                            repsDec: { state.setPlanReps(weekday: weekday, itemId: item.id, reps: item.reps - 1) },
-                            repsInc: { state.setPlanReps(weekday: weekday, itemId: item.id, reps: item.reps + 1) },
+                        let ex = state.exercise(item.exerciseId)
+                        ExercisePlanRow(
+                            name: ex?.name ?? "Unknown",
+                            subtitle: [ex?.category.label, ex?.primary].compactMap { $0 }
+                                .filter { !$0.isEmpty }.joined(separator: " · "),
+                            category: ex?.category ?? .core,
+                            sets: item.sets, reps: item.reps,
+                            onSets: { state.setPlanSets(weekday: weekday, itemId: item.id, sets: $0) },
+                            onReps: { state.setPlanReps(weekday: weekday, itemId: item.id, reps: $0) },
                             remove: { state.removePlanExercise(weekday: weekday, itemId: item.id) })
                     }
                     Button { pickingExercise = true } label: { Label("Add exercise", systemImage: "plus.circle.fill") }
@@ -226,6 +234,17 @@ struct WeeklyPlannerView: View {
                 }
             }
         }
+    }
+
+    /// "Chest + Shoulders + Triceps" — what this day actually trains, from the
+    /// exercises on it. Empty list reads as a day still being built.
+    private var muscleSummary: String {
+        let muscles = workoutPlan.items
+            .compactMap { state.exercise($0.exerciseId)?.category.label }
+        var seen: [String] = []
+        for m in muscles where !seen.contains(m) { seen.append(m) }
+        if seen.isEmpty { return "Nothing planned yet" }
+        return seen.prefix(3).joined(separator: " + ")
     }
 
     private var fullDayName: String {
@@ -257,63 +276,3 @@ private struct PlanMealRow: View {
     }
 }
 
-private struct PlanExerciseRow: View {
-    let item: PlanExercise
-    let exercise: Exercise?
-    let setsDec: () -> Void
-    let setsInc: () -> Void
-    let repsDec: () -> Void
-    let repsInc: () -> Void
-    let remove: () -> Void
-    @State private var showDelete = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                ExerciseIcon(category: exercise?.category ?? .core, size: 34)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(exercise?.name ?? "Unknown")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Palette.text)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("\(exercise?.category.label ?? "") · \(exercise?.primary ?? "")")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                Button { showDelete = true } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 22))
-                    .holdToDelete(isPresented: $showDelete, title: "Remove \(exercise?.name ?? "exercise")?",
-                                  message: "Removes it from this day's plan.", confirmLabel: "Hold to remove") { remove() }
-            }
-            HStack(spacing: 10) {
-                stepper(item.sets, "sets", dec: setsDec, inc: setsInc)
-                Text("×").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.faint)
-                stepper(item.reps, "reps", dec: repsDec, inc: repsInc)
-                Spacer(minLength: 0)
-            }
-            .padding(.leading, 44)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func stepper(_ value: Int, _ label: String, dec: @escaping () -> Void, inc: @escaping () -> Void) -> some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 4) {
-                miniBtn("minus", dec)
-                Text("\(value)").font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(Palette.text).frame(minWidth: 20)
-                miniBtn("plus", inc)
-            }
-            Text(label.uppercased()).font(.system(size: 7, weight: .heavy)).tracking(0.5).foregroundStyle(Palette.faint)
-        }
-    }
-    private func miniBtn(_ icon: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon).font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.text)
-                .frame(width: 22, height: 20)
-                .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
-        }
-        .buttonStyle(KPressStyle(scale: 0.9))
-    }
-}

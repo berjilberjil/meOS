@@ -9,6 +9,13 @@ import AppKit
 /// chat panel that talks with full context of your data. Supports multiple
 /// conversations (New / History / Delete). On Mac it's a floating panel; on iPhone it
 /// opens full-screen with a clear close button.
+extension ChatWidget {
+    /// Catherine sits in the same place on every screen and on both platforms —
+    /// she is OS chrome, not per-screen decoration. It was 20/28 on Mac and
+    /// 14/14 on the phone, which is close enough to look like a mistake.
+    static let edgeInset: CGFloat = 20
+}
+
 struct ChatWidget: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var agent = AgentConfig.shared
