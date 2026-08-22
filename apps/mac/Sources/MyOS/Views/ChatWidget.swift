@@ -25,6 +25,7 @@ struct ChatWidget: View {
     @State private var draft = ""
     @State private var confirmClearChat = false
     @State private var pendingHistoryDelete: String?
+    @State private var showCall = false
     @FocusState private var inputFocused: Bool
 
     var body: some View { content }
@@ -57,6 +58,11 @@ struct ChatWidget: View {
                     .background(Palette.bg.ignoresSafeArea())
                     .preferredColorScheme(themeStore.theme.colorScheme)
                     .animation(.knTheme, value: themeStore.theme.id)
+            }
+            .fullScreenCover(isPresented: $showCall) {
+                VoiceCallView()
+                    .environmentObject(state)
+                    .preferredColorScheme(themeStore.theme.colorScheme)
             }
     }
     #endif
@@ -133,6 +139,11 @@ struct ChatWidget: View {
                     .font(.system(size: 10)).foregroundStyle(Palette.faint)
             }
             Spacer()
+            #if os(iOS)
+            // Mac is deliberately excluded: hardened runtime + empty entitlements
+            // means it cannot open the microphone. See the voice spec, Risks.
+            iconButton("phone.fill", help: "Talk") { showCall = true }
+            #endif
             iconButton("clock.arrow.circlepath", help: "History") { showHistory.toggle() }
             iconButton("square.and.pencil", help: "New chat") {
                 state.newChat(); showHistory = false; inputFocused = true

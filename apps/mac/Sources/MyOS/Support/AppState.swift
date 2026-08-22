@@ -2000,3 +2000,32 @@ final class AppState: ObservableObject {
         belongings = BelongingsState(); push(StateKey.belongings, belongings)
     }
 }
+
+// MARK: - Voice
+
+extension AppState {
+    /// The active thread's history, in the shape `runCatrineTurn` wants.
+    ///
+    /// Voice and text share one thread on purpose — a spoken question and a
+    /// typed follow-up are the same conversation, and she should remember both.
+    func voiceTurns() -> [APIClient.ChatTurn] {
+        guard let id = chat.activeID,
+              let i = chat.threads.firstIndex(where: { $0.id == id }) else { return [] }
+        return chat.threads[i].messages
+            .filter { !$0.content.isEmpty }
+            .suffix(24)
+            .map { APIClient.ChatTurn(role: $0.role, content: $0.content) }
+    }
+
+    /// Record a spoken turn in the active thread so the call survives in history.
+    func appendVoiceTurn(role: String, content: String) {
+        guard !content.isEmpty else { return }
+        let i = activeThreadIndex()
+        if chat.threads[i].title == "New chat", role == "user" {
+            chat.threads[i].title = String(content.prefix(40))
+        }
+        chat.threads[i].messages.append(ChatMessage(role: role, content: content, at: Self.nowStamp()))
+        chat.threads[i].updatedAt = Self.nowStamp()
+        if isHydrated { push(StateKey.chat, chat) }
+    }
+}
