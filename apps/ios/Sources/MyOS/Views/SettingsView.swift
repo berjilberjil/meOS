@@ -110,6 +110,8 @@ struct SettingsView: View {
                 row(.reminders)
             }
 
+            section("Advanced") { MacroEntryCard(boxed: false).padding(10) }
+
             section("Assistant") {
                 row(.assistant); divider
                 row(.memory); divider

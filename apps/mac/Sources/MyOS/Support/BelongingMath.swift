@@ -44,7 +44,7 @@ enum BelongingKind: String, Codable, CaseIterable, Identifiable, Hashable {
         case .home:    return 0xFFC24B
         case .books:   return 0xFF8A3D
         case .wheels:  return 0x7FD1FF
-        case .other:   return 0x1FD37A
+        case .other:   return 0x56BB06
         }
     }
 }

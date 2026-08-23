@@ -64,6 +64,12 @@ final class AppState: ObservableObject {
     /// In memory only: stops a failing report from re-running on every
     /// return to the foreground. See `generateWeeklyReportIfDue`.
     var lastWeeklyAttempt: Date?
+    /// Macro Intelligence — the snapshot on screen, and every one fetched this
+    /// session. Not synced: it is public market data, re-fetchable anywhere.
+    @Published var macro: MacroSnapshot?
+    @Published var macroBusy = false
+    @Published var macroError: String?
+    var macroCache: [String: MacroSnapshot] = [:]
     @Published var fold: FoldData?
     @Published var foldBusy = false
     @Published var foldError: String?

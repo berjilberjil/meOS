@@ -678,3 +678,41 @@ struct ExercisePlanRow: View {
         .padding(.vertical, 6)
     }
 }
+
+/// A minimal filled area sparkline. Started life in Fold; Macro Intelligence
+/// reads the same way, so it lives here rather than existing twice.
+struct Sparkline: View {
+    let values: [Double]
+    var color: Color = Palette.brand
+
+    var body: some View {
+        GeometryReader { geo in
+            let minV = values.min() ?? 0
+            let maxV = values.max() ?? 1
+            let range = max(maxV - minV, 1)
+            let stepX = values.count > 1 ? geo.size.width / CGFloat(values.count - 1) : geo.size.width
+            let pts = values.enumerated().map { i, v in
+                CGPoint(x: CGFloat(i) * stepX,
+                        y: geo.size.height * (1 - CGFloat((v - minV) / range)))
+            }
+            ZStack {
+                Path { p in
+                    guard let first = pts.first else { return }
+                    p.move(to: CGPoint(x: first.x, y: geo.size.height))
+                    p.addLine(to: first)
+                    for pt in pts.dropFirst() { p.addLine(to: pt) }
+                    p.addLine(to: CGPoint(x: pts.last!.x, y: geo.size.height))
+                    p.closeSubpath()
+                }
+                .fill(LinearGradient(colors: [color.opacity(0.22), color.opacity(0.0)],
+                                     startPoint: .top, endPoint: .bottom))
+                Path { p in
+                    guard let first = pts.first else { return }
+                    p.move(to: first)
+                    for pt in pts.dropFirst() { p.addLine(to: pt) }
+                }
+                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            }
+        }
+    }
+}

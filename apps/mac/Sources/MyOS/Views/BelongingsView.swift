@@ -638,7 +638,7 @@ private struct NewBelongingCategorySheet: View {
     ]
     private let colors: [UInt32] = [
         0x4AA8FF, 0xB98CFF, 0xFFC24B, 0xFF8A3D, 0x7FD1FF,
-        0x1FD37A, 0xFF5A5F, 0xFF6B9A, 0x2DD4BF, 0xF5C451, 0xFF7A59
+        0x56BB06, 0xFF5A5F, 0xFF6B9A, 0x2DD4BF, 0xF5C451, 0xFF7A59
     ]
 
     var body: some View {

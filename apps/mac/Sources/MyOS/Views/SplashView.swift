@@ -4,7 +4,10 @@ import SwiftUI
 /// background baked into it, so any screen it sits on has to match or the
 /// square shows up as a patch.
 enum Brandmark {
-    static let green = Color(hex: 0x56BB07)
+    /// The one green in the app. Sampled from the logo, which ships with this
+    /// background baked in — so a screen the mark sits on matches exactly and
+    /// the square never shows.
+    static let green = Color(hex: 0x56BB06)
     /// On green, the app's surface tokens are the wrong contrast — these are the
     /// two the branded screens use instead.
     static let ink = Color(hex: 0x0B0B0B)

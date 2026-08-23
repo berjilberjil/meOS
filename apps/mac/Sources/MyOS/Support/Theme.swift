@@ -65,7 +65,7 @@ struct AppTheme: Identifiable, Hashable {
         surface: Color(hex: 0x151515), surface2: Color(hex: 0x242424), elevated: Color(hex: 0x1B1B1B),
         border: Color(hex: 0x242424), borderStrong: Color(hex: 0x333333), ring: Color(hex: 0x242424),
         text: Color(hex: 0xFFFFFF), muted: Color(hex: 0x9A9A9A), faint: Color(hex: 0x5E5E5E),
-        brand: Color(hex: 0x1FD37A), brandDeep: Color(hex: 0x12A85E), green: Color(hex: 0x1FD37A))
+        brand: Color(hex: 0x56BB06), brandDeep: Color(hex: 0x3F8A04), green: Color(hex: 0x56BB06))
 
     static let light = AppTheme(
         id: "light", name: "Light",
@@ -73,7 +73,7 @@ struct AppTheme: Identifiable, Hashable {
         surface: Color(hex: 0xFFFFFF), surface2: Color(hex: 0xEDEFF3), elevated: Color(hex: 0xFFFFFF),
         border: Color(hex: 0xE3E6EB), borderStrong: Color(hex: 0xCED3DB), ring: Color(hex: 0xE3E6EB),
         text: Color(hex: 0x0B0D12), muted: Color(hex: 0x5C6470), faint: Color(hex: 0x99A1AE),
-        brand: Color(hex: 0x12B76A), brandDeep: Color(hex: 0x0E9257), green: Color(hex: 0x12B76A))
+        brand: Color(hex: 0x56BB06), brandDeep: Color(hex: 0x3F8A04), green: Color(hex: 0x56BB06))
 
     static let all: [AppTheme] = [foldDark, light]
     static func by(id: String) -> AppTheme {

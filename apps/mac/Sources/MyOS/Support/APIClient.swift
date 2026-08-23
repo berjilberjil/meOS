@@ -277,6 +277,16 @@ final class APIClient {
         return try decoder.decode(WeeklyReportDTO.self, from: data)
     }
 
+    /// One dated macro snapshot. `refresh` forces the server past its cache.
+    func macro(date: String, refresh: Bool = false) async throws -> MacroSnapshot {
+        var path = "api/macro?date=\(date)"
+        if refresh { path += "&refresh=1" }
+        // The grounded lookup and the brief are two model calls; this is slow on
+        // a cold day and instant on a cached one.
+        let data = try await request("GET", path, using: aiSession)
+        return try decoder.decode(MacroSnapshot.self, from: data)
+    }
+
     struct EventCategoryDTO: Codable { let tagId: String; let reason: String }
 
     /// Classify a spoken/typed event into a built-in tag.
