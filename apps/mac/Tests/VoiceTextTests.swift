@@ -43,6 +43,45 @@ final class VoiceTextTests: XCTestCase {
     }
 
     func testCollapsesNewlinesInsideASentence() {
-        XCTAssertEqual(VoiceText.sentences("Two things:\n- rest\n- eat"), ["Two things: - rest - eat"])
+        XCTAssertEqual(VoiceText.sentences("Two things:\n- rest\n- eat"), ["Two things: rest eat"])
+    }
+
+    // MARK: - Markdown must never be spoken
+
+    /// The reported bug: she read "star star Clear Skcript Deliverables star star"
+    /// out loud, because the model answered in markdown and Aura says what it is given.
+    func testStripsBoldMarkers() {
+        XCTAssertEqual(VoiceText.plain("**Clear Skcript Deliverables:** wrap it up"),
+                       "Clear Skcript Deliverables: wrap it up")
+    }
+
+    func testStripsItalicAndCode() {
+        XCTAssertEqual(VoiceText.plain("that is *really* the `main` thing"),
+                       "that is really the main thing")
+    }
+
+    func testStripsNumberedAndBulletMarkers() {
+        XCTAssertEqual(VoiceText.plain("1. lock the plan\n2. cut the video"),
+                       "lock the plan cut the video")
+        XCTAssertEqual(VoiceText.plain("- rest\n• eat"), "rest eat")
+    }
+
+    func testStripsHeadings() {
+        XCTAssertEqual(VoiceText.plain("## Focus\ntrain legs"), "Focus train legs")
+    }
+
+    func testKeepsLinkTextAndDropsTheUrl() {
+        XCTAssertEqual(VoiceText.plain("see [the plan](https://x.com/y) tonight"),
+                       "see the plan tonight")
+    }
+
+    /// A decimal is not a list marker — "82.5" must survive.
+    func testDoesNotMistakeADecimalForAListMarker() {
+        XCTAssertEqual(VoiceText.plain("you lifted 82.5 kg"), "you lifted 82.5 kg")
+    }
+
+    func testAsterisksNeverReachTheSpokenOutput() {
+        let out = VoiceText.sentences("**One.** Two *things* here.").joined(separator: " ")
+        XCTAssertFalse(out.contains("*"), "an asterisk in TTS input is read aloud as a word")
     }
 }

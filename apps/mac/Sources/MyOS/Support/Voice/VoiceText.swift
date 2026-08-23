@@ -19,7 +19,7 @@ enum VoiceText {
     /// Nothing is ever dropped: joining the result with a single space
     /// reproduces the input's words in order.
     static func sentences(_ text: String, maxLength: Int = 400) -> [String] {
-        let flat = text
+        let flat = plain(text)
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\r", with: " ")
         let collapsed = flat.split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
@@ -38,6 +38,40 @@ enum VoiceText {
         if !current.isEmpty { out.append(current) }
 
         return out.flatMap { split($0, maxLength: maxLength) }
+    }
+
+    /// Strip markdown so it is not read out as words.
+    ///
+    /// Aura says exactly what it is given: `**Deliverables:**` comes out as
+    /// "star star Deliverables star star". The model is told not to use
+    /// markdown (see the voice directive in VoiceCallView), but a prompt is a
+    /// request and this is a guarantee.
+    ///
+    /// List markers are only stripped at the START of a line, so "82.5 kg"
+    /// survives intact.
+    static func plain(_ text: String) -> String {
+        var out: [String] = []
+        for rawLine in text.components(separatedBy: .newlines) {
+            var line = rawLine.trimmingCharacters(in: .whitespaces)
+
+            // Leading markers: "## ", "1. ", "- ", "* ", "• "
+            line = line.replacingOccurrences(
+                of: "^(#{1,6}\\s+|[-*•]\\s+|\\d{1,2}[.)]\\s+)", with: "",
+                options: [.regularExpression])
+
+            // [text](url) -> text
+            line = line.replacingOccurrences(
+                of: "\\[([^\\]]*)\\]\\([^)]*\\)", with: "$1",
+                options: [.regularExpression])
+
+            // Emphasis and inline code. Order matters: ** before *.
+            for marker in ["**", "__", "*", "_", "`"] {
+                line = line.replacingOccurrences(of: marker, with: "")
+            }
+
+            if !line.isEmpty { out.append(line) }
+        }
+        return out.joined(separator: " ")
     }
 
     /// Does this word terminate a sentence?

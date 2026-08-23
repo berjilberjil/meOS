@@ -71,7 +71,10 @@ final class SystemSynth: NSObject, SpeechSynth, @unchecked Sendable {
             lock.lock(); continuation = c; lock.unlock()
             let utterance = AVSpeechUtterance(string: text)
             utterance.voice = Self.bestVoice()
-            utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+            // The default rate reads like a station announcement. Slightly
+            // quicker lands closer to speech without turning into chipmunk.
+            utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.08
+            utterance.prefersAssistiveTechnologySettings = false
             synth.speak(utterance)
         }
     }

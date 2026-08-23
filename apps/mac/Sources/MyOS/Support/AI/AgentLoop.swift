@@ -25,21 +25,27 @@ extension AppState {
         var trace: CatrineTrace
     }
 
+    /// `maxRounds` is overridable because a voice call cannot afford the full
+    /// three rounds: each one is a sequential model round trip, and 35 seconds
+    /// of silence on a phone call reads as broken. Voice trades one round of
+    /// follow-up lookups for an answer that arrives while he is still listening.
     func runCatrineTurn(query: String,
                         turns: [APIClient.ChatTurn],
-                        agent: APIClient.AgentInfo) async throws -> AgentOutcome {
+                        agent: APIClient.AgentInfo,
+                        maxRounds: Int = AppState.catrineMaxRounds,
+                        timeout: TimeInterval = AppState.catrineTurnTimeout) async throws -> AgentOutcome {
         var trace = CatrineTrace(query: query)
         let started = Date()
         var toolResults: [String] = []
         var executed = 0
         let toolWire = CatrineToolbox.wireFormat()
 
-        for round in 1...Self.catrineMaxRounds {
+        for round in 1...max(1, maxRounds) {
             try Task.checkCancellation()
             trace.steps = round
 
-            let outOfTime = Date().timeIntervalSince(started) > Self.catrineTurnTimeout
-            let allowTools = round < Self.catrineMaxRounds
+            let outOfTime = Date().timeIntervalSince(started) > timeout
+            let allowTools = round < max(1, maxRounds)
                 && executed < Self.catrineMaxToolCalls
                 && !outOfTime
 

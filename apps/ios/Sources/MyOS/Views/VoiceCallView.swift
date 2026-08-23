@@ -100,7 +100,9 @@ struct VoiceCallView: View {
         case .starting:  return "Connecting"
         case .listening: return "Listening"
         case .thinking:  return "Thinking"
-        case .speaking:  return agent.displayName
+        case .speaking:  return router?.remoteExhausted == true
+                            ? "\(agent.displayName) · basic voice"
+                            : agent.displayName
         case .blocked:   return "Microphone access needed"
         case .failed:    return "She could not answer"
         }
@@ -153,6 +155,19 @@ struct VoiceCallView: View {
         }
     }
 
+    /// Spoken answers are a different medium from written ones.
+    ///
+    /// Without this she writes a document and then reads it aloud: numbered
+    /// lists, bold headings, 700 characters. That is slow to generate, slow to
+    /// speak, and sounds nothing like a person. It rides in on `custom`, which
+    /// the server injects as "this overrides the defaults above".
+    ///
+    /// It goes FIRST so that if the server's 600-character cap truncates
+    /// anything, it truncates his styling and not the thing keeping her short.
+    private static let voiceDirective = """
+    YOU ARE BEING SPOKEN ALOUD ON A PHONE CALL. Reply in at most two or three     short sentences, the way a person actually talks. Never use markdown,     asterisks, bullet points, numbered lists or headings — they get read out as     words. Do not enumerate options: pick the single most important thing and     say that. He will ask if he wants more.
+    """
+
     private func answer(_ text: String) {
         turn?.cancel()
         phase = .thinking
@@ -160,13 +175,16 @@ struct VoiceCallView: View {
             let a = AgentConfig.shared
             let info = APIClient.AgentInfo(name: a.displayName,
                                            tone: a.tone.directive,
-                                           custom: a.custom.trimmingCharacters(in: .whitespacesAndNewlines))
+                                           custom: Self.voiceDirective + " " +
+                                                   a.custom.trimmingCharacters(in: .whitespacesAndNewlines))
             let turns = state.voiceTurns()
             state.appendVoiceTurn(role: "user", content: text)
 
             var reply: String
             do {
-                let outcome = try await state.runCatrineTurn(query: text, turns: turns, agent: info)
+                let outcome = try await state.runCatrineTurn(
+                    query: text, turns: turns, agent: info,
+                    maxRounds: 2, timeout: 25)
                 if Task.isCancelled { return }
                 reply = ChatAction.parse(outcome.reply).visible
                 failures = 0
