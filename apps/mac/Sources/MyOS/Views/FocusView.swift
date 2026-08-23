@@ -13,6 +13,9 @@ final class FocusTimer: ObservableObject {
     static let shared = FocusTimer()
 
     @Published private(set) var itemID: String?
+    /// Kept alongside the id so the menu bar and the "time's up" notification can
+    /// name the task without reaching into AppState.
+    @Published private(set) var itemTitle = ""
     @Published private(set) var total = 0        // planned seconds
     @Published private(set) var remaining = 0
     @Published private(set) var running = false
@@ -34,6 +37,7 @@ final class FocusTimer: ObservableObject {
     func begin(_ item: FocusItem, minutes: Int) {
         stopTicking()
         itemID = item.id
+        itemTitle = item.text
         total = max(60, minutes * 60)
         remaining = total
         unbanked = 0
@@ -70,6 +74,7 @@ final class FocusTimer: ObservableObject {
     func end() {
         stopTicking()
         itemID = nil
+        itemTitle = ""
         running = false
         total = 0; remaining = 0
     }
@@ -94,6 +99,9 @@ final class FocusTimer: ObservableObject {
             stopTicking()
             Haptics.success()
             SoundPlayer.drop()
+            // The menu bar can run a block with no window on screen, so a sound
+            // nobody is looking at isn't enough.
+            FocusNotify.timesUp(task: itemTitle)
         }
     }
 
@@ -120,9 +128,11 @@ struct FocusCard: View {
     @FocusState private var addFieldActive: Bool
     @State private var pendingDelete: String?
     @State private var showCalendar = false
-    @State private var showSession = false
 
     private var items: [FocusItem] { state.plan(for: day ?? state.todayKey).todos }
+    /// Task Mode always runs today's list, so a card showing a past day doesn't
+    /// offer it.
+    private var isToday: Bool { (day ?? state.todayKey) == state.todayKey }
     private var doneCount: Int { items.filter(\.done).count }
     private var nextUp: FocusItem? { items.first { !$0.done } }
     private var focusedSecondsToday: Int { items.reduce(0) { $0 + $1.spent } }
@@ -160,17 +170,6 @@ struct FocusCard: View {
             if let id = pendingDelete { state.removeTodo(id) }
             pendingDelete = nil
         }
-        .sheet(isPresented: $showSession) { sessionSheet }
-    }
-
-    @ViewBuilder private var sessionSheet: some View {
-        let view = FocusSessionView(defaultMinutes: defaultMinutes) { showSession = false }
-            .environmentObject(state)
-        #if os(iOS)
-        view.presentationDetents([.large]).presentationBackground(Palette.bg)
-        #else
-        view.frame(width: 460)
-        #endif
     }
 
     private var header: some View {
@@ -206,16 +205,17 @@ struct FocusCard: View {
             .help(showCalendar ? "Hide the record" : "See the record")
             }
 
-            if nextUp != nil {
+            if nextUp != nil, isToday {
                 Button { startSession() } label: {
                     HStack(spacing: 5) {
                         Image(systemName: timer.isActive ? "timer" : "play.fill")
                             .font(.system(size: 10, weight: .bold))
-                        Text(timer.isActive ? "Open" : "Focus")
+                        Text(timer.isActive ? "Open" : "Task Mode")
                             .font(.system(size: 11, weight: .heavy, design: .rounded))
                     }
                 }
                 .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
+                .help("Everything else goes away until you turn it off")
             }
         }
     }
@@ -223,7 +223,7 @@ struct FocusCard: View {
     /// A live strip while a block runs, so the timer is visible without the sheet.
     private var runningPill: some View {
         let item = items.first { $0.id == timer.itemID }
-        return Button { showSession = true } label: {
+        return Button { state.setTaskMode(true) } label: {
             HStack(spacing: 10) {
                 ZStack {
                     Circle().stroke(Palette.teal.opacity(0.25), lineWidth: 3)
@@ -336,7 +336,7 @@ struct FocusCard: View {
         if !timer.isActive, let next = nextUp {
             timer.begin(next, minutes: next.mins ?? defaultMinutes)
         }
-        showSession = true
+        state.setTaskMode(true)
     }
 
     private func start(_ item: FocusItem) {
@@ -344,7 +344,7 @@ struct FocusCard: View {
             bank()
             timer.begin(item, minutes: item.mins ?? defaultMinutes)
         }
-        showSession = true
+        state.setTaskMode(true)
     }
 
     private func bank() {
@@ -355,12 +355,15 @@ struct FocusCard: View {
 // MARK: - The focus session
 
 /// One task at a time: a countdown, then "Done & next" pulls the following one in.
+/// This is the whole of Task Mode — `TaskModeView` just gives it the screen.
 struct FocusSessionView: View {
     var defaultMinutes: Int
     let onClose: () -> Void
 
     @EnvironmentObject var state: AppState
     @ObservedObject private var timer = FocusTimer.shared
+    @State private var newTask = ""
+    @FocusState private var addFieldActive: Bool
 
     private var items: [FocusItem] { state.todayPlan().todos }
     private var current: FocusItem? { items.first { $0.id == timer.itemID } }
@@ -368,16 +371,7 @@ struct FocusSessionView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Focus").font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Palette.text)
-                Spacer()
-                Button { endSession() } label: {
-                    Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
-                }
-                .buttonStyle(KIconButtonStyle(size: 28))
-            }
-            .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 6)
+            header
 
             if let item = current {
                 ring
@@ -391,21 +385,108 @@ struct FocusSessionView: View {
                 controls.padding(.horizontal, 20).padding(.top, 18)
                 upNext.padding(.horizontal, 20).padding(.top, 20)
             } else {
-                VStack(spacing: 10) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 38)).foregroundStyle(Palette.green)
-                    Text("Nothing left to crush.")
-                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
-                    Text("Add a to-do on Today to start another block.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
-                }
-                .padding(.vertical, 48)
+                emptyState
             }
             Spacer(minLength: 12)
         }
         .padding(.bottom, 18)
+        // A column, not a wall of screen — the Mac window is wide and a timer
+        // centred in 1400pt of black reads as a mistake.
+        .frame(maxWidth: 460)
         .frame(maxWidth: .infinity)
         .background(Palette.bg)
+    }
+
+    /// The only chrome in the mode: what it is, how far in, and the way out.
+    private var header: some View {
+        HStack(spacing: 8) {
+            Text("TASK MODE")
+                .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(1.2)
+                .foregroundStyle(Palette.teal)
+            if !items.isEmpty {
+                Text("\(TaskMode.doneCount(items))/\(items.count)")
+                    .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                    .foregroundStyle(Palette.faint)
+            }
+            Spacer(minLength: 4)
+            Button { endSession() } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                    Text("Exit").font(.system(size: 11, weight: .heavy, design: .rounded))
+                }
+            }
+            .buttonStyle(KSoftButtonStyle(tint: Palette.muted))
+            .help("Leave Task Mode — on every device")
+        }
+        .padding(.horizontal, 20)
+        // Clears the traffic lights: the mode hides the sidebar this normally sits beside.
+        .padding(.leading, Self.trafficLightInset)
+        .padding(.top, Self.topInset).padding(.bottom, 10)
+    }
+
+    /// Nothing running: either the list is empty (write one) or the day is done.
+    @ViewBuilder private var emptyState: some View {
+        let empty = items.isEmpty
+        VStack(spacing: 11) {
+            Image(systemName: empty ? "list.bullet.rectangle" : "checkmark.seal.fill")
+                .font(.system(size: 38, weight: .semibold))
+                .foregroundStyle(empty ? Palette.teal : Palette.green)
+            Text(empty ? "Nothing on today's list." : "Day crushed.")
+                .font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.text)
+            Text(subtitle(empty: empty))
+                .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                .fixedSize(horizontal: false, vertical: true)
+            addField.padding(.top, 8)
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 28).padding(.vertical, 44)
+    }
+
+    private func subtitle(empty: Bool) -> String {
+        if empty { return "Write down what you need to crush. The first one starts the clock." }
+        let streak = state.focusStreak()
+        return streak > 0 ? "\(streak) clean day\(streak == 1 ? "" : "s") in a row." : "Everything on the list is done."
+    }
+
+    private var addField: some View {
+        HStack(spacing: 8) {
+            TextField("", text: $newTask,
+                      prompt: Text("Add a to-do…").foregroundColor(Palette.faint))
+                .textFieldStyle(.plain).font(.system(size: 15)).foregroundStyle(Palette.text)
+                .focused($addFieldActive)
+                .onSubmit(addTask)
+            Button(action: addTask) {
+                Image(systemName: "plus.circle.fill").font(.system(size: 18))
+                    .foregroundStyle(Palette.teal)
+            }
+            .buttonStyle(KPressStyle())
+            .opacity(newTask.isEmpty ? 0.35 : 1)
+            .disabled(newTask.isEmpty)
+        }
+        .knField(focused: addFieldActive)
+    }
+
+    private func addTask() {
+        let t = newTask.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty else { return }
+        state.addTodo(t)
+        newTask = ""
+    }
+
+    private static var topInset: CGFloat {
+        #if os(macOS)
+        return 30
+        #else
+        return 18
+        #endif
+    }
+
+    private static var trafficLightInset: CGFloat {
+        #if os(macOS)
+        return 62
+        #else
+        return 0
+        #endif
     }
 
     private var ring: some View {
@@ -425,7 +506,7 @@ struct FocusSessionView: View {
                     .foregroundStyle(Palette.faint)
             }
         }
-        .frame(width: 208, height: 208)
+        .frame(width: 220, height: 220)
         .padding(.top, 10)
     }
 
@@ -538,8 +619,9 @@ struct FocusSessionView: View {
         if let next = remaining.first {
             timer.begin(next, minutes: next.mins ?? defaultMinutes)
         } else {
+            // Nothing left. Stay in the mode and say so — leaving is always a
+            // deliberate act, because the switch is synced to the other device.
             timer.end()
-            onClose()
         }
     }
 

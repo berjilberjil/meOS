@@ -58,6 +58,8 @@ targets:
       - path: ../mac/Sources/MyOS/Views/DayDetailView.swift
       - path: ../mac/Sources/MyOS/Views/ProgressPhotoCalendar.swift
       - path: ../mac/Sources/MyOS/Views/FocusView.swift
+      - path: ../mac/Sources/MyOS/Views/TaskModeView.swift
+      - path: ../mac/Sources/MyOS/Views/ScanHistory.swift
       - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift
       - path: ../mac/Sources/MyOS/Views/SettingsKit.swift

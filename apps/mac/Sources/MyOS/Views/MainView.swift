@@ -121,6 +121,23 @@ struct MainView: View {
                 .padding(.horizontal, 14).padding(.bottom, 10)
             }
 
+            Button { state.setTaskMode(true) } label: {
+                if collapsed {
+                    Image(systemName: "target").font(.system(size: 15))
+                        .frame(width: 44, height: 30)
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "target")
+                        Text("TASK MODE")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(0.6)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .buttonStyle(KGhostButtonStyle(color: Palette.teal))
+            .padding(.horizontal, 8).padding(.bottom, 4)
+            .help("Hide everything but today's task")
+
             Button { Task { await state.logout() } } label: {
                 if collapsed {
                     Image(systemName: "rectangle.portrait.and.arrow.right").font(.system(size: 15))

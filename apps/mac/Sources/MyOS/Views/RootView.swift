@@ -22,6 +22,10 @@ struct RootView: View {
                 Group {
                     if BiometricLock.isEnabled && !unlocked {
                         LockView { await tryUnlock() }
+                    } else if state.taskMode.on {
+                        // The whole takeover, in one line and on both platforms:
+                        // no sidebar, no dock, no chat widget — just the task.
+                        TaskModeView()
                     } else {
                         MainView()
                     }

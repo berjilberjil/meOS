@@ -27,6 +27,19 @@ struct MyOSApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1160, height: 780)
         .windowResizability(.contentSize)
+
+        // The focus timer, with or without a window. Independent of Task Mode on
+        // purpose: the point is crushing a task with MyOS closed.
+        MenuBarExtra {
+            MenuBarView()
+                .environmentObject(state)
+                .preferredColorScheme(themeStore.theme.colorScheme)
+                .tint(themeStore.theme.brand)
+                .fontDesign(.rounded)
+        } label: {
+            MenuBarLabel(state: state)
+        }
+        .menuBarExtraStyle(.window)
     }
 }
 

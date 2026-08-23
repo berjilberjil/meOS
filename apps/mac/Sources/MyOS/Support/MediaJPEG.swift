@@ -44,6 +44,12 @@ enum MediaJPEG {
 
     static func image(fromBase64 s: String) -> Image? {
         guard !s.isEmpty, let data = Data(base64Encoded: s) else { return nil }
+        return image(from: data)
+    }
+
+    /// Same, for bytes that never took a trip through base64 — scan photos
+    /// come back from the sealed media cache as `Data`.
+    static func image(from data: Data) -> Image? {
         #if os(macOS)
         guard let ns = NSImage(data: data) else { return nil }
         // NSImage.size can be 72dpi points and disagree with the pixel

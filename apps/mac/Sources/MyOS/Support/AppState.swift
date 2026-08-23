@@ -53,6 +53,10 @@ final class AppState: ObservableObject {
     /// tool calls, timing. In memory only, for the debug sheet. Never logged.
     @Published var lastTrace: CatrineTrace?
     @Published var belongings = BelongingsState()
+    /// Everything the camera has read, newest first. See `Support/ScanRecord.swift`.
+    @Published var scans: [ScanRecord] = []
+    /// The synced Task Mode switch. See `Support/TaskMode.swift`.
+    @Published var taskMode = TaskModeState()
     @Published var fold: FoldData?
     @Published var foldBusy = false
     @Published var foldError: String?
@@ -130,6 +134,8 @@ final class AppState: ObservableObject {
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
         watch     = s.watch ?? []
         memory    = s.memory ?? MemoryState()
+        scans     = s.scans ?? []
+        taskMode  = s.taskMode ?? TaskModeState()
         belongings = s.belongings ?? BelongingsState()
         if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
@@ -244,6 +250,7 @@ final class AppState: ObservableObject {
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
         events = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
+        scans = []; taskMode = TaskModeState()
         fold = nil
         username = ""; isHydrated = false; lastSyncError = nil
         pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
@@ -297,7 +304,8 @@ final class AppState: ObservableObject {
             (StateKey.chat, chat), (StateKey.nutrition, nutrition), (StateKey.training, training),
             (StateKey.events, events), (StateKey.eventTags, eventTags),
             (StateKey.watch, watch), (StateKey.belongings, belongings),
-            (StateKey.memory, memory)
+            (StateKey.memory, memory), (StateKey.scans, scans),
+            (StateKey.taskMode, taskMode)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -397,6 +405,7 @@ final class AppState: ObservableObject {
         add("watch", watch)
         add("memory", memory)
         add("belongings", belongings)
+        add("scans", scans); add("taskMode", taskMode)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -493,6 +502,10 @@ final class AppState: ObservableObject {
         if let v = s.watch,          !hasPendingPush(StateKey.watch),          v != watch          { watch = v }
         if let v = s.memory,         !hasPendingPush(StateKey.memory),         v != memory         { memory = v }
         if let v = s.belongings,     !hasPendingPush(StateKey.belongings),     v != belongings     { belongings = v }
+        if let v = s.scans,          !hasPendingPush(StateKey.scans),          v != scans          { scans = v }
+        // The mode is the one switch meant to reach across devices — a flip on
+        // the Mac lands here on the phone within one poll.
+        if let v = s.taskMode,       !hasPendingPush(StateKey.taskMode),       v != taskMode       { taskMode = v }
         if let v = s.fold, !hasPendingPush(StateKey.fold), v != fold {
             if FoldSnapshotBuilder.isBare(v) {
                 restoreFoldIfBare()
@@ -1998,6 +2011,7 @@ final class AppState: ObservableObject {
         events = [];                   push(StateKey.events, events)
         watch = [];                    push(StateKey.watch, watch)
         belongings = BelongingsState(); push(StateKey.belongings, belongings)
+        clearScans()
     }
 }
 

@@ -757,6 +757,8 @@ struct AppStatePayload: Codable {
     var belongings: BelongingsState?
     var fold: FoldData?
     var memory: MemoryState?
+    var scans: [ScanRecord]?
+    var taskMode: TaskModeState?
 
     init() {}
 
@@ -777,6 +779,8 @@ struct AppStatePayload: Codable {
         case belongings     = "myos.belongings"
         case fold           = "myos.fold"
         case memory         = "myos.memory"
+        case scans          = "myos.scans"
+        case taskMode       = "myos.taskMode"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -800,6 +804,8 @@ struct AppStatePayload: Codable {
         belongings     = try? c.decodeIfPresent(BelongingsState.self, forKey: .belongings)
         fold           = try? c.decodeIfPresent(FoldData.self, forKey: .fold)
         memory         = try? c.decodeIfPresent(MemoryState.self, forKey: .memory)
+        scans          = try? c.decodeIfPresent([ScanRecord].self, forKey: .scans)
+        taskMode       = try? c.decodeIfPresent(TaskModeState.self, forKey: .taskMode)
     }
 }
 
@@ -880,4 +886,6 @@ enum StateKey {
     static let belongings     = "myos.belongings"
     static let fold           = "myos.fold"
     static let memory         = "myos.memory"
+    static let scans          = "myos.scans"
+    static let taskMode       = "myos.taskMode"
 }

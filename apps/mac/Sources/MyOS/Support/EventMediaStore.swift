@@ -1,7 +1,8 @@
 import Foundation
 import CryptoKit
 
-/// Event photos and videos used to ride inside the `myos.events` blob as base64
+/// The sealed-media cache. Event photos and videos used to ride inside the
+/// `myos.events` blob as base64
 /// — 2 MB of a 2.27 MB payload, re-synced on every poll. They now live in R2,
 /// sealed on-device with the vault DEK, so the server stores opaque bytes.
 ///
@@ -48,6 +49,10 @@ final class EventMediaStore: ObservableObject {
         guard let key = m.r2Key else { return nil }
         return bytes(id: key)
     }
+
+    /// Bytes for a raw R2 id — what scan history holds instead of an
+    /// `EventMedia`. Same cache, same fetch-then-bump-`version` behaviour.
+    func data(key: String) -> Data? { bytes(id: key) }
 
     /// A video's thumbnail, or an image's own bytes.
     func poster(for m: EventMedia) -> Data? {
@@ -96,8 +101,12 @@ final class EventMediaStore: ObservableObject {
     // MARK: - Writing
 
     /// Seal one asset and upload it. Returns the R2 key to store on the media.
-    static func upload(_ plain: Data, api: APIClient, dek: SymmetricKey) async throws -> String {
-        let id = UUID().uuidString.lowercased()
+    ///
+    /// `id` is nameable so other features can share this store: scan photos pass
+    /// `scan-<uuid>` and stay tellable apart in the bucket. Event media keeps the
+    /// bare UUID it has always used.
+    static func upload(_ plain: Data, api: APIClient, dek: SymmetricKey,
+                       id: String = UUID().uuidString.lowercased()) async throws -> String {
         let sealedB64 = try MyOSCrypto.seal(plain, key: dek, aad: aad(id))
         guard let sealed = Data(base64Encoded: sealedB64) else { throw MyOSCryptoError.badBase64 }
         try await api.uploadEventMedia(id: id, sealed: sealed)

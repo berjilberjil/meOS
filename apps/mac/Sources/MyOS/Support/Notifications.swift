@@ -118,3 +118,37 @@ final class ReminderStore: ObservableObject {
         if let d = try? JSONEncoder().encode(reminders) { UserDefaults.standard.set(d, forKey: kList) }
     }
 }
+
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
+
+/// The one notification the focus timer fires. Not scheduled and not a
+/// `Reminder` — it goes out the moment a block ends, and only when nobody is
+/// looking at the app. Uses whatever authorization the reminders already have;
+/// it never prompts on its own.
+@MainActor
+enum FocusNotify {
+    static let id = "myos.focus.timesup"
+
+    static func timesUp(task: String) {
+        guard !appIsFrontmost else { return }
+        let c = UNMutableNotificationContent()
+        c.title = "Time's up"
+        c.body = task.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "Your focus block is done." : task
+        c.sound = .default
+        UNUserNotificationCenter.current()
+            .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
+    }
+
+    private static var appIsFrontmost: Bool {
+        #if os(macOS)
+        return NSApplication.shared.isActive
+        #else
+        return UIApplication.shared.applicationState == .active
+        #endif
+    }
+}
