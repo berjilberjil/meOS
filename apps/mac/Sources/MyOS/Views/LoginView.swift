@@ -51,12 +51,11 @@ struct LoginView: View {
                 .foregroundStyle(.white)
             Text("Your second brain. Money · Body · Mind.")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(.white.opacity(0.88))
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 26).padding(.vertical, 14)
         .frame(maxWidth: .infinity)
-        .background(Brandmark.ink, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
     private var form: some View {
@@ -97,15 +96,12 @@ struct LoginView: View {
             } label: {
                 Text(isRegister ? "Have an account? Log in" : "New here? Create your account")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.white.opacity(0.85))
             }
             .buttonStyle(KPressStyle())
             .padding(.top, 2)
         }
-        .padding(18)
-        .background(Brandmark.inkSoft, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
-        .padding(7)
-        .background(Brandmark.ink, in: RoundedRectangle(cornerRadius: Radius.xl + 7, style: .continuous))
+        .padding(.horizontal, 4)
     }
 
     private func submit() async {
@@ -145,8 +141,8 @@ private struct BrandField: ViewModifier {
             .padding(.horizontal, 18).padding(.vertical, 14)
             .background(Brandmark.ink, in: Capsule())
             .overlay(
-                Capsule().strokeBorder(focused ? Brandmark.green.opacity(0.8) : .white.opacity(0.10),
-                                       lineWidth: focused ? 1.5 : 1)
+                Capsule().strokeBorder(focused ? .white.opacity(0.55) : .clear,
+                                       lineWidth: 1.5)
             )
             .animation(.knFast, value: focused)
     }
