@@ -69,6 +69,7 @@ targets:
       - path: ../mac/Sources/MyOS/Views/ImageDropZone.swift
       - path: ../mac/Sources/MyOS/Views/WatchLogCard.swift
       - path: ../mac/Sources/MyOS/Views/SplashView.swift
+      - path: ../mac/Sources/MyOS/Views/CatherinePresence.swift
       - path: ../mac/Sources/MyOS/Views/BelongingsView.swift
       - path: ../mac/Sources/MyOS/Resources/drop.wav
         buildPhase: resources

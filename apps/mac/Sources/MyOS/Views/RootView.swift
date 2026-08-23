@@ -9,29 +9,23 @@ struct RootView: View {
     var body: some View {
         ZStack {
             Palette.bg.ignoresSafeArea()
-            switch state.phase {
-            case .loading:
-                SplashView()
-            case .loggedOut:
-                LoginView()
-            case .setup:
-                VaultSetupView()
-            case .locked:
-                VaultUnlockView()
-            case .loggedIn:
-                Group {
-                    if BiometricLock.isEnabled && !unlocked {
-                        LockView { await tryUnlock() }
-                    } else if state.taskMode.on {
-                        // The whole takeover, in one line and on both platforms:
-                        // no sidebar, no dock, no chat widget — just the task.
-                        TaskModeView()
-                    } else {
-                        MainView()
-                    }
+            Group {
+                switch state.phase {
+                case .loading:
+                    // The only status line in the app that is allowed to exist,
+                    // and only because bootstrap is real work — hydrate, then pull.
+                    SplashView(status: "Getting your day ready…")
+                case .loggedOut:
+                    LoginView()
+                case .setup:
+                    VaultSetupView()
+                case .locked:
+                    VaultUnlockView()
+                case .loggedIn:
+                    loggedIn
                 }
-                .onAppear { DietBridge.shared.start(state: state) }
             }
+            .transition(.opacity)
 
             // One-time recovery code — shown above any phase, after setup or a
             // regeneration from Settings.
@@ -40,6 +34,9 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
+        // Splash and app are one continuous moment, not two screens: the phase
+        // change cross-fades instead of cutting.
+        .animation(.easeInOut(duration: 0.28), value: state.phase)
         .fontDesign(.rounded)   // Feather-substitute: rounds all text app-wide
         .preferredColorScheme(themeStore.theme.colorScheme)
         .tint(themeStore.theme.brand)
@@ -72,6 +69,21 @@ struct RootView: View {
             if newPhase == .background { SoundPlayer.close() }
             #endif
         }
+    }
+
+    @ViewBuilder private var loggedIn: some View {
+        Group {
+            if BiometricLock.isEnabled && !unlocked {
+                LockView { await tryUnlock() }
+            } else if state.taskMode.on {
+                // The whole takeover, in one line and on both platforms: no
+                // sidebar, no dock, no chat widget — just the task.
+                TaskModeView()
+            } else {
+                MainView()
+            }
+        }
+        .onAppear { DietBridge.shared.start(state: state) }
     }
 
     @discardableResult
