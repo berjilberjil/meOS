@@ -9,16 +9,21 @@ final class PrefsStore: ObservableObject {
     private let kHideFold = "myos.fold.hideNumbers"
     private let kLaunchTab = "myos.launchTab"
     private let kLastTab = "myos.lastTab"
-    private let kRunning = "myos.wasRunning"
+    private let kRoutes = "myos.routes"
+    private let kResumeMigrated = "myos.launchTab.resumeDefault"
 
     /// Fold privacy: when on, every amount in the Fold dashboard is masked.
     @Published var hideFoldNumbers: Bool {
         didSet { UserDefaults.standard.set(hideFoldNumbers, forKey: kHideFold) }
     }
 
-    /// The tab MyOS opens to on launch. Stored as a `NavTab` raw string.
-    @Published var launchTab: NavTab {
-        didSet { UserDefaults.standard.set(launchTab.rawValue, forKey: kLaunchTab) }
+    /// A tab to pin the app to on every launch. `nil` — the default — means
+    /// "wherever I left off", which is what reopening an app should do.
+    @Published var launchTab: NavTab? {
+        didSet {
+            if let launchTab { UserDefaults.standard.set(launchTab.rawValue, forKey: kLaunchTab) }
+            else { UserDefaults.standard.removeObject(forKey: kLaunchTab) }
+        }
     }
 
     /// The tab you were last on. Written on every switch so reopening resumes
@@ -28,26 +33,45 @@ final class PrefsStore: ObservableObject {
     }
 
     private init() {
-        hideFoldNumbers = UserDefaults.standard.bool(forKey: kHideFold)
-        launchTab = NavTab.resolveLaunch(UserDefaults.standard.string(forKey: kLaunchTab))
-        lastTab = NavTab.resolveLaunch(UserDefaults.standard.string(forKey: kLastTab))
+        let d = UserDefaults.standard
+        // One-time: opening on a fixed tab was the only behaviour, so a choice
+        // made back then wasn't a choice against resuming. Existing values move
+        // to Resume; the fixed option is still one tap away in Settings.
+        if !d.bool(forKey: kResumeMigrated) {
+            d.removeObject(forKey: kLaunchTab)
+            d.set(true, forKey: kResumeMigrated)
+        }
+        hideFoldNumbers = d.bool(forKey: kHideFold)
+        launchTab = d.string(forKey: kLaunchTab).flatMap { NavTab(rawValue: $0) }
+        lastTab = NavTab.resolveLaunch(d.string(forKey: kLastTab))
     }
 
-    /// Where to open. Resumes `lastTab` when the previous run ended without a
-    /// clean shutdown — i.e. it was backgrounded or the system reclaimed it —
-    /// and falls back to the configured launch tab after a real quit.
-    ///
-    /// The flag is set while running and cleared on terminate, so "was still
-    /// running when we stopped seeing it" is what distinguishes the two. A
-    /// force-quit clears it too, which is the behaviour asked for: only a full
-    /// close starts from the top.
+    /// Where to open. A pinned launch tab wins; otherwise resume the last one —
+    /// including after a quit, because "take me back where I was" is the point.
     func resolveOpeningTab(allowed: [NavTab]? = nil) -> NavTab {
-        let resume = UserDefaults.standard.bool(forKey: kRunning)
-        let target = resume ? lastTab : launchTab
+        let target = launchTab ?? lastTab
         guard let allowed else { return target }
         return allowed.contains(target) ? target : NavTab.resolveLaunch(target.rawValue, allowed: allowed)
     }
 
-    func markRunning() { UserDefaults.standard.set(true, forKey: kRunning) }
-    func markCleanExit() { UserDefaults.standard.set(false, forKey: kRunning) }
+    // MARK: - Where you were inside a tab
+
+    /// The tab is only half of "where I left off" — the other half is the note
+    /// that was open, which is `@State` in the view and therefore dies with the
+    /// process. Screens park an id here and pick it back up on the next launch.
+    func route(for tab: NavTab) -> String? {
+        guard let v = routes[tab.rawValue], !v.isEmpty else { return nil }
+        return v
+    }
+
+    func setRoute(_ value: String?, for tab: NavTab) {
+        var next = routes
+        if let value, !value.isEmpty { next[tab.rawValue] = value } else { next[tab.rawValue] = nil }
+        routes = next
+    }
+
+    private var routes: [String: String] {
+        get { (UserDefaults.standard.dictionary(forKey: kRoutes) as? [String: String]) ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: kRoutes) }
+    }
 }

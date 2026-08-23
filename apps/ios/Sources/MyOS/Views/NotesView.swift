@@ -13,6 +13,8 @@ struct NotesView: View {
     @State private var revealed = false
     @State private var titleTaps = 0
     @State private var tapTimer: Task<Void, Never>?
+    /// One-shot: reopen the note that was open when the app was last closed.
+    @State private var restored = false
 
     private var filtered: [Note] {
         // Locked notes are hidden from the list until revealed (5-tap + Face ID).
@@ -63,7 +65,13 @@ struct NotesView: View {
             }
         }
         .navigationDestination(item: $openID) { id in NoteEditor(id: id) }
-        .onAppear { consumeNewNoteRequest(); consumeRevealHidden() }
+        .onAppear { consumeNewNoteRequest(); consumeRevealHidden(); restoreRoute() }
+        // Notes arrive from the cache a beat after the view builds on a cold
+        // launch, so the first attempt can find nothing to reopen.
+        .onChange(of: state.notes.count) { _, _ in restoreRoute() }
+        // Covers opening, creating and backing out in one hook: the tab is only
+        // half of "where I left off", and `openID` dies with the process.
+        .onChange(of: openID) { _, id in PrefsStore.shared.setRoute(id, for: .notes) }
         .onChange(of: state.pendingNewNote) { _, on in if on { consumeNewNoteRequest() } }
         .onChange(of: signals.revealHiddenNotes) { _, on in if on { consumeRevealHidden() } }
         .holdToDelete(
@@ -113,6 +121,18 @@ struct NotesView: View {
     }
 
     private func newNote() { openID = state.addBlockNote() }
+
+    /// Reopen the note from last time. Runs once; a route pointing at a note
+    /// that has since been deleted is simply dropped.
+    private func restoreRoute() {
+        guard !restored, openID == nil else { return }
+        guard let id = PrefsStore.shared.route(for: .notes), state.note(id) != nil else {
+            if !state.notes.isEmpty { restored = true }
+            return
+        }
+        restored = true
+        openID = id
+    }
 
     private func consumeNewNoteRequest() {
         guard state.pendingNewNote else { return }

@@ -4,7 +4,6 @@ import AppKit
 @main
 struct MyOSApp: App {
     @StateObject private var state = AppState()
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var themeStore = ThemeStore.shared
 
     var body: some Scene {
@@ -16,10 +15,6 @@ struct MyOSApp: App {
                 .tint(themeStore.theme.brand)
                 .animation(.knTheme, value: themeStore.theme.id)
                 .task { await ReminderStore.shared.syncOnLaunch() }
-                // "Was still running when we stopped seeing it" is how the app
-                // tells a background/relaunch apart from a real quit, so only a
-                // full close starts from the top again.
-                .onAppear { PrefsStore.shared.markRunning() }
                 // Window chrome follows the active theme so Light doesn't sit on a
                 // forced-black titlebar (that snap was the "theme isn't switching").
                 .background(WindowChrome(themeID: themeStore.theme.id))
@@ -68,14 +63,5 @@ private struct WindowChrome: NSViewRepresentable {
         // Drop the toolbar entirely — the app draws its own sidebar and headers,
         // so the empty system toolbar strip (and its grey material) is pure chrome.
         window.toolbar = nil
-    }
-}
-
-
-/// Clears the running marker on a real quit so the next launch starts at the
-/// configured launch tab rather than resuming.
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationWillTerminate(_ notification: Notification) {
-        PrefsStore.shared.markCleanExit()
     }
 }

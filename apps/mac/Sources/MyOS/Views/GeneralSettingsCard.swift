@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// General app preferences card — currently the launch tab (which screen MyOS
-/// opens to). Device-local via `PrefsStore`. Shared by mac + iOS; the tab list
-/// is the full set on mac and just the bottom-bar tabs on iOS.
+/// General app preferences card — where MyOS opens. The first option is to
+/// resume, which is the default; picking a tab pins every launch to it instead.
+/// Device-local via `PrefsStore`. Shared by mac + iOS; the tab list is the full
+/// set on mac and just the bottom-bar tabs on iOS.
 struct GeneralSettingsCard: View {
     var boxed = true
     @ObservedObject private var prefs = PrefsStore.shared
@@ -13,38 +14,56 @@ struct GeneralSettingsCard: View {
     private let options = NavTab.allCases
     #endif
 
+    @ViewBuilder
+    private func boxedRow(title: String, icon: String, tint: Color,
+                          selected: Bool, divider: Bool, action: @escaping () -> Void) -> some View {
+        if divider { Rectangle().fill(Palette.border).frame(height: 1) }
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 28)
+                Text(title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20)).foregroundStyle(Palette.green)
+                }
+            }
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(KPressStyle())
+    }
+
     var body: some View {
         let inner = VStack(alignment: .leading, spacing: 6) {
             SectionTitle(text: "General").padding(.bottom, 8)
-            ForEach(Array(options.enumerated()), id: \.element.id) { i, t in
-                if i > 0 { Rectangle().fill(Palette.border).frame(height: 1) }
-                Button { prefs.launchTab = t } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: t.icon)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(t.tint)
-                            .frame(width: 28)
-                        Text(t.title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
-                        Spacer()
-                        if t == prefs.launchTab {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 20)).foregroundStyle(Palette.green)
-                        }
-                    }
-                    .padding(.vertical, 12)
-                    .contentShape(Rectangle())
+            boxedRow(title: "Where I left off", icon: "arrow.uturn.backward",
+                     tint: Palette.teal, selected: prefs.launchTab == nil, divider: false) {
+                prefs.launchTab = nil
+            }
+            ForEach(options) { t in
+                boxedRow(title: t.title, icon: t.icon, tint: t.tint,
+                         selected: t == prefs.launchTab, divider: true) {
+                    prefs.launchTab = t
                 }
-                .buttonStyle(KPressStyle())
             }
         }
         if boxed {
             Card { inner }
         } else {
             SettingsPage {
-                SettingsIntro(text: "Which screen opens when you launch MyOS.")
+                SettingsIntro(text: "Where MyOS opens. Resuming also reopens what you had open — the note you were writing, not just the screen it was on.")
                 SettingsGroup {
-                    ForEach(Array(options.enumerated()), id: \.element.id) { i, t in
-                        if i > 0 { SettingsDivider() }
+                    SettingsPickRow(title: "Where I left off", icon: "arrow.uturn.backward",
+                                    tint: Palette.teal, selected: prefs.launchTab == nil) {
+                        Haptics.selection()
+                        prefs.launchTab = nil
+                    }
+                    ForEach(options) { t in
+                        SettingsDivider()
                         SettingsPickRow(title: t.title, icon: t.icon, tint: t.tint,
                                         selected: t == prefs.launchTab) {
                             Haptics.selection()

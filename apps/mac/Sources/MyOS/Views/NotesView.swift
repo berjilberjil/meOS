@@ -27,6 +27,8 @@ struct NotesView: View {
     @State private var unlocked: Set<String> = []
     /// Bumped to open the editor's native find bar.
     @State private var findToken = 0
+    /// One-shot: reopen the note that was open when the app was last closed.
+    @State private var restored = false
 
     private var filtered: [Note] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
@@ -40,6 +42,10 @@ struct NotesView: View {
         Group {
             if inDetail { detailView } else { browseView }
         }
+        .onAppear { restoreRoute() }
+        // Notes arrive from the cache a beat after the view builds on a cold
+        // launch, so the first attempt can find nothing to reopen.
+        .onChange(of: state.notes.count) { _, _ in restoreRoute() }
         .onDisappear { persistCurrent() }   // flush + drop an untouched empty note
         .holdToDelete(
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -464,6 +470,7 @@ struct NotesView: View {
     private func backToBrowse() {
         persistCurrent()
         selectedID = nil
+        remember(nil)
         inDetail = false
     }
 
@@ -471,6 +478,7 @@ struct NotesView: View {
         persistCurrent()
         let id = state.addBlockNote()
         selectedID = id
+        remember(id)
         draftTitle = ""
         draftDoc = BlockDoc()
         titleEdited = false
@@ -483,6 +491,7 @@ struct NotesView: View {
         if note.id == selectedID { return }
         persistCurrent()
         selectedID = note.id
+        remember(note.id)
         draftTitle = note.title
         draftDoc = note.effectiveDoc
         titleEdited = !note.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -533,6 +542,26 @@ struct NotesView: View {
         // user just asked for is not recoverable.
     }
 
+    /// The tab is only half of "where I left off" — which note was open is view
+    /// state, and view state dies with the process. Park it on disk instead.
+    private func remember(_ id: String?) {
+        PrefsStore.shared.setRoute(id, for: .notes)
+    }
+
+    /// Reopen the note from last time. Runs once; a route pointing at a note
+    /// that has since been deleted is simply dropped.
+    private func restoreRoute() {
+        guard !restored, selectedID == nil else { return }
+        guard let id = PrefsStore.shared.route(for: .notes), let note = state.note(id) else {
+            // Only give up once the notes have actually loaded.
+            if !state.notes.isEmpty { restored = true }
+            return
+        }
+        restored = true
+        open(note)
+        inDetail = true
+    }
+
     private func selectFirstAfterDelete() {
         if let next = state.sortedNotes.first {
             selectedID = nil            // force the editor to re-key onto the new note
@@ -540,6 +569,7 @@ struct NotesView: View {
         } else {
             // No notes left — fall back to the browse listing.
             selectedID = nil
+            remember(nil)
             draftTitle = ""
             draftDoc = BlockDoc()
             inDetail = false
