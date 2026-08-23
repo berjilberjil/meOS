@@ -22,8 +22,10 @@ struct VoiceCallView: View {
     @State private var router: VoiceRouter?
     @State private var turn: Task<Void, Never>?
     @State private var authorized = false
+    @State private var failures = 0
+    @State private var lastError = ""
 
-    enum Phase { case starting, listening, thinking, speaking, blocked }
+    enum Phase { case starting, listening, thinking, speaking, blocked, failed }
 
     var body: some View {
         VStack(spacing: Gap.screen) {
@@ -62,6 +64,8 @@ struct VoiceCallView: View {
                     .foregroundStyle(phase == .speaking ? Palette.bg : Palette.text)
             )
             .animation(.knPop, value: phase)
+            .contentShape(Circle())
+            .onTapGesture { interrupt() }
             .knRise(1)
     }
 
@@ -72,6 +76,7 @@ struct VoiceCallView: View {
         case .thinking:  return "ellipsis"
         case .speaking:  return "waveform"
         case .blocked:   return "mic.slash.fill"
+        case .failed:    return "exclamationmark.triangle.fill"
         }
     }
 
@@ -97,6 +102,7 @@ struct VoiceCallView: View {
         case .thinking:  return "Thinking"
         case .speaking:  return agent.displayName
         case .blocked:   return "Microphone access needed"
+        case .failed:    return "She could not answer"
         }
     }
 
@@ -104,6 +110,7 @@ struct VoiceCallView: View {
         if phase == .blocked {
             return "Turn on Microphone and Speech Recognition for MyOS in Settings."
         }
+        if phase == .failed { return lastError }
         if phase == .speaking { return said }
         if !listener.partial.isEmpty { return listener.partial }
         return heard
@@ -130,11 +137,8 @@ struct VoiceCallView: View {
 
         // Barge-in: the moment he speaks, she stops. This fires on the first
         // partial result, not the final transcript — a final would be far too late.
-        listener.onSpeechStarted = {
-            r.stop()
-            turn?.cancel()
-            if phase == .speaking || phase == .thinking { phase = .listening }
-        }
+        // NOTE: no voice-triggered barge-in. The mic is muted while she
+        // speaks, so it cannot hear her; interrupting is a tap on the orb.
 
         listener.onFinal = { text in
             heard = text
@@ -165,17 +169,49 @@ struct VoiceCallView: View {
                 let outcome = try await state.runCatrineTurn(query: text, turns: turns, agent: info)
                 if Task.isCancelled { return }
                 reply = ChatAction.parse(outcome.reply).visible
+                failures = 0
+            } catch is CancellationError {
+                return
             } catch {
                 if Task.isCancelled { return }
-                reply = "Something went wrong there."
+                failures += 1
+
+                // Say the ACTUAL error, once. A generic "something went wrong"
+                // told us nothing and was impossible to diagnose from the phone.
+                let detail = (error as? APIError)?.message ?? error.localizedDescription
+                lastError = detail
+
+                // Two failures in a row means it is not going to fix itself.
+                // Stop talking and put the error on screen instead of reciting
+                // it forever — a spoken error the mic can hear is a loop.
+                if failures >= 2 {
+                    phase = .failed
+                    return
+                }
+                reply = detail
             }
 
             state.appendVoiceTurn(role: "assistant", content: reply)
             said = reply
             phase = .speaking
+
+            // Deaf while she talks, or she answers her own voice forever.
+            listener.isMuted = true
             await router?.speak(reply: reply)
+            listener.isMuted = false
+
             if !Task.isCancelled { phase = .listening }
         }
+    }
+
+    /// Cut her off. The mic is deaf while she speaks (see `listener.isMuted`),
+    /// so interrupting is a deliberate tap rather than talking over her.
+    private func interrupt() {
+        guard phase == .speaking || phase == .thinking else { return }
+        turn?.cancel()
+        router?.stop()
+        listener.isMuted = false
+        phase = .listening
     }
 
     private func finish() {

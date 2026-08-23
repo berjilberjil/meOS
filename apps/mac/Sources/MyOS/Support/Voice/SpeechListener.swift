@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Speech
 import AVFoundation
 
@@ -34,6 +35,26 @@ final class SpeechListener: ObservableObject {
     private var silenceTimer: Timer?
     private var sawSpeechThisUtterance = false
 
+    /// Deaf while Catrine talks.
+    ///
+    /// On speakerphone the microphone hears HER, transcribes it, and feeds it
+    /// back as a new question — she then answers herself forever. Hardware echo
+    /// cancellation (below) removes most of it, but "most" is not good enough
+    /// for a loop that never terminates, so audio is simply not fed to the
+    /// recogniser while she is speaking. Interrupting her is a tap on the orb.
+    var isMuted = false {
+        // Copy out first: the lock's closure is Sendable and cannot capture a
+        // main-actor-isolated property.
+        didSet {
+            let muted = isMuted
+            mutedFlag.withLock { $0 = muted }
+        }
+    }
+
+    /// `isMuted` read from the audio tap, which is not on the main actor.
+    private let mutedFlag = OSAllocatedUnfairLock(initialState: false)
+    nonisolated var isMutedUnsafe: Bool { mutedFlag.withLock { $0 } }
+
     /// How long a pause ends an utterance. Short enough to feel responsive,
     /// long enough to survive thinking mid-sentence.
     private let endpointSilence: TimeInterval = 1.1
@@ -64,8 +85,12 @@ final class SpeechListener: ObservableObject {
         request = req
 
         let input = engine.inputNode
+        // Hardware echo cancellation — stops the mic hearing the speaker.
+        // Must be set before the engine starts.
+        try? input.setVoiceProcessingEnabled(true)
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
+            if self?.isMutedUnsafe == true { return }
             req.append(buffer)
         }
         engine.prepare()
