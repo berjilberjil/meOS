@@ -256,6 +256,27 @@ final class APIClient {
         return try decoder.decode(ImageParseResult.self, from: data)
     }
 
+    struct WeeklyReportDTO: Codable {
+        let verdict: String
+        let percent: Double
+        let headline: String
+        let read: String
+        let workouts: [String]
+        let diet: [String]
+        let cheer: String
+        let needsPhotos: Bool
+    }
+
+    /// The Friday progress report — the same vision route Scan uses, a different
+    /// mode. Images are last week's first, then this week's; `context` says how
+    /// many of each and carries the logged numbers.
+    func weeklyReport(imagesBase64: [String], context: String) async throws -> WeeklyReportDTO {
+        let body = ImageRequest(images: imagesBase64, mediaType: "image/jpeg",
+                                mode: "weekly", context: context)
+        let data = try await request("POST", "api/parse-image", body: body, using: aiSession)
+        return try decoder.decode(WeeklyReportDTO.self, from: data)
+    }
+
     struct EventCategoryDTO: Codable { let tagId: String; let reason: String }
 
     /// Classify a spoken/typed event into a built-in tag.

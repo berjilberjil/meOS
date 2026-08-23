@@ -12,6 +12,8 @@ import UniformTypeIdentifiers
 struct BelongingsView: View {
     @EnvironmentObject var state: AppState
     @State private var editing: BelongingItem?
+    /// Long-pressed to see the product photo full size, rather than the card's crop.
+    @State private var viewingPhoto: BelongingItem?
     @State private var showNew = false
     @State private var salaryDraft = ""
 
@@ -40,6 +42,7 @@ struct BelongingsView: View {
         }
         .sheet(isPresented: $showNew) { editor(nil).belongingSheetChrome() }
         .sheet(item: $editing) { editor($0).belongingSheetChrome() }
+        .sheet(item: $viewingPhoto) { BelongingPhotoViewer(item: $0) }
         .onAppear { salaryDraft = rupeesString(state.belongings.salaryPaise) }
     }
 
@@ -198,6 +201,13 @@ struct BelongingsView: View {
             #endif
         }
         .buttonStyle(KPressStyle())
+        // Tap edits; press and hold shows the photo you added, full size. Items
+        // without one just don't respond — there is nothing to open.
+        .onLongPressGesture(minimumDuration: 0.4) {
+            guard !item.photoBase64.isEmpty else { return }
+            Haptics.selection()
+            viewingPhoto = item
+        }
     }
 
     /// Phone: compact 2-col card — photo is a short banner, not a tall square.
@@ -700,5 +710,50 @@ private struct NewBelongingCategorySheet: View {
                 }
             }
         }
+    }
+}
+
+
+/// The product photo, full size, on black. Reached by pressing and holding a
+/// card in Stuff.
+private struct BelongingPhotoViewer: View {
+    let item: BelongingItem
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let content = ZStack {
+            Color.black.ignoresSafeArea()
+            if let img = MediaJPEG.image(fromBase64: item.photoBase64) {
+                img.resizable().scaledToFit()
+            } else {
+                Text("No photo on this one.")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white.opacity(0.7))
+            }
+            VStack {
+                HStack(alignment: .top) {
+                    Text(item.name)
+                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                        .lineLimit(2)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(.black.opacity(0.45), in: Capsule())
+                    Spacer(minLength: 8)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                            .padding(9)
+                            .background(.black.opacity(0.45), in: Circle())
+                    }
+                    .buttonStyle(KPressStyle())
+                }
+                .padding(16)
+                Spacer()
+            }
+        }
+
+        #if os(iOS)
+        content.presentationBackground(.black)
+        #else
+        content.frame(width: 620, height: 620)
+        #endif
     }
 }

@@ -1,9 +1,11 @@
 import SwiftUI
 import AppKit
+import UserNotifications
 
 @main
 struct MyOSApp: App {
     @StateObject private var state = AppState()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var themeStore = ThemeStore.shared
 
     var body: some Scene {
@@ -63,5 +65,13 @@ private struct WindowChrome: NSViewRepresentable {
         // Drop the toolbar entirely — the app draws its own sidebar and headers,
         // so the empty system toolbar strip (and its grey material) is pure chrome.
         window.toolbar = nil
+    }
+}
+
+
+/// Installs the notification router, so tapping the Friday report opens on it.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
     }
 }

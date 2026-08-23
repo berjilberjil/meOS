@@ -354,8 +354,9 @@ struct FocusCard: View {
 
 // MARK: - The focus session
 
-/// One task at a time: a countdown, then "Done & next" pulls the following one in.
-/// This is the whole of Task Mode — `TaskModeView` just gives it the screen.
+/// One task at a time: a countdown, the slide that finishes it, and the rest of
+/// today underneath. This is the whole of Task Mode — `TaskModeView` just gives
+/// it the screen.
 struct FocusSessionView: View {
     var defaultMinutes: Int
     let onClose: () -> Void
@@ -367,31 +368,38 @@ struct FocusSessionView: View {
 
     private var items: [FocusItem] { state.todayPlan().todos }
     private var current: FocusItem? { items.first { $0.id == timer.itemID } }
-    private var queue: [FocusItem] { items.filter { !$0.done && $0.id != timer.itemID } }
+    private var queue: [FocusItem] { TaskMode.remaining(items, excluding: timer.itemID) }
 
     var body: some View {
         VStack(spacing: 0) {
             header
 
             if let item = current {
-                ring
-                Text(item.text)
-                    .font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.text)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 28).padding(.top, 16)
-
-                lengthChips.padding(.top, 14)
-                controls.padding(.horizontal, 20).padding(.top, 18)
-                upNext.padding(.horizontal, 20).padding(.top, 20)
+                // The mode is taller than a phone now that the whole list is on
+                // it, so it scrolls — the timer and the slide stay above the fold.
+                ScrollView {
+                    VStack(spacing: 0) {
+                        now(item)
+                        ring.padding(.top, 14)
+                        lengthChips.padding(.top, 16)
+                        SlideToComplete(title: queue.isEmpty ? "slide to finish up" : "slide to done") {
+                            doneAndNext()
+                        }
+                        // A fresh slider per task: the knob parks at the end
+                        // after a slide, and that is only right until the next one.
+                        .id(item.id)
+                        .padding(.horizontal, 20).padding(.top, 20)
+                        controls.padding(.horizontal, 20).padding(.top, 10)
+                        todayList.padding(.horizontal, 20).padding(.top, 26)
+                    }
+                    .padding(.bottom, 28)
+                }
+                .scrollIndicators(.hidden)
             } else {
                 emptyState
+                Spacer(minLength: 12)
             }
-            Spacer(minLength: 12)
         }
-        .padding(.bottom, 18)
-        // A column, not a wall of screen — the Mac window is wide and a timer
-        // centred in 1400pt of black reads as a mistake.
         .frame(maxWidth: 460)
         .frame(maxWidth: .infinity)
         .background(Palette.bg)
@@ -422,6 +430,37 @@ struct FocusSessionView: View {
         // Clears the traffic lights: the mode hides the sidebar this normally sits beside.
         .padding(.leading, Self.trafficLightInset)
         .padding(.top, Self.topInset).padding(.bottom, 10)
+    }
+
+    /// Which task, and what the clock is doing — the two things that were never
+    /// obvious enough at a glance.
+    private func now(_ item: FocusItem) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Text("NOW")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(1)
+                    .foregroundStyle(Palette.faint)
+                Circle().fill(stateColor).frame(width: 4, height: 4)
+                Text(stateWord)
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundStyle(stateColor)
+            }
+            Text(item.text)
+                .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+    }
+
+    private var stateWord: String {
+        if timer.finished { return "time's up" }
+        return timer.running ? "focusing" : "paused"
+    }
+
+    private var stateColor: Color {
+        if timer.finished { return Palette.green }
+        return timer.running ? Palette.teal : Palette.amber
     }
 
     /// Nothing running: either the list is empty (write one) or the day is done.
@@ -501,13 +540,12 @@ struct FocusSessionView: View {
                 Text(timer.clock)
                     .font(.system(size: 44, weight: .heavy, design: .rounded)).monospacedDigit()
                     .foregroundStyle(timer.finished ? Palette.green : Palette.text)
-                Text(timer.finished ? "Time's up" : (timer.running ? "focusing" : "paused"))
+                Text("of \(max(1, timer.total / 60))m")
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .foregroundStyle(Palette.faint)
             }
         }
         .frame(width: 220, height: 220)
-        .padding(.top, 10)
     }
 
     private var lengthChips: some View {
@@ -532,53 +570,74 @@ struct FocusSessionView: View {
     }
 
     private var controls: some View {
-        VStack(spacing: 10) {
-            Button { doneAndNext() } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "checkmark").font(.system(size: 14, weight: .bold))
-                    Text(queue.isEmpty ? "Done — finish up" : "Done & next")
+        HStack(spacing: 10) {
+            Button { toggleRun() } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: timer.running ? "pause.fill" : "play.fill")
+                        .font(.system(size: 12, weight: .bold))
+                    Text(timer.running ? "Pause" : "Resume")
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KPrimaryButtonStyle(tint: Palette.green, fullWidth: true))
+            .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+            .disabled(timer.finished)
+            .opacity(timer.finished ? 0.5 : 1)
 
-            HStack(spacing: 10) {
-                Button { toggleRun() } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: timer.running ? "pause.fill" : "play.fill")
-                            .font(.system(size: 12, weight: .bold))
-                        Text(timer.running ? "Pause" : "Resume")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
-                .disabled(timer.finished)
-                .opacity(timer.finished ? 0.5 : 1)
+            Button { skip() } label: {
+                Text(queue.isEmpty ? "Stop" : "Skip").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+        }
+    }
 
-                Button { skip() } label: {
-                    Text(queue.isEmpty ? "Stop" : "Skip").frame(maxWidth: .infinity)
+    /// The rest of the day, in the mode. Tapping one moves the block onto it, so
+    /// the order is a suggestion rather than a queue you are stuck in.
+    @ViewBuilder private var todayList: some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: Gap.tight) {
+                HStack(spacing: 6) {
+                    Text("TODAY")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.8)
+                        .foregroundStyle(Palette.faint)
+                    Text(queue.isEmpty ? "· last one" : "· \(queue.count) left")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Palette.faint)
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                ForEach(items) { item in listRow(item) }
+                addField.padding(.top, 6)
             }
         }
     }
 
-    @ViewBuilder private var upNext: some View {
-        if !queue.isEmpty {
-            VStack(alignment: .leading, spacing: 7) {
-                SectionTitle(text: "Up next")
-                ForEach(queue.prefix(4)) { q in
-                    HStack(spacing: 8) {
-                        Circle().fill(Palette.border).frame(width: 5, height: 5)
-                        Text(q.text).font(.system(size: 13)).foregroundStyle(Palette.muted).lineLimit(1)
-                        Spacer(minLength: 0)
-                    }
-                }
-                if queue.count > 4 {
-                    Text("+\(queue.count - 4) more").font(.system(size: 11)).foregroundStyle(Palette.faint)
+    private func listRow(_ item: FocusItem) -> some View {
+        let isCurrent = item.id == timer.itemID
+        return Button { jump(to: item) } label: {
+            HStack(spacing: 9) {
+                Image(systemName: item.done ? "checkmark.circle.fill" : (isCurrent ? "timer" : "circle"))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(item.done ? Palette.green : (isCurrent ? Palette.teal : Palette.border))
+                Text(item.text)
+                    .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
+                    .strikethrough(item.done, color: Palette.faint)
+                    .foregroundStyle(item.done ? Palette.faint : (isCurrent ? Palette.text : Palette.muted))
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                if item.done, item.spent >= 60 {
+                    Text("\(item.spent / 60)m")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Palette.faint)
+                } else if !item.done {
+                    Text("\(item.mins ?? defaultMinutes)m")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(isCurrent ? Palette.teal : Palette.faint)
                 }
             }
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(KPressStyle())
+        .disabled(item.done)
     }
 
     // MARK: Actions
@@ -596,6 +655,14 @@ struct FocusSessionView: View {
         bank()
         state.setTodoMinutes(item.id, minutes)
         timer.begin(item, minutes: minutes)
+    }
+
+    /// Move the block onto another task on the list.
+    private func jump(to item: FocusItem) {
+        guard !item.done, item.id != timer.itemID else { return }
+        timer.pause()
+        bank()
+        timer.begin(item, minutes: item.mins ?? defaultMinutes)
     }
 
     private func doneAndNext() {

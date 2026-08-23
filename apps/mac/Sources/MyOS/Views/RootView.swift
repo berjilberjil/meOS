@@ -49,11 +49,21 @@ struct RootView: View {
             SoundPlayer.open()   // cold launch — scenePhase is already .active by now
             #endif
             await state.bootstrap()
-            if state.phase == .loggedIn { DietBridge.shared.start(state: state) }
+            if state.phase == .loggedIn {
+                DietBridge.shared.start(state: state)
+                await state.generateWeeklyReportIfDue()
+            }
         }
         .onChange(of: scenePhase) { old, newPhase in
             if newPhase == .background { unlocked = false }
-            if newPhase == .active { Task { await state.pullRemote() } }
+            if newPhase == .active {
+                Task {
+                    await state.pullRemote()
+                    // Friday 6pm: the first time the app is open and unlocked
+                    // after it, the week gets read back.
+                    await state.generateWeeklyReportIfDue()
+                }
+            }
             #if os(iOS)
             // The app has a voice for coming and going. Only a real re-open counts —
             // gating on `.background` keeps Control Center and the Face ID prompt

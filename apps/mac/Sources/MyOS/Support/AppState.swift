@@ -57,6 +57,13 @@ final class AppState: ObservableObject {
     @Published var scans: [ScanRecord] = []
     /// The synced Task Mode switch. See `Support/TaskMode.swift`.
     @Published var taskMode = TaskModeState()
+    /// Friday progress reports, newest first. See `Support/WeeklyReport.swift`.
+    @Published var weekly: [WeeklyReport] = []
+    @Published var weeklyBusy = false
+    @Published var weeklyError: String?
+    /// In memory only: stops a failing report from re-running on every
+    /// return to the foreground. See `generateWeeklyReportIfDue`.
+    var lastWeeklyAttempt: Date?
     @Published var fold: FoldData?
     @Published var foldBusy = false
     @Published var foldError: String?
@@ -136,6 +143,7 @@ final class AppState: ObservableObject {
         memory    = s.memory ?? MemoryState()
         scans     = s.scans ?? []
         taskMode  = s.taskMode ?? TaskModeState()
+        weekly    = s.weekly ?? []
         belongings = s.belongings ?? BelongingsState()
         if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
@@ -250,7 +258,7 @@ final class AppState: ObservableObject {
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
         events = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
-        scans = []; taskMode = TaskModeState()
+        scans = []; taskMode = TaskModeState(); weekly = []
         fold = nil
         username = ""; isHydrated = false; lastSyncError = nil
         pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
@@ -305,7 +313,7 @@ final class AppState: ObservableObject {
             (StateKey.events, events), (StateKey.eventTags, eventTags),
             (StateKey.watch, watch), (StateKey.belongings, belongings),
             (StateKey.memory, memory), (StateKey.scans, scans),
-            (StateKey.taskMode, taskMode)
+            (StateKey.taskMode, taskMode), (StateKey.weekly, weekly)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -405,7 +413,7 @@ final class AppState: ObservableObject {
         add("watch", watch)
         add("memory", memory)
         add("belongings", belongings)
-        add("scans", scans); add("taskMode", taskMode)
+        add("scans", scans); add("taskMode", taskMode); add("weekly", weekly)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -506,6 +514,7 @@ final class AppState: ObservableObject {
         // The mode is the one switch meant to reach across devices — a flip on
         // the Mac lands here on the phone within one poll.
         if let v = s.taskMode,       !hasPendingPush(StateKey.taskMode),       v != taskMode       { taskMode = v }
+        if let v = s.weekly,         !hasPendingPush(StateKey.weekly),         v != weekly         { weekly = v }
         if let v = s.fold, !hasPendingPush(StateKey.fold), v != fold {
             if FoldSnapshotBuilder.isBare(v) {
                 restoreFoldIfBare()
@@ -2012,6 +2021,7 @@ final class AppState: ObservableObject {
         watch = [];                    push(StateKey.watch, watch)
         belongings = BelongingsState(); push(StateKey.belongings, belongings)
         clearScans()
+        weekly = [];                   push(StateKey.weekly, weekly)
     }
 }
 

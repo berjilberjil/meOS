@@ -19,7 +19,7 @@ struct SettingsView: View {
     private var textInset: CGFloat { tile + 14 + 12 }
 
     private enum Page: String, Identifiable {
-        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data, calendar
+        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data, calendar, weekly
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -33,6 +33,7 @@ struct SettingsView: View {
             case .keys: return "AI keys"
             case .reorder: return "Reorder Today"
             case .data: return "Data & resets"
+            case .weekly: return "Weekly report"
             }
         }
         var icon: String {
@@ -47,6 +48,7 @@ struct SettingsView: View {
             case .keys: return "key.fill"
             case .reorder: return "arrow.up.arrow.down"
             case .data: return "trash.fill"
+            case .weekly: return "chart.line.uptrend.xyaxis"
             }
         }
         var tint: Color {
@@ -61,6 +63,7 @@ struct SettingsView: View {
             case .keys: return Palette.flame
             case .reorder: return Palette.ice
             case .data: return Palette.red
+            case .weekly: return Palette.rose
             }
         }
     }
@@ -83,6 +86,13 @@ struct SettingsView: View {
         .animation(.knTheme, value: themeStore.theme.id)
         .sheet(item: $page) { p in editorSheet(p) }
         .onChange(of: page) { _, now in if now == nil { sheetHeight = 0 } }
+        // Arrived from the Friday report notification — open straight on it.
+        .onAppear {
+            if UISignals.shared.openWeeklyReport {
+                UISignals.shared.openWeeklyReport = false
+                page = .weekly
+            }
+        }
     }
 
     private var groups: some View {
@@ -96,6 +106,7 @@ struct SettingsView: View {
                 row(.reorder); divider
                 row(.appearance); divider
                 row(.launch); divider
+                row(.weekly); divider
                 row(.reminders)
             }
 
@@ -229,6 +240,7 @@ struct SettingsView: View {
                             case .assistant: AgentSettingsCard(boxed: false)
                             case .memory: MemoryCard(boxed: false)
                             case .keys: AIProvidersCard(boxed: false)
+                            case .weekly: WeeklyReportCard(boxed: false)
                             case .data: DataManagementCard(boxed: false)
                             case .reorder: EmptyView()
                             }

@@ -11,6 +11,7 @@ struct MainView: View {
     @State private var foldTaps = 0
     @State private var lastFoldTap = Date.distantPast
     @State private var showSettings = false
+    @ObservedObject private var signals = UISignals.shared
 
     var body: some View {
         ZStack {
@@ -58,6 +59,9 @@ struct MainView: View {
         .animation(.knTheme, value: themeStore.theme.id)
         .preferredColorScheme(themeStore.theme.colorScheme)
         .sheet(isPresented: $showSettings) { SettingsView() }
+        // Tapped the Friday report notification. SettingsView clears the flag
+        // once it is up, and opens on the report.
+        .onChange(of: signals.openWeeklyReport) { _, on in if on { showSettings = true } }
         // Every heavy import lives here, not in the cards. Today is paged by
         // day, so a card-level `.task` runs once per live page — i.e. three
         // times, and again on every swipe.

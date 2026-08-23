@@ -1,0 +1,229 @@
+import SwiftUI
+
+/// Settings → Weekly report. The latest Friday read-back in full, older ones
+/// collapsed underneath.
+struct WeeklyReportCard: View {
+    var boxed = true
+    @EnvironmentObject var state: AppState
+    @State private var openID: String?
+
+    private var latest: WeeklyReport? { state.weekly.first }
+
+    var body: some View {
+        let inner = VStack(alignment: .leading, spacing: Gap.row) {
+            header
+            if let r = latest {
+                ReportBody(report: r)
+                if state.weekly.count > 1 { older }
+            } else {
+                empty
+            }
+            if let err = state.weeklyError {
+                Text(err).font(.system(size: 12)).foregroundStyle(Palette.amber)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            generateButton
+        }
+        // Opening the report is what marks it read — the Settings row badge and
+        // this are the same fact.
+        .onAppear { if let r = latest, !r.seen { state.markWeeklyReportSeen(r.id) } }
+        .sheet(item: Binding(get: { state.weekly.first { $0.id == openID } },
+                             set: { if $0 == nil { openID = nil } })) { r in
+            PastReportSheet(report: r)
+        }
+
+        if boxed { Card { inner } } else { inner }
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            SectionTitle(text: "Weekly report")
+            Spacer(minLength: 0)
+            if let r = latest {
+                Text(Fmt.day(r.weekEnd))
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Palette.faint)
+            }
+        }
+    }
+
+    private var empty: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("No report yet.")
+                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+            Text("Every Friday from 6pm, MyOS reads this week's progress photos against last week's — with your goal and what you actually logged — and tells you straight whether you moved.")
+                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var older: some View {
+        VStack(alignment: .leading, spacing: Gap.tight) {
+            Text("EARLIER WEEKS")
+                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                .foregroundStyle(Palette.faint)
+                .padding(.top, 4)
+            ForEach(state.weekly.dropFirst()) { r in
+                Button { openID = r.id } label: {
+                    HStack(spacing: 8) {
+                        VerdictDot(verdict: r.kind)
+                        Text(Fmt.day(r.weekEnd))
+                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text(r.headline)
+                            .font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(1)
+                        Spacer(minLength: 0)
+                        if !r.percentLabel.isEmpty {
+                            Text(r.percentLabel)
+                                .font(.system(size: 11, weight: .heavy, design: .rounded)).monospacedDigit()
+                                .foregroundStyle(Palette.faint)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(KPressStyle())
+            }
+        }
+    }
+
+    private var generateButton: some View {
+        Button { Task { await state.generateWeeklyReport(notify: false) } } label: {
+            HStack(spacing: 6) {
+                if state.weeklyBusy {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 11, weight: .bold))
+                }
+                Text(state.weeklyBusy ? "Reading your week…"
+                                      : (latest == nil ? "Read my week now" : "Read it again"))
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+        .disabled(state.weeklyBusy)
+    }
+}
+
+/// One report, rendered. Shared by the card and the past-report sheet.
+private struct ReportBody: View {
+    let report: WeeklyReport
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 9) {
+                VerdictDot(verdict: report.kind)
+                Text(report.kind.label.uppercased())
+                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.8)
+                    .foregroundStyle(tint)
+                Spacer(minLength: 0)
+                if !report.percentLabel.isEmpty {
+                    Text(report.percentLabel)
+                        .font(.system(size: 20, weight: .heavy, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(tint)
+                }
+            }
+
+            Text(report.headline)
+                .font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !report.read.isEmpty {
+                Text(report.read)
+                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !report.workouts.isEmpty { list("TRAIN", report.workouts, tint: Palette.rose) }
+            if !report.diet.isEmpty { list("EAT", report.diet, tint: Palette.green) }
+
+            if !report.cheer.isEmpty {
+                Text(report.cheer)
+                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            }
+
+            Text("\(report.photosThisWeek) photo\(report.photosThisWeek == 1 ? "" : "s") this week · \(report.photosLastWeek) last week")
+                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .foregroundStyle(Palette.faint)
+        }
+    }
+
+    private var tint: Color { VerdictDot.color(report.kind) }
+
+    private func list(_ label: String, _ items: [String], tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                .foregroundStyle(Palette.faint)
+            ForEach(items, id: \.self) { item in
+                HStack(alignment: .top, spacing: 8) {
+                    Circle().fill(tint).frame(width: 5, height: 5).padding(.top, 6)
+                    Text(item).font(.system(size: 14)).foregroundStyle(Palette.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+}
+
+struct VerdictDot: View {
+    let verdict: WeeklyReport.Verdict
+
+    var body: some View {
+        Image(systemName: Self.icon(verdict))
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(Self.color(verdict))
+    }
+
+    static func color(_ v: WeeklyReport.Verdict) -> Color {
+        switch v {
+        case .gaining: return Palette.green
+        case .holding: return Palette.amber
+        case .slipping: return Palette.red
+        case .unknown: return Palette.muted
+        }
+    }
+
+    static func icon(_ v: WeeklyReport.Verdict) -> String {
+        switch v {
+        case .gaining: return "arrow.up.right.circle.fill"
+        case .holding: return "equal.circle.fill"
+        case .slipping: return "arrow.down.right.circle.fill"
+        case .unknown: return "questionmark.circle.fill"
+        }
+    }
+}
+
+private struct PastReportSheet: View {
+    let report: WeeklyReport
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let content = ScrollView {
+            VStack(alignment: .leading, spacing: Gap.screen) {
+                HStack {
+                    Text(Fmt.day(report.weekStart) + " – " + Fmt.day(report.weekEnd))
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Palette.faint)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                    }
+                    .buttonStyle(KIconButtonStyle(size: 28))
+                }
+                ReportBody(report: report)
+            }
+            .padding(20)
+        }
+        .background(Palette.bg)
+
+        #if os(iOS)
+        content.presentationDetents([.large]).presentationBackground(Palette.bg)
+        #else
+        content.frame(width: 460, height: 600)
+        #endif
+    }
+}

@@ -5,6 +5,7 @@ import SwiftUI
 struct MainView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
+    @ObservedObject private var signals = UISignals.shared
     @State private var tab: NavTab = PrefsStore.shared.resolveOpeningTab()
     private static let kCollapsed = "myos.sidebar.collapsed"
     @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
@@ -68,10 +69,19 @@ struct MainView: View {
         .background(Palette.bg.ignoresSafeArea())
         .animation(.knTheme, value: themeStore.theme.id)
         .onChange(of: tab) { _, _ in Haptics.selection() }
+        // Tapped the Friday report notification.
+        .onAppear { consumeWeeklySignal() }
+        .onChange(of: signals.openWeeklyReport) { _, on in if on { consumeWeeklySignal() } }
     }
 
     @State private var foldTaps = 0
     @State private var lastFoldTap = Date.distantPast
+
+    private func consumeWeeklySignal() {
+        guard signals.openWeeklyReport else { return }
+        signals.openWeeklyReport = false
+        switchTo(.settings)
+    }
 
     private func switchTo(_ t: NavTab) {
         withAnimation(.knPop) { tab = t }

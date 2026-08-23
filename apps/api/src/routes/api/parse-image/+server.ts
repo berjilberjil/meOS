@@ -39,6 +39,19 @@ const ScanResult = z.object({
   object: ScanObject.nullable()
 });
 
+/// The Friday report. `percent` is a signed estimate against last week, and the
+/// model is told to leave it at 0 with needsPhotos=true rather than invent one.
+const WeeklyResult = z.object({
+  verdict: z.enum(['gaining', 'holding', 'slipping', 'unknown']),
+  percent: z.number(),
+  headline: z.string(),
+  read: z.string(),
+  workouts: z.array(z.string()),
+  diet: z.array(z.string()),
+  cheer: z.string(),
+  needsPhotos: z.boolean()
+});
+
 const BelongingResult = z.object({
   name: z.string(),
   category: z.string(),
@@ -87,6 +100,44 @@ function belongingPrompt(context: string): string {
   ].filter(Boolean).join('\n');
 }
 
+function weeklyPrompt(context: string): string {
+  return [
+    `You are Catherine inside MyOS, writing this person's weekly body-progress report.`,
+    `You are their coach, not a cheerleader and not a hype account. You know them.`,
+    ``,
+    `THEIR WEEK — goal, targets and what they actually logged:`,
+    context.trim().slice(0, 6000),
+    ``,
+    `The images are body photos. The context above says how many are from LAST week and`,
+    `how many are from THIS week, and they are attached in that order — last week first.`,
+    `Compare the two weeks against THEIR STATED GOAL. Cutting and gaining are not the same`,
+    `win; read the goal before you judge the photos.`,
+    ``,
+    `- verdict: gaining (moving toward the goal) | holding (flat) | slipping (moving away)`,
+    `  | unknown (you genuinely cannot tell).`,
+    `- percent: signed, approximate change toward the goal versus last week, e.g. -1.8 for`,
+    `  1.8% down when cutting is the goal is PROGRESS — sign it by the number that moved`,
+    `  (weight, waist), not by whether it is good news. Small is fine; a real week is 0-3%.`,
+    `  Lean on the logged weight when it exists — a photo alone cannot tell 1 kg from`,
+    `  different lighting. If there is no photo in one of the two weeks, set percent 0,`,
+    `  verdict unknown and needsPhotos true, and say so in read. Never invent a number.`,
+    `- headline: one short line they will read first. Specific, not "Great work!".`,
+    `- read: 2-4 sentences on what you actually SEE and what the numbers say. Name body`,
+    `  parts plainly (belly, chest, arms, posture). If the belly is bigger, say the belly`,
+    `  is bigger.`,
+    `- workouts: 2-4 concrete things to focus on next week, named as real exercises or`,
+    `  sessions (e.g. "3 x 30 min zone-2 walk after dinner", "weighted incline press 4x8").`,
+    `- diet: 2-4 concrete targets in THEIR numbers (kcal, protein g, what to cut). Use the`,
+    `  targets from the context when they exist instead of inventing new ones.`,
+    `- cheer: speak to them directly. If they earned it, say so warmly and mean it. If they`,
+    `  slipped, tell them straight — disappointed, not cruel, and never sarcastic. One or`,
+    `  two sentences, their name if you know it.`,
+    `- needsPhotos: true only when a week is missing photos to compare.`,
+    ``,
+    `Never flatter. Never pad. They asked to be told the truth.`
+  ].join('\n');
+}
+
 function foodPrompt(): string {
   return [
     `These images show a packaged food item — a nutrition/ingredients label, a product`,
@@ -120,8 +171,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   const mode = typeof body.mode === 'string' ? body.mode : 'food';
   const context = typeof body.context === 'string' ? body.context : '';
-  const schema = mode === 'scan' ? ScanResult : mode === 'belonging' ? BelongingResult : FoodResult;
-  const prompt = mode === 'scan' ? scanPrompt(context) : mode === 'belonging' ? belongingPrompt(context) : foodPrompt();
+  // One table beats a fourth nested ternary. Unknown modes read a label, which is
+  // what this route did before any of the others existed.
+  const MODES: Record<string, { schema: z.ZodTypeAny; prompt: (c: string) => string }> = {
+    scan: { schema: ScanResult, prompt: scanPrompt },
+    belonging: { schema: BelongingResult, prompt: belongingPrompt },
+    weekly: { schema: WeeklyResult, prompt: weeklyPrompt },
+    food: { schema: FoodResult, prompt: () => foodPrompt() }
+  };
+  const { schema, prompt: buildPrompt } = MODES[mode] ?? MODES.food;
+  const prompt = buildPrompt(context);
 
   let resolved;
   try {

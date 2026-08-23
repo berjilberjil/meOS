@@ -152,3 +152,42 @@ enum FocusNotify {
         #endif
     }
 }
+
+/// The Friday report's notification. Fired only once the report actually exists —
+/// the app builds it first, because the photos are sealed on this device.
+@MainActor
+enum WeeklyNotify {
+    static let id = "myos.weekly.ready"
+    static let route = "weekly"
+
+    static func ready(headline: String) {
+        let c = UNMutableNotificationContent()
+        c.title = "Your week, read back"
+        c.body = headline.isEmpty ? "The Friday report is ready." : headline
+        c.sound = .default
+        c.userInfo = ["route": route]
+        UNUserNotificationCenter.current()
+            .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
+    }
+}
+
+/// Routes a tapped notification to the screen it belongs to. Shared by both
+/// platforms' app delegates.
+final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationRouter()
+
+    /// Show it even when MyOS is open — the report is generated in-app, so the
+    /// moment it lands he is usually looking at something else in the app.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async
+    -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse) async {
+        let route = response.notification.request.content.userInfo["route"] as? String
+        guard route == WeeklyNotify.route else { return }
+        await MainActor.run { UISignals.shared.openWeeklyReport = true }
+    }
+}

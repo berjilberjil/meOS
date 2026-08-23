@@ -17,4 +17,6 @@ final class UISignals: ObservableObject {
     @Published var revealHiddenNotes = false
     /// Open Journal on this `yyyy-MM-dd` (Today streak calendar tap).
     @Published var pendingJournalDate: String?
+    /// Tapped the Friday report notification — open Settings on the report.
+    @Published var openWeeklyReport = false
 }

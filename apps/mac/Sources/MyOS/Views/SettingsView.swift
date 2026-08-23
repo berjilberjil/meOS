@@ -28,6 +28,7 @@ struct SettingsView: View {
             DayDetailView().knRise(1)
             AppearanceCard().knRise(2)
             GeneralSettingsCard().knRise(2)
+            WeeklyReportCard().knRise(3)
             NotificationsCard().knRise(3)
             AgentSettingsCard().knRise(3)
             MemoryCard().knRise(3)
