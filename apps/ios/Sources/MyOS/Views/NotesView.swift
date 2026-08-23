@@ -64,7 +64,16 @@ struct NotesView: View {
                 }
             }
         }
-        .navigationDestination(item: $openID) { id in NoteEditor(id: id) }
+        // A full-screen cover, NOT `navigationDestination`: iOS MainView has no
+        // NavigationStack (deliberately — a stack with a hidden bar re-negotiates
+        // the scroll view's safe-area inset mid-scroll), so a push had nowhere to
+        // go and silently did nothing. That is why notes opened as a blank
+        // nothing and new ones could not be typed into.
+        .fullScreenCover(item: Binding(get: { openID.map(OpenNote.init) },
+                                       set: { openID = $0?.id })) { note in
+            NoteEditor(id: note.id)
+                .environmentObject(state)
+        }
         .onAppear { consumeNewNoteRequest(); consumeRevealHidden(); restoreRoute() }
         // Notes arrive from the cache a beat after the view builds on a cold
         // launch, so the first attempt can find nothing to reopen.
@@ -167,6 +176,9 @@ struct NotesView: View {
         }
     }
 }
+
+/// `fullScreenCover(item:)` wants an Identifiable; the note id is a String.
+private struct OpenNote: Identifiable { let id: String }
 
 /// Full-screen plain-text editor for one note (iOS).
 private struct NoteEditor: View {

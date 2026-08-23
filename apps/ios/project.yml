@@ -61,6 +61,7 @@ targets:
       - path: ../mac/Sources/MyOS/Views/TaskModeView.swift
       - path: ../mac/Sources/MyOS/Views/SlideToComplete.swift
       - path: ../mac/Sources/MyOS/Views/ScanHistory.swift
+      - path: ../mac/Sources/MyOS/Views/ActivitySheet.swift
       - path: ../mac/Sources/MyOS/Views/WeeklyReportCard.swift
       - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift
@@ -69,7 +70,6 @@ targets:
       - path: ../mac/Sources/MyOS/Views/ImageDropZone.swift
       - path: ../mac/Sources/MyOS/Views/WatchLogCard.swift
       - path: ../mac/Sources/MyOS/Views/SplashView.swift
-      - path: ../mac/Sources/MyOS/Views/CatherinePresence.swift
       - path: ../mac/Sources/MyOS/Views/BelongingsView.swift
       - path: ../mac/Sources/MyOS/Resources/drop.wav
         buildPhase: resources

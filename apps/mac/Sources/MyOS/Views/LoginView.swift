@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// The way in. The mark sits on its own green, and everything you actually
+/// operate sits on black on top of it — so the eye goes to the two fields and
+/// the button, not to the branding.
 struct LoginView: View {
     @EnvironmentObject var state: AppState
     @State private var username = ""
@@ -10,66 +13,99 @@ struct LoginView: View {
     private enum Field { case username, password }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            VStack(spacing: 12) {
-                Image("LogoMark")
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 60, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-                    .knShadow()
-                VStack(spacing: 5) {
-                    Text("MyOS")
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundStyle(Palette.text)
-                    Text("Your second brain. Money · Body · Mind.")
-                        .font(.system(size: 14)).foregroundStyle(Palette.muted)
+        ZStack {
+            Brandmark.green.ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    Image("LogoMark")
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(maxWidth: 190)
+                        .padding(.top, 28)
+
+                    wordmark.padding(.top, 4)
+                    form.padding(.top, 18)
+
+                    Text("Berjil Jacob")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .padding(.top, 34).padding(.bottom, 28)
                 }
+                .frame(maxWidth: 420)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
             }
-            .padding(.bottom, 32)
-
-            VStack(spacing: 12) {
-                field("Username", text: $username, field: .username)
-                secureField("Password", text: $password)
-
-                if let err = state.authError {
-                    Text(err)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Palette.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                PrimaryButton(title: isRegister ? "Create account" : "Log in",
-                              loading: state.isWorking) {
-                    Task { await submit() }
-                }
-                .padding(.top, 4)
-
-                Button {
-                    withAnimation(.knFast) { isRegister.toggle(); state.authError = nil }
-                } label: {
-                    Text(isRegister ? "Have an account? Log in" : "New here? Create your account")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Palette.muted)
-                }
-                .buttonStyle(KPressStyle())
-                .padding(.top, 2)
-            }
-            .padding(24)
-            .frame(width: 340)
-            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-                    .strokeBorder(Palette.ring, lineWidth: 1)
-            )
-            .knShadow(true)
-
-            Spacer(); Spacer()
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg.ignoresSafeArea())
         .onSubmit { Task { await submit() } }
+    }
+
+    /// Name and promise, on black — the one place the green stops.
+    private var wordmark: some View {
+        VStack(spacing: 3) {
+            Text("MyOS")
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text("Your second brain. Money · Body · Mind.")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.72))
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 26).padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .background(Brandmark.ink, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+    }
+
+    private var form: some View {
+        VStack(spacing: 12) {
+            field("Username", text: $username, field: .username)
+            secureField("Password", text: $password)
+
+            if let err = state.authError {
+                Text(err)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Palette.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button { Task { await submit() } } label: {
+                HStack(spacing: 8) {
+                    if state.isWorking { ProgressView().controlSize(.small).tint(Brandmark.ink) }
+                    Text(isRegister ? "CREATE ACCOUNT" : "LOG IN")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .tracking(0.6)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .foregroundStyle(Brandmark.ink)
+                .background(
+                    LinearGradient(colors: [Color(hex: 0x7BE07B), Color(hex: 0x4FCB6B)],
+                                   startPoint: .leading, endPoint: .trailing),
+                    in: Capsule()
+                )
+            }
+            .buttonStyle(KPressStyle())
+            .disabled(state.isWorking)
+            .padding(.top, 4)
+
+            Button {
+                withAnimation(.knFast) { isRegister.toggle(); state.authError = nil }
+            } label: {
+                Text(isRegister ? "Have an account? Log in" : "New here? Create your account")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .buttonStyle(KPressStyle())
+            .padding(.top, 2)
+        }
+        .padding(18)
+        .background(Brandmark.inkSoft, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+        .padding(7)
+        .background(Brandmark.ink, in: RoundedRectangle(cornerRadius: Radius.xl + 7, style: .continuous))
     }
 
     private func submit() async {
@@ -80,20 +116,38 @@ struct LoginView: View {
         else { await state.login(username: u, password: password) }
     }
 
+    // The app's own field chrome is tuned for a dark surface; on this card it
+    // needs its own, darker still than the card it sits on.
     private func field(_ placeholder: String, text: Binding<String>, field: Field) -> some View {
-        TextField("", text: text, prompt: Text(placeholder).foregroundColor(Palette.faint))
+        TextField("", text: text, prompt: Text(placeholder).foregroundColor(.white.opacity(0.42)))
             .textFieldStyle(.plain)
             .autocorrectionDisabled()
-            .foregroundStyle(Palette.text)
+            .foregroundStyle(.white)
             .focused($focus, equals: field)
-            .knField(focused: focus == field)
+            .modifier(BrandField(focused: focus == field))
     }
 
     private func secureField(_ placeholder: String, text: Binding<String>) -> some View {
-        SecureField("", text: text, prompt: Text(placeholder).foregroundColor(Palette.faint))
+        SecureField("", text: text, prompt: Text(placeholder).foregroundColor(.white.opacity(0.42)))
             .textFieldStyle(.plain)
-            .foregroundStyle(Palette.text)
+            .foregroundStyle(.white)
             .focused($focus, equals: .password)
-            .knField(focused: focus == .password)
+            .modifier(BrandField(focused: focus == .password))
+    }
+}
+
+private struct BrandField: ViewModifier {
+    var focused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 16, design: .rounded))
+            .padding(.horizontal, 18).padding(.vertical, 14)
+            .background(Brandmark.ink, in: Capsule())
+            .overlay(
+                Capsule().strokeBorder(focused ? Brandmark.green.opacity(0.8) : .white.opacity(0.10),
+                                       lineWidth: focused ? 1.5 : 1)
+            )
+            .animation(.knFast, value: focused)
     }
 }

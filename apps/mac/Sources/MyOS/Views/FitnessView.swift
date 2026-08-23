@@ -451,6 +451,7 @@ struct ActivityStepsCard: View {
     @EnvironmentObject var state: AppState
 
     @State private var showCalendar = false
+    @State private var showSheet = false
     @State private var year = CalMath.cal.component(.year, from: Date())
     @State private var month = CalMath.cal.component(.month, from: Date())
     @State private var selected: String = AppState.dateKey(Date())
@@ -474,7 +475,7 @@ struct ActivityStepsCard: View {
     var body: some View {
         Card(padding: 14) {
             VStack(alignment: .leading, spacing: 12) {
-                summary
+                summaryRow
                 if showCalendar {
                     Divider().overlay(Palette.border).padding(.top, 2)
                     record.transition(.knReveal)
@@ -485,9 +486,32 @@ struct ActivityStepsCard: View {
         // paged by day — so a per-card task means seven serial main-actor
         // CoreMotion queries per live page, fired while you are mid-swipe.
         // `MainView` runs the backfill once at launch and once per foreground.
+        .sheet(isPresented: $showSheet) {
+            ActivitySheet(day: day ?? state.todayKey).environmentObject(state)
+        }
     }
 
     // MARK: Today
+
+    /// The number is the button — the calendar toggle sits outside it, because a
+    /// button inside a button is a tap the inner one never gets.
+    private var summaryRow: some View {
+        HStack(spacing: 12) {
+            Button { showSheet = true } label: { summary.contentShape(Rectangle()) }
+                .buttonStyle(KPressStyle())
+                .accessibilityLabel("See this week's activity")
+
+            if showsCalendar {
+                Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
+                    Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
+                        .font(.system(size: 13, weight: .bold))
+                }
+                .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
+                .help(showCalendar ? "Hide the record" : "See every day")
+                .accessibilityLabel(showCalendar ? "Hide the activity calendar" : "Show the activity calendar")
+            }
+        }
+    }
 
     private var summary: some View {
         let n = steps(day ?? state.todayKey)
@@ -503,15 +527,8 @@ struct ActivityStepsCard: View {
             }
             Spacer(minLength: 4)
             MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6).frame(width: 72)
-            if showsCalendar {
-            Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
-                Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
-                    .font(.system(size: 13, weight: .bold))
-            }
-            .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
-            .help(showCalendar ? "Hide the record" : "See every day")
-            .accessibilityLabel(showCalendar ? "Hide the activity calendar" : "Show the activity calendar")
-            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
         }
     }
 

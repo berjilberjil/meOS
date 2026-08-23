@@ -584,6 +584,15 @@ enum Fmt {
         return r == r.rounded() ? String(Int(r)) : String(format: "%.1f", r)
     }
 
+    /// One-letter weekday for a `yyyy-MM-dd` key. Hand-rolled rather than
+    /// localised: a strip of seven needs exactly one character each, and some
+    /// locales give two.
+    static func weekdayInitial(_ iso: String) -> String {
+        guard let date = CalMath.date(fromKey: String(iso.prefix(10))) else { return "" }
+        let i = CalMath.cal.component(.weekday, from: date)   // Sunday = 1
+        return ["S", "M", "T", "W", "T", "F", "S"][max(0, min(6, i - 1))]
+    }
+
     /// Human day label from an ISO stamp ("2026-08-04" or "2026-08-04T13:22:10").
     /// → "Today" / "Yesterday" / "Aug 4" / "Aug 4, 2025".
     static func day(_ iso: String) -> String {
