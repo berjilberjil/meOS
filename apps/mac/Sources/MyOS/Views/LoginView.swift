@@ -16,29 +16,40 @@ struct LoginView: View {
         ZStack {
             Brandmark.green.ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    Image("LogoMark")
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(1, contentMode: .fit)
-                        .frame(maxWidth: 190)
-                        .padding(.top, 28)
+            // The block is centred in the window and the name sits on the floor.
+            // `minHeight` tied to the viewport is what makes the spacers push:
+            // inside a scroll view, content otherwise collapses to its own height
+            // and stacks at the top. It still scrolls when the viewport is too
+            // short for all of it — a small phone with the keyboard up.
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 24)
 
-                    wordmark.padding(.top, 4)
-                    form.padding(.top, 18)
+                        Image("LogoMark")
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(1, contentMode: .fit)
+                            .frame(maxWidth: 190)
 
-                    Text("Berjil Jacob")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.95))
-                        .padding(.top, 34).padding(.bottom, 28)
+                        wordmark.padding(.top, 4)
+                        form.padding(.top, 18)
+
+                        Spacer(minLength: 24)
+
+                        Text("Berjil Jacob")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .padding(.bottom, 30)
+                    }
+                    .frame(maxWidth: 420)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
+                    .frame(minHeight: proxy.size.height)
                 }
-                .frame(maxWidth: 420)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 24)
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
         }
         .onSubmit { Task { await submit() } }
     }
