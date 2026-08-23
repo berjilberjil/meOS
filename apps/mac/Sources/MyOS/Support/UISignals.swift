@@ -19,4 +19,7 @@ final class UISignals: ObservableObject {
     @Published var pendingJournalDate: String?
     /// Tapped the Friday report notification — open Settings on the report.
     @Published var openWeeklyReport = false
+    /// Macro Intelligence opens over the whole content area rather than in a
+    /// sheet — it is a screen, not a dialog.
+    @Published var openMacro = false
 }

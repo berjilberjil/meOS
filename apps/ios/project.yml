@@ -64,6 +64,7 @@ targets:
       - path: ../mac/Sources/MyOS/Views/ActivitySheet.swift
       - path: ../mac/Sources/MyOS/Views/MacroPulseView.swift
       - path: ../mac/Sources/MyOS/Views/MacroMetricDetail.swift
+      - path: ../mac/Sources/MyOS/Views/MacroMethodSheet.swift
       - path: ../mac/Sources/MyOS/Views/WeeklyReportCard.swift
       - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift

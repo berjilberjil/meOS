@@ -80,6 +80,27 @@ final class MacroTests: XCTestCase {
         XCTAssertEqual(MacroFormat.shift("2026-12-31", by: 1), "2027-01-01")
     }
 
+    // MARK: Bullion and readings
+
+    func testAReadingCarriesItsUnit() {
+        XCTAssertEqual(MacroFormat.reading(9432.5, unit: "₹/g"), "9,432.5 ₹/g")
+        XCTAssertEqual(MacroFormat.reading(4.69, unit: "%"), "4.69%")
+        XCTAssertEqual(MacroFormat.reading(7674.37, unit: ""), "7,674.37")
+    }
+
+    func testDatesParseForTheChartAxis() {
+        XCTAssertNotNil(MacroFormat.date("2026-08-21"))
+        XCTAssertNotNil(MacroFormat.date("2026-08-21T10:00:00"), "a stamp is still a date")
+        XCTAssertNil(MacroFormat.date("not-a-date"))
+    }
+
+    func testGoldPerGramMathMatchesTheStatedFormula() {
+        // The sheet tells him ₹/g = $/oz × USD/INR ÷ 31.1035; this is that.
+        let usdPerOz = 4616.8, usdinr = 95.43
+        let expected = (usdPerOz * usdinr) / 31.1034768
+        XCTAssertEqual(expected, 14166.0, accuracy: 2.0)
+    }
+
     // MARK: The snapshot
 
     func testPulseIsOnlyTheTopPriorityMetrics() {

@@ -72,8 +72,22 @@ export const AI_METRICS = [
   { id: 'india10y', name: 'India 10Y G-Sec', category: 'Rates', country: 'IN', unit: '%', kind: 'rate' as const, frequency: 'Daily', priority: 0 as const },
   { id: 'nifty', name: 'NIFTY 50', category: 'Equities', country: 'IN', unit: '', kind: 'index' as const, frequency: 'Daily', priority: 0 as const },
   { id: 'indiavix', name: 'India VIX', category: 'Equities', country: 'IN', unit: '', kind: 'index' as const, frequency: 'Daily', priority: 0 as const },
-  { id: 'gold', name: 'Gold', category: 'Commodities', country: 'GL', unit: '$/oz', kind: 'price' as const, frequency: 'Daily', priority: 0 as const }
+  { id: 'gold', name: 'Gold', category: 'Commodities', country: 'GL', unit: '$/oz', kind: 'price' as const, frequency: 'Daily', priority: 0 as const },
+  { id: 'silver', name: 'Silver', category: 'Commodities', country: 'GL', unit: '$/oz', kind: 'price' as const, frequency: 'Daily', priority: 0 as const }
 ];
+
+/** A troy ounce in grams. Bullion is quoted per ounce and bought per gram. */
+export const GRAMS_PER_TROY_OUNCE = 31.1034768;
+
+/**
+ * Dollars an ounce is the quote; rupees a gram is the thing you actually pay.
+ * Returns null when there is no USD/INR to convert with — a half-converted
+ * price is worse than no price.
+ */
+export function perGramINR(usdPerOunce: number | null, usdinr: number | null): number | null {
+  if (usdPerOunce === null || usdinr === null || !usdinr) return null;
+  return Math.round(((usdPerOunce * usdinr) / GRAMS_PER_TROY_OUNCE) * 100) / 100;
+}
 
 // ---------------------------------------------------------------- FRED
 

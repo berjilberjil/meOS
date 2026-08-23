@@ -164,6 +164,15 @@ enum MacroFormat {
         return f.string(from: NSNumber(value: v)) ?? String(format: "%.0f", v)
     }
 
+    /// One value with its unit, for a hover readout where there is no card.
+    static func reading(_ v: Double, unit: String) -> String {
+        let body = abs(v) >= 1000 ? grouped(v) : String(format: "%.2f", v)
+        if unit == "%" { return body + "%" }
+        if unit == "₹" || unit == "$" { return unit + body }
+        if unit.isEmpty { return body }
+        return body + " " + unit
+    }
+
     /// Rates move in basis points; everything else in percent. Showing a repo
     /// rate as "+1.4%" when it went 6.50 → 6.59 is how people misread a chart.
     static func change(_ d: MacroDelta?, isRate: Bool) -> String {
@@ -185,6 +194,17 @@ enum MacroFormat {
         guard let days = range.days, let last = points.last else { return points }
         let cutoff = shift(last.d, by: -days)
         return points.filter { $0.d >= cutoff }
+    }
+
+    /// `yyyy-MM-dd` → Date. Charting the raw string puts every observation on
+    /// its own category tick, which is what turned the axis into a smear.
+    static func date(_ key: String) -> Date? {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.date(from: String(key.prefix(10)))
     }
 
     static func shift(_ key: String, by days: Int) -> String {

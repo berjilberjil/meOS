@@ -23,9 +23,13 @@ struct MainView: View {
             // A ZStack of one: the background + chat-widget overlay below hang off
             // this container, and a Group would re-apply them per branch.
             ZStack {
-                // Notes manages its own scrolling (its editor hosts an NSScrollView);
-                // every other tab shares the standard scrolling container.
-                if tab == .notes {
+                // Macro Intelligence is a screen, not a dialog: it takes the whole
+                // content area the way a tab does, keeping the rail to get back.
+                if signals.openMacro {
+                    MacroPulseView(onClose: { signals.openMacro = false })
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
+                } else if tab == .notes {
                     NotesView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {

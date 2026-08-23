@@ -6,13 +6,17 @@ import SwiftUI
 /// It is reached from Settings, not the sidebar: this is a module you go to on
 /// purpose, not part of the daily-life OS.
 struct MacroPulseView: View {
+    /// Set when the screen is hosted rather than presented — the Mac renders it
+    /// in the content area, so there is no sheet to dismiss.
+    var onClose: (() -> Void)? = nil
+
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
 
     @State private var date = AppState.dateKey(Date())
     @State private var range: MacroRange = .d1
     @State private var detail: MacroMetric?
-    @State private var showPicker = false
+    @State private var showMethod = false
 
     private var snap: MacroSnapshot? { state.macro }
     private var isToday: Bool { date == state.todayKey }
@@ -50,13 +54,14 @@ struct MacroPulseView: View {
             MacroMetricDetail(metric: m, snapshot: snap)
                 .environmentObject(state)
         }
+        .sheet(isPresented: $showMethod) { MacroMethodSheet(regime: snap?.regime ?? []) }
     }
 
     // MARK: Chrome
 
     private var header: some View {
         HStack(spacing: 10) {
-            Button { dismiss() } label: {
+            Button { close() } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
                     Text("MyOS").font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -78,6 +83,12 @@ struct MacroPulseView: View {
             }
 
             Spacer(minLength: 0)
+
+            Button { showMethod = true } label: {
+                Image(systemName: "info.circle").font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(KIconButtonStyle(size: 28))
+            .help("Where these numbers come from and how they are worked out")
 
             Button { Task { await state.loadMacro(date: date, refresh: true) } } label: {
                 Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .bold))
@@ -141,7 +152,14 @@ struct MacroPulseView: View {
 
     private func regimeBlock(_ snap: MacroSnapshot) -> some View {
         VStack(alignment: .leading, spacing: Gap.tight) {
-            blockTitle("MACRO REGIME", "OS reading, not advice")
+            HStack(spacing: 6) {
+                blockTitle("MACRO REGIME", "OS reading, not advice")
+                Button { showMethod = true } label: {
+                    Image(systemName: "info.circle").font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(KIconButtonStyle(size: 20, color: Palette.faint))
+                .help("How each score is worked out")
+            }
             Card {
                 VStack(spacing: 12) {
                     ForEach(snap.regime) { s in
@@ -297,6 +315,10 @@ struct MacroPulseView: View {
         let next = MacroFormat.shift(date, by: days)
         guard next <= state.todayKey else { return }
         go(next)
+    }
+
+    private func close() {
+        if let onClose { onClose() } else { dismiss() }
     }
 
     private func go(_ key: String) {

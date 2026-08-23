@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { resolveModel } from '$lib/server/ai';
 import { sql, nowISO } from '$lib/server/db';
 import {
-  AI_METRICS, briefTable, derive, loadFredMetrics, regime, trim,
+  AI_METRICS, briefTable, derive, loadFredMetrics, perGramINR, regime, trim,
   type Metric, type Point
 } from '$lib/server/macro';
 
@@ -21,7 +21,7 @@ import {
  */
 
 const AiMetric = z.object({
-  id: z.enum(['repo', 'indiacpi', 'india10y', 'nifty', 'indiavix', 'gold']),
+  id: z.enum(['repo', 'indiacpi', 'india10y', 'nifty', 'indiavix', 'gold', 'silver']),
   value: z.number().nullable(),
   asOf: z.string().nullable(),
   source: z.string().nullable(),
@@ -69,7 +69,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   let brief: unknown = null;
   if (isToday) {
     const prior = await priorSnapshots(locals.user.id, date);
-    estimated = await loadEstimated(locals.user.id, date, prior);
+    estimated = await loadEstimated(locals.user.id, date, prior, byId['usdinr']?.value ?? null);
     brief = await writeBrief(locals.user.id, [...fred, ...estimated]);
   } else {
     estimated = AI_METRICS.map((spec) => blank(spec, 'No snapshot was taken on this date.'));
@@ -121,7 +121,9 @@ async function priorSnapshots(userId: number, before: string): Promise<Record<st
   return series;
 }
 
-async function loadEstimated(userId: number, date: string, prior: Record<string, Point[]>): Promise<Metric[]> {
+async function loadEstimated(
+  userId: number, date: string, prior: Record<string, Point[]>, usdinr: number | null
+): Promise<Metric[]> {
   let resolved;
   try { resolved = await resolveModel('news', userId); } catch { resolved = null; }
   if (!resolved?.google) {
@@ -138,13 +140,14 @@ async function loadEstimated(userId: number, date: string, prior: Record<string,
         `1. RBI repo rate (%)\n2. India CPI inflation, year-on-year (%)\n` +
         `3. India 10-year government bond yield (%)\n4. NIFTY 50 index close\n` +
         `5. India VIX\n6. Gold spot price in USD per troy ounce\n` +
+        `7. Silver spot price in USD per troy ounce\n` +
         `Give the actual number and the date it refers to. If you cannot find a current figure for one, say so.`
     });
     const { object } = await generateObject({
       model: resolved.model,
       schema: AiMetrics,
       prompt:
-        `Extract the six figures from these search results. value = the number only (no % sign, no commas). ` +
+        `Extract the seven figures from these search results. value = the number only (no % sign, no commas). ` +
         `asOf = the date that figure is for, as YYYY-MM-DD. source = the publication or institution. ` +
         `sourceUrl = the page it came from, else null. If a figure was not found, value must be null — ` +
         `never estimate, never carry forward an old number as if it were current.\n\n${text}`
@@ -154,23 +157,43 @@ async function loadEstimated(userId: number, date: string, prior: Record<string,
     return AI_METRICS.map((s) => blank(s, 'The web lookup failed. Nothing was substituted.'));
   }
 
+  const bullion = new Set(['gold', 'silver']);
+
   return AI_METRICS.map((spec) => {
     const hit = found?.metrics.find((m) => m.id === spec.id);
     if (!hit || hit.value === null) return blank(spec, 'No current figure was found.');
-    // Its own past snapshots are the only honest source of change for these.
-    const series = [...(prior[spec.id] ?? []), { d: date, v: hit.value }];
+
+    // Bullion is quoted per ounce in dollars and bought per gram in rupees.
+    // Converting here (not in the UI) keeps the stored history in one unit, so
+    // tomorrow's change is computed against a comparable number.
+    let value = hit.value;
+    let unit = spec.unit;
+    let note: string | undefined;
+    if (bullion.has(spec.id)) {
+      const inr = perGramINR(hit.value, usdinr);
+      if (inr === null) {
+        note = `Quoted $${hit.value}/oz — no USD/INR available to convert.`;
+      } else {
+        value = inr;
+        unit = '₹/g';
+        note = `$${hit.value}/oz converted at USD/INR ${usdinr}. Spot metal, not a jeweller's rate — no making charges or GST.`;
+      }
+    }
+
+    const series = [...(prior[spec.id] ?? []), { d: date, v: value }];
     const d = derive(series, date);
     return {
       id: spec.id, name: spec.name, category: spec.category, country: spec.country,
-      unit: spec.unit, kind: spec.kind, frequency: spec.frequency,
+      unit, kind: spec.kind, frequency: spec.frequency,
       source: hit.source ?? 'Web', sourceUrl: hit.sourceUrl ?? '',
       priority: spec.priority,
       ...d,
-      value: hit.value,
+      value,
       asOf: hit.asOf ?? date,
       history: trim(series),
       quality: 'estimated' as const,
-      note: series.length < 2 ? 'Changes start once this has been snapshotted for more than one day.' : undefined
+      note: [note, series.length < 2 ? 'Changes start once this has been snapshotted for more than one day.' : '']
+        .filter(Boolean).join(' ') || undefined
     };
   });
 }

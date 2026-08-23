@@ -10,8 +10,13 @@ struct MacroMetricDetail: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var range: MacroRange = .y1
+    /// What the pointer is over, so the chart can be read rather than admired.
+    @State private var hover: MacroPoint?
 
     private var series: [MacroPoint] { MacroFormat.series(metric.history, range: range) }
+    private var plotted: [(date: Date, point: MacroPoint)] {
+        series.compactMap { p in MacroFormat.date(p.d).map { ($0, p) } }
+    }
 
     var body: some View {
         let content = ScrollView {
@@ -94,28 +99,73 @@ struct MacroMetricDetail: View {
     }
 
     @ViewBuilder private var chart: some View {
-        if series.count > 1 {
-            Chart(series, id: \.d) { p in
-                LineMark(x: .value("Date", p.d), y: .value(metric.name, p.v))
-                    .interpolationMethod(.monotone)
-                    .foregroundStyle(Palette.brand)
-            }
-            .chartYScale(domain: .automatic(includesZero: false))
-            .chartXAxis {
-                // Dates as strings keep the axis honest about gaps (weekends,
-                // holidays) instead of interpolating across days with no print.
-                AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                    AxisGridLine().foregroundStyle(Palette.border)
-                    AxisValueLabel().font(.system(size: 9)).foregroundStyle(Palette.faint)
+        if plotted.count > 1 {
+            VStack(alignment: .leading, spacing: 6) {
+                // The readout sits above the plot in fixed space, so following the
+                // line does not make the chart jump.
+                HStack(spacing: 8) {
+                    if let h = hover {
+                        Text(Fmt.day(h.d))
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Palette.faint)
+                        Text(MacroFormat.reading(h.v, unit: metric.unit))
+                            .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .foregroundStyle(Palette.text)
+                    }
+                    Spacer(minLength: 0)
                 }
-            }
-            .chartYAxis {
-                AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
-                    AxisGridLine().foregroundStyle(Palette.border)
-                    AxisValueLabel().font(.system(size: 9)).foregroundStyle(Palette.faint)
+                .frame(height: 16)
+
+                Chart {
+                    ForEach(plotted, id: \.point.d) { row in
+                        LineMark(x: .value("Date", row.date), y: .value(metric.name, row.point.v))
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(Palette.brand)
+                    }
+                    if let h = hover, let d = MacroFormat.date(h.d) {
+                        RuleMark(x: .value("Date", d))
+                            .foregroundStyle(Palette.faint.opacity(0.6))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        PointMark(x: .value("Date", d), y: .value(metric.name, h.v))
+                            .foregroundStyle(Palette.brand)
+                            .symbolSize(60)
+                    }
                 }
+                .chartYScale(domain: .automatic(includesZero: false))
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                        AxisGridLine().foregroundStyle(Palette.border)
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
+                            .font(.system(size: 9)).foregroundStyle(Palette.faint)
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
+                        AxisGridLine().foregroundStyle(Palette.border)
+                        AxisValueLabel().font(.system(size: 9)).foregroundStyle(Palette.faint)
+                    }
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geo in
+                        Rectangle().fill(.clear).contentShape(Rectangle())
+                            #if os(macOS)
+                            .onContinuousHover { phase in
+                                switch phase {
+                                case .active(let p): hover = nearest(to: p, proxy: proxy, geo: geo)
+                                case .ended: hover = nil
+                                }
+                            }
+                            #endif
+                            // Touch gets the same readout by dragging along the line.
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { v in hover = nearest(to: v.location, proxy: proxy, geo: geo) }
+                                    .onEnded { _ in hover = nil }
+                            )
+                    }
+                }
+                .frame(height: 200)
             }
-            .frame(height: 200)
         } else {
             Card(padding: 20) {
                 Text(metric.available
@@ -125,6 +175,17 @@ struct MacroMetricDetail: View {
                     .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    /// The observation closest to the pointer's x, which is what "hovering the
+    /// line" means when the series has gaps for weekends and holidays.
+    private func nearest(to location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> MacroPoint? {
+        guard let plotFrame = proxy.plotFrame else { return nil }
+        let x = location.x - geo[plotFrame].origin.x
+        guard let target: Date = proxy.value(atX: x) else { return nil }
+        return plotted.min { a, b in
+            abs(a.date.timeIntervalSince(target)) < abs(b.date.timeIntervalSince(target))
+        }?.point
     }
 
     private var changes: some View {
@@ -222,7 +283,7 @@ struct MacroEntryCard: View {
     @State private var open = false
 
     var body: some View {
-        let inner = Button { open = true } label: {
+        let inner = Button { present() } label: {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -252,8 +313,16 @@ struct MacroEntryCard: View {
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $open) { MacroPulseView() }
+        #endif
+    }
+
+    private func present() {
+        #if os(macOS)
+        // The Mac hands it to MainView, which gives it the whole content area.
+        // A fixed-size sheet was the reason it looked clipped and half-finished.
+        withAnimation(.knNormal) { UISignals.shared.openMacro = true }
         #else
-        .sheet(isPresented: $open) { MacroPulseView().frame(width: 900, height: 720) }
+        open = true
         #endif
     }
 }
