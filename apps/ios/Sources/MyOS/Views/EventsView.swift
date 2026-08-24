@@ -26,7 +26,7 @@ struct EventsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
             HStack {
-                ScreenTitle(text: "Events")
+                // Title comes from the navigation bar (JournalView sets it).
                 Spacer()
                 Button { showNew = true } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(.borderedProminent)

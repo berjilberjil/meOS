@@ -83,8 +83,9 @@ struct MainView: View {
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
+                                    // JournalView owns this title — it swaps
+                                    // with the Events/Journal segment.
                                     screen { JournalView() }
-                                        .navigationTitle(NavTab.journal.title)
                                 } label: {
                                     Label(NavTab.journal.title, systemImage: NavTab.journal.icon)
                                 }

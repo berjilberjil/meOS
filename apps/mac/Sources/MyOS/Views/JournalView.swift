@@ -54,6 +54,7 @@ struct JournalView: View {
             }
             if jseg == .events { EventsView() } else { journalBody }
         }
+        .navigationTitle(jseg == .events ? "Events" : "Journal")
         .sheet(isPresented: $showPresets) {
             NavigationStack {
                 ScrollView {
@@ -113,8 +114,7 @@ struct JournalView: View {
     @ViewBuilder private var header: some View {
         #if os(iOS)
         VStack(alignment: .leading, spacing: 10) {
-            ScreenTitle(text: "Journal")
-                .lineLimit(1)
+            // No title here: on iOS the navigation bar draws it.
             HStack(spacing: 10) {
                 if !isToday {
                     Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
