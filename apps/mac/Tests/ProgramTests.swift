@@ -49,6 +49,24 @@ final class MuscleGroupTests: XCTestCase {
             XCTAssertFalse(ex.group == .fullBody, "\(ex.name) fell through to Full body")
         }
     }
+
+    /// Reading the slugs literally filed a treadmill run under Quads and a jab
+    /// under Shoulders, and left Cardio with nothing in it.
+    func testCardioAndBoxingFileUnderCardio() {
+        for ex in ExerciseSeed.all where ex.category == .cardio || ex.category == .boxing {
+            XCTAssertEqual(ex.group, .cardio, "\(ex.name) filed under \(ex.group.label)")
+        }
+    }
+
+    /// A muscle group you can pick with nothing behind it is a dead end. Full
+    /// body is the one exception: it exists as the decode fallback and as a
+    /// home for custom circuit work.
+    func testEveryPickableGroupHasSeedExercises() {
+        let filled = Set(ExerciseSeed.all.map(\.group))
+        for g in MuscleGroup.allCases where g != .fullBody {
+            XCTAssertTrue(filled.contains(g), "no seed exercise for \(g.label)")
+        }
+    }
 }
 
 final class ProgramScheduleTests: XCTestCase {

@@ -131,6 +131,11 @@ extension Exercise {
     /// primary anatomy slug, else its library category.
     var group: MuscleGroup {
         if let g = muscleGroup { return g }
+        // Cardio and boxing are activities, not muscle targets. Their slugs say
+        // which muscles the work happens to use — read literally that files a
+        // treadmill run under Quads and a jab under Shoulders, and leaves
+        // Cardio empty. Nobody looks for a 5k under Quads.
+        if category == .cardio || category == .boxing { return .cardio }
         for slug in muscles { if let g = MuscleGroup.fromSlug(slug) { return g } }
         return MuscleGroup.fromCategory(category)
     }

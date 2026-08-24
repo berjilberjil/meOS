@@ -182,6 +182,21 @@ struct ExercisePickerSheet: View {
             Divider().overlay(Palette.border)
             ScrollView {
                 VStack(spacing: 6) {
+                    if results.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(group2 == nil ? "Nothing matches." : "No \(group2!.label.lowercased()) exercises yet.")
+                                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                            Text("Clear the filter to see everything, or add your own with New.")
+                                .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if group2 != nil {
+                                Button { group2 = nil } label: { Label("Show all exercises", systemImage: "line.3.horizontal.decrease") }
+                                    .buttonStyle(KSecondaryButtonStyle())
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 20)
+                    }
                     ForEach(results) { ex in
                         Button { add(ex); dismiss() } label: {
                             HStack(spacing: 10) {

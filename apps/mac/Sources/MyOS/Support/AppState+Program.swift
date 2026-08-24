@@ -226,7 +226,10 @@ extension AppState {
     func scheduledDay(for date: String) -> (program: WorkoutProgram, day: ProgramDay)? {
         guard let p = activeProgram else { return nil }
         let weekday = Int(Self.weekdayKey(date)) ?? 0
-        let offset = Self.daysBetween(p.anchorDate ?? p.createdAt, and: date) ?? 0
+        // Only a rotation needs the date arithmetic. This runs in the Today
+        // card's body, and Today keeps three pages alive at once on iPhone.
+        let offset = p.isWeekdayBound ? 0
+                   : (Self.daysBetween(p.anchorDate ?? p.createdAt, and: date) ?? 0)
         guard let d = p.day(weekday: weekday, dayOffset: offset) else { return nil }
         return (p, d)
     }
