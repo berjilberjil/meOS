@@ -33,8 +33,10 @@ struct FitnessView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
+            #if os(macOS)   // iOS: the navigation bar owns the title
             ScreenTitle(text: "Fitness")
                 .knRise(0)
+            #endif
 
             #if os(iOS)
             Picker("", selection: $sub) { ForEach(FitSub.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()

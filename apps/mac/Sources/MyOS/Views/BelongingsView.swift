@@ -49,7 +49,9 @@ struct BelongingsView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
+                #if os(macOS)   // iOS: the navigation bar owns the title
                 ScreenTitle(text: "Stuff")
+                #endif
                 Text("What you own, and what it costs you.").font(.footnote).foregroundStyle(Palette.faint)
             }
             Spacer()

@@ -18,7 +18,7 @@ final class PrefsTests: XCTestCase {
 
     func testResolveLaunchReturnsKnownTab() {
         XCTAssertEqual(NavTab.resolveLaunch("fitness"), .fitness)
-        XCTAssertEqual(NavTab.resolveLaunch("fold", allowed: NavTab.iosTabs), .fold)
+        XCTAssertEqual(NavTab.resolveLaunch("productivity", allowed: NavTab.iosTabs), .productivity)
     }
 
     func testResolveLaunchFallsBackToToday() {
@@ -63,8 +63,10 @@ final class PrefsTests: XCTestCase {
             prefs.launchTab = nil
             prefs.lastTab = .events            // no Events on the iOS bottom bar
             XCTAssertEqual(prefs.resolveOpeningTab(allowed: NavTab.iosTabs), .today)
-            prefs.lastTab = .fold
-            XCTAssertEqual(prefs.resolveOpeningTab(allowed: NavTab.iosTabs), .fold)
+            prefs.lastTab = .fold              // Fold left the iOS bar too
+            XCTAssertEqual(prefs.resolveOpeningTab(allowed: NavTab.iosTabs), .today)
+            prefs.lastTab = .productivity
+            XCTAssertEqual(prefs.resolveOpeningTab(allowed: NavTab.iosTabs), .productivity)
         }
     }
 

@@ -1,5 +1,9 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 
 /// The Productivity tab — a log of YouTube videos watched, as a thumbnail grid.
 /// Paste a link, the app pulls the title/channel/thumbnail, and each video gets a
@@ -47,7 +51,9 @@ struct ProductivityView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
             HStack(spacing: 8) {
+                #if os(macOS)   // iOS: the navigation bar owns the title
                 ScreenTitle(text: "Productivity")
+                #endif
                 Spacer()
                 Text("\(state.watch.count) videos").font(.caption).foregroundStyle(Palette.faint)
                 if !state.watch.isEmpty {
@@ -436,7 +442,15 @@ private struct WatchDetailSheet: View {
             }
 
             HStack(spacing: 10) {
-                Button { if let u = URL(string: draft.url) { NSWorkspace.shared.open(u) } } label: {
+                Button {
+                    if let u = URL(string: draft.url) {
+                        #if os(macOS)
+                        NSWorkspace.shared.open(u)
+                        #else
+                        UIApplication.shared.open(u)
+                        #endif
+                    }
+                } label: {
                     Label("Open in YouTube", systemImage: "play.fill")
                 }
                 .buttonStyle(.bordered)

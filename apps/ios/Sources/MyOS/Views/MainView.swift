@@ -4,14 +4,13 @@ import SwiftUI
 ///
 /// This replaced a hand-built dock (`IOSTabBar`) that drew its own slots, raised
 /// Scan in the centre on a coloured circle, and hung hidden multi-tap gestures
-/// off each slot. None of that survives a real tab bar, and none of it should:
-/// Scan is an ordinary tab, and the secondary destinations it used to hide
-/// (Stuff, Journal) are toolbar items, which is where Apple's own apps put them.
+/// off each slot. Scan is an ordinary tab now, and the secondary destinations
+/// that dock used to hide are toolbar items.
 ///
-/// Every tab owns a `NavigationStack`, so screens get a real large title, a real
-/// toolbar, and somewhere for `.searchable` and pushes to go. Non-Today tabs
-/// keep their `ScrollView` here, because the screens themselves have never
-/// supplied one — see `screen(_:)`.
+/// Every tab owns a `NavigationStack`, so screens get a real title, a real
+/// toolbar, and somewhere for `.searchable` and pushes to go. The screens
+/// themselves must NOT also draw a title — theirs are `#if os(macOS)` now, or
+/// you get the heading twice.
 struct MainView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
@@ -28,14 +27,17 @@ struct MainView: View {
         TabView(selection: selection) {
             Tab(NavTab.today.title, systemImage: NavTab.today.icon, value: NavTab.today) {
                 NavigationStack {
-                    // Owns its own scrolling: one scroll view per day page.
+                    // Owns its own scrolling: a horizontal pager of day pages,
+                    // each with its own vertical ScrollView. That means there is
+                    // no single scroll view for a large title to track, and a
+                    // large title with nothing to collapse against just sits on
+                    // top of the page — which is exactly what it did. Inline.
                     TodayPager(go: { select($0) })
                         .navigationTitle(NavTab.today.title)
+                        .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
-                                Button {
-                                    showSettings = true
-                                } label: {
+                                Button { showSettings = true } label: {
                                     Label("Settings", systemImage: "gearshape")
                                 }
                             }
@@ -43,10 +45,10 @@ struct MainView: View {
                 }
             }
 
-            Tab(NavTab.fold.title, systemImage: NavTab.fold.icon, value: NavTab.fold) {
+            Tab(NavTab.productivity.title, systemImage: NavTab.productivity.icon, value: NavTab.productivity) {
                 NavigationStack {
-                    screen { FoldView() }
-                        .navigationTitle(NavTab.fold.title)
+                    screen { ProductivityView() }
+                        .navigationTitle(NavTab.productivity.title)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
@@ -91,11 +93,16 @@ struct MainView: View {
                 }
             }
         }
+        // Content scrolls under the bar, so the bar needs its material. Without
+        // this the tab labels sat directly on top of the cards.
+        .toolbarBackground(.visible, for: .tabBar)
         .preferredColorScheme(themeStore.theme.colorScheme)
         .overlay(alignment: .bottomTrailing) {
+            // This overlay covers the whole TabView, tab bar included, so it has
+            // to clear the bar itself — it was landing on the Notes tab button.
             ChatWidget()
                 .padding(.trailing, ChatWidget.edgeInset)
-                .padding(.bottom, ChatWidget.edgeInset)
+                .padding(.bottom, ChatWidget.edgeInset + 52)
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         // Tapped the Friday report notification. SettingsView clears the flag

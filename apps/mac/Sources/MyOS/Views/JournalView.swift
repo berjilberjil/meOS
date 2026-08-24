@@ -32,7 +32,9 @@ struct JournalView: View {
         #if os(iOS)
         VStack(alignment: .leading, spacing: Gap.screen) {
             HStack {
+                #if os(macOS)   // iOS: the navigation bar owns the title
                 ScreenTitle(text: jseg == .events ? "Events" : "Journal").lineLimit(1)
+                #endif
                 Spacer()
                 if jseg == .journal {
                     Button { showPresets = true } label: {

@@ -12,7 +12,9 @@ struct ScanView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
+                #if os(macOS)   // iOS: the navigation bar owns the title
                 ScreenTitle(text: "Scan")
+                #endif
                 Text("Food logs itself. Anything else — Catherine tells you if you actually want it.")
                     .font(.callout).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
