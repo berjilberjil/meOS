@@ -631,6 +631,21 @@ struct Sparkline: View {
     let values: [Double]
     var color: Color = Palette.brand
 
+    /// A flat series (every point equal — "0 bp" happens constantly on the macro
+    /// board) collapses the y domain to a single value, and an AreaMark against a
+    /// zero-height domain paints the whole plot. That is why these rendered as
+    /// solid blocks. Pad the domain, and strip the plot inset so the line still
+    /// fills a 52x18 box.
+    private var domain: ClosedRange<Double> {
+        let lo = values.min() ?? 0
+        let hi = values.max() ?? 1
+        guard hi > lo else {
+            let pad = max(abs(hi), 1) * 0.1
+            return (hi - pad)...(hi + pad)
+        }
+        return lo...hi
+    }
+
     var body: some View {
         Chart(Array(values.enumerated()), id: \.offset) { point in
             AreaMark(x: .value("Point", point.offset), y: .value("Value", point.element))
@@ -638,10 +653,12 @@ struct Sparkline: View {
                                                 startPoint: .top, endPoint: .bottom))
             LineMark(x: .value("Point", point.offset), y: .value("Value", point.element))
                 .foregroundStyle(color)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        .chartYScale(domain: (values.min() ?? 0)...(max(values.max() ?? 1, (values.min() ?? 0) + 1)))
+        .chartLegend(.hidden)
+        .chartYScale(domain: domain)
+        .chartPlotStyle { $0.padding(0) }
     }
 }

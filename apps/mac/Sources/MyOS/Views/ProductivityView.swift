@@ -49,6 +49,31 @@ struct ProductivityView: View {
     private var toNoteCount: Int { state.watch.filter { $0.watched && $0.takeaway.trimmingCharacters(in: .whitespaces).isEmpty }.count }
 
     var body: some View {
+        #if os(iOS)
+        // The log field is what you open this tab to use, so it sticks to the
+        // bottom instead of scrolling away above a month of history.
+        ScrollView {
+            stack
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+        .safeAreaInset(edge: .bottom) {
+            addCard
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+                .background(.bar)
+        }
+        .sheet(item: $selected) { item in WatchDetailSheet(item: item) }
+        #else
+        stack
+            .sheet(item: $selected) { item in WatchDetailSheet(item: item) }
+        #endif
+    }
+
+    private var stack: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
             HStack(spacing: 8) {
                 #if os(macOS)   // iOS: the navigation bar owns the title
@@ -62,7 +87,9 @@ struct ProductivityView: View {
             }
             .knRise(0)
 
+            #if os(macOS)
             addCard.knRise(1)
+            #endif
             if !state.watch.isEmpty { filterRow.knRise(2) }
             Group {
                 switch mode {
@@ -73,7 +100,6 @@ struct ProductivityView: View {
             .id(mode)
             .knRise(3)
         }
-        .sheet(item: $selected) { item in WatchDetailSheet(item: item) }
     }
 
     // MARK: - Add

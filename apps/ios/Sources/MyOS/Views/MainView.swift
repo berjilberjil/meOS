@@ -2,15 +2,13 @@ import SwiftUI
 
 /// The iOS shell — the system's `TabView`.
 ///
-/// This replaced a hand-built dock (`IOSTabBar`) that drew its own slots, raised
-/// Scan in the centre on a coloured circle, and hung hidden multi-tap gestures
-/// off each slot. Scan is an ordinary tab now, and the secondary destinations
-/// that dock used to hide are toolbar items.
+/// Replaced a hand-built dock (`IOSTabBar`). Scan is an ordinary tab now, and
+/// the destinations that dock hid behind multi-taps are toolbar items.
 ///
-/// Every tab owns a `NavigationStack`, so screens get a real title, a real
-/// toolbar, and somewhere for `.searchable` and pushes to go. The screens
-/// themselves must NOT also draw a title — theirs are `#if os(macOS)` now, or
-/// you get the heading twice.
+/// Titles sit **leading**, not centred: the bar stays compact (`.inline`) and the
+/// name is a `topBarLeading` toolbar item, so a screen gets its name without the
+/// large-title block eating the top of the page. Screens must therefore NOT draw
+/// their own title — theirs are `#if os(macOS)`.
 struct MainView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
@@ -28,35 +26,25 @@ struct MainView: View {
             Tab(NavTab.today.title, systemImage: NavTab.today.icon, value: NavTab.today) {
                 NavigationStack {
                     // Owns its own scrolling: a horizontal pager of day pages,
-                    // each with its own vertical ScrollView. That means there is
-                    // no single scroll view for a large title to track, and a
-                    // large title with nothing to collapse against just sits on
-                    // top of the page — which is exactly what it did. Inline.
+                    // each with its own vertical ScrollView.
                     TodayPager(go: { select($0) })
-                        // No title at all here — the tab bar already says
-                        // Today, and the page leads with the day and date.
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button { showSettings = true } label: {
-                                    Label("Settings", systemImage: "gearshape")
-                                }
-                            }
-                        }
+                        .chrome(NavTab.today.title)
                 }
             }
 
             Tab(NavTab.productivity.title, systemImage: NavTab.productivity.icon, value: NavTab.productivity) {
                 NavigationStack {
-                    screen { ProductivityView() }
-                        .navigationTitle(NavTab.productivity.title)
-                        .navigationBarTitleDisplayMode(.inline)
+                    // Not wrapped in `screen`: it brings its own ScrollView so it
+                    // can pin the "log a video" bar to the bottom.
+                    ProductivityView()
+                        .chrome(NavTab.productivity.title)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
                                     screen { BelongingsView() }
                                         .navigationTitle(NavTab.stuff.title)
+                                        .navigationBarTitleDisplayMode(.inline)
+                                        .toolbarBackground(.visible, for: .tabBar)
                                 } label: {
                                     Label(NavTab.stuff.title, systemImage: NavTab.stuff.icon)
                                 }
@@ -68,30 +56,29 @@ struct MainView: View {
             Tab(NavTab.scan.title, systemImage: NavTab.scan.icon, value: NavTab.scan) {
                 NavigationStack {
                     screen { ScanView() }
-                        .navigationTitle(NavTab.scan.title)
-                        .navigationBarTitleDisplayMode(.inline)
+                        .chrome(NavTab.scan.title)
                 }
             }
 
             Tab(NavTab.fitness.title, systemImage: NavTab.fitness.icon, value: NavTab.fitness) {
                 NavigationStack {
                     screen { FitnessView() }
-                        .navigationTitle(NavTab.fitness.title)
-                        .navigationBarTitleDisplayMode(.inline)
+                        .chrome(NavTab.fitness.title)
                 }
             }
 
             Tab(NavTab.notes.title, systemImage: NavTab.notes.icon, value: NavTab.notes) {
                 NavigationStack {
                     NotesView()
-                        .navigationTitle(NavTab.notes.title)
-                        .navigationBarTitleDisplayMode(.inline)
+                        .chrome(NavTab.notes.title)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
-                                    // JournalView owns this title — it swaps
-                                    // with the Events/Journal segment.
+                                    // JournalView owns that title — it swaps with
+                                    // the Events/Journal segment.
                                     screen { JournalView() }
+                                        .navigationBarTitleDisplayMode(.inline)
+                                        .toolbarBackground(.visible, for: .tabBar)
                                 } label: {
                                     Label(NavTab.journal.title, systemImage: NavTab.journal.icon)
                                 }
@@ -100,18 +87,19 @@ struct MainView: View {
                 }
             }
         }
-        // Content scrolls under the bar, so the bar needs its material. Without
-        // this the tab labels sat directly on top of the cards.
-        .toolbarBackground(.visible, for: .tabBar)
         .preferredColorScheme(themeStore.theme.colorScheme)
         .overlay(alignment: .bottomTrailing) {
             // This overlay covers the whole TabView, tab bar included, so it has
-            // to clear the bar itself — it was landing on the Notes tab button.
+            // to clear the bar itself.
             ChatWidget()
                 .padding(.trailing, ChatWidget.edgeInset)
                 .padding(.bottom, ChatWidget.edgeInset + 52)
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        // Settings is the last row of the Today page now, not a toolbar gear.
+        .onChange(of: signals.openSettings) { _, on in
+            if on { signals.openSettings = false; showSettings = true }
+        }
         // Tapped the Friday report notification. SettingsView clears the flag
         // once it is up, and opens on the report.
         .onChange(of: signals.openWeeklyReport) { _, on in if on { showSettings = true } }
@@ -129,8 +117,8 @@ struct MainView: View {
         }
     }
 
-    /// Screens other than Today have never carried their own `ScrollView` — the
-    /// shell has always supplied it. Keep doing that, inside the stack.
+    /// Screens other than Today and Productivity carry no `ScrollView` of their
+    /// own — the shell has always supplied it.
     @ViewBuilder
     private func screen<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         ScrollView {
@@ -156,5 +144,24 @@ struct MainView: View {
         if newValue != tab { Haptics.selection() }
         tab = newValue
         PrefsStore.shared.lastTab = newValue   // so reopening resumes here
+    }
+}
+
+private extension View {
+    /// One screen's bar: compact, name on the left, and a tab bar that actually
+    /// draws its material. Applied per tab — `.toolbarBackground` set on the
+    /// TabView itself does not reach the bars inside each tab, which is why
+    /// content was showing through the tab labels.
+    func chrome(_ title: String) -> some View {
+        self
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text(title).font(.headline)
+                }
+            }
     }
 }

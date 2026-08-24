@@ -43,11 +43,16 @@ struct TodayView: View {
         let sections = TodaySection.ordered()
         VStack(alignment: .leading, spacing: Gap.screen) {
             header.knRise(0).id(Self.headerAnchor)
-            ForEach(Array(sections.enumerated()), id: \.element.id) { idx, section in
+                // Deliberately NOT on the outer stack: two `.sheet` modifiers on
+                // the same view means only one of them presents.
+                    ForEach(Array(sections.enumerated()), id: \.element.id) { idx, section in
                 todaySection(section).knRise(idx + 1)
             }
             #if os(macOS)
             settingsCard.knRise(7)
+            #else
+            // Settings is the last thing on the page rather than a toolbar gear.
+            iosSettingsRow.knRise(7)
             #endif
         }
         .modifier(ScrollAnchors(enabled: sectionAnchors))
@@ -602,6 +607,25 @@ struct TodayView: View {
             .frame(height: 5)
         }
     }
+
+    #if os(iOS)
+    /// Bottom-of-Today entry into Settings. A plain labelled row, the way a
+    /// grouped settings link reads.
+    private var iosSettingsRow: some View {
+        Button { UISignals.shared.openSettings = true } label: {
+            Card {
+                HStack(spacing: 10) {
+                    Image(systemName: "gearshape.fill").foregroundStyle(Palette.muted)
+                    Text("Settings").font(.body).foregroundStyle(Palette.text)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                        .foregroundStyle(Palette.faint)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+    #endif
 
     private var settingsCard: some View {
         VStack(alignment: .leading, spacing: 12) {

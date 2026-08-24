@@ -13,8 +13,10 @@ struct EventsView: View {
     /// bytes land in cache and the view never re-renders — which is exactly why
     /// thumbnails stayed grey placeholders on iPhone.
     @ObservedObject private var mediaStore = EventMediaStore.shared
-    @State private var editing: EventItem?
-    @State private var showNew = false
+    /// ONE presentation for both "new" and "edit". Two `.sheet` modifiers on the
+    /// same view is a SwiftUI trap — only one of them ever presents, which is why
+    /// tapping an event stopped opening it.
+    @State private var editTarget: EditTarget?
     @State private var pendingDelete: EventItem?
     @State private var viewingMedia: EventMedia?
     @State private var viewingAll: [EventMedia] = []
@@ -28,7 +30,7 @@ struct EventsView: View {
             HStack {
                 // Title comes from the navigation bar (JournalView sets it).
                 Spacer()
-                Button { showNew = true } label: { Label("New", systemImage: "plus") }
+                Button { editTarget = EditTarget(nil) } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(.borderedProminent)
             }
             if state.events.isEmpty {
@@ -36,14 +38,13 @@ struct EventsView: View {
                     Text("Nothing yet. Tap New to add a trip, a shoot, or any moment.")
                         .font(.footnote).foregroundStyle(Palette.faint)
                 }
-                .onTapGesture(count: 2) { showNew = true }
+                .onTapGesture(count: 2) { editTarget = EditTarget(nil) }
             } else {
                 if !upcoming.isEmpty { section("Upcoming", Array(upcoming.reversed())) }
                 if !past.isEmpty { section("Past", past) }
             }
         }
-        .sheet(isPresented: $showNew) { EventEditorSheet(event: nil) }
-        .sheet(item: $editing) { e in EventEditorSheet(event: e) }
+        .sheet(item: $editTarget) { target in EventEditorSheet(event: target.event) }
         .fullScreenCover(item: $viewingMedia) { m in
             EventMediaViewer(media: viewingAll, start: m, onClose: { viewingMedia = nil })
         }
@@ -62,7 +63,7 @@ struct EventsView: View {
     /// Open a fresh event editor in response to a double-tap on the Journal tab.
     private func consumeNewEvent() {
         signals.pendingNewEvent = false
-        showNew = true
+        editTarget = EditTarget(nil)
     }
 
     private func section(_ title: String, _ items: [EventItem]) -> some View {
@@ -73,7 +74,7 @@ struct EventsView: View {
     }
 
     private func eventRow(_ e: EventItem) -> some View {
-        Button { editing = e } label: {
+        Button { editTarget = EditTarget(e) } label: {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
@@ -297,4 +298,12 @@ private struct EventEditorSheet: View {
         }
         dismiss()
     }
+}
+
+
+/// Identifies a single event-editor presentation. `nil` event means "new".
+private struct EditTarget: Identifiable {
+    let event: EventItem?
+    var id: String { event?.id ?? "__new__" }
+    init(_ event: EventItem?) { self.event = event }
 }
