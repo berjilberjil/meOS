@@ -42,7 +42,7 @@ struct JournalView: View {
                 }
             }
             HStack(spacing: 10) {
-                Segmented(options: JSeg.allCases.map { ($0, $0.rawValue.capitalized) }, selection: $jseg)
+                Picker("", selection: $jseg) { ForEach(JSeg.allCases.map { ($0, $0.rawValue.capitalized) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 Spacer(minLength: 8)
                 // "Today" lives on the same row as the Events/Journal tabs, right-aligned.
                 if jseg == .journal && !isToday {

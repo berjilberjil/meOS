@@ -1,63 +1,102 @@
 import SwiftUI
 
-/// The iOS shell — custom dock with Scan raised in the center.
+/// The iOS shell — the system's `TabView`.
+///
+/// This replaced a hand-built dock (`IOSTabBar`) that drew its own slots, raised
+/// Scan in the centre on a coloured circle, and hung hidden multi-tap gestures
+/// off each slot. None of that survives a real tab bar, and none of it should:
+/// Scan is an ordinary tab, and the secondary destinations it used to hide
+/// (Stuff, Journal) are toolbar items, which is where Apple's own apps put them.
+///
+/// Every tab owns a `NavigationStack`, so screens get a real large title, a real
+/// toolbar, and somewhere for `.searchable` and pushes to go. Non-Today tabs
+/// keep their `ScrollView` here, because the screens themselves have never
+/// supplied one — see `screen(_:)`.
 struct MainView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: NavTab = PrefsStore.shared.resolveOpeningTab(allowed: NavTab.iosTabs)
-    @State private var notesTaps = 0
-    @State private var lastNotesTap = Date.distantPast
-    @State private var foldTaps = 0
-    @State private var lastFoldTap = Date.distantPast
     @State private var showSettings = false
     @ObservedObject private var signals = UISignals.shared
 
-    var body: some View {
-        ZStack {
-            Palette.bg.ignoresSafeArea()
+    private var selection: Binding<NavTab> {
+        Binding(get: { tab }, set: { select($0) })
+    }
 
-            // No NavigationStack: nothing here pushes, and a stack whose bar is
-            // hidden re-negotiates the scroll view's safe-area inset after the
-            // first layout — which shows up as the page quietly re-seating
-            // itself while you are already scrolling.
-            Group {
-                if tab == .today {
+    var body: some View {
+        TabView(selection: selection) {
+            Tab(NavTab.today.title, systemImage: NavTab.today.icon, value: NavTab.today) {
+                NavigationStack {
                     // Owns its own scrolling: one scroll view per day page.
                     TodayPager(go: { select($0) })
-                } else {
-                    ScrollView {
-                        content
-                            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 128)
-                    }
-                    .scrollIndicators(.hidden)
+                        .navigationTitle(NavTab.today.title)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button {
+                                    showSettings = true
+                                } label: {
+                                    Label("Settings", systemImage: "gearshape")
+                                }
+                            }
+                        }
                 }
             }
-            .id(tab)
 
-            VStack(spacing: 0) {
-                Spacer()
-                HStack {
-                    Spacer()
-                    ChatWidget()
-                        .padding(.trailing, ChatWidget.edgeInset)
-                        .padding(.bottom, ChatWidget.edgeInset)
+            Tab(NavTab.fold.title, systemImage: NavTab.fold.icon, value: NavTab.fold) {
+                NavigationStack {
+                    screen { FoldView() }
+                        .navigationTitle(NavTab.fold.title)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                NavigationLink {
+                                    screen { BelongingsView() }
+                                        .navigationTitle(NavTab.stuff.title)
+                                } label: {
+                                    Label(NavTab.stuff.title, systemImage: NavTab.stuff.icon)
+                                }
+                            }
+                        }
                 }
-                .padding(.bottom, 72)
-                IOSTabBar(
-                    tab: Binding(get: { tab }, set: { select($0) }),
-                    onScan: {
-                        UISignals.shared.openScanCamera = true
-                        select(.scan)
-                    },
-                    onSettings: { showSettings = true },
-                    onNotesTap: { tapNotes() },
-                    onFoldTap: { tapFold() }
-                )
+            }
+
+            Tab(NavTab.scan.title, systemImage: NavTab.scan.icon, value: NavTab.scan) {
+                NavigationStack {
+                    screen { ScanView() }
+                        .navigationTitle(NavTab.scan.title)
+                }
+            }
+
+            Tab(NavTab.fitness.title, systemImage: NavTab.fitness.icon, value: NavTab.fitness) {
+                NavigationStack {
+                    screen { FitnessView() }
+                        .navigationTitle(NavTab.fitness.title)
+                }
+            }
+
+            Tab(NavTab.notes.title, systemImage: NavTab.notes.icon, value: NavTab.notes) {
+                NavigationStack {
+                    NotesView()
+                        .navigationTitle(NavTab.notes.title)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                NavigationLink {
+                                    screen { JournalView() }
+                                        .navigationTitle(NavTab.journal.title)
+                                } label: {
+                                    Label(NavTab.journal.title, systemImage: NavTab.journal.icon)
+                                }
+                            }
+                        }
+                }
             }
         }
-        .animation(.knTheme, value: themeStore.theme.id)
         .preferredColorScheme(themeStore.theme.colorScheme)
+        .overlay(alignment: .bottomTrailing) {
+            ChatWidget()
+                .padding(.trailing, ChatWidget.edgeInset)
+                .padding(.bottom, ChatWidget.edgeInset)
+        }
         .sheet(isPresented: $showSettings) { SettingsView() }
         // Tapped the Friday report notification. SettingsView clears the flag
         // once it is up, and opens on the report.
@@ -76,6 +115,19 @@ struct MainView: View {
         }
     }
 
+    /// Screens other than Today have never carried their own `ScrollView` — the
+    /// shell has always supplied it. Keep doing that, inside the stack.
+    @ViewBuilder
+    private func screen<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView {
+            content()
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+
     /// Photos, steps and anything shared in from outside. `drainShareInbox`
     /// runs last so a video shared while the app was away is appended to fresh
     /// state rather than a stale copy.
@@ -86,61 +138,9 @@ struct MainView: View {
         await state.drainShareInbox()
     }
 
-    @ViewBuilder
-    private var content: some View {
-        switch tab {
-        case .today:   TodayView(go: { select($0) })
-        case .fold:    FoldView()
-        case .stuff:   BelongingsView()
-        case .scan:    ScanView()
-        case .fitness: FitnessView()
-        case .notes:   NotesView()
-        case .journal: JournalView()
-        case .events:  EventsView()
-        default:       TodayView(go: { select($0) })
-        }
-    }
-
     private func select(_ newValue: NavTab) {
         if newValue != tab { Haptics.selection() }
         tab = newValue
         PrefsStore.shared.lastTab = newValue   // so reopening resumes here
-    }
-
-    /// 1 tap → Notes. 2 → new note. 3 → Journal. 5 → hidden notes (Face ID).
-    private func tapNotes() {
-        let now = Date()
-        if now.timeIntervalSince(lastNotesTap) < 0.55 { notesTaps += 1 } else { notesTaps = 1 }
-        lastNotesTap = now
-        select(.notes)
-        Task { @MainActor in
-            let count = notesTaps
-            try? await Task.sleep(nanoseconds: 550_000_000)
-            guard notesTaps == count else { return }
-            notesTaps = 0
-            if count >= 5 {
-                Haptics.success()
-                UISignals.shared.revealHiddenNotes = true
-            } else if count >= 3 {
-                Haptics.success()
-                select(.journal)
-            } else if count == 2 {
-                state.requestNewNote()
-            }
-        }
-    }
-
-    /// 1 tap → Stuff. 2 taps → Fold (money).
-    private func tapFold() {
-        let now = Date()
-        if now.timeIntervalSince(lastFoldTap) < 0.45 { foldTaps += 1 } else { foldTaps = 1 }
-        lastFoldTap = now
-        if foldTaps >= 2 {
-            foldTaps = 0
-            Haptics.success()
-            select(.fold)
-            return
-        }
-        select(.stuff)
     }
 }

@@ -40,7 +40,7 @@ struct BodyView: View {
     @ViewBuilder private func content(_ a: AnatomyData) -> some View {
         let selected = a.groups.first { $0.id == selectedId } ?? a.groups.first
         VStack(alignment: .leading, spacing: 18) {
-            Segmented(options: [("front", "Front"), ("back", "Back")], selection: $side).knRise(0)
+            Picker("", selection: $side) { ForEach([("front", "Front"), ("back", "Back")], id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden().knRise(0)
             chips(a.groups, sel: selected?.id).knRise(1)
             // The figure is the point of this screen; it used to sit small in
             // the middle of a tall card.

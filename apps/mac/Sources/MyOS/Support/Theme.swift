@@ -302,43 +302,6 @@ struct MeterBar: View {
     }
 }
 
-// MARK: - Segmented control
-
-struct Segmented<T: Hashable>: View {
-    let options: [(value: T, title: String)]
-    @Binding var selection: T
-    /// Share the row evenly (7 weekdays on iPhone). Default keeps hugging labels.
-    var fillsWidth: Bool = false
-    @Namespace private var ns
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(options, id: \.value) { opt in
-                let on = selection == opt.value
-                Text(opt.title)
-                    .font((fillsWidth ? Font.caption : Font.footnote).weight(.heavy))
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                    .foregroundStyle(on ? Palette.text : Palette.muted)
-                    .padding(.horizontal, fillsWidth ? 4 : 14).padding(.vertical, 7)
-                    .frame(maxWidth: fillsWidth ? .infinity : nil)
-                    .background {
-                        if on {
-                            Capsule().fill(Palette.surface2)
-                                .matchedGeometryEffect(id: "seg", in: ns)
-                        }
-                    }
-                    .contentShape(Capsule())
-                    .onTapGesture {
-                        Haptics.selection()
-                        withAnimation(.knNormal) { selection = opt.value }
-                    }
-            }
-        }
-        .padding(3)
-        .background(Palette.bg, in: Capsule())
-        .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 2))
-    }
-}
-
 // MARK: - Text field styling
 
 extension View {

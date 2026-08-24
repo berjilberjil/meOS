@@ -27,11 +27,7 @@ struct WeeklyPlannerView: View {
             #endif
 
             VStack(alignment: .leading, spacing: 10) {
-                Segmented(
-                    options: (0..<7).map { (String($0), dayLetters[$0]) },
-                    selection: $weekday,
-                    fillsWidth: true
-                )
+                Picker("", selection: $weekday) { ForEach((0..<7).map { (String($0), dayLetters[$0]) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 HStack(spacing: 8) {
                     Button { showClearMeals = true } label: {
                         Label("Clear meals", systemImage: "trash")

@@ -11,7 +11,6 @@ struct NotesView: View {
     @State private var openID: String?
     @State private var pendingDelete: Note?
     @State private var revealed = false
-    @State private var titleTaps = 0
     @State private var tapTimer: Task<Void, Never>?
     /// One-shot: reopen the note that was open when the app was last closed.
     @State private var restored = false
@@ -27,52 +26,75 @@ struct NotesView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Gap.screen) {
-            HStack(alignment: .firstTextBaseline) {
-                ScreenTitle(text: "Notes")
-                    .contentShape(Rectangle())
-                    .onTapGesture { handleTitleTap() }
-                if revealed {
-                    Image(systemName: "lock.open.fill").font(.caption).foregroundStyle(Palette.brand)
+        List {
+            if filtered.isEmpty {
+                ContentUnavailableView {
+                    Label(state.notes.isEmpty ? "No Notes" : "No Results", systemImage: "note.text")
+                } description: {
+                    Text(state.notes.isEmpty
+                         ? "Tap the compose button to write one."
+                         : "No notes match \u{201C}\(query)\u{201D}.")
                 }
-                if !state.notes.isEmpty {
-                    Text("\(state.notes.count)").font(.footnote.weight(.semibold))
-                        .monospacedDigit().foregroundStyle(Palette.faint)
-                }
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Palette.faint)
-                TextField("", text: $query, prompt: Text("Search notes…").foregroundColor(Palette.faint))
-                    .textFieldStyle(.plain).foregroundStyle(Palette.text)
-            }
-            .knField()
-
-            // Rows are a list, not screen blocks — they get the row beat, not
-            // the screen one, or the page reads as eight separate sections.
-            VStack(alignment: .leading, spacing: Gap.row) {
-                if filtered.isEmpty {
-                    Card {
-                        Text(state.notes.isEmpty ? "No notes yet. Double-tap here to write one."
-                                                 : "No notes match “\(query)”.")
-                            .font(.footnote).foregroundStyle(Palette.faint)
-                    }
-                    .onTapGesture(count: 2) { newNote() }
-                } else {
-                    ForEach(filtered) { noteRow($0) }
+            } else {
+                ForEach(filtered) { note in
+                    Button { openID = note.id } label: { noteRow(note) }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) { pendingDelete = note } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            Button { state.toggleLockNote(note.id) } label: {
+                                Label(note.locked ? "Unhide" : "Hide",
+                                      systemImage: note.locked ? "lock.open" : "lock")
+                            }
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button { state.togglePinNote(note.id) } label: {
+                                Label(note.pinned ? "Unpin" : "Pin",
+                                      systemImage: note.pinned ? "pin.slash" : "pin")
+                            }
+                            .tint(Palette.amber)
+                        }
+                        .contextMenu {
+                            Button { state.togglePinNote(note.id) } label: {
+                                Label(note.pinned ? "Unpin" : "Pin", systemImage: note.pinned ? "pin.slash" : "pin")
+                            }
+                            Button { state.toggleLockNote(note.id) } label: {
+                                Label(note.locked ? "Unhide" : "Hide", systemImage: note.locked ? "lock.open" : "lock")
+                            }
+                            Button(role: .destructive) { pendingDelete = note } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                 }
             }
         }
-        // A full-screen cover, NOT `navigationDestination`: iOS MainView has no
-        // NavigationStack (deliberately — a stack with a hidden bar re-negotiates
-        // the scroll view's safe-area inset mid-scroll), so a push had nowhere to
-        // go and silently did nothing. That is why notes opened as a blank
-        // nothing and new ones could not be typed into.
-        .fullScreenCover(item: Binding(get: { openID.map(OpenNote.init) },
-                                       set: { openID = $0?.id })) { note in
-            NoteEditor(id: note.id)
+        .listStyle(.insetGrouped)
+        .searchable(text: $query, prompt: "Search notes")
+        // A real push now that MainView gives every tab a NavigationStack. This
+        // used to be a `fullScreenCover` purely because there was no stack to
+        // push into, so a NavigationLink silently did nothing.
+        .navigationDestination(item: $openID) { id in
+            NoteEditor(id: id)
                 .environmentObject(state)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { newNote() } label: { Label("New Note", systemImage: "square.and.pencil") }
+            }
+            // The 5-tap-the-title gesture that used to reveal locked notes has
+            // no target left once the title belongs to the navigation bar, so
+            // it is an explicit menu item behind the same Face ID check.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { Task { await revealHidden() } } label: {
+                        Label("Show Hidden Notes", systemImage: "lock.open")
+                    }
+                    .disabled(revealed)
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
+            }
         }
         .onAppear { consumeNewNoteRequest(); consumeRevealHidden(); restoreRoute() }
         // Notes arrive from the cache a beat after the view builds on a cold
@@ -85,7 +107,7 @@ struct NotesView: View {
         .onChange(of: signals.revealHiddenNotes) { _, on in if on { consumeRevealHidden() } }
         .holdToDelete(
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-            title: pendingDelete.map { $0.title.isEmpty ? "Delete this note?" : "Delete “\($0.title)”?" } ?? "Delete this note?",
+            title: pendingDelete.map { $0.title.isEmpty ? "Delete this note?" : "Delete \u{201C}\($0.title)\u{201D}?" } ?? "Delete this note?",
             message: "This can't be undone."
         ) {
             if let n = pendingDelete { state.deleteNote(n.id) }
@@ -94,39 +116,27 @@ struct NotesView: View {
         .onDisappear { revealed = false; tapTimer?.cancel() }
     }
 
+    /// A grouped-list cell. The Card wrapper is gone — List draws the surface.
     private func noteRow(_ note: Note) -> some View {
-        Button { openID = note.id } label: {
-            Card {
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        if note.pinned {
-                            Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
-                        }
-                        Text(note.title.isEmpty ? "Untitled" : note.title)
-                            .font(.callout.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                        if note.locked {
-                            Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Palette.faint)
-                        }
-                        Spacer()
-                        Text(Fmt.day(note.updatedAt)).font(.caption2).foregroundStyle(Palette.faint)
-                    }
-                    if !note.locked && !note.body.isEmpty {
-                        Text(note.body).font(.footnote).foregroundStyle(Palette.muted)
-                            .lineLimit(2).multilineTextAlignment(.leading)
-                    }
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                if note.pinned {
+                    Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
                 }
+                Text(note.title.isEmpty ? "Untitled" : note.title)
+                    .font(.callout.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                if note.locked {
+                    Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Palette.faint)
+                }
+                Spacer()
+                Text(Fmt.day(note.updatedAt)).font(.caption2).foregroundStyle(Palette.faint)
+            }
+            if !note.locked && !note.body.isEmpty {
+                Text(note.body).font(.footnote).foregroundStyle(Palette.muted)
+                    .lineLimit(2).multilineTextAlignment(.leading)
             }
         }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button { state.togglePinNote(note.id) } label: {
-                Label(note.pinned ? "Unpin" : "Pin", systemImage: note.pinned ? "pin.slash" : "pin")
-            }
-            Button { state.toggleLockNote(note.id) } label: {
-                Label(note.locked ? "Unhide" : "Hide", systemImage: note.locked ? "lock.open" : "lock")
-            }
-            Button(role: .destructive) { pendingDelete = note } label: { Label("Delete", systemImage: "trash") }
-        }
+        .contentShape(Rectangle())
     }
 
     private func newNote() { openID = state.addBlockNote() }
@@ -153,21 +163,6 @@ struct NotesView: View {
         guard UISignals.shared.revealHiddenNotes else { return }
         UISignals.shared.revealHiddenNotes = false
         Task { await revealHidden() }
-    }
-
-    /// Every tap on the title increments a counter; after a short settle window,
-    /// 2 taps = new note, 5+ taps = reveal hidden (locked) notes behind Face ID.
-    private func handleTitleTap() {
-        titleTaps += 1
-        tapTimer?.cancel()
-        tapTimer = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            if Task.isCancelled { return }
-            let count = titleTaps
-            titleTaps = 0
-            if count >= 5 { await revealHidden() }
-            else if count == 2 { newNote() }
-        }
     }
 
     private func revealHidden() async {

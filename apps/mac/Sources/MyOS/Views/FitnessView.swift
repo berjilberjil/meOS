@@ -37,10 +37,10 @@ struct FitnessView: View {
                 .knRise(0)
 
             #if os(iOS)
-            Segmented(options: FitSub.allCases.map { ($0, $0.label) }, selection: $sub, fillsWidth: true)
+            Picker("", selection: $sub) { ForEach(FitSub.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 .knRise(1)
             #else
-            Segmented(options: FitSub.allCases.map { ($0, $0.label) }, selection: $sub)
+            Picker("", selection: $sub) { ForEach(FitSub.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 .knRise(1)
             #endif
 
@@ -59,7 +59,7 @@ struct FitnessView: View {
 
     @ViewBuilder private var trainContent: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
-            Segmented(options: TrainSub.allCases.map { ($0, $0.label) }, selection: $trainSub)
+            Picker("", selection: $trainSub) { ForEach(TrainSub.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
             Group {
                 switch trainSub {
                 case .programs: ProgramsView()

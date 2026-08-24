@@ -8,7 +8,7 @@ struct FitnessLibraryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
-            Segmented(options: [(LibMode.foods, "Foods"), (LibMode.workouts, "Workouts")], selection: $mode)
+            Picker("", selection: $mode) { ForEach([(LibMode.foods, "Foods"), (LibMode.workouts, "Workouts")], id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 .knRise(0)
             Group {
                 if mode == .foods { FoodLibrarySection() } else { WorkoutLibrarySection() }

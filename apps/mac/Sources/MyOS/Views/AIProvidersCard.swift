@@ -147,8 +147,7 @@ private struct AddKeyForm: View {
             Card(padding: 4) {
                 VStack(spacing: 0) {
                     HStack {
-                        Segmented(options: AIProvider.allCases.map { ($0, $0.label) },
-                                  selection: $provider)
+                        Picker("", selection: $provider) { ForEach(AIProvider.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                     }
                     .padding(.horizontal, SettingsMetrics.rowPadH)
                     .padding(.vertical, 10)
@@ -198,7 +197,7 @@ private struct AddKeyForm: View {
     private var macForm: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Segmented(options: AIProvider.allCases.map { ($0, $0.label) }, selection: $provider)
+                Picker("", selection: $provider) { ForEach(AIProvider.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 Spacer()
                 if let url = provider.getKeyURL {
                     Button { openURL(url) } label: {

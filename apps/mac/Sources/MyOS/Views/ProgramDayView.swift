@@ -552,8 +552,7 @@ struct ProgramEditorSheet: View {
                 if isNew {
                     VStack(alignment: .leading, spacing: 8) {
                         KFieldLabel(text: "How the week runs")
-                        Segmented(options: [(true, "By weekday"), (false, "Day 1, 2, 3…")],
-                                  selection: $byWeekday, fillsWidth: true)
+                        Picker("", selection: $byWeekday) { ForEach([(true, "By weekday"), (false, "Day 1, 2, 3…")], id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                         Text(byWeekday
                              ? "Days sit on Monday–Sunday. Today reads the calendar."
                              : "Days rotate in order from today, however many there are.")

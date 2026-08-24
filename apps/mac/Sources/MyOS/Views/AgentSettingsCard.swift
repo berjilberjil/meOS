@@ -60,8 +60,7 @@ struct AgentSettingsCard: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 KFieldLabel(text: "Tone")
-                Segmented(options: AgentTone.allCases.map { ($0, $0.label) },
-                          selection: Binding(get: { agent.tone }, set: { agent.tone = $0 }))
+                Picker("", selection: Binding(get: { agent.tone }, set: { agent.tone = $0 })) { ForEach(AgentTone.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 Text(agent.tone.directive)
                     .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)

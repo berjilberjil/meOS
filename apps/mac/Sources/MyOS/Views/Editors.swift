@@ -19,15 +19,11 @@ struct FitnessProfileEditor: View {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
                     KFieldLabel(text: "Goal")
-                    Segmented(options: FitnessGoal.allCases.map { ($0, $0.label) },
-                              selection: Binding(get: { state.fitnessProfile.goal },
-                                                 set: { g in state.updateFitnessProfile { $0.goal = g } }))
+                    Picker("", selection: Binding(get: { state.fitnessProfile.goal }, set: { g in state.updateFitnessProfile { $0.goal = g } })) { ForEach(FitnessGoal.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     KFieldLabel(text: "Sex")
-                    Segmented(options: Sex.allCases.map { ($0, $0.label) },
-                              selection: Binding(get: { state.fitnessProfile.sex },
-                                                 set: { s in state.updateFitnessProfile { $0.sex = s } }))
+                    Picker("", selection: Binding(get: { state.fitnessProfile.sex }, set: { s in state.updateFitnessProfile { $0.sex = s } })) { ForEach(Sex.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 }
             }
             VStack(alignment: .leading, spacing: 6) {

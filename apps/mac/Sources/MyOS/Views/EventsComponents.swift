@@ -41,7 +41,7 @@ struct EventsView: View {
             HStack(spacing: 10) {
                 ScreenTitle(text: "Events")
                 Spacer()
-                Segmented(options: Mode.allCases.map { ($0, $0.label) }, selection: $mode)
+                Picker("", selection: $mode) { ForEach(Mode.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 Button { showTags = true } label: { Label("Tags", systemImage: "tag") }
                     .buttonStyle(.borderless)
                 Button { editTarget = EventEditTarget(event: nil) } label: {

@@ -51,7 +51,7 @@ struct ProductivityView: View {
                 Spacer()
                 Text("\(state.watch.count) videos").font(.caption).foregroundStyle(Palette.faint)
                 if !state.watch.isEmpty {
-                    Segmented(options: ViewMode.allCases.map { ($0, $0.label) }, selection: $mode)
+                    Picker("", selection: $mode) { ForEach(ViewMode.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 }
             }
             .knRise(0)
