@@ -33,7 +33,9 @@ struct MainView: View {
                     // large title with nothing to collapse against just sits on
                     // top of the page — which is exactly what it did. Inline.
                     TodayPager(go: { select($0) })
-                        .navigationTitle(NavTab.today.title)
+                        // No title at all here — the tab bar already says
+                        // Today, and the page leads with the day and date.
+                        .navigationTitle("")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
@@ -49,6 +51,7 @@ struct MainView: View {
                 NavigationStack {
                     screen { ProductivityView() }
                         .navigationTitle(NavTab.productivity.title)
+                        .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
@@ -66,6 +69,7 @@ struct MainView: View {
                 NavigationStack {
                     screen { ScanView() }
                         .navigationTitle(NavTab.scan.title)
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             }
 
@@ -73,6 +77,7 @@ struct MainView: View {
                 NavigationStack {
                     screen { FitnessView() }
                         .navigationTitle(NavTab.fitness.title)
+                        .navigationBarTitleDisplayMode(.inline)
                 }
             }
 
@@ -80,6 +85,7 @@ struct MainView: View {
                 NavigationStack {
                     NotesView()
                         .navigationTitle(NavTab.notes.title)
+                        .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {

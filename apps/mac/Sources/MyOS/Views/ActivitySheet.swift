@@ -14,19 +14,46 @@ struct ActivitySheet: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
 
+    /// The day being READ. Tapping a ring moves this WITHOUT moving the strip,
+    /// so you can compare days without the week sliding under you.
+    @State private var selected: String
+    /// The last day of the strip. Only the date picker moves this.
+    @State private var anchor: String
+
+    init(day: String) {
+        self.day = day
+        _selected = State(initialValue: day)
+        _anchor = State(initialValue: day)
+    }
+
     private var target: Int { state.stepsTarget }
     private func steps(_ key: String) -> Int { state.fitness[key]?.steps ?? 0 }
 
-    /// The seven days ending on the one being shown, oldest first.
-    private var week: [String] { (0..<7).reversed().map { AppState.addDays(-$0, to: day) } }
+    /// The seven days ending on the anchor, oldest first.
+    private var week: [String] { (0..<7).reversed().map { AppState.addDays(-$0, to: anchor) } }
 
-    private var today: Int { steps(day) }
+    /// Any date, not just the last seven. Picking one re-anchors the strip.
+    private var selectedDate: Binding<Date> {
+        Binding(
+            get: { CalMath.date(fromKey: selected) ?? Date() },
+            set: { picked in
+                let key = AppState.dateKey(picked)
+                selected = key
+                anchor = key
+            }
+        )
+    }
+
+    private var today: Int { steps(selected) }
     private var fraction: Double { target > 0 ? min(1, Double(today) / Double(target)) : 0 }
 
     var body: some View {
         let content = ScrollView {
             VStack(alignment: .leading, spacing: Gap.screen) {
                 header
+                DatePicker("Date", selection: selectedDate,
+                           in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
                 weekStrip
                 ring
                 stats
@@ -49,7 +76,7 @@ struct ActivitySheet: View {
                 Text("Activity")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(Palette.text)
-                Text(Fmt.day(day))
+                Text(Fmt.day(selected))
                     .font(.caption.weight(.heavy))
                     .foregroundStyle(Palette.faint)
             }
@@ -68,19 +95,29 @@ struct ActivitySheet: View {
             ForEach(week, id: \.self) { key in
                 let n = steps(key)
                 let f = target > 0 ? min(1, Double(n) / Double(target)) : 0
-                VStack(spacing: 6) {
-                    Text(Fmt.weekdayInitial(key))
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(key == day ? Palette.text : Palette.faint)
-                    ZStack {
-                        Circle().stroke(Palette.surface2, lineWidth: 3.5)
-                        Circle().trim(from: 0, to: max(0.001, f))
-                            .stroke(tint(n), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
+                let on = key == selected
+                Button { selected = key } label: {
+                    VStack(spacing: 6) {
+                        Text(Fmt.weekdayInitial(key))
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(on ? Palette.text : Palette.faint)
+                        ZStack {
+                            Circle().stroke(Palette.surface2, lineWidth: 3.5)
+                            Circle().trim(from: 0, to: max(0.001, f))
+                                .stroke(tint(n), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                            if on {
+                                Circle().stroke(Palette.accent, lineWidth: 1.5).padding(-3.5)
+                            }
+                        }
+                        .frame(width: 26, height: 26)
                     }
-                    .frame(width: 26, height: 26)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(Fmt.day(key)), \(n) steps")
+                .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
     }
@@ -167,7 +204,7 @@ struct ActivitySheet: View {
                         if let key = value.as(String.self) {
                             Text(Fmt.weekdayInitial(key))
                                 .font(.caption2.weight(.semibold))
-                                .foregroundStyle(key == day ? Palette.text : Palette.faint)
+                                .foregroundStyle(key == selected ? Palette.text : Palette.faint)
                         }
                     }
                 }

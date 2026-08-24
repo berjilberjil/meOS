@@ -174,20 +174,24 @@ enum Motion {
 }
 
 extension Animation {
-    // The system's own spring presets. MyOS used to run critically damped
-    // everywhere on the rule that "nothing wobbles after it lands"; that rule was
-    // lifted 2026-08-24 at Berjil's explicit request, because interruptible
-    // springs — not stillness — are what iOS and macOS actually feel like.
-    static let knFast     = Animation.snappy(duration: 0.18)
-    static let knNormal   = Animation.smooth(duration: 0.26)
-    static let knEntrance = Animation.smooth(duration: 0.32)
-    /// Momentum moves (tab pop, flick) get the system's bounce back.
-    static let knPop      = Animation.bouncy(duration: 0.28)
+    // Stiff again, 2026-08-24. These were switched to the system spring presets
+    // earlier the same day; the app then read as "buggy and stuck", which is the
+    // same complaint that produced the stiff rule in the first place. A page
+    // that is still settling when your thumb arrives feels broken, not lively.
+    static let knFast     = Animation.easeOut(duration: Motion.fast)
+    static let knNormal   = Animation.easeInOut(duration: Motion.normal)
+    /// Screens arrive by fading, not by moving. See `RiseIn`.
+    static let knEntrance = Animation.easeOut(duration: 0.14)
+    /// No bounce. A control that overshoots reads as loose.
+    static let knPop      = Animation.spring(response: 0.26, dampingFraction: 1.0)
     /// Dark ↔ light. Interrupted retargets from the live colour (no snap).
     static var knTheme: Animation {
-        Motion.reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.4)
+        Motion.reduceMotion
+            ? .easeInOut(duration: 0.2)
+            : .spring(response: Motion.theme, dampingFraction: 1.0)
     }
 }
+
 
 // MARK: - Elevation
 
@@ -309,17 +313,12 @@ struct RiseIn: ViewModifier {
     @State private var shown = false
 
     func body(content: Content) -> some View {
-        let animates = entrances && !Motion.reduceMotion
-        let settled = shown || !animates
-        return content
+        content
             .opacity(entrances ? (shown ? 1 : 0) : 1)
-            .offset(y: settled ? 0 : 10)
-            .onAppear {
-                guard entrances else { return }
-                withAnimation(.knEntrance.delay(Double(min(index, 8)) * 0.03)) { shown = true }
-            }
+            .onAppear { if entrances { withAnimation(.knEntrance) { shown = true } } }
     }
 }
+
 
 private struct KnEntrancesKey: EnvironmentKey { static let defaultValue = true }
 
