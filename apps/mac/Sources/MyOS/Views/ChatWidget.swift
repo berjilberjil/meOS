@@ -101,7 +101,7 @@ struct ChatWidget: View {
                 }
             }
         }
-        .buttonStyle(KPressStyle(scale: 0.92))
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
         .help("Catherine")
         .accessibilityLabel("Catherine")
@@ -166,7 +166,7 @@ struct ChatWidget: View {
 
     private func iconButton(_ name: String, help: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: name).font(.caption.weight(.bold)) }
-            .buttonStyle(KIconButtonStyle(size: 28))
+            .buttonStyle(.borderless)
             .help(help)
     }
 
@@ -249,7 +249,7 @@ struct ChatWidget: View {
                 Button { pendingHistoryDelete = th.id } label: {
                     Image(systemName: "trash").font(.caption2)
                 }
-                .buttonStyle(KIconButtonStyle(size: 24, color: Palette.red))
+                .buttonStyle(.borderless).tint(Palette.red)
                 .holdToDelete(
                     isPresented: Binding(get: { pendingHistoryDelete == th.id },
                                          set: { if !$0 { pendingHistoryDelete = nil } }),
@@ -265,7 +265,7 @@ struct ChatWidget: View {
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                 .strokeBorder(active ? Palette.brand.opacity(0.5) : .clear, lineWidth: 1))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private var briefing: some View {
@@ -333,7 +333,7 @@ struct ChatWidget: View {
             .background(Palette.surface2.opacity(0.55), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
     }
 
@@ -385,7 +385,7 @@ struct ChatWidget: View {
                     .foregroundStyle(Palette.bg).frame(width: 30, height: 30)
                     .background(canSend ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(Palette.surface2), in: Circle())
             }
-            .buttonStyle(KPressStyle(scale: 0.9))
+            .buttonStyle(.plain)
             .disabled(!canSend)
             .onHover { h in cursor(h) }
         }

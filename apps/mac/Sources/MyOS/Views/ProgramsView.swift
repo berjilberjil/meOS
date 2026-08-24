@@ -45,7 +45,7 @@ struct ProgramsView: View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
                 Text("That program is gone.").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
-                Button("Back to programs") { route = .list }.buttonStyle(KSecondaryButtonStyle())
+                Button("Back to programs") { route = .list }.buttonStyle(.bordered)
             }
         }
     }
@@ -79,7 +79,7 @@ struct ProgramListView: View {
                     Label("Create program", systemImage: "plus")
                         .font(.subheadline.weight(.semibold))
                 }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
                 .knRise(1)
             }
         }
@@ -101,7 +101,7 @@ struct ProgramListView: View {
                     Label("Create my first program", systemImage: "plus")
                         .font(.subheadline.weight(.semibold))
                 }
-                .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
+                .buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth: .infinity)
             }
         }
     }
@@ -155,19 +155,19 @@ private struct ProgramCard: View {
                             Label("Continue", systemImage: "chevron.right")
                                 .font(.footnote.weight(.semibold))
                         }
-                        .buttonStyle(KPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                     } else {
                         Button(action: open) {
                             Label("View", systemImage: "chevron.right")
                                 .font(.footnote.weight(.semibold))
                         }
-                        .buttonStyle(KSecondaryButtonStyle())
+                        .buttonStyle(.bordered)
                     }
                     if !isActive {
                         Button { state.setActiveProgram(program.id) } label: {
                             Label("Set active", systemImage: "bolt.fill").font(.footnote.weight(.semibold))
                         }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.brand))
+                        .buttonStyle(.borderless).tint(Palette.brand)
                     }
                     Spacer(minLength: 0)
                 }
@@ -270,12 +270,12 @@ struct ProgramDetailView: View {
                     Button { state.setActiveProgram(p.id) } label: {
                         Label("Set as active", systemImage: "bolt.fill").font(.footnote.weight(.semibold))
                     }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                 }
                 Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                 Button { state.duplicateProgram(p.id) } label: { Label("Duplicate", systemImage: "doc.on.doc") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                 Spacer(minLength: 0)
             }
         }
@@ -304,7 +304,7 @@ struct ProgramDetailView: View {
                               open: { openDay(day.id) })
             }
             Button { addingDay = true } label: { Label("Add day", systemImage: "plus") }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
         }
     }
 
@@ -424,7 +424,7 @@ struct BackBar: View {
             .foregroundStyle(Palette.muted)
             .padding(.vertical, 4).contentShape(Rectangle())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
     }
 }

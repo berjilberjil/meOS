@@ -29,7 +29,7 @@ struct FoodLibrarySection: View {
                 }
                 .knField(focused: searchFocused)
                 Button { newFood = true } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -66,7 +66,7 @@ struct FoodLibrarySection: View {
                 .background(on ? Palette.surface2 : .clear, in: Capsule())
                 .overlay(Capsule().strokeBorder(on ? Palette.borderStrong : Palette.border, lineWidth: 1))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
     }
 
@@ -137,7 +137,7 @@ struct FoodPickerSheet: View {
                 Text("Add to \(meal.label)").font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer()
                 Button { dismiss(); newCustom() } label: { Label("New food", systemImage: "plus") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
             }
             .padding(16)
             HStack(spacing: 8) {
@@ -167,7 +167,7 @@ struct FoodPickerSheet: View {
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(KPressStyle())
+                        .buttonStyle(.plain)
                         .onHover { h in cursor(h) }
                     }
                 }
@@ -233,19 +233,19 @@ struct FoodEditor: View {
             HStack {
                 if let food, !food.isDefault {
                     Button("Delete") { showDelete = true }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.red))
+                        .buttonStyle(.borderless).tint(Palette.red)
                         .holdToDelete(isPresented: $showDelete, title: "Delete \(food.name)?",
                                       message: "Removes it from your food library.") {
                             state.deleteFood(food.id); dismiss()
                         }
                 }
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                Button("Cancel") { dismiss() }.buttonStyle(.borderless)
                 Button("Save") {
                     if food == nil { state.addFood(draft) } else { state.updateFood(draft) }
                     dismiss()
                 }
-                .buttonStyle(KPrimaryButtonStyle())
+                .buttonStyle(.borderedProminent)
                 .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -288,7 +288,7 @@ struct FoodScanSheet: View {
                 Text("Scan a food photo").font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 28))
+                    .buttonStyle(.borderless)
             }
             ImageDropZone(
                 title: "Drop a nutrition label or product photo",
@@ -374,7 +374,7 @@ struct FoodScanReviewSheet: View {
                 HStack {
                     Text("\(included.count) selected").font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
                     Spacer()
-                    Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                    Button("Cancel") { dismiss() }.buttonStyle(.borderless)
                 }
                 if included.isEmpty {
                     Text("Select at least one.").font(.footnote).foregroundStyle(Palette.faint)
@@ -419,7 +419,7 @@ private struct ScanFoodRow: View {
                         .font(.body)
                         .foregroundStyle(draft.include ? Palette.green : Palette.faint)
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 FoodIcon(category: draft.food.category, name: draft.food.name, size: 28)
                 TextField("Name", text: $draft.food.name)
                     .textFieldStyle(.plain).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)

@@ -26,22 +26,22 @@ struct FoldView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
-                .buttonStyle(KIconButtonStyle(size: 30, color: Palette.muted))
+                .buttonStyle(.borderless).tint(Palette.muted)
                 .disabled(state.foldBusy)
                 .help("Pull latest from Fold")
                 if state.fold != nil {
                     Button { prefs.hideFoldNumbers.toggle() } label: {
                         Image(systemName: prefs.hideFoldNumbers ? "eye.slash.fill" : "eye.fill")
                     }
-                    .buttonStyle(KIconButtonStyle(size: 30, color: Palette.muted))
+                    .buttonStyle(.borderless).tint(Palette.muted)
                     .help(prefs.hideFoldNumbers ? "Show net worth" : "Hide net worth")
                 }
                 if state.foldLinked {
                     Button("Sign out") { state.disconnectFold() }
-                        .buttonStyle(KGhostButtonStyle())
+                        .buttonStyle(.borderless)
                 } else {
                     Button { showLogin = true } label: { Label("Connect Fold", systemImage: "link") }
-                        .buttonStyle(KPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                 }
             }
             .knRise(0)
@@ -219,7 +219,7 @@ struct FoldView: View {
                 Button { showLogin = true } label: {
                     Label("Connect with phone OTP", systemImage: "iphone")
                 }
-                .buttonStyle(KGhostButtonStyle())
+                .buttonStyle(.borderless)
             }
         }
         .knRise(2)
@@ -417,7 +417,7 @@ private struct FoldLoginSheet: View {
                             if await state.verifyFoldOTP(phone, otp: otp) { dismiss() }
                         }
                     } label: { Label(state.foldBusy ? "Checking…" : "Verify & pull", systemImage: "checkmark") }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                     .disabled(otp.count < 4 || state.foldBusy)
                 } else {
                     Button {
@@ -426,7 +426,7 @@ private struct FoldLoginSheet: View {
                             if state.foldError == nil { sent = true; focus = .otp }
                         }
                     } label: { Label(state.foldBusy ? "Sending…" : "Send OTP", systemImage: "message") }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                     .disabled(phone.filter(\.isNumber).count < 10 || state.foldBusy)
                 }
                 Spacer()

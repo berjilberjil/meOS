@@ -131,7 +131,7 @@ struct ProgramDayEditorView: View {
                 Button { settings = true } label: {
                     Image(systemName: "slider.horizontal.3").font(.footnote.weight(.bold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help("Rename, schedule or make it a rest day")
             }
             Text(subtitle(d)).font(.footnote).foregroundStyle(Palette.faint)
@@ -163,7 +163,7 @@ struct ProgramDayEditorView: View {
                     Label("Make it a training day", systemImage: "figure.strengthtraining.traditional")
                         .font(.footnote.weight(.semibold))
                 }
-                .buttonStyle(KSecondaryButtonStyle())
+                .buttonStyle(.bordered)
             }
         }
     }
@@ -192,7 +192,7 @@ struct ProgramDayEditorView: View {
                                    })
             }
             Button { addingGroup = true } label: { Label("Add muscle group", systemImage: "plus") }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
         }
     }
 }
@@ -227,7 +227,7 @@ private struct MuscleBlockSection: View {
                     }
                 }
                 Button(action: addExercise) { Label("Add exercise", systemImage: "plus") }
-                    .buttonStyle(KGhostButtonStyle(color: block.group.tint))
+                    .buttonStyle(.borderless).tint(block.group.tint)
             }
         }
     }
@@ -293,7 +293,7 @@ private struct ProgramExerciseRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button { withAnimation(.knNormal) { expanded.toggle() } } label: { summary }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .onHover { h in cursor(h) }
             if expanded { controls }
         }
@@ -348,7 +348,7 @@ private struct ProgramExerciseRow: View {
             }
             HStack(spacing: 8) {
                 Button(action: replace) { Label("Change exercise", systemImage: "arrow.left.arrow.right") }
-                    .buttonStyle(KGhostButtonStyle(color: tint))
+                    .buttonStyle(.borderless).tint(tint)
                 Menu {
                     Button("Move up") { move(-1) }.disabled(index == 0)
                     Button("Move down") { move(1) }.disabled(index >= count - 1)
@@ -430,7 +430,7 @@ struct MuscleGroupPickerSheet: View {
                             .strokeBorder(on ? g.tint.opacity(0.5) : Palette.border, lineWidth: 1))
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .onHover { h in cursor(h) }
                 }
             }
@@ -483,9 +483,9 @@ struct DaySettingsSheet: View {
 
                 HStack {
                     Spacer()
-                    Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                    Button("Cancel") { dismiss() }.buttonStyle(.borderless)
                     Button(day == nil ? "Add day" : "Save", action: save)
-                        .buttonStyle(KPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
@@ -508,7 +508,7 @@ struct DaySettingsSheet: View {
                 .background(on ? Palette.brand : Palette.surface2.opacity(0.6),
                             in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
     }
 
@@ -578,9 +578,9 @@ struct ProgramEditorSheet: View {
 
                 HStack {
                     Spacer()
-                    Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                    Button("Cancel") { dismiss() }.buttonStyle(.borderless)
                     Button(isNew ? "Create" : "Save", action: save)
-                        .buttonStyle(KPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
@@ -641,7 +641,7 @@ struct SheetShell<Content: View>: View {
                 }
                 Spacer(minLength: 4)
                 Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 30))
+                    .buttonStyle(.borderless)
             }
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 14)
 

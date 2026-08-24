@@ -80,7 +80,7 @@ struct WeeklyReportCard: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
             }
         }
     }
@@ -98,7 +98,7 @@ struct WeeklyReportCard: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+        .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
         .disabled(state.weeklyBusy)
     }
 }
@@ -212,7 +212,7 @@ private struct PastReportSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.caption.weight(.bold))
                     }
-                    .buttonStyle(KIconButtonStyle(size: 28))
+                    .buttonStyle(.borderless)
                 }
                 ReportBody(report: report)
             }

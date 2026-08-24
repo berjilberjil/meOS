@@ -120,7 +120,7 @@ struct VoiceCallView: View {
 
     private var endButton: some View {
         Button("End") { onEnd() }
-            .buttonStyle(KSecondaryButtonStyle())
+            .buttonStyle(.bordered)
             .knRise(3)
     }
 

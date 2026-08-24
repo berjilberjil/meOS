@@ -47,7 +47,7 @@ struct JournalView: View {
                 // "Today" lives on the same row as the Events/Journal tabs, right-aligned.
                 if jseg == .journal && !isToday {
                     Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: { Text("Today") }
-                        .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
+                        .buttonStyle(.bordered).tint(Palette.brand)
                 }
             }
             if jseg == .events { EventsView() } else { journalBody }
@@ -118,7 +118,7 @@ struct JournalView: View {
                     Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
                         Text("Today")
                     }
-                    .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
+                    .buttonStyle(.bordered).tint(Palette.brand)
                     .help("Back to today")
                 }
                 dateNavigator
@@ -134,7 +134,7 @@ struct JournalView: View {
                 Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
                     Text("Today")
                 }
-                .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
+                .buttonStyle(.bordered).tint(Palette.brand)
                 .help("Back to today")
             }
             dateNavigator
@@ -184,7 +184,7 @@ struct JournalView: View {
             Button { withAnimation(.knFast) { viewedDate = AppState.addDays(-1, to: viewedDate) } } label: {
                 Image(systemName: "chevron.left").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 26))
+            .buttonStyle(.borderless)
             .help("Previous day")
 
             Button { showCalendar = true } label: {
@@ -198,7 +198,7 @@ struct JournalView: View {
                 .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
                 .contentShape(Capsule())
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
             .help("Open calendar")
             .popover(isPresented: $showCalendar, arrowEdge: .bottom) {
                 StreakCalendar(viewedDate: $viewedDate, isPresented: $showCalendar)
@@ -208,7 +208,7 @@ struct JournalView: View {
             Button { withAnimation(.knFast) { viewedDate = AppState.addDays(1, to: viewedDate) } } label: {
                 Image(systemName: "chevron.right").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 26))
+            .buttonStyle(.borderless)
             .disabled(isToday)
             .opacity(isToday ? 0.3 : 1)
             .help("Next day")
@@ -431,7 +431,7 @@ struct StreakCalendar: View {
             Button { shiftMonth(-1) } label: {
                 Image(systemName: "chevron.left").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 24))
+            .buttonStyle(.borderless)
             Spacer()
             Text(monthTitle)
                 .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
@@ -439,7 +439,7 @@ struct StreakCalendar: View {
             Button { shiftMonth(1) } label: {
                 Image(systemName: "chevron.right").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 24))
+            .buttonStyle(.borderless)
             .disabled(isCurrentMonth)
             .opacity(isCurrentMonth ? 0.3 : 1)
         }
@@ -517,7 +517,7 @@ struct StreakCalendar: View {
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .opacity(isFuture ? 0.35 : 1)
         }
-        .buttonStyle(KPressStyle(scale: 0.92))
+        .buttonStyle(.plain)
         .disabled(isFuture)
     }
 
@@ -690,7 +690,7 @@ private struct JournalListCard: View {
                         Button { remove(i) } label: {
                             Image(systemName: "xmark").font(.caption2.weight(.bold))
                         }
-                        .buttonStyle(KIconButtonStyle(size: 22))
+                        .buttonStyle(.borderless)
                     }
                 }
                 HStack(spacing: 8) {
@@ -701,7 +701,7 @@ private struct JournalListCard: View {
                     Button(action: commit) {
                         Image(systemName: "plus.circle.fill").font(.body).foregroundStyle(color)
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .opacity(text.isEmpty ? 0.35 : 1)
                     .disabled(text.isEmpty)
                 }

@@ -67,7 +67,7 @@ struct MacroPulseView: View {
                     Text("MyOS").font(.footnote.weight(.semibold))
                 }
             }
-            .buttonStyle(KGhostButtonStyle(color: Palette.muted))
+            .buttonStyle(.borderless).tint(Palette.muted)
 
             Spacer(minLength: 0)
 
@@ -87,13 +87,13 @@ struct MacroPulseView: View {
             Button { showMethod = true } label: {
                 Image(systemName: "info.circle").font(.footnote.weight(.semibold))
             }
-            .buttonStyle(KIconButtonStyle(size: 28))
+            .buttonStyle(.borderless)
             .help("Where these numbers come from and how they are worked out")
 
             Button { Task { await state.loadMacro(date: date, refresh: true) } } label: {
                 Image(systemName: "arrow.clockwise").font(.caption.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 28))
+            .buttonStyle(.borderless)
             .disabled(state.macroBusy)
             .help("Fetch again now")
         }
@@ -105,19 +105,19 @@ struct MacroPulseView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Button { step(-1) } label: { Image(systemName: "chevron.left").font(.caption.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 28))
+                    .buttonStyle(.borderless)
                 Text(Fmt.day(date))
                     .font(.body.weight(.bold))
                     .foregroundStyle(Palette.text)
                     .frame(minWidth: 120)
                 Button { step(1) } label: { Image(systemName: "chevron.right").font(.caption.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 28))
+                    .buttonStyle(.borderless)
                     .disabled(isToday)
                     .opacity(isToday ? 0.35 : 1)
                 Spacer(minLength: 0)
                 if !isToday {
                     Button("Today") { go(state.todayKey) }
-                        .buttonStyle(KSoftButtonStyle(tint: Palette.brand))
+                        .buttonStyle(.bordered).tint(Palette.brand)
                 }
             }
             HStack(spacing: 6) {
@@ -129,7 +129,7 @@ struct MacroPulseView: View {
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(r == range ? Palette.brand : Palette.surface2, in: Capsule())
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                 }
                 Spacer(minLength: 0)
             }
@@ -144,7 +144,7 @@ struct MacroPulseView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 168), spacing: 10)], spacing: 10) {
                 ForEach(snap.pulse) { m in
                     Button { detail = m } label: { MacroMetricCard(metric: m, range: range) }
-                        .buttonStyle(KPressStyle())
+                        .buttonStyle(.plain)
                 }
             }
         }
@@ -157,7 +157,7 @@ struct MacroPulseView: View {
                 Button { showMethod = true } label: {
                     Image(systemName: "info.circle").font(.caption2.weight(.semibold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 20, color: Palette.faint))
+                .buttonStyle(.borderless).tint(Palette.faint)
                 .help("How each score is worked out")
             }
             Card {

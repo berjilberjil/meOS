@@ -117,7 +117,7 @@ struct NotesView: View {
                 }
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .contextMenu {
             Button { state.togglePinNote(note.id) } label: {
                 Label(note.pinned ? "Unpin" : "Pin", systemImage: note.pinned ? "pin.slash" : "pin")

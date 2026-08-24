@@ -75,12 +75,12 @@ struct BodyPhotosCard: View {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                     .font(.callout.weight(.semibold))
             }
-            .buttonStyle(KIconButtonStyle(size: 30, color: showCalendar ? Palette.brand : Palette.muted))
+            .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.muted)
             .accessibilityLabel(showCalendar ? "Hide calendar" : "Show calendar")
             Button { adding = true } label: {
                 Image(systemName: "plus.circle.fill").font(.body.weight(.semibold))
             }
-            .buttonStyle(KIconButtonStyle(size: 30, color: Palette.teal))
+            .buttonStyle(.borderless).tint(Palette.teal)
             .accessibilityLabel("Add photo")
         }
     }
@@ -143,7 +143,7 @@ struct BodyPhotosCard: View {
                 }
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private func addPicked(_ item: PhotosPickerItem?) async {
@@ -193,7 +193,7 @@ private struct ProgressGallery: View {
                 Button { confirmingDelete = true } label: {
                     Image(systemName: "trash").font(.footnote.weight(.bold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
+                .buttonStyle(.borderless).tint(Palette.red)
                 .accessibilityLabel("Delete photo")
 
                 Spacer()
@@ -203,7 +203,7 @@ private struct ProgressGallery: View {
                 Button(action: onClose) {
                     Image(systemName: "xmark").font(.footnote.weight(.bold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
             }
             .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 8)
 
@@ -232,7 +232,7 @@ private struct ProgressGallery: View {
                     .font(.footnote.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KPrimaryButtonStyle(tint: Palette.teal, fullWidth: true))
+            .buttonStyle(.borderedProminent).tint(Palette.teal).controlSize(.large).frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 20)
@@ -258,7 +258,7 @@ private struct ProgressGallery: View {
                 deleteCurrent()
             }
             Button("Cancel") { confirmingDelete = false }
-                .buttonStyle(KGhostButtonStyle())
+                .buttonStyle(.borderless)
         }
         .padding(20)
     }

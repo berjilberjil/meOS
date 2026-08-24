@@ -202,7 +202,7 @@ private struct DayCell: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
         }
-        .buttonStyle(KPressStyle(scale: 0.92))
+        .buttonStyle(.plain)
         .help(holidayName ?? "")
         .onHover { h in
             hover = h
@@ -245,11 +245,11 @@ struct KMonthHeader: View {
             Text("\(CalMath.monthName(month)) \(String(year))")
                 .font(.callout.weight(.heavy)).foregroundStyle(Palette.text)
             Spacer()
-            if showToday { Button("Today", action: onToday).buttonStyle(KGhostButtonStyle()) }
+            if showToday { Button("Today", action: onToday).buttonStyle(.borderless) }
             Button(action: onPrev) { Image(systemName: "chevron.left").font(.caption2.weight(.bold)) }
-                .buttonStyle(KIconButtonStyle(size: 26))
+                .buttonStyle(.borderless)
             Button(action: onNext) { Image(systemName: "chevron.right").font(.caption2.weight(.bold)) }
-                .buttonStyle(KIconButtonStyle(size: 26))
+                .buttonStyle(.borderless)
         }
     }
 }

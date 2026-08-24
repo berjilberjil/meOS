@@ -99,7 +99,7 @@ struct FitnessView: View {
                 }
                 .padding(.vertical, 4).contentShape(Rectangle())
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
             if showFitnessSettings {
                 nutritionCard
                 weightCard
@@ -152,11 +152,11 @@ struct FitnessView: View {
                     .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(stepsFocused ? Palette.brand : Palette.border, lineWidth: 2))
-                    Button("Log", action: saveSteps).buttonStyle(KPrimaryButtonStyle())
+                    Button("Log", action: saveSteps).buttonStyle(.borderedProminent)
                         .disabled(Int(stepsInput.trimmingCharacters(in: .whitespaces)) == nil)
                     ForEach([1000, 2000], id: \.self) { d in
                         Button { state.setTodaySteps(steps + d) } label: { Text("+\(d / 1000)k") }
-                            .buttonStyle(KSoftButtonStyle(tint: Palette.flame))
+                            .buttonStyle(.bordered).tint(Palette.flame)
                     }
                     Spacer()
                 }
@@ -195,7 +195,7 @@ struct FitnessView: View {
                     .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(weightFocused ? Palette.brand : Palette.border, lineWidth: 2))
-                    Button("Log", action: saveWeight).buttonStyle(KPrimaryButtonStyle())
+                    Button("Log", action: saveWeight).buttonStyle(.borderedProminent)
                         .disabled(Double(weightInput.trimmingCharacters(in: .whitespaces)) == nil)
                     KStepButton(icon: "minus", accent: Palette.blue) { bumpWeight(-0.5) }
                     KStepButton(icon: "plus", accent: Palette.blue) { bumpWeight(0.5) }
@@ -374,7 +374,7 @@ struct FitnessView: View {
                             $0.proteinTargetG = Double(c.proteinG)
                         }
                     } label: { Label("Use as my daily targets", systemImage: "target") }
-                    .buttonStyle(KSecondaryButtonStyle())
+                    .buttonStyle(.bordered)
                 } else {
                     Text("Add your height, age, sex and a weight (above) to see your maintenance, cut and bulk calories.")
                         .font(.footnote).foregroundStyle(Palette.faint)
@@ -527,7 +527,7 @@ struct ActivityStepsCard: View {
     private var summaryRow: some View {
         HStack(spacing: 12) {
             Button { showSheet = true } label: { summary.contentShape(Rectangle()) }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .accessibilityLabel("See this week's activity")
 
             if showsCalendar {
@@ -535,7 +535,7 @@ struct ActivityStepsCard: View {
                     Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                         .font(.footnote.weight(.bold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
+                .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.faint)
                 .help(showCalendar ? "Hide the record" : "See every day")
                 .accessibilityLabel(showCalendar ? "Hide the activity calendar" : "Show the activity calendar")
             }

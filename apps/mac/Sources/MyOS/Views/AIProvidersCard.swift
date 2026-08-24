@@ -182,7 +182,7 @@ private struct AddKeyForm: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KPrimaryButtonStyle())
+            .buttonStyle(.borderedProminent)
             .disabled(!canAdd)
             .opacity(canAdd ? 1 : 0.5)
             .padding(.top, 2)
@@ -204,7 +204,7 @@ private struct AddKeyForm: View {
                     Button { openURL(url) } label: {
                         Label("Get key", systemImage: "arrow.up.right")
                     }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                 }
             }
 
@@ -234,7 +234,7 @@ private struct AddKeyForm: View {
                         Text(store.busy ? "Checking…" : "Check & add")
                     }
                 }
-                .buttonStyle(KPrimaryButtonStyle())
+                .buttonStyle(.borderedProminent)
                 .disabled(!canAdd)
                 Spacer(minLength: 0)
             }
@@ -301,10 +301,10 @@ private struct AIKeyRow: View {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 Button { Task { await store.recheck(key) } } label: { Text("Check") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                     .disabled(store.busy)
                 Button { showDelete = true } label: { Image(systemName: "trash") }
-                    .buttonStyle(KIconButtonStyle(size: 28, color: Palette.red))
+                    .buttonStyle(.borderless).tint(Palette.red)
                     .holdToDelete(isPresented: $showDelete,
                                   title: "Remove \(key.label)?",
                                   message: "Deletes this key from your account. Any feature using it falls back to your default.",

@@ -56,12 +56,12 @@ struct ProfileView: View {
             Button { withAnimation(.knFast) { isEditing = false } } label: {
                 Label("Done", systemImage: "checkmark")
             }
-            .buttonStyle(KPrimaryButtonStyle())
+            .buttonStyle(.borderedProminent)
         } else {
             Button { withAnimation(.knFast) { isEditing = true } } label: {
                 Label("Edit profile", systemImage: "pencil")
             }
-            .buttonStyle(KGhostButtonStyle(color: Palette.brand))
+            .buttonStyle(.borderless).tint(Palette.brand)
         }
     }
 
@@ -101,7 +101,7 @@ struct ProfileView: View {
                         .background(Palette.blue, in: Circle())
                         .overlay(Circle().strokeBorder(Palette.surface, lineWidth: 2))
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .help("Change photo")
                 .offset(x: 3, y: 3)
             }
@@ -356,7 +356,7 @@ struct ProfileView: View {
                 Button { NSWorkspace.shared.open(url) } label: {
                     Image(systemName: "arrow.up.right").font(.caption2.weight(.bold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 24))
+                .buttonStyle(.borderless)
                 .help("Open \(label)")
             }
         }
@@ -503,7 +503,7 @@ private struct GoalList: View {
                         Button { remove(i) } label: {
                             Image(systemName: "xmark").font(.caption2.weight(.bold))
                         }
-                        .buttonStyle(KIconButtonStyle(size: 22))
+                        .buttonStyle(.borderless)
                     }
                 }
                 .padding(.leading, 2)
@@ -518,7 +518,7 @@ private struct GoalList: View {
                     Button(action: commit) {
                         Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(color)
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .opacity(text.isEmpty ? 0.35 : 1)
                     .disabled(text.isEmpty)
                 }
@@ -574,7 +574,7 @@ private struct AchievementsEditor: View {
                         } label: {
                             Image(systemName: "xmark").font(.caption2.weight(.bold))
                         }
-                        .buttonStyle(KIconButtonStyle(size: 22))
+                        .buttonStyle(.borderless)
                     }
                 }
             }
@@ -593,7 +593,7 @@ private struct AchievementsEditor: View {
                     Button(action: commit) {
                         Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.amber)
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .opacity(title.isEmpty ? 0.35 : 1)
                     .disabled(title.isEmpty)
                 }

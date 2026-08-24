@@ -56,7 +56,7 @@ struct SplashView: View {
 
                 if failed, let onRetry {
                     Button(retryTitle, action: onRetry)
-                        .buttonStyle(KDarkPillButtonStyle())
+                        .buttonStyle(.bordered)
                         .padding(.bottom, 28)
                         .transition(.opacity)
                 }

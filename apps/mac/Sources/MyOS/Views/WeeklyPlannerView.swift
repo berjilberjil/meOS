@@ -36,7 +36,7 @@ struct WeeklyPlannerView: View {
                     Button { showClearMeals = true } label: {
                         Label("Clear meals", systemImage: "trash")
                     }
-                    .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+                    .buttonStyle(.borderless).tint(Palette.faint)
                     .disabled(weekMealsEmpty)
                     .holdToDelete(isPresented: $showClearMeals,
                                   title: "Clear the whole meal plan?",
@@ -114,7 +114,7 @@ struct WeeklyPlannerView: View {
                             Text(state.planBusy ? "Building…" : "Generate plan")
                         }
                     }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                     .disabled(state.planBusy)
                 }
                 if let s = state.planSummary {
@@ -156,7 +156,7 @@ struct WeeklyPlannerView: View {
                             }
                         }
                         Button { addingMeal = meal } label: { Label("Add food", systemImage: "plus.circle.fill") }
-                            .buttonStyle(KGhostButtonStyle(color: Palette.brand))
+                            .buttonStyle(.borderless).tint(Palette.brand)
                     }
                 }
             }
@@ -181,7 +181,7 @@ private struct PlanMealRow: View {
             }
             Spacer()
             Button { showDelete = true } label: { Image(systemName: "xmark").font(.caption2.weight(.bold)) }
-                .buttonStyle(KIconButtonStyle(size: 22))
+                .buttonStyle(.borderless)
                 .holdToDelete(isPresented: $showDelete, title: "Remove \(food?.name ?? "food")?",
                               message: "Removes it from this day's plan.", confirmLabel: "Hold to remove") { remove() }
         }

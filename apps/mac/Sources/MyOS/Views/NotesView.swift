@@ -109,7 +109,7 @@ struct NotesView: View {
                     Text("New note").font(.caption.weight(.semibold))
                 }
             }
-            .buttonStyle(KPrimaryButtonStyle())
+            .buttonStyle(.borderedProminent)
             .keyboardShortcut("n", modifiers: .command)
             .help("New note (⌘N)")
                 .accessibilityHidden(true)
@@ -126,7 +126,7 @@ struct NotesView: View {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill").font(.caption)
                 }
-                .buttonStyle(KIconButtonStyle(size: 20))
+                .buttonStyle(.borderless)
             }
         }
         .knField(focused: searchFocused)
@@ -151,12 +151,12 @@ struct NotesView: View {
                         Button { state.togglePinNote(note.id) } label: {
                             Image(systemName: note.pinned ? "pin.slash" : "pin").font(.caption2)
                         }
-                        .buttonStyle(KIconButtonStyle(size: 24))
+                        .buttonStyle(.borderless)
                         .help(note.pinned ? "Unpin" : "Pin to top")
                         Button { pendingDelete = note } label: {
                             Image(systemName: "trash").font(.caption2)
                         }
-                        .buttonStyle(KIconButtonStyle(size: 24))
+                        .buttonStyle(.borderless)
                         .help("Delete")
                     }
                     let preview = hidden ? "Locked" : note.body
@@ -170,7 +170,7 @@ struct NotesView: View {
                 .frame(minHeight: 0, alignment: .topLeading)
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .knHoverLift()
         .contextMenu { noteMenu(note) }
     }
@@ -196,7 +196,7 @@ struct NotesView: View {
                 Button { backToBrowse() } label: {
                     Image(systemName: "square.grid.2x2").font(.footnote.weight(.semibold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help("All notes")
                 Text("Notes").font(.title3.weight(.bold)).foregroundStyle(Palette.text)
                     .onTapGesture(count: 2) { startNew() }
@@ -210,7 +210,7 @@ struct NotesView: View {
                 Button(action: startNew) {
                     Image(systemName: "square.and.pencil").font(.footnote.weight(.semibold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help("New note (⌘N)")
             }
             .padding(.horizontal, 12).padding(.top, 26).padding(.bottom, 8)
@@ -224,7 +224,7 @@ struct NotesView: View {
                         .font(.caption).foregroundStyle(Palette.faint)
                     if state.notes.isEmpty {
                         Button("Write your first note", action: startNew)
-                            .buttonStyle(KSecondaryButtonStyle())
+                            .buttonStyle(.bordered)
                     }
                 }
                 Spacer()
@@ -255,7 +255,7 @@ struct NotesView: View {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill").font(.caption)
                 }
-                .buttonStyle(KIconButtonStyle(size: 18))
+                .buttonStyle(.borderless)
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
@@ -296,7 +296,7 @@ struct NotesView: View {
                 .strokeBorder(selected ? Palette.amber.opacity(0.5) : .clear, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .padding(.horizontal, 8)
         .contextMenu { noteMenu(note) }
     }
@@ -345,7 +345,7 @@ struct NotesView: View {
                 .font(.body.weight(.bold)).foregroundStyle(Palette.text)
             Text("This note is locked.").font(.footnote).foregroundStyle(Palette.muted)
             Button { unlocked.insert(note.id) } label: { Label("Unlock", systemImage: "lock.open.fill") }
-                .buttonStyle(KPrimaryButtonStyle(tint: Palette.amber))
+                .buttonStyle(.borderedProminent).tint(Palette.amber)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -358,19 +358,19 @@ struct NotesView: View {
                     Image(systemName: note.pinned ? "pin.fill" : "pin")
                         .font(.footnote).foregroundStyle(note.pinned ? Palette.amber : Palette.muted)
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help(note.pinned ? "Unpin" : "Pin to top")
 
                 Button { findToken += 1 } label: {
                     Image(systemName: "magnifyingglass").font(.footnote)
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help("Find in Note")
 
                 ShareLink(item: shareText(note)) {
                     Image(systemName: "square.and.arrow.up").font(.footnote)
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help("Share")
 
                 Menu {
@@ -379,7 +379,7 @@ struct NotesView: View {
                     Image(systemName: "ellipsis").font(.footnote.weight(.bold))
                 }
                 .menuStyle(.button)
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .menuIndicator(.hidden)
                 .frame(width: 30)
                 .help("More")

@@ -201,7 +201,7 @@ struct FocusCard: View {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                     .font(.footnote.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
+            .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.faint)
             .help(showCalendar ? "Hide the record" : "See the record")
             }
 
@@ -214,7 +214,7 @@ struct FocusCard: View {
                             .font(.caption2.weight(.heavy))
                     }
                 }
-                .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
+                .buttonStyle(.bordered).tint(Palette.teal)
                 .help("Everything else goes away until you turn it off")
             }
         }
@@ -252,7 +252,7 @@ struct FocusCard: View {
                 .strokeBorder(Palette.teal.opacity(0.35), lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private var progressBar: some View {
@@ -275,7 +275,7 @@ struct FocusCard: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(item.done ? Palette.green : Palette.teal)
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.text)
@@ -297,13 +297,13 @@ struct FocusCard: View {
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(isCurrent ? Palette.teal : Palette.muted)
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .help(isCurrent ? "Open the running block" : "Focus on this one")
             }
             Button { pendingDelete = item.id } label: {
                 Image(systemName: "xmark").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 22))
+            .buttonStyle(.borderless)
         }
     }
 
@@ -318,7 +318,7 @@ struct FocusCard: View {
                 Image(systemName: "plus.circle.fill").font(.body)
                     .foregroundStyle(Palette.teal)
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
             .opacity(newFocus.isEmpty ? 0.35 : 1)
             .disabled(newFocus.isEmpty)
         }
@@ -423,7 +423,7 @@ struct FocusSessionView: View {
                     Text("Exit").font(.caption2.weight(.heavy))
                 }
             }
-            .buttonStyle(KSoftButtonStyle(tint: Palette.muted))
+            .buttonStyle(.bordered).tint(Palette.muted)
             .help("Leave Task Mode — on every device")
         }
         .padding(.horizontal, 20)
@@ -498,7 +498,7 @@ struct FocusSessionView: View {
                 Image(systemName: "plus.circle.fill").font(.body)
                     .foregroundStyle(Palette.teal)
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
             .opacity(newTask.isEmpty ? 0.35 : 1)
             .disabled(newTask.isEmpty)
         }
@@ -557,7 +557,7 @@ struct FocusSessionView: View {
                         .padding(.horizontal, 13).padding(.vertical, 7)
                         .background(timer.total == m * 60 ? Palette.teal : Palette.surface2, in: Capsule())
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
             }
             Button { timer.add(minutes: 5) } label: {
                 Text("+5").font(.caption.weight(.heavy))
@@ -565,7 +565,7 @@ struct FocusSessionView: View {
                     .padding(.horizontal, 13).padding(.vertical, 7)
                     .background(Palette.teal.opacity(0.14), in: Capsule())
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
         }
     }
 
@@ -579,14 +579,14 @@ struct FocusSessionView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+            .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
             .disabled(timer.finished)
             .opacity(timer.finished ? 0.5 : 1)
 
             Button { skip() } label: {
                 Text(queue.isEmpty ? "Stop" : "Skip").frame(maxWidth: .infinity)
             }
-            .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+            .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
         }
     }
 
@@ -636,7 +636,7 @@ struct FocusSessionView: View {
             .padding(.vertical, 3)
             .contentShape(Rectangle())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .disabled(item.done)
     }
 

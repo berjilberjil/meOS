@@ -43,11 +43,11 @@ struct EventsView: View {
                 Spacer()
                 Segmented(options: Mode.allCases.map { ($0, $0.label) }, selection: $mode)
                 Button { showTags = true } label: { Label("Tags", systemImage: "tag") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                 Button { editTarget = EventEditTarget(event: nil) } label: {
                     Label("Add event", systemImage: "plus")
                 }
-                .buttonStyle(KGhostButtonStyle(color: Palette.brand))
+                .buttonStyle(.borderless).tint(Palette.brand)
             }
             .knRise(0)
 
@@ -136,9 +136,9 @@ struct EventsView: View {
                         Text(String(viewYear)).font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                         Spacer()
                         Button { withAnimation(.knFast) { viewYear -= 1 } } label: { Image(systemName: "chevron.left").font(.caption.weight(.bold)) }
-                            .buttonStyle(KIconButtonStyle(size: 28))
+                            .buttonStyle(.borderless)
                         Button { withAnimation(.knFast) { viewYear += 1 } } label: { Image(systemName: "chevron.right").font(.caption.weight(.bold)) }
-                            .buttonStyle(KIconButtonStyle(size: 28))
+                            .buttonStyle(.borderless)
                     }
                     LazyVGrid(columns: cols, spacing: 16) {
                         ForEach(1...12, id: \.self) { m in
@@ -274,9 +274,9 @@ private struct EventRow: View {
             }
             Spacer(minLength: 0)
             Button(action: edit) { Image(systemName: "pencil").font(.caption2.weight(.bold)) }
-                .buttonStyle(KIconButtonStyle(size: 24)).opacity(hover ? 1 : 0.001).help("Edit")
+                .buttonStyle(.borderless).opacity(hover ? 1 : 0.001).help("Edit")
             Button { showConfirm = true } label: { Image(systemName: "trash").font(.caption2.weight(.bold)) }
-                .buttonStyle(KIconButtonStyle(size: 24, color: Palette.red)).opacity(hover ? 1 : 0.001).help("Delete")
+                .buttonStyle(.borderless).tint(Palette.red).opacity(hover ? 1 : 0.001).help("Delete")
                 .holdToDelete(isPresented: $showConfirm, title: "Delete this memory?",
                               message: "\(event.title) — this can't be undone.") { delete() }
         }
@@ -501,7 +501,7 @@ private struct EventEditor: View {
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                             .strokeBorder(showCal ? Palette.brand : Palette.border, lineWidth: 2))
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .popover(isPresented: $showCal, arrowEdge: .bottom) {
                         KDatePicker(date: $date).frame(width: 264).padding(8).background(Palette.elevated)
                     }
@@ -516,7 +516,7 @@ private struct EventEditor: View {
                     .padding(.horizontal, 12).padding(.vertical, 9)
                     .background(special ? Palette.amber : Palette.amber.opacity(0.14), in: Capsule())
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .help("Mark the big, once-in-a-lifetime ones")
             }
 
@@ -533,7 +533,7 @@ private struct EventEditor: View {
                         .padding(.horizontal, 11).padding(.vertical, 8)
                         .background(Palette.surface2.opacity(0.6), in: Capsule())
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -543,9 +543,9 @@ private struct EventEditor: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                Button("Cancel") { dismiss() }.buttonStyle(.borderless)
                 Button(isNew ? "Log it" : "Save") { save() }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || !uploads.filter { !$0.failed }.isEmpty)
             }
         }
@@ -587,7 +587,7 @@ private struct EventEditor: View {
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                         .foregroundStyle(dropTargeted ? Palette.brand : Palette.border))
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .help("Choose photos or videos")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -641,7 +641,7 @@ private struct EventEditor: View {
             .padding(.horizontal, 11).padding(.vertical, 8)
             .background(on ? tag.color : tag.color.opacity(0.14), in: Capsule())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     /// The Add button. A plain NSOpenPanel, run modally over the editor sheet —
@@ -798,7 +798,7 @@ private struct TagManagerSheet: View {
                 Spacer()
                 Button { isAdding = true; editing = EventTag(name: "", symbol: "star.fill", colorHex: "1CB0F6") } label: {
                     Label("New tag", systemImage: "plus")
-                }.buttonStyle(KGhostButtonStyle(color: Palette.brand))
+                }.buttonStyle(.borderless).tint(Palette.brand)
             }
 
             if let editing {
@@ -820,7 +820,7 @@ private struct TagManagerSheet: View {
 
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(KPrimaryButtonStyle())
+                Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
             }
         }
         .padding(24).frame(width: 460)
@@ -839,10 +839,10 @@ private struct TagManagerSheet: View {
             }
             Spacer()
             Button { editing = tag; isAdding = false } label: { Image(systemName: "pencil").font(.caption2.weight(.bold)) }
-                .buttonStyle(KIconButtonStyle(size: 26)).help("Edit")
+                .buttonStyle(.borderless).help("Edit")
             if !tag.builtIn {
                 Button { state.deleteTag(tag.id) } label: { Image(systemName: "trash").font(.caption2.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 26, color: Palette.red)).help("Delete tag")
+                    .buttonStyle(.borderless).tint(Palette.red).help("Delete tag")
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
@@ -877,9 +877,9 @@ private struct TagEditForm: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel", action: onCancel).buttonStyle(KGhostButtonStyle())
+                Button("Cancel", action: onCancel).buttonStyle(.borderless)
                 Button(isNew ? "Add tag" : "Save") { onSave(tag) }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                     .disabled(tag.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -916,7 +916,7 @@ private struct SymbolPicker: View {
                             .frame(width: 38, height: 38)
                             .background(on ? tint : tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                 }
             }
             .padding(2)

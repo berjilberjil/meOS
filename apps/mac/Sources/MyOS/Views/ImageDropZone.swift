@@ -67,9 +67,9 @@ private struct MacImageDropZone: View {
             if !busy {
                 HStack(spacing: 8) {
                     Button { importing = true } label: { Label("Choose file", systemImage: "folder") }
-                        .buttonStyle(KSoftButtonStyle(tint: tint))
+                        .buttonStyle(.bordered).tint(tint)
                     Button { pasteFromClipboard() } label: { Label("Paste", systemImage: "doc.on.clipboard") }
-                        .buttonStyle(KSoftButtonStyle(tint: tint))
+                        .buttonStyle(.bordered).tint(tint)
                 }
             } else {
                 ProgressView().controlSize(.small).tint(tint)
@@ -259,7 +259,7 @@ private struct IOSImageDropZone: View {
                 .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                     .strokeBorder(tint.opacity(0.35), lineWidth: 1.5))
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
             .disabled(busy)
 
             HStack(spacing: 10) {
@@ -272,7 +272,7 @@ private struct IOSImageDropZone: View {
                 Label("Choose from library", systemImage: "photo.on.rectangle")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+            .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
             .disabled(busy)
         }
         .animation(.knNormal, value: busy)

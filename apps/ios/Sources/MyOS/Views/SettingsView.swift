@@ -155,7 +155,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
@@ -181,7 +181,7 @@ struct SettingsView: View {
             .padding(.horizontal, 12).padding(.vertical, 13)
             .contentShape(Rectangle())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private var lockRow: some View {
@@ -221,7 +221,7 @@ struct SettingsView: View {
                 .font(.callout.weight(.semibold))
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+        .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
     }
 
     @ViewBuilder

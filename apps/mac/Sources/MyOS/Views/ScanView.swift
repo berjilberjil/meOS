@@ -23,7 +23,7 @@ struct ScanView: View {
             } else if let r = result, !r.failed {
                 resultCard(r)
                 Button("Scan another") { reset() }
-                    .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                    .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
             } else if let err = state.imageError {
                 failCard(err)
             } else {
@@ -89,7 +89,7 @@ struct ScanView: View {
                 .padding(.vertical, 8)
             }
             Button("Try again") { reset() }
-                .buttonStyle(KPrimaryButtonStyle(tint: Palette.teal, fullWidth: true))
+                .buttonStyle(.borderedProminent).tint(Palette.teal).controlSize(.large).frame(maxWidth: .infinity)
         }
     }
 
@@ -107,7 +107,7 @@ struct ScanView: View {
                 ScanVerdictView(insight: r)
                 if r.kind == .food {
                     Button(logged ? "Logged" : "Log this meal") { logFoods(r) }
-                        .buttonStyle(KPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                         .disabled(logged || r.foods.isEmpty)
                 }
             }

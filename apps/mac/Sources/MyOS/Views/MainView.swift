@@ -148,7 +148,7 @@ struct MainView: View {
                     }
                 }
             }
-            .buttonStyle(KGhostButtonStyle(color: Palette.teal))
+            .buttonStyle(.borderless).tint(Palette.teal)
             .padding(.horizontal, 8).padding(.bottom, 4)
             .help("Hide everything but today's task")
 
@@ -165,7 +165,7 @@ struct MainView: View {
                     }
                 }
             }
-            .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+            .buttonStyle(.borderless).tint(Palette.faint)
             .padding(.horizontal, 8).padding(.bottom, 12)
             .help(collapsed ? (state.username.isEmpty ? "Log out" : "@\(state.username)") : "")
         }
@@ -189,7 +189,7 @@ struct MainView: View {
         } label: {
             Image(systemName: "sidebar.left").font(.footnote.weight(.semibold))
         }
-        .buttonStyle(KIconButtonStyle(size: 28, color: Palette.faint))
+        .buttonStyle(.borderless).tint(Palette.faint)
         .help(collapsed ? "Expand sidebar" : "Collapse sidebar")
 
         return Group {
@@ -241,7 +241,7 @@ private struct NavItem: View {
             )
             .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in hover = h; cursor(h) }
         .animation(.knFast, value: hover)
         .animation(.knFast, value: active)

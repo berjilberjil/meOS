@@ -174,18 +174,18 @@ enum Motion {
 }
 
 extension Animation {
-    static let knFast     = Animation.easeOut(duration: Motion.fast)
-    static let knNormal   = Animation.easeInOut(duration: Motion.normal)
-    // Screens arrive by fading, not by moving. See `RiseIn`.
-    static let knEntrance = Animation.easeOut(duration: 0.14)
-    // No bounce, anywhere. A control that overshoots reads as loose, and the
-    // whole point of this design language is that nothing wobbles after it lands.
-    static let knPop      = Animation.spring(response: 0.26, dampingFraction: 1.0)
-    /// Dark ↔ light. Interrupted retargets from the live color (no snap).
+    // The system's own spring presets. MyOS used to run critically damped
+    // everywhere on the rule that "nothing wobbles after it lands"; that rule was
+    // lifted 2026-08-24 at Berjil's explicit request, because interruptible
+    // springs — not stillness — are what iOS and macOS actually feel like.
+    static let knFast     = Animation.snappy(duration: 0.18)
+    static let knNormal   = Animation.smooth(duration: 0.26)
+    static let knEntrance = Animation.smooth(duration: 0.32)
+    /// Momentum moves (tab pop, flick) get the system's bounce back.
+    static let knPop      = Animation.bouncy(duration: 0.28)
+    /// Dark ↔ light. Interrupted retargets from the live colour (no snap).
     static var knTheme: Animation {
-        Motion.reduceMotion
-            ? .easeInOut(duration: 0.2)
-            : .spring(response: Motion.theme, dampingFraction: 1.0)
+        Motion.reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.4)
     }
 }
 
@@ -245,156 +245,6 @@ extension View {
     }
 }
 
-/// Primary pill — green 3D button, uppercase heavy label. The hero control.
-struct KPrimaryButtonStyle: ButtonStyle {
-    var tint: Color = Palette.brand
-    var fullWidth = false
-    func makeBody(configuration: Configuration) -> some View {
-        Inner(configuration: configuration, tint: tint, fullWidth: fullWidth)
-    }
-    private struct Inner: View {
-        let configuration: ButtonStyleConfiguration
-        let tint: Color
-        let fullWidth: Bool
-        @State private var hover = false
-        var body: some View {
-            let pressed = configuration.isPressed
-            let face = hover ? tint.mixedWithWhite(0.10) : tint
-            configuration.label
-                .font(.subheadline.weight(.bold))
-                .tracking(0.3)
-                .textCase(.uppercase)
-                .foregroundStyle(Palette.bg)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 13)
-                .frame(maxWidth: fullWidth ? .infinity : nil)
-                .background(face, in: Capsule())
-                .contentShape(Capsule())
-                .scaleEffect(pressed ? 0.97 : 1)
-                .opacity(pressed ? 0.9 : 1)
-                .animation(.knFast, value: pressed)
-                .animation(.knFast, value: hover)
-                .onHover { h in hover = h; cursor(h) }
-                .pressHaptic(configuration.isPressed)
-        }
-    }
-}
-
-/// Secondary — neutral 3D button (surface face, darker edge). White text.
-struct KSecondaryButtonStyle: ButtonStyle {
-    var fullWidth = false
-    func makeBody(configuration: Configuration) -> some View {
-        Inner(configuration: configuration, fullWidth: fullWidth)
-    }
-    private struct Inner: View {
-        let configuration: ButtonStyleConfiguration
-        let fullWidth: Bool
-        @State private var hover = false
-        var body: some View {
-            let pressed = configuration.isPressed
-            let face = hover ? Palette.surface2.mixedWithWhite(0.06) : Palette.surface2
-            configuration.label
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.text)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .frame(maxWidth: fullWidth ? .infinity : nil)
-                .background(face, in: Capsule())
-                .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
-                .contentShape(Capsule())
-                .scaleEffect(pressed ? 0.97 : 1)
-                .animation(.knFast, value: pressed)
-                .animation(.knFast, value: hover)
-                .onHover { h in hover = h; cursor(h) }
-                .pressHaptic(configuration.isPressed)
-        }
-    }
-}
-
-/// Ghost button — transparent, hover reveals a soft surface. For toolbar-ish actions.
-struct KGhostButtonStyle: ButtonStyle {
-    var color: Color = Palette.muted
-    func makeBody(configuration: Configuration) -> some View {
-        Inner(configuration: configuration, color: color)
-    }
-    private struct Inner: View {
-        let configuration: ButtonStyleConfiguration
-        let color: Color
-        @State private var hover = false
-        var body: some View {
-            configuration.label
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(hover ? Palette.text : color)
-                .padding(.horizontal, 12).padding(.vertical, 7)
-                .background(hover ? Palette.surface2.opacity(0.8) : .clear,
-                            in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-                .scaleEffect(configuration.isPressed ? 0.96 : 1)
-                .animation(.knFast, value: configuration.isPressed)
-                .animation(.knFast, value: hover)
-                .onHover { h in hover = h; cursor(h) }
-                .pressHaptic(configuration.isPressed)
-        }
-    }
-}
-
-/// Icon-only button — hover reveals a soft round backing. For xmark / trash / pin.
-struct KIconButtonStyle: ButtonStyle {
-    var size: CGFloat = 28
-    var color: Color = Palette.muted
-    func makeBody(configuration: Configuration) -> some View {
-        Inner(configuration: configuration, size: size, color: color)
-    }
-    private struct Inner: View {
-        let configuration: ButtonStyleConfiguration
-        let size: CGFloat
-        let color: Color
-        @State private var hover = false
-        var body: some View {
-            configuration.label
-                .foregroundStyle(hover ? Palette.text : color)
-                .frame(width: size, height: size)
-                .background(hover ? Palette.surface2 : .clear, in: Circle())
-                .contentShape(Circle())
-                .scaleEffect(configuration.isPressed ? 0.9 : 1)
-                .animation(.knFast, value: configuration.isPressed)
-                .animation(.knFast, value: hover)
-                .onHover { h in hover = h; cursor(h) }
-                .pressHaptic(configuration.isPressed)
-        }
-    }
-}
-
-/// Tinted 3D chip — quick actions like "Pay ₹5k" / "+ ₹2k". A small press-down
-/// button that keeps its color coding (amber pay, blue fund, …).
-struct KSoftButtonStyle: ButtonStyle {
-    var tint: Color
-    func makeBody(configuration: Configuration) -> some View {
-        Inner(configuration: configuration, tint: tint)
-    }
-    private struct Inner: View {
-        let configuration: ButtonStyleConfiguration
-        let tint: Color
-        @State private var hover = false
-        var body: some View {
-            let pressed = configuration.isPressed
-            let base = hover ? tint.opacity(0.26) : tint.opacity(0.16)
-            configuration.label
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(tint)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(base, in: Capsule())
-                .contentShape(Capsule())
-                .scaleEffect(pressed ? 0.96 : 1)
-                .animation(.knFast, value: pressed)
-                .animation(.knFast, value: hover)
-                .onHover { h in hover = h; cursor(h) }
-                .pressHaptic(configuration.isPressed)
-        }
-    }
-}
-
 // Balanced pointing-hand cursor (uses .set(), so no push/pop imbalance on disappear).
 // No-op on iOS — there's no pointer to change.
 func cursor(_ inside: Bool) {
@@ -403,32 +253,23 @@ func cursor(_ inside: Bool) {
     #endif
 }
 
-/// Adds only tactile press-scale — for buttons that carry their own visual state
-/// (nav items, cards) but still want the press feedback.
-struct KPressStyle: ButtonStyle {
-    var scale: CGFloat = 0.97
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? scale : 1)
-            .animation(.knFast, value: configuration.isPressed)
-            .pressHaptic(configuration.isPressed)
-    }
-}
-
 /// Full-width primary action used by forms (login, etc.).
 struct PrimaryButton: View {
     let title: String
     var loading = false
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.accent
     let action: () -> Void
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                if loading { ProgressView().controlSize(.small).tint(.white) }
+                if loading { ProgressView().controlSize(.small) }
                 Text(title)
             }
+            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(KPrimaryButtonStyle(tint: tint, fullWidth: true))
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(tint)
         .disabled(loading)
     }
 }
@@ -517,23 +358,31 @@ extension View {
 
 // MARK: - Entrance
 
-/// Staggered spring rise-in on appear — a bouncy, game-like page load.
-/// Entrance for a screen's blocks: one short fade, nothing else.
+/// Entrance for a screen's blocks: a short rise on a system spring, lightly
+/// staggered so a page reads as arriving in order.
 ///
-/// It used to slide each block up 14pt on a spring, staggered 45ms apart. Inside
-/// a scroll view that is a layout that is still moving when your thumb arrives —
-/// you scroll, the page is mid-cascade, and the content shifts under you. A card
-/// that is already where it will end up cannot do that. `index` is kept so the
-/// 60-odd call sites still read as an order, but nothing is staggered any more:
-/// a staggered fade is the same wobble measured in opacity.
+/// The stagger is why this modifier was once reduced to a bare fade — inside a
+/// scroll view, a page still cascading when your thumb lands shifts content
+/// under you. The fix that matters is not stillness but the `knEntrances` guard
+/// below: `TodayPager` sets it false, so turning a page never replays entrances.
+/// Keep that guard wherever blocks are not genuinely arriving. Reduce Motion
+/// drops the movement entirely, and the stagger is capped so a long page cannot
+/// cascade for a noticeable length of time.
 struct RiseIn: ViewModifier {
     var index: Int = 0
     @Environment(\.knEntrances) private var entrances
     @State private var shown = false
+
     func body(content: Content) -> some View {
-        content
+        let animates = entrances && !Motion.reduceMotion
+        let settled = shown || !animates
+        return content
             .opacity(entrances ? (shown ? 1 : 0) : 1)
-            .onAppear { if entrances { withAnimation(.knEntrance) { shown = true } } }
+            .offset(y: settled ? 0 : 10)
+            .onAppear {
+                guard entrances else { return }
+                withAnimation(.knEntrance.delay(Double(min(index, 8)) * 0.03)) { shown = true }
+            }
     }
 }
 

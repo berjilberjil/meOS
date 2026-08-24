@@ -93,7 +93,7 @@ struct ProductivityView: View {
                     .animation(.knFast, value: urlFocused)
 
                     Button("Add", action: addVideo)
-                        .buttonStyle(KPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                         .disabled(urlInput.trimmingCharacters(in: .whitespaces).isEmpty)
                         .opacity(urlInput.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
                 }
@@ -121,14 +121,14 @@ struct ProductivityView: View {
                     .background(dayFilter == nil ? Palette.surface2.opacity(0.6) : Palette.brand.opacity(0.16), in: Capsule())
                     .overlay(Capsule().strokeBorder(dayFilter == nil ? Palette.border : Palette.brand.opacity(0.5), lineWidth: 1))
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .popover(isPresented: $showCal, arrowEdge: .bottom) { calendarFilterPopover }
 
                 if dayFilter != nil {
                     Button { withAnimation(.knFast) { dayFilter = nil } } label: {
                         Image(systemName: "xmark.circle.fill").font(.subheadline).foregroundStyle(Palette.faint)
                     }
-                    .buttonStyle(KPressStyle()).help("Clear day filter")
+                    .buttonStyle(.plain).help("Clear day filter")
                 }
                 Spacer()
                 if toNoteCount > 0 {
@@ -256,7 +256,7 @@ struct ProductivityView: View {
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(on ? color : color.opacity(0.14), in: Capsule())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     // MARK: - Grid
@@ -356,7 +356,7 @@ private struct WatchCard: View {
             .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
             .knShadow()
         }
-        .buttonStyle(KPressStyle(scale: 0.98))
+        .buttonStyle(.plain)
         .knHoverLift()
     }
 
@@ -439,13 +439,13 @@ private struct WatchDetailSheet: View {
                 Button { if let u = URL(string: draft.url) { NSWorkspace.shared.open(u) } } label: {
                     Label("Open in YouTube", systemImage: "play.fill")
                 }
-                .buttonStyle(KSecondaryButtonStyle())
+                .buttonStyle(.bordered)
                 Button { draft.watched.toggle() } label: {
                     Label(draft.watched ? "Watched" : "Mark watched",
                           systemImage: draft.watched ? "checkmark.circle.fill" : "circle")
                 }
-                .buttonStyle(draft.watched ? AnyButtonStyle(KSoftButtonStyle(tint: Palette.green))
-                                           : AnyButtonStyle(KSecondaryButtonStyle()))
+                .buttonStyle(.bordered)
+                .tint(draft.watched ? Palette.accent : Palette.muted)
                 Spacer()
             }
 
@@ -472,13 +472,13 @@ private struct WatchDetailSheet: View {
 
             HStack {
                 Button { showConfirm = true } label: { Label("Delete", systemImage: "trash") }
-                    .buttonStyle(KGhostButtonStyle(color: Palette.red))
+                    .buttonStyle(.borderless).tint(Palette.red)
                     .holdToDelete(isPresented: $showConfirm, title: "Delete this video?",
                                   message: "It'll be removed from your log — this can't be undone.") {
                         state.deleteWatchItem(draft.id); dismiss()
                     }
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(KPrimaryButtonStyle())
+                Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
             }
         }
         .padding(22).frame(width: 460)
@@ -498,7 +498,7 @@ private struct WatchDetailSheet: View {
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(on ? c.color : c.color.opacity(0.14), in: Capsule())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 }
 

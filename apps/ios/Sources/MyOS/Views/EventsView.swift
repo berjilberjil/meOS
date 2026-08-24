@@ -29,7 +29,7 @@ struct EventsView: View {
                 ScreenTitle(text: "Events")
                 Spacer()
                 Button { showNew = true } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
             }
             if state.events.isEmpty {
                 Card {
@@ -105,7 +105,7 @@ struct EventsView: View {
                 }
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .contextMenu {
             Button(role: .destructive) { pendingDelete = e } label: { Label("Delete", systemImage: "trash") }
         }
@@ -270,7 +270,7 @@ private struct EventEditorSheet: View {
             .padding(.horizontal, 11).padding(.vertical, 7)
             .background(on ? AnyShapeStyle(tag.color) : AnyShapeStyle(tag.color.opacity(0.14)), in: Capsule())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private func loadPicked(_ items: [PhotosPickerItem]) async {

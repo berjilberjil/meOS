@@ -101,7 +101,7 @@ struct SettingsRow<Trailing: View>: View {
     @ViewBuilder
     var body: some View {
         if let action {
-            Button(action: action) { line }.buttonStyle(KPressStyle())
+            Button(action: action) { line }.buttonStyle(.plain)
         } else {
             line
         }
@@ -270,7 +270,7 @@ struct SettingsNotice: View {
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if let actionLabel, let action {
-                Button(actionLabel, action: action).buttonStyle(KGhostButtonStyle())
+                Button(actionLabel, action: action).buttonStyle(.borderless)
             }
         }
         .padding(12)

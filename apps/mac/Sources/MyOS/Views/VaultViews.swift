@@ -101,12 +101,12 @@ struct VaultUnlockView: View {
                         Text(useRecovery ? "Use passphrase instead" : "Forgot it? Use recovery code")
                             .font(.footnote.weight(.medium)).foregroundStyle(Palette.muted)
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     Spacer()
                     Button { Task { await state.logout() } } label: {
                         Text("Log out").font(.footnote.weight(.medium)).foregroundStyle(Palette.muted)
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -163,7 +163,7 @@ struct RecoveryCodeOverlay: View {
                     Label(copied ? "Copied" : "Copy code", systemImage: copied ? "checkmark" : "doc.on.doc")
                         .font(.footnote.weight(.medium)).foregroundStyle(Palette.muted)
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
 
                 Toggle(isOn: $saved) {
                     Text("I’ve saved this somewhere safe").font(.footnote).foregroundStyle(Palette.text)

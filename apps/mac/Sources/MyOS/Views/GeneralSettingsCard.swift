@@ -34,7 +34,7 @@ struct GeneralSettingsCard: View {
             .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     var body: some View {

@@ -189,7 +189,7 @@ struct PersonDetailsEditor: View {
             } label: { avatar }
         } else {
             Button { picking = true } label: { avatar }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
         }
         #else
         avatar
@@ -344,7 +344,7 @@ private struct JournalPresetSection: View {
                 Button(action: commit) {
                     Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(tint)
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .opacity(text.isEmpty ? 0.35 : 1)
                 .disabled(text.isEmpty)
             }

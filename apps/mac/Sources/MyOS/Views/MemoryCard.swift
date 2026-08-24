@@ -102,7 +102,7 @@ struct MemoryCard: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
+            .buttonStyle(.bordered).tint(Palette.teal)
 
             if state.lastTrace != nil {
                 Button { showTrace = true } label: {
@@ -110,7 +110,7 @@ struct MemoryCard: View {
                         .font(.footnote.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(KGhostButtonStyle())
+                .buttonStyle(.borderless)
             }
         }
     }
@@ -149,14 +149,14 @@ struct MemoryCard: View {
                     Label("Add a memory", systemImage: "plus.circle.fill")
                         .font(.footnote.weight(.semibold))
                 }
-                .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
+                .buttonStyle(.bordered).tint(Palette.teal)
                 Spacer(minLength: 0)
                 if state.lastTrace != nil {
                     Button { showTrace = true } label: {
                         Label("Last answer", systemImage: "waveform.path.ecg")
                             .font(.footnote.weight(.semibold))
                     }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                     .help("What the last reply was built from")
                 }
             }
@@ -188,7 +188,7 @@ struct MemoryCard: View {
                     Image(systemName: "xmark.circle.fill").font(.caption)
                         .foregroundStyle(Palette.faint)
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
             }
         }
         .knField(focused: searchFocused)
@@ -213,7 +213,7 @@ struct MemoryCard: View {
                 .padding(.horizontal, 11).padding(.vertical, 6)
                 .background(on ? Palette.brand : Palette.surface2, in: Capsule())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     /// What she remembers reads first; where it came from and what you can do
@@ -252,19 +252,19 @@ struct MemoryCard: View {
                         .font(.caption.weight(.bold))
                         .foregroundStyle(m.pinned ? Palette.amber : Palette.faint)
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help(m.pinned ? "Stop always including it" : "Pin so it's always in context")
 
                 Button { editing = m } label: {
                     Image(systemName: "pencil").font(.caption.weight(.bold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
                 .help("Edit")
 
                 Button { pendingDelete = m.id } label: {
                     Image(systemName: "trash").font(.caption2.weight(.bold))
                 }
-                .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
+                .buttonStyle(.borderless).tint(Palette.red)
                 .help("Forget this")
             }
         }
@@ -346,7 +346,7 @@ private struct MemoryEditorSheet: View {
                                     .padding(.horizontal, 11).padding(.vertical, 6)
                                     .background(category == c ? Palette.brand : Palette.surface2, in: Capsule())
                             }
-                            .buttonStyle(KPressStyle())
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -369,9 +369,9 @@ private struct MemoryEditorSheet: View {
             .tint(Palette.brand)
 
             HStack(spacing: 10) {
-                Button("Cancel") { dismiss() }.buttonStyle(KSecondaryButtonStyle())
+                Button("Cancel") { dismiss() }.buttonStyle(.bordered)
                 Button(isNew ? "Remember it" : "Save", action: save)
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                     .disabled(content.trimmingCharacters(in: .whitespaces).count < 3)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -419,7 +419,7 @@ private struct TraceSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.caption.weight(.bold))
                     }
-                    .buttonStyle(KIconButtonStyle(size: 28))
+                    .buttonStyle(.borderless)
                 }
 
                 stat("Asked", trace.query)

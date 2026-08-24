@@ -168,8 +168,8 @@ struct MealChecklistCard: View {
     @ViewBuilder private var loggedBody: some View {
         ForEach(logged) { item in itemRow(item, ghost: false) }
         HStack(spacing: 8) {
-            Button(action: edit) { Label("Edit", systemImage: "pencil") }.buttonStyle(KGhostButtonStyle())
-            Button(action: scan) { Label("Add / scan", systemImage: "camera.viewfinder") }.buttonStyle(KGhostButtonStyle())
+            Button(action: edit) { Label("Edit", systemImage: "pencil") }.buttonStyle(.borderless)
+            Button(action: scan) { Label("Add / scan", systemImage: "camera.viewfinder") }.buttonStyle(.borderless)
             Spacer()
         }
     }
@@ -179,17 +179,17 @@ struct MealChecklistCard: View {
             Text("Skipped").font(.footnote.weight(.semibold)).strikethrough().foregroundStyle(Palette.faint)
             Spacer()
             Button { state.unskipMeal(date: date, meal: meal) } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                .buttonStyle(KGhostButtonStyle())
+                .buttonStyle(.borderless)
         }
     }
 
     private var actionRow: some View {
         HStack(spacing: 8) {
-            Button(action: edit) { Label("Edit", systemImage: "pencil") }.buttonStyle(KGhostButtonStyle())
-            Button(action: scan) { Label("Scan", systemImage: "camera.viewfinder") }.buttonStyle(KGhostButtonStyle())
+            Button(action: edit) { Label("Edit", systemImage: "pencil") }.buttonStyle(.borderless)
+            Button(action: scan) { Label("Scan", systemImage: "camera.viewfinder") }.buttonStyle(.borderless)
             Spacer()
             Button { state.skipMeal(date: date, meal: meal) } label: { Label("Skip", systemImage: "xmark") }
-                .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+                .buttonStyle(.borderless).tint(Palette.faint)
         }
     }
 
@@ -342,7 +342,7 @@ struct WorkoutChecklistCard: View {
                     .font(.footnote).foregroundStyle(Palette.muted)
             }
             Button { choosing = true } label: { Label("Train anyway", systemImage: "figure.run") }
-                .buttonStyle(KGhostButtonStyle())
+                .buttonStyle(.borderless)
         }
     }
 
@@ -355,7 +355,7 @@ struct WorkoutChecklistCard: View {
                     Text("\(r.day.name) has no exercises yet.")
                         .font(.footnote).foregroundStyle(Palette.faint)
                     Button { editingDay = true } label: { Label("Build this day", systemImage: "plus") }
-                        .buttonStyle(KSecondaryButtonStyle())
+                        .buttonStyle(.bordered)
                 }
             } else {
                 VStack(spacing: Gap.tight) {
@@ -368,7 +368,7 @@ struct WorkoutChecklistCard: View {
                         Label("Start workout", systemImage: "play.fill")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
+                    .buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth: .infinity)
                 }
             }
         }
@@ -385,7 +385,7 @@ struct WorkoutChecklistCard: View {
             Button { session = true } label: {
                 Label("Continue workout", systemImage: "play.fill").font(.subheadline.weight(.semibold))
             }
-            .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
+            .buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth: .infinity)
         }
     }
 
@@ -430,7 +430,7 @@ struct WorkoutChecklistCard: View {
             }
         }
         Button { session = true } label: { Label("Edit what I logged", systemImage: "pencil") }
-            .buttonStyle(KGhostButtonStyle())
+            .buttonStyle(.borderless)
     }
 
     private var skippedBody: some View {
@@ -438,7 +438,7 @@ struct WorkoutChecklistCard: View {
             Text("Skipped").font(.footnote.weight(.semibold)).strikethrough().foregroundStyle(Palette.faint)
             Spacer()
             Button { state.unskipWorkout(date: date) } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                .buttonStyle(KGhostButtonStyle())
+                .buttonStyle(.borderless)
         }
     }
 }
@@ -486,7 +486,7 @@ struct ProgramDayPickerSheet: View {
                                 .strokeBorder(Palette.border, lineWidth: 1))
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(KPressStyle())
+                        .buttonStyle(.plain)
                         .onHover { h in cursor(h) }
                     }
                     if state.workoutDayLog(date).dayId != nil {
@@ -495,7 +495,7 @@ struct ProgramDayPickerSheet: View {
                             state.resetSession(date: date)
                             dismiss()
                         } label: { Label("Back to the scheduled day", systemImage: "arrow.uturn.backward") }
-                            .buttonStyle(KGhostButtonStyle())
+                            .buttonStyle(.borderless)
                     }
                 } else {
                     Text("No active program.").font(.footnote).foregroundStyle(Palette.faint)
@@ -582,7 +582,7 @@ struct MealLogEditorSheet: View {
                             .font(.callout.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                    .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -624,7 +624,7 @@ struct MealLogEditorSheet: View {
                 }
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 32))
+                    .buttonStyle(.borderless)
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(Int(mealMacros.calories.rounded()))")
@@ -727,7 +727,7 @@ private struct DraftFoodRow: View {
             Button { showDelete = true } label: {
                 Image(systemName: "xmark").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 28))
+            .buttonStyle(.borderless)
             .holdToDelete(isPresented: $showDelete, title: "Remove \(food?.name ?? "food")?",
                           message: "Takes it off this meal. The food stays in your library.",
                           confirmLabel: "Hold to remove") { remove() }
@@ -744,6 +744,6 @@ private struct DraftFoodRow: View {
                 .frame(width: 34, height: 34)
                 .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
-        .buttonStyle(KPressStyle(scale: 0.9))
+        .buttonStyle(.plain)
     }
 }

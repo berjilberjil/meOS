@@ -55,7 +55,7 @@ struct WorkoutSessionView: View {
                         }
                     }
                     Button { adding = true } label: { Label("Add an exercise today", systemImage: "plus") }
-                        .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                        .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
                     Text("Anything you change here is today's log only — your program keeps its shape.")
                         .font(.caption2).foregroundStyle(Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
@@ -105,7 +105,7 @@ struct WorkoutSessionView: View {
                 }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 30)
                 Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 30))
+                    .buttonStyle(.borderless)
             }
             if totalSets > 0 {
                 VStack(alignment: .leading, spacing: 6) {
@@ -207,7 +207,7 @@ private struct SessionExerciseCard: View {
                 Button { state.addSet(date: date, entryId: entry.id) } label: {
                     Label("Add set", systemImage: "plus").font(.caption.weight(.semibold))
                 }
-                .buttonStyle(KGhostButtonStyle(color: entry.group.tint))
+                .buttonStyle(.borderless).tint(entry.group.tint)
             }
         }
         .onAppear {
@@ -269,13 +269,13 @@ private struct SetRow: View {
                     .font(.title3)
                     .foregroundStyle(set.done ? Palette.green : Palette.faint)
             }
-            .buttonStyle(KPressStyle(scale: 0.88))
+            .buttonStyle(.plain)
             .accessibilityLabel(set.done ? "Set \(index + 1) done" : "Mark set \(index + 1) done")
 
             Button { state.removeSet(date: date, entryId: entryId, setId: set.id) } label: {
                 Image(systemName: "xmark").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 22))
+            .buttonStyle(.borderless)
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
         .background(set.done ? Palette.green.opacity(0.10) : Palette.surface2.opacity(0.4),

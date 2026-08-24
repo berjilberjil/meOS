@@ -114,7 +114,7 @@ struct DangerConfirmSheet: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+            .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
             .disabled(pass.isEmpty || checking)
             .opacity(pass.isEmpty || checking ? 0.55 : 1)
         }
@@ -134,7 +134,7 @@ struct DangerConfirmSheet: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KPrimaryButtonStyle(tint: Palette.red, fullWidth: true))
+            .buttonStyle(.borderedProminent).tint(Palette.red).controlSize(.large).frame(maxWidth: .infinity)
             .disabled(passAgain.isEmpty)
             .opacity(passAgain.isEmpty ? 0.55 : 1)
         }
@@ -275,7 +275,7 @@ struct DangerResetRow: View {
             Button { show = true } label: {
                 Label("Reset", systemImage: "trash")
             }
-            .buttonStyle(KSoftButtonStyle(tint: tint))
+            .buttonStyle(.bordered).tint(tint)
         }
         .padding(.vertical, 8).padding(.horizontal, 10)
         .background(emphatic ? tint.opacity(0.06) : Color.clear,

@@ -57,9 +57,9 @@ struct SettingsView: View {
                     }
                     Spacer()
                     Button { Task { await state.refresh() } } label: { Text("Refresh") }
-                        .buttonStyle(KSecondaryButtonStyle())
+                        .buttonStyle(.bordered)
                     Button { Task { await state.logout() } } label: { Text("Log out") }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+                        .buttonStyle(.borderless).tint(Palette.faint)
                 }
                 if let err = state.lastSyncError ?? state.lastHydrateError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
@@ -88,7 +88,7 @@ struct SettingsView: View {
                     }
                     Spacer()
                     Button { exportData() } label: { Text("Export…") }
-                        .buttonStyle(KSecondaryButtonStyle())
+                        .buttonStyle(.bordered)
                 }
                 if let m = exportMsg {
                     Text(m).font(.caption2).foregroundStyle(Palette.green)
@@ -105,7 +105,7 @@ struct SettingsView: View {
                     }
                     Spacer()
                     Button { Task { await state.regenerateRecoveryCode() } } label: { Text("New code") }
-                        .buttonStyle(KSecondaryButtonStyle())
+                        .buttonStyle(.bordered)
                 }
 
                 Divider().overlay(Palette.ring)
@@ -120,7 +120,7 @@ struct SettingsView: View {
                     Text(m).font(.caption).foregroundStyle(passOK ? Palette.green : Palette.red)
                 }
                 Button { Task { await changePass() } } label: { Text("Update passphrase") }
-                    .buttonStyle(KSecondaryButtonStyle())
+                    .buttonStyle(.bordered)
             }
         }
     }

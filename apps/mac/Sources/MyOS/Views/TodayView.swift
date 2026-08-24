@@ -126,7 +126,7 @@ struct TodayView: View {
             .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private func mealSubtitle(_ st: MealLog.MealState, _ names: [String]) -> String {
@@ -146,7 +146,7 @@ struct TodayView: View {
                     SectionTitle(text: "Coming up")
                     Spacer()
                     Button { go(.events) } label: { Label("All events", systemImage: "calendar") }
-                        .buttonStyle(KGhostButtonStyle())
+                        .buttonStyle(.borderless)
                 }
                 if state.nextEvents.isEmpty {
                     Text("Nothing coming up. Tap All events to add one.")
@@ -154,7 +154,7 @@ struct TodayView: View {
                 } else {
                     ForEach(state.nextEvents) { e in
                         Button { go(.events) } label: { eventLine(e) }
-                            .buttonStyle(KPressStyle())
+                            .buttonStyle(.plain)
                     }
                 }
             }
@@ -213,7 +213,7 @@ struct TodayView: View {
                             Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                         }
                     }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                     .disabled(state.newsBusy)
                 }
                 if let n = state.news, !n.items.isEmpty {
@@ -228,7 +228,7 @@ struct TodayView: View {
                     Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.amber)
                 } else {
                     Button { Task { await state.fetchNews() } } label: { Label("Get today's news", systemImage: "newspaper") }
-                        .buttonStyle(KSecondaryButtonStyle())
+                        .buttonStyle(.bordered)
                 }
             }
         }
@@ -297,7 +297,7 @@ struct TodayView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
 
             if open {
                 if let d = item.detail, !d.isEmpty {
@@ -318,7 +318,7 @@ struct TodayView: View {
                             .padding(.horizontal, 8).padding(.vertical, 5)
                             .background(tint.opacity(0.14), in: Capsule())
                         }
-                        .buttonStyle(KPressStyle())
+                        .buttonStyle(.plain)
                         .disabled(item.url == nil)
                         .help(item.url ?? s)
                     }
@@ -331,7 +331,7 @@ struct TodayView: View {
                         .padding(.horizontal, 8).padding(.vertical, 5)
                         .background(Palette.brand.opacity(0.14), in: Capsule())
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .help("Chat about this with your mentor")
                     Spacer(minLength: 0)
                 }
@@ -374,7 +374,7 @@ struct TodayView: View {
                             Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                         }
                     }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                     .disabled(state.suggestBusy)
                     .help("Refresh suggestions")
                 }
@@ -398,13 +398,13 @@ struct TodayView: View {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(Palette.amber)
                         Button("Try again") { Task { await state.fetchSuggestions() } }
-                            .buttonStyle(KSecondaryButtonStyle())
+                            .buttonStyle(.bordered)
                     }
                 } else {
                     Button { Task { await state.fetchSuggestions() } } label: {
                         Label("Get today's read", systemImage: "sparkles")
                     }
-                    .buttonStyle(KPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
                 }
             }
         }
@@ -517,7 +517,7 @@ struct TodayView: View {
             .background(Palette.surface, in: Capsule())
             .overlay(Capsule().strokeBorder((ice ? Palette.ice : Palette.flame).opacity(0.4), lineWidth: 1.5))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
             Haptics.tap()
             showStreakCal = true
@@ -583,7 +583,7 @@ struct TodayView: View {
                 }
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private func prodBar(label: String, value: Double, detail: String) -> some View {

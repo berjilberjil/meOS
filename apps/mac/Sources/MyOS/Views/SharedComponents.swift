@@ -63,7 +63,7 @@ struct PresetChip: View {
             .background(hover ? Palette.surface2 : Palette.surface2.opacity(0.55), in: Capsule())
             .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in hover = h; cursor(h) }
     }
 }
@@ -80,7 +80,7 @@ struct RemovableChip: View {
             Button(action: remove) {
                 Image(systemName: "xmark").font(.caption2.weight(.heavy))
             }
-            .buttonStyle(KIconButtonStyle(size: 16, color: Palette.faint))
+            .buttonStyle(.borderless).tint(Palette.faint)
         }
         .padding(.leading, 11).padding(.trailing, 5).padding(.vertical, 5)
         .background(tint.opacity(0.14), in: Capsule())
@@ -538,7 +538,7 @@ struct KLabeledDateField: View {
                     Button { text = "" } label: {
                         Image(systemName: "xmark.circle.fill").font(.caption)
                     }
-                    .buttonStyle(KIconButtonStyle(size: 20)).help("Clear date of birth")
+                    .buttonStyle(.borderless).help("Clear date of birth")
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(Palette.surface2.opacity(0.35),
@@ -558,7 +558,7 @@ struct KLabeledDateField: View {
                     .font(.footnote)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .knField()
             }
         }
@@ -584,7 +584,7 @@ struct KStepButton: View {
                             in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
-        .buttonStyle(KPressStyle(scale: 0.92))
+        .buttonStyle(.plain)
         .onHover { h in hover = h; cursor(h) }
         .animation(.knFast, value: hover)
     }

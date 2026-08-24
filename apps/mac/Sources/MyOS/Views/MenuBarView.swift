@@ -65,7 +65,7 @@ struct MenuBarView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(KPrimaryButtonStyle(tint: Palette.green, fullWidth: true))
+            .buttonStyle(.borderedProminent).tint(Palette.green).controlSize(.large).frame(maxWidth: .infinity)
 
             HStack(spacing: 8) {
                 Button { toggleRun() } label: {
@@ -76,14 +76,14 @@ struct MenuBarView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
                 .disabled(timer.finished)
                 .opacity(timer.finished ? 0.5 : 1)
 
                 Button { timer.add(minutes: 5) } label: {
                     Text("+5m").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
             }
 
             upNext
@@ -108,7 +108,7 @@ struct MenuBarView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(KPrimaryButtonStyle(tint: Palette.teal, fullWidth: true))
+                .buttonStyle(.borderedProminent).tint(Palette.teal).controlSize(.large).frame(maxWidth: .infinity)
                 upNext
             } else if items.isEmpty {
                 Text("Nothing on today's list.")
@@ -178,7 +178,7 @@ struct MenuBarView: View {
                     Text("Task Mode")
                 }
             }
-            .buttonStyle(KSoftButtonStyle(tint: state.taskMode.on ? Palette.teal : Palette.muted))
+            .buttonStyle(.bordered).tint(state.taskMode.on ? Palette.teal : Palette.muted)
             .disabled(state.phase != .loggedIn)
             .help("Hide everything but today's task, on every device")
 
@@ -187,7 +187,7 @@ struct MenuBarView: View {
             Button { openApp() } label: {
                 Text("Open MyOS").font(.caption2.weight(.heavy))
             }
-            .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+            .buttonStyle(.borderless).tint(Palette.faint)
         }
     }
 

@@ -31,7 +31,7 @@ struct WorkoutLibrarySection: View {
                 }
                 .knField(focused: libSearchFocused)
                 Button { newExercise = true } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -71,7 +71,7 @@ struct WorkoutLibrarySection: View {
                 .padding(.horizontal, 11).padding(.vertical, 6)
                 .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
     }
 
@@ -163,7 +163,7 @@ struct ExercisePickerSheet: View {
                 Text(title).font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer()
                 Button { dismiss(); newCustom() } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
             }
             .padding(16)
             HStack(spacing: 8) {
@@ -191,7 +191,7 @@ struct ExercisePickerSheet: View {
                                 .fixedSize(horizontal: false, vertical: true)
                             if group2 != nil {
                                 Button { group2 = nil } label: { Label("Show all exercises", systemImage: "line.3.horizontal.decrease") }
-                                    .buttonStyle(KSecondaryButtonStyle())
+                                    .buttonStyle(.bordered)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -214,7 +214,7 @@ struct ExercisePickerSheet: View {
                             }
                             .padding(.horizontal, 10).padding(.vertical, 7).contentShape(Rectangle())
                         }
-                        .buttonStyle(KPressStyle())
+                        .buttonStyle(.plain)
                         .onHover { h in cursor(h) }
                     }
                 }
@@ -240,7 +240,7 @@ struct ExercisePickerSheet: View {
                 .padding(.horizontal, 11).padding(.vertical, 6)
                 .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
     }
 }
@@ -283,19 +283,19 @@ struct ExerciseEditor: View {
             HStack {
                 if let exercise, !exercise.isDefault {
                     Button("Delete") { showDelete = true }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.red))
+                        .buttonStyle(.borderless).tint(Palette.red)
                         .holdToDelete(isPresented: $showDelete, title: "Delete \(exercise.name)?",
                                       message: "Removes it from your exercise library.") {
                             state.deleteExercise(exercise.id); dismiss()
                         }
                 }
                 Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
+                Button("Cancel") { dismiss() }.buttonStyle(.borderless)
                 Button("Save") {
                     if exercise == nil { state.addExercise(draft) } else { state.updateExercise(draft) }
                     dismiss()
                 }
-                .buttonStyle(KPrimaryButtonStyle())
+                .buttonStyle(.borderedProminent)
                 .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -334,7 +334,7 @@ struct ExerciseDetailSheet: View {
                 }
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 28))
+                    .buttonStyle(.borderless)
             }
 
             #if os(macOS)

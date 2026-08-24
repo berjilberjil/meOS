@@ -40,14 +40,14 @@ struct ProgressPhotoCalendar: View {
             Button { shiftMonth(-1) } label: {
                 Image(systemName: "chevron.left").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 24))
+            .buttonStyle(.borderless)
             Spacer()
             Text(monthTitle).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             Spacer()
             Button { shiftMonth(1) } label: {
                 Image(systemName: "chevron.right").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 24))
+            .buttonStyle(.borderless)
             .disabled(isCurrentMonth)
             .opacity(isCurrentMonth ? 0.3 : 1)
         }
@@ -121,7 +121,7 @@ struct ProgressPhotoCalendar: View {
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .opacity(isFuture ? 0.35 : 1)
         }
-        .buttonStyle(KPressStyle(scale: 0.92))
+        .buttonStyle(.plain)
         .disabled(isFuture)
     }
 

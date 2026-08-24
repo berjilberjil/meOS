@@ -56,7 +56,7 @@ struct ActivitySheet: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.caption.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 28))
+            .buttonStyle(.borderless)
         }
     }
 

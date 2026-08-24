@@ -186,7 +186,7 @@ struct ScanHistoryList: View {
                                           : "Show all \(state.scans.count)")
                                 .font(.caption.weight(.heavy))
                         }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.teal))
+                        .buttonStyle(.borderless).tint(Palette.teal)
                     }
                 }
             }
@@ -251,12 +251,12 @@ private struct ScanHistoryRow: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
 
             Button(action: onDelete) {
                 Image(systemName: "xmark").font(.caption2.weight(.bold))
             }
-            .buttonStyle(KIconButtonStyle(size: 22))
+            .buttonStyle(.borderless)
         }
     }
 
@@ -291,7 +291,7 @@ struct ScanDetailSheet: View {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.caption.weight(.bold))
                     }
-                    .buttonStyle(KIconButtonStyle(size: 28))
+                    .buttonStyle(.borderless)
                 }
 
                 if record.photoKey != nil {
@@ -308,7 +308,7 @@ struct ScanDetailSheet: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
+                .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
             }
             .padding(20)
         }

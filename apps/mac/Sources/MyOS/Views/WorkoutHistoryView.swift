@@ -91,7 +91,7 @@ private struct HistoryRow: View {
         Card(padding: 14) {
             VStack(alignment: .leading, spacing: isOpen ? 12 : 0) {
                 Button(action: toggle) { summaryRow }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .onHover { h in cursor(h) }
                 if isOpen { detail }
             }

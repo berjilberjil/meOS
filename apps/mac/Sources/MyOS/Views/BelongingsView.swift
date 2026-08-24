@@ -54,7 +54,7 @@ struct BelongingsView: View {
             }
             Spacer()
             Button { showNew = true } label: { Label("Add", systemImage: "plus") }
-                .buttonStyle(KPrimaryButtonStyle())
+                .buttonStyle(.borderedProminent)
         }
     }
 
@@ -121,7 +121,7 @@ struct BelongingsView: View {
                         .onSubmit(saveSalary)
                     Text("₹ / mo").font(.caption).foregroundStyle(Palette.faint)
                     Spacer()
-                    Button("Save", action: saveSalary).buttonStyle(KGhostButtonStyle())
+                    Button("Save", action: saveSalary).buttonStyle(.borderless)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 10)
                 .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
@@ -200,7 +200,7 @@ struct BelongingsView: View {
             photoItemCard(item, snap: snap, tint: tint, icon: cat.icon)
             #endif
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         // Tap edits; press and hold shows the photo you added, full size. Items
         // without one just don't respond — there is nothing to open.
         .onLongPressGesture(minimumDuration: 0.4) {
@@ -340,7 +340,7 @@ private struct BelongingEditor: View {
                                         .padding(.horizontal, 12).padding(.vertical, 8)
                                         .background(on ? k.color : k.color.opacity(0.16), in: Capsule())
                                     }
-                                    .buttonStyle(KPressStyle())
+                                    .buttonStyle(.plain)
                                 }
                                 Button { showNewCat = true } label: {
                                     HStack(spacing: 5) {
@@ -352,7 +352,7 @@ private struct BelongingEditor: View {
                                     .padding(.horizontal, 12).padding(.vertical, 8)
                                     .background(Palette.surface2, in: Capsule())
                                 }
-                                .buttonStyle(KPressStyle())
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -447,7 +447,7 @@ private struct BelongingEditor: View {
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(selectedCat.color.opacity(0.45), lineWidth: 1.5))
                 }
-                .buttonStyle(KPressStyle())
+                .buttonStyle(.plain)
                 .onDrop(of: [.image], isTargeted: nil) { providers in
                     Task { await dropPhoto(providers) }
                     return true
@@ -465,7 +465,7 @@ private struct BelongingEditor: View {
                         Label(photoBase64.isEmpty ? "Choose photo" : "Change photo", systemImage: "photo.badge.plus")
                             .font(.footnote.weight(.semibold)).foregroundStyle(selectedCat.color)
                     }
-                    .buttonStyle(KGhostButtonStyle())
+                    .buttonStyle(.borderless)
                     #endif
                     if !photoBase64.isEmpty {
                         Button { showRemovePhoto = true } label: {
@@ -666,7 +666,7 @@ private struct NewBelongingCategorySheet: View {
                                         .background(icon == s ? Color(hex: tint) : Color(hex: tint).opacity(0.16),
                                                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 }
-                                .buttonStyle(KPressStyle())
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -679,7 +679,7 @@ private struct NewBelongingCategorySheet: View {
                                         .frame(width: 28, height: 28)
                                         .overlay(Circle().strokeBorder(Palette.text.opacity(tint == hex ? 0.9 : 0), lineWidth: 2))
                                 }
-                                .buttonStyle(KPressStyle())
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -743,7 +743,7 @@ private struct BelongingPhotoViewer: View {
                             .padding(9)
                             .background(.black.opacity(0.45), in: Circle())
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                 }
                 .padding(16)
                 Spacer()

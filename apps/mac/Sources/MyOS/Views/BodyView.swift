@@ -19,7 +19,7 @@ struct BodyView: View {
                         Text("Couldn't load body map").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                         Text(err).font(.caption).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
                         Button("Retry") { Task { state.anatomy = nil; state.anatomyError = nil; await state.loadAnatomy() } }
-                            .buttonStyle(KSecondaryButtonStyle())
+                            .buttonStyle(.bordered)
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 30)
                 }
@@ -73,7 +73,7 @@ struct BodyView: View {
                             .padding(.horizontal, 12).padding(.vertical, 7)
                             .background(on ? Palette.brand : Palette.surface2.opacity(0.6), in: Capsule())
                     }
-                    .buttonStyle(KPressStyle())
+                    .buttonStyle(.plain)
                     .onHover { h in cursor(h) }
                 }
             }
@@ -192,7 +192,7 @@ struct ActivationList: View {
                         Text("reference ranking").font(.caption2).foregroundStyle(Palette.faint)
                     }
                     ForEach(Array(rows.enumerated()), id: \.offset) { i, r in
-                        Button { demo = r.ex } label: { row(i, r.ex, r.percent) }.buttonStyle(KPressStyle())
+                        Button { demo = r.ex } label: { row(i, r.ex, r.percent) }.buttonStyle(.plain)
                     }
                 }
             }

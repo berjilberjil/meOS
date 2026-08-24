@@ -98,7 +98,7 @@ struct LoginView: View {
                     in: Capsule()
                 )
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
             .disabled(state.isWorking)
             .padding(.top, 4)
 
@@ -109,7 +109,7 @@ struct LoginView: View {
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(.white.opacity(0.85))
             }
-            .buttonStyle(KPressStyle())
+            .buttonStyle(.plain)
             .padding(.top, 2)
         }
         .padding(.horizontal, 4)

@@ -49,11 +49,11 @@ struct ProgressPhotosCard: View {
                             Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                                 .font(.footnote.weight(.bold))
                         }
-                        .buttonStyle(KIconButtonStyle(size: 28, color: showCalendar ? Palette.brand : Palette.faint))
+                        .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.faint)
                         .help(showCalendar ? "Hide the calendar" : "Pick a day")
                     }
                     Button { chooseFile() } label: { Label("Add photo", systemImage: "camera.fill") }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.brand))
+                        .buttonStyle(.borderless).tint(Palette.brand)
                 }
                 if photos.isEmpty {
                     Text(dropTargeted ? "Drop it here."
@@ -187,7 +187,7 @@ struct ProgressPhotosCard: View {
                 }
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
         .onHover { h in cursor(h) }
     }
 
@@ -206,7 +206,7 @@ private struct DeleteWithConfirmButton: View {
 
     var body: some View {
         Button { confirming = true } label: { Image(systemName: "trash").font(.footnote.weight(.bold)) }
-            .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
+            .buttonStyle(.borderless).tint(Palette.red)
             .popover(isPresented: $confirming, arrowEdge: .bottom) {
                 VStack(spacing: 12) {
                     Text("Delete this photo?").font(.footnote.weight(.bold)).foregroundStyle(Palette.text)
@@ -292,7 +292,7 @@ private struct ProgressPhotoViewer: View {
             }
             Spacer()
             Button(action: onClose) { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
-                .buttonStyle(KIconButtonStyle(size: 30))
+                .buttonStyle(.borderless)
         }
     }
 
@@ -324,7 +324,7 @@ private struct ProgressPhotoViewer: View {
 
     private func arrow(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon).font(.footnote.weight(.bold)) }
-            .buttonStyle(KIconButtonStyle(size: 34))
+            .buttonStyle(.borderless)
             .disabled(!enabled)
             .opacity(enabled ? 0.85 : 0)
     }

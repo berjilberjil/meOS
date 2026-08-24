@@ -43,7 +43,7 @@ struct WatchLogCard: View {
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(urlFocused ? Palette.brand : Palette.border, lineWidth: 1.5))
                     Button("Add") { addVideo() }
-                        .buttonStyle(KPrimaryButtonStyle())
+                        .buttonStyle(.borderedProminent)
                         .disabled(urlInput.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
 
@@ -91,7 +91,7 @@ struct WatchLogCard: View {
                 Spacer(minLength: 0)
             }
         }
-        .buttonStyle(KPressStyle())
+        .buttonStyle(.plain)
     }
 
     private func addVideo() {
