@@ -142,14 +142,14 @@ private struct SlashMenuView: View {
     private func row(_ cmd: SlashCommand, selected: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: cmd.icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(selected ? .white : Palette.muted)
                 .frame(width: 26, height: 26)
                 .background(selected ? Palette.brand : Palette.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
-                Text(cmd.title).font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.text)
-                Text(cmd.subtitle).font(.system(size: 11)).foregroundStyle(Palette.faint)
+                Text(cmd.title).font(.footnote.weight(.medium)).foregroundStyle(Palette.text)
+                Text(cmd.subtitle).font(.caption2).foregroundStyle(Palette.faint)
             }
             Spacer()
         }

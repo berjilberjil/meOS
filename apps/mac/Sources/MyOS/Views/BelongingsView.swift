@@ -32,9 +32,9 @@ struct BelongingsView: View {
                 Card(padding: 20) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Nothing tracked yet.")
-                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("Add a gadget, a tee, a bike — anything you spent on. You’ll see what it costs per day and when it’s paid for itself.")
-                            .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                            .font(.subheadline).foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -50,7 +50,7 @@ struct BelongingsView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 ScreenTitle(text: "Stuff")
-                Text("What you own, and what it costs you.").font(.system(size: 14)).foregroundStyle(Palette.faint)
+                Text("What you own, and what it costs you.").font(.footnote).foregroundStyle(Palette.faint)
             }
             Spacer()
             Button { showNew = true } label: { Label("Add", systemImage: "plus") }
@@ -78,15 +78,15 @@ struct BelongingsView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("OWNING ALL THIS")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.8)
+                            .font(.caption2.weight(.heavy)).tracking(0.8)
                             .foregroundStyle(Palette.muted)
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(BelongingINR.format(day, decimals: 0))
-                                .font(.system(size: 40, weight: .bold, design: .rounded))
+                                .font(.largeTitle.weight(.bold))
                                 .monospacedDigit()
                                 .foregroundStyle(healthTint)
                             Text("/ day")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.body.weight(.semibold))
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -98,7 +98,7 @@ struct BelongingsView: View {
                     Text(salary > 0
                          ? "\(Int((burn * 100).rounded()))% of monthly salary"
                          : "Set a salary to judge the burn")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(Palette.faint)
                 }
                 HStack(spacing: 8) {
@@ -112,14 +112,14 @@ struct BelongingsView: View {
                     .padding(.top, 2)
                 HStack(spacing: 10) {
                     Text("Salary")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(Palette.faint)
                     TextField("40000", text: $salaryDraft)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 16, weight: .semibold)).monospacedDigit()
+                        .font(.callout.weight(.semibold)).monospacedDigit()
                         .foregroundStyle(Palette.text)
                         .onSubmit(saveSalary)
-                    Text("₹ / mo").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    Text("₹ / mo").font(.caption).foregroundStyle(Palette.faint)
                     Spacer()
                     Button("Save", action: saveSalary).buttonStyle(KGhostButtonStyle())
                 }
@@ -138,7 +138,7 @@ struct BelongingsView: View {
             }
         }()
         return Text(t)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.caption.weight(.semibold))
             .foregroundStyle(c)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(c.opacity(0.16), in: Capsule())
@@ -147,10 +147,10 @@ struct BelongingsView: View {
     private func heroStat(_ label: String, _ value: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label.uppercased())
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.4)
+                .font(.caption2.weight(.heavy)).tracking(0.4)
                 .foregroundStyle(tint)
             Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .font(.body.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(Palette.text)
                 .lineLimit(1).minimumScaleFactor(0.7)
@@ -172,13 +172,13 @@ struct BelongingsView: View {
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10, style: .continuous).fill(tint.opacity(0.16))
-                    Image(systemName: kind.icon).font(.system(size: 14, weight: .semibold)).foregroundStyle(tint)
+                    Image(systemName: kind.icon).font(.footnote.weight(.semibold)).foregroundStyle(tint)
                 }
                 .frame(width: 32, height: 32)
-                Text(kind.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                Text(kind.name).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                 Spacer()
                 Text(BelongingINR.format(day) + " / day")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(tint)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(tint.opacity(0.14), in: Capsule())
@@ -224,20 +224,20 @@ struct BelongingsView: View {
                     RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                         .fill(tint.opacity(0.16))
                     Image(systemName: icon)
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(tint)
                 }
                 .frame(height: 72)
             }
-            Text(item.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+            Text(item.name).font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                 .lineLimit(2).multilineTextAlignment(.leading)
             Text(BelongingINR.format(item.pricePaise))
-                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
             Text(BelongingINR.format(snap.actualPerDay, decimals: snap.actualPerDay < 100 ? 2 : 0) + " / day")
-                .font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(tint)
+                .font(.callout.weight(.bold)).foregroundStyle(tint)
             MeterBar(fraction: snap.progress, tint: snap.progress >= 1 ? Palette.green : tint, height: 6)
             Text(snap.daysLeft == 0 ? "Full ROI" : BelongingINR.span(snap.daysLeft))
-                .font(.system(size: 12)).foregroundStyle(snap.daysLeft == 0 ? Palette.green : Palette.faint)
+                .font(.caption).foregroundStyle(snap.daysLeft == 0 ? Palette.green : Palette.faint)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -252,17 +252,17 @@ struct BelongingsView: View {
             BelongingPhotoWell(base64: item.photoBase64, tint: tint, icon: icon)
             VStack(alignment: .leading, spacing: 7) {
                 Text(item.name)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(Palette.text)
                     .lineLimit(2).multilineTextAlignment(.leading)
                 Text(BelongingINR.format(item.pricePaise))
-                    .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                 Text(BelongingINR.format(snap.actualPerDay, decimals: snap.actualPerDay < 100 ? 2 : 0) + " / day")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .font(.body.weight(.bold))
                     .foregroundStyle(tint)
                 MeterBar(fraction: snap.progress, tint: snap.progress >= 1 ? Palette.green : tint, height: 6)
                 Text(snap.daysLeft == 0 ? "Full ROI" : BelongingINR.span(snap.daysLeft))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(snap.daysLeft == 0 ? Palette.green : Palette.faint)
             }
             .padding(14)
@@ -332,10 +332,10 @@ private struct BelongingEditor: View {
                                         if item == nil { lifeMonths = max(1, k.defaultLifeDays / 30) }
                                     } label: {
                                         HStack(spacing: 5) {
-                                            Image(systemName: k.icon).font(.system(size: 12, weight: .bold))
+                                            Image(systemName: k.icon).font(.caption.weight(.bold))
                                             Text(k.name)
                                         }
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.footnote.weight(.semibold))
                                         .foregroundStyle(on ? Palette.bg : k.color)
                                         .padding(.horizontal, 12).padding(.vertical, 8)
                                         .background(on ? k.color : k.color.opacity(0.16), in: Capsule())
@@ -344,10 +344,10 @@ private struct BelongingEditor: View {
                                 }
                                 Button { showNewCat = true } label: {
                                     HStack(spacing: 5) {
-                                        Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                                        Image(systemName: "plus").font(.caption.weight(.bold))
                                         Text("New")
                                     }
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.footnote.weight(.semibold))
                                     .foregroundStyle(Palette.text)
                                     .padding(.horizontal, 12).padding(.vertical, 8)
                                     .background(Palette.surface2, in: Capsule())
@@ -365,7 +365,7 @@ private struct BelongingEditor: View {
                     VStack(alignment: .leading, spacing: 6) {
                         KFieldLabel(text: "Payoff period")
                         Stepper("\(lifeMonths) months", value: $lifeMonths, in: 1...120)
-                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                     }
                     field("Product link", $link, "https://www.amazon.in/dp/…")
                     field("Note", $note, "Optional")
@@ -436,8 +436,8 @@ private struct BelongingEditor: View {
                         } else {
                             VStack(spacing: 6) {
                                 Image(systemName: "photo.badge.plus")
-                                    .font(.system(size: 26, weight: .semibold))
-                                Text("Add").font(.system(size: 12, weight: .semibold))
+                                    .font(.title.weight(.semibold))
+                                Text("Add").font(.caption.weight(.semibold))
                             }
                             .foregroundStyle(selectedCat.color)
                         }
@@ -457,19 +457,19 @@ private struct BelongingEditor: View {
                     #if os(iOS)
                     PhotosPicker(selection: $pickItem, matching: .images) {
                         Label(photoBase64.isEmpty ? "Choose photo" : "Change photo", systemImage: "photo.badge.plus")
-                            .font(.system(size: 14, weight: .semibold)).foregroundStyle(selectedCat.color)
+                            .font(.footnote.weight(.semibold)).foregroundStyle(selectedCat.color)
                     }
                     .onChange(of: pickItem) { _, item in Task { await loadPicked(item) } }
                     #else
                     Button { importing = true } label: {
                         Label(photoBase64.isEmpty ? "Choose photo" : "Change photo", systemImage: "photo.badge.plus")
-                            .font(.system(size: 14, weight: .semibold)).foregroundStyle(selectedCat.color)
+                            .font(.footnote.weight(.semibold)).foregroundStyle(selectedCat.color)
                     }
                     .buttonStyle(KGhostButtonStyle())
                     #endif
                     if !photoBase64.isEmpty {
                         Button { showRemovePhoto = true } label: {
-                            Text("Remove photo").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.red)
+                            Text("Remove photo").font(.footnote.weight(.semibold)).foregroundStyle(Palette.red)
                         }
                         .buttonStyle(.plain)
                         .holdToDelete(isPresented: $showRemovePhoto, title: "Remove this photo?",
@@ -479,7 +479,7 @@ private struct BelongingEditor: View {
                     }
                     Text(photoBusy ? "Catherine is reading the photo…"
                          : (photoHint.isEmpty ? "Drop a photo and Catherine fills the name, shelf and price." : photoHint))
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -550,7 +550,7 @@ private struct BelongingEditor: View {
         VStack(alignment: .leading, spacing: 6) {
             KFieldLabel(text: label)
             TextField("", text: text, prompt: Text(hint).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 17)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                 .padding(.horizontal, 14).padding(.vertical, 12)
                 .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
@@ -592,7 +592,7 @@ private struct BelongingPhotoWell: View {
                     .padding(10)
             } else {
                 Image(systemName: icon)
-                    .font(.system(size: 28, weight: .semibold))
+                    .font(.title.weight(.semibold))
                     .foregroundStyle(tint)
             }
         }
@@ -648,7 +648,7 @@ private struct NewBelongingCategorySheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         KFieldLabel(text: "Name")
                         TextField("", text: $name, prompt: Text("Shoes, cameras, watches…").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.system(size: 17)).foregroundStyle(Palette.text)
+                            .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                             .padding(.horizontal, 14).padding(.vertical, 12)
                             .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
@@ -660,7 +660,7 @@ private struct NewBelongingCategorySheet: View {
                             ForEach(icons, id: \.self) { s in
                                 Button { icon = s } label: {
                                     Image(systemName: s)
-                                        .font(.system(size: 16, weight: .semibold))
+                                        .font(.callout.weight(.semibold))
                                         .foregroundStyle(icon == s ? Palette.bg : Color(hex: tint))
                                         .frame(width: 44, height: 44)
                                         .background(icon == s ? Color(hex: tint) : Color(hex: tint).opacity(0.16),
@@ -684,10 +684,10 @@ private struct NewBelongingCategorySheet: View {
                         }
                     }
                     HStack(spacing: 8) {
-                        Image(systemName: icon).font(.system(size: 13, weight: .bold))
+                        Image(systemName: icon).font(.footnote.weight(.bold))
                         Text(name.isEmpty ? "Preview" : name)
                     }
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Palette.bg)
                     .padding(.horizontal, 14).padding(.vertical, 8)
                     .background(Color(hex: tint), in: Capsule())
@@ -727,19 +727,19 @@ private struct BelongingPhotoViewer: View {
                 img.resizable().scaledToFit()
             } else {
                 Text("No photo on this one.")
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white.opacity(0.7))
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
             }
             VStack {
                 HStack(alignment: .top) {
                     Text(item.name)
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
                         .lineLimit(2)
                         .padding(.horizontal, 12).padding(.vertical, 7)
                         .background(.black.opacity(0.45), in: Capsule())
                     Spacer(minLength: 8)
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                            .font(.footnote.weight(.bold)).foregroundStyle(.white)
                             .padding(9)
                             .background(.black.opacity(0.45), in: Circle())
                     }

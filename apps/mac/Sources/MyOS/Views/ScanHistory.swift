@@ -63,13 +63,13 @@ struct ScanVerdictView: View {
     }
 
     @ViewBuilder private var foodBody: some View {
-        Text("FOOD").font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(0.8)
+        Text("FOOD").font(.caption.weight(.heavy)).tracking(0.8)
             .foregroundStyle(Palette.green)
-        Text(insight.summary).font(.system(size: 18, weight: .semibold)).foregroundStyle(Palette.text)
+        Text(insight.summary).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
         ForEach(insight.foods, id: \.name) { f in
             VStack(alignment: .leading, spacing: 8) {
-                Text(f.name).font(.system(size: 17, weight: .semibold))
-                Text(f.serving).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                Text(f.name).font(.body.weight(.semibold))
+                Text(f.serving).font(.footnote).foregroundStyle(Palette.muted)
                 HStack {
                     macro("\(Int(f.calories))", "kcal")
                     macro("\(Int(f.protein))g", "protein")
@@ -82,17 +82,17 @@ struct ScanVerdictView: View {
 
     @ViewBuilder private func objectBody(_ o: ScanInsight.Object) -> some View {
         Text(ScanVerdict.label(o.needed).uppercased())
-            .font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(0.7)
+            .font(.caption.weight(.heavy)).tracking(0.7)
             .foregroundStyle(ScanVerdict.color(o.needed))
         Text(o.name)
-            .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+            .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
         if !insight.summary.isEmpty, insight.summary != o.name {
-            Text(insight.summary).font(.system(size: 15)).foregroundStyle(Palette.muted)
+            Text(insight.summary).font(.subheadline).foregroundStyle(Palette.muted)
         }
 
         field("WANTED FOR YOU") {
             Text(ScanVerdict.blurb(o.needed))
-                .font(.system(size: 16, weight: .semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(ScanVerdict.color(o.needed))
         }
         if !o.why.isEmpty {
@@ -104,14 +104,14 @@ struct ScanVerdictView: View {
     }
 
     private func body(_ s: String) -> some View {
-        Text(s).font(.system(size: 16)).foregroundStyle(Palette.text)
+        Text(s).font(.callout).foregroundStyle(Palette.text)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private func field<C: View>(_ label: String, @ViewBuilder content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.6)
+                .font(.caption2.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
             content()
         }
@@ -119,8 +119,8 @@ struct ScanVerdictView: View {
 
     private func macro(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
-            Text(value).font(.system(size: 15, weight: .semibold)).monospacedDigit()
-            Text(label).font(.system(size: 10)).foregroundStyle(Palette.muted)
+            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
+            Text(label).font(.caption2).foregroundStyle(Palette.muted)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -184,7 +184,7 @@ struct ScanHistoryList: View {
                         Button { withAnimation(.knNormal) { expanded.toggle() } } label: {
                             Text(expanded ? "Show less"
                                           : "Show all \(state.scans.count)")
-                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .font(.caption.weight(.heavy))
                         }
                         .buttonStyle(KGhostButtonStyle(color: Palette.teal))
                     }
@@ -209,7 +209,7 @@ struct ScanHistoryList: View {
         HStack(spacing: 8) {
             SectionTitle(text: "Recent scans")
             Text("\(state.scans.count)")
-                .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                .font(.caption2.weight(.semibold)).monospacedDigit()
                 .foregroundStyle(Palette.faint)
             Spacer(minLength: 0)
         }
@@ -229,22 +229,22 @@ private struct ScanHistoryRow: View {
                     ScanThumb(record: record)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(record.title)
-                            .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                             .lineLimit(1)
                         HStack(spacing: 6) {
                             Text(ScanRecord.dayLabel(record.date, today: today))
-                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .font(.caption2.weight(.heavy))
                                 .foregroundStyle(Palette.faint)
                             if record.isFood, record.logged {
                                 Text("LOGGED")
-                                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                    .font(.caption2.weight(.heavy))
                                     .foregroundStyle(Palette.green)
                             }
                         }
                     }
                     Spacer(minLength: 0)
                     Text(record.badge)
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(badgeColor)
                         .padding(.horizontal, 7).padding(.vertical, 4)
                         .background(badgeColor.opacity(0.14), in: Capsule())
@@ -254,7 +254,7 @@ private struct ScanHistoryRow: View {
             .buttonStyle(KPressStyle())
 
             Button(action: onDelete) {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                Image(systemName: "xmark").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 22))
         }
@@ -285,11 +285,11 @@ struct ScanDetailSheet: View {
             VStack(alignment: .leading, spacing: Gap.screen) {
                 HStack {
                     Text(ScanRecord.dayLabel(record.date, today: state.todayKey))
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                     Spacer()
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                        Image(systemName: "xmark").font(.caption.weight(.bold))
                     }
                     .buttonStyle(KIconButtonStyle(size: 28))
                 }
@@ -303,7 +303,7 @@ struct ScanDetailSheet: View {
 
                 Button { confirmDelete = true } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "trash").font(.system(size: 12, weight: .bold))
+                        Image(systemName: "trash").font(.caption.weight(.bold))
                         Text("Delete scan")
                     }
                     .frame(maxWidth: .infinity)

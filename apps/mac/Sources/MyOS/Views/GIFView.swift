@@ -22,8 +22,8 @@ struct GIFView: View {
                 AnimatedGIF(data: data)
             } else if failed {
                 VStack(spacing: 6) {
-                    Image(systemName: "wifi.slash").font(.system(size: 20)).foregroundStyle(Palette.faint)
-                    Text("Demo unavailable").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    Image(systemName: "wifi.slash").font(.title3).foregroundStyle(Palette.faint)
+                    Text("Demo unavailable").font(.caption2).foregroundStyle(Palette.faint)
                 }
             } else {
                 ProgressView().controlSize(.small)

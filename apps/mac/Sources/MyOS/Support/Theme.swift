@@ -261,7 +261,7 @@ struct KPrimaryButtonStyle: ButtonStyle {
             let pressed = configuration.isPressed
             let face = hover ? tint.mixedWithWhite(0.10) : tint
             configuration.label
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(.subheadline.weight(.bold))
                 .tracking(0.3)
                 .textCase(.uppercase)
                 .foregroundStyle(Palette.bg)
@@ -294,7 +294,7 @@ struct KSecondaryButtonStyle: ButtonStyle {
             let pressed = configuration.isPressed
             let face = hover ? Palette.surface2.mixedWithWhite(0.06) : Palette.surface2
             configuration.label
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(Palette.text)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
@@ -323,7 +323,7 @@ struct KGhostButtonStyle: ButtonStyle {
         @State private var hover = false
         var body: some View {
             configuration.label
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(hover ? Palette.text : color)
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(hover ? Palette.surface2.opacity(0.8) : .clear,
@@ -380,7 +380,7 @@ struct KSoftButtonStyle: ButtonStyle {
             let pressed = configuration.isPressed
             let base = hover ? tint.opacity(0.26) : tint.opacity(0.16)
             configuration.label
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(tint)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -474,7 +474,7 @@ struct Segmented<T: Hashable>: View {
             ForEach(options, id: \.value) { opt in
                 let on = selection == opt.value
                 Text(opt.title)
-                    .font(.system(size: fillsWidth ? 12 : 13, weight: .heavy, design: .rounded))
+                    .font((fillsWidth ? Font.caption : Font.footnote).weight(.heavy))
                     .lineLimit(1).minimumScaleFactor(0.7)
                     .foregroundStyle(on ? Palette.text : Palette.muted)
                     .padding(.horizontal, fillsWidth ? 4 : 14).padding(.vertical, 7)

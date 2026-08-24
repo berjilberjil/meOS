@@ -33,10 +33,10 @@ struct NotesView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { handleTitleTap() }
                 if revealed {
-                    Image(systemName: "lock.open.fill").font(.system(size: 12)).foregroundStyle(Palette.brand)
+                    Image(systemName: "lock.open.fill").font(.caption).foregroundStyle(Palette.brand)
                 }
                 if !state.notes.isEmpty {
-                    Text("\(state.notes.count)").font(.system(size: 13, weight: .semibold))
+                    Text("\(state.notes.count)").font(.footnote.weight(.semibold))
                         .monospacedDigit().foregroundStyle(Palette.faint)
                 }
                 Spacer()
@@ -56,7 +56,7 @@ struct NotesView: View {
                     Card {
                         Text(state.notes.isEmpty ? "No notes yet. Double-tap here to write one."
                                                  : "No notes match “\(query)”.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            .font(.footnote).foregroundStyle(Palette.faint)
                     }
                     .onTapGesture(count: 2) { newNote() }
                 } else {
@@ -100,18 +100,18 @@ struct NotesView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
                         if note.pinned {
-                            Image(systemName: "pin.fill").font(.system(size: 10)).foregroundStyle(Palette.amber)
+                            Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
                         }
                         Text(note.title.isEmpty ? "Untitled" : note.title)
-                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                            .font(.callout.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                         if note.locked {
-                            Image(systemName: "lock.fill").font(.system(size: 10)).foregroundStyle(Palette.faint)
+                            Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Palette.faint)
                         }
                         Spacer()
-                        Text(Fmt.day(note.updatedAt)).font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        Text(Fmt.day(note.updatedAt)).font(.caption2).foregroundStyle(Palette.faint)
                     }
                     if !note.locked && !note.body.isEmpty {
-                        Text(note.body).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text(note.body).font(.footnote).foregroundStyle(Palette.muted)
                             .lineLimit(2).multilineTextAlignment(.leading)
                     }
                 }
@@ -194,12 +194,12 @@ private struct NoteEditor: View {
             HStack {
                 Button { dismiss() } label: {
                     HStack(spacing: 3) { Image(systemName: "chevron.left"); Text("Notes") }
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.brand)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.brand)
                 }
                 Spacer()
                 if let n = state.note(id) {
                     Button { state.togglePinNote(id) } label: {
-                        Image(systemName: n.pinned ? "pin.fill" : "pin").font(.system(size: 15))
+                        Image(systemName: n.pinned ? "pin.fill" : "pin").font(.subheadline)
                             .foregroundStyle(n.pinned ? Palette.amber : Palette.muted)
                     }
                 }
@@ -207,11 +207,11 @@ private struct NoteEditor: View {
             .padding(.bottom, 2)
 
             TextField("", text: $title, prompt: Text("Title").foregroundColor(Palette.faint))
-                .font(.system(size: 24, weight: .bold)).foregroundStyle(Palette.text)
+                .font(.title2.weight(.bold)).foregroundStyle(Palette.text)
                 .onChange(of: title) { save() }
 
             TextEditor(text: $text)
-                .font(.system(size: 16)).foregroundStyle(Palette.text)
+                .font(.callout).foregroundStyle(Palette.text)
                 .scrollContentBackground(.hidden)
                 .background(Palette.bg)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

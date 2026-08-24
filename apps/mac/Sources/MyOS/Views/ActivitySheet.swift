@@ -46,15 +46,15 @@ struct ActivitySheet: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Activity")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.title2.weight(.bold))
                     .foregroundStyle(Palette.text)
                 Text(Fmt.day(day))
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .font(.caption.weight(.heavy))
                     .foregroundStyle(Palette.faint)
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                Image(systemName: "xmark").font(.caption.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 28))
         }
@@ -69,7 +69,7 @@ struct ActivitySheet: View {
                 let f = target > 0 ? min(1, Double(n) / Double(target)) : 0
                 VStack(spacing: 6) {
                     Text(Fmt.weekdayInitial(key))
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(key == day ? Palette.text : Palette.faint)
                     ZStack {
                         Circle().stroke(Palette.surface2, lineWidth: 3.5)
@@ -92,10 +92,10 @@ struct ActivitySheet: View {
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 1) {
                 Text(today.formatted())
-                    .font(.system(size: 38, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .font(.largeTitle.weight(.heavy)).monospacedDigit()
                     .foregroundStyle(Palette.text)
                 Text("of \(target.formatted()) steps")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(Palette.faint)
             }
         }
@@ -118,10 +118,10 @@ struct ActivitySheet: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 3) {
             Text(value)
-                .font(.system(size: 17, weight: .heavy, design: .rounded)).monospacedDigit()
+                .font(.body.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(Palette.text)
             Text(label)
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint)
         }
         .frame(maxWidth: .infinity)
@@ -137,12 +137,12 @@ struct ActivitySheet: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Text("LAST 7 DAYS")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .font(.caption2.weight(.heavy)).tracking(0.6)
                     .foregroundStyle(Palette.faint)
                 Spacer(minLength: 0)
                 if target > 0 {
                     Text("goal \(target.formatted())")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                 }
             }
@@ -151,13 +151,13 @@ struct ActivitySheet: View {
                     let n = counts[i]
                     VStack(spacing: 6) {
                         Text(n > 0 ? compact(n) : "–")
-                            .font(.system(size: 9, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .font(.caption2.weight(.heavy)).monospacedDigit()
                             .foregroundStyle(Palette.faint)
                         Capsule()
                             .fill(tint(n))
                             .frame(height: max(3, 96 * CGFloat(n) / CGFloat(ceiling)))
                         Text(Fmt.weekdayInitial(key))
-                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .font(.caption2.weight(.heavy))
                             .foregroundStyle(key == day ? Palette.text : Palette.faint)
                     }
                     .frame(maxWidth: .infinity)

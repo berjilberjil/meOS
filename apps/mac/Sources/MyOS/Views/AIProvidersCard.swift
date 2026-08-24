@@ -43,7 +43,7 @@ struct AIProvidersCard: View {
                     HStack(spacing: 10) {
                         ProgressView().controlSize(.small)
                         Text("Loading your keys…")
-                            .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                            .font(.footnote).foregroundStyle(Palette.muted)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, SettingsMetrics.rowPadH)
@@ -53,9 +53,9 @@ struct AIProvidersCard: View {
                 SettingsGroup {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("No keys yet")
-                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("Add one above and Catherine runs on it. Until then everything uses the server default.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            .font(.footnote).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,10 +84,10 @@ struct AIProvidersCard: View {
             HStack {
                 SectionTitle(text: "AI providers & models")
                 Spacer()
-                Text("bring your own keys").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                Text("bring your own keys").font(.caption).foregroundStyle(Palette.faint)
             }
             Text("Add a Gemini, Claude or OpenAI key, then pick which model powers each feature.")
-                .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                .font(.subheadline).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let e = store.loadError {
@@ -108,7 +108,7 @@ struct AIProvidersCard: View {
                 KFieldLabel(text: "Route features to models")
                 if store.enabledKeys.isEmpty {
                     Text("Add and enable a key above to route features. Until then everything uses the server default.")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ModelPickerRow(store: store, feature: nil, boxed: true)
@@ -159,7 +159,7 @@ private struct AddKeyForm: View {
                                     subtitle: "Opens \(url.host ?? "the provider") in Safari.",
                                     action: { openURL(url) }) {
                             Image(systemName: "arrow.up.right")
-                                .font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.faint)
+                                .font(.footnote.weight(.bold)).foregroundStyle(Palette.faint)
                         }
                     }
 
@@ -213,7 +213,7 @@ private struct AddKeyForm: View {
                     KFieldLabel(text: "Label")
                     TextField("", text: $label,
                               prompt: Text("e.g. Personal \(provider.label)").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .focused($labelFocused).knField(focused: labelFocused)
                 }
                 .frame(width: 190)
@@ -222,7 +222,7 @@ private struct AddKeyForm: View {
                     KFieldLabel(text: "API key")
                     SecureField("", text: $keyText,
                                 prompt: Text(provider.keyPlaceholder).foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 13)).monospaced().foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).monospaced().foregroundStyle(Palette.text)
                         .focused($keyFocused).knField(focused: keyFocused)
                 }
             }
@@ -276,7 +276,7 @@ private struct AIKeyRow: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 Text(provider.label)
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(provider.accent.opacity(0.18), in: Capsule())
                     .foregroundStyle(provider.accent)
@@ -284,13 +284,13 @@ private struct AIKeyRow: View {
                     HStack(spacing: 5) {
                         if key.enabled && !key.models.isEmpty {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 12)).foregroundStyle(Palette.green)
+                                .font(.caption).foregroundStyle(Palette.green)
                         }
-                        Text(key.label).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text(key.label).font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                             .lineLimit(1)
                     }
                     Text(status)
-                        .font(.system(size: 12)).monospaced().foregroundStyle(Palette.faint)
+                        .font(.caption).monospaced().foregroundStyle(Palette.faint)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 6)
@@ -359,7 +359,7 @@ private struct ModelPickerRow: View {
     @ViewBuilder private var menu: some View {
         if candidates.isEmpty {
             Text(feature?.geminiOnly == true ? "Needs a Gemini key" : "Add a key first")
-                .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                .font(.caption2).foregroundStyle(Palette.faint)
         } else {
             Menu {
                 Button(feature == nil ? "Server default (env)" : "Use default") {
@@ -384,10 +384,10 @@ private struct ModelPickerRow: View {
             } label: {
                 HStack(spacing: 6) {
                     Text(currentLabel)
-                        .font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                        .font(.caption.weight(.semibold)).lineLimit(1)
                         .foregroundStyle(current == nil ? Palette.muted : Palette.text)
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint)
+                        .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))

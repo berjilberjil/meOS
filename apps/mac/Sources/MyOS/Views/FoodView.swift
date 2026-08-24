@@ -50,7 +50,7 @@ struct FoodLibrarySection: View {
                 }
             }
             if results.isEmpty {
-                Card { Text("No foods match.").font(.system(size: 13)).foregroundStyle(Palette.faint) }
+                Card { Text("No foods match.").font(.footnote).foregroundStyle(Palette.faint) }
             }
         }
         .sheet(isPresented: $newFood) { FoodEditor(food: nil) }
@@ -60,7 +60,7 @@ struct FoodLibrarySection: View {
     private func catChip(_ c: FoodCategory?, _ label: String) -> some View {
         let on = category == c
         return Button { category = c } label: {
-            Text(label).font(.system(size: 12, weight: on ? .semibold : .medium))
+            Text(label).font(.caption.weight(on ? .semibold : .medium))
                 .foregroundStyle(on ? Palette.text : Palette.muted)
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(on ? Palette.surface2 : .clear, in: Capsule())
@@ -74,12 +74,12 @@ struct FoodLibrarySection: View {
         HStack(spacing: 11) {
             FoodIcon(category: f.category, name: f.name, size: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text(f.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Text(f.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Text("\(FoodServing.display(f.servingLabel)) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g protein")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                    .font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 6)
-            if !f.isDefault { Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint) }
+            if !f.isDefault { Text("custom").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint) }
         }
         .padding(.vertical, 3)
         .frame(minHeight: 44)          // still a comfortable tap target
@@ -134,7 +134,7 @@ struct FoodPickerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Add to \(meal.label)").font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Text("Add to \(meal.label)").font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer()
                 Button { dismiss(); newCustom() } label: { Label("New food", systemImage: "plus") }
                     .buttonStyle(KGhostButtonStyle())
@@ -154,15 +154,15 @@ struct FoodPickerSheet: View {
                             HStack(spacing: 10) {
                                 FoodIcon(category: f.category, name: f.name, size: 30)
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(f.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                                    Text(f.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                                     Text("\(FoodServing.display(f.servingLabel)) · \(Int(f.perServing.calories)) kcal · \(Int(f.perServing.protein))g P")
-                                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                                        .font(.caption2).foregroundStyle(Palette.faint)
                                 }
                                 Spacer()
                                 if !f.isDefault {
-                                    Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint)
+                                    Text("custom").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
                                 }
-                                Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.brand)
+                                Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.brand)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .contentShape(Rectangle())
@@ -201,7 +201,7 @@ struct FoodEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(food == nil ? "New food" : "Edit food")
-                .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.body.weight(.heavy)).foregroundStyle(Palette.text)
             KLabeledField(label: "Name", placeholder: "e.g. Grilled chicken", text: $draft.name)
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -212,8 +212,8 @@ struct FoodEditor: View {
                         }
                     } label: {
                         HStack { Text(draft.category.label).foregroundStyle(Palette.text)
-                            Spacer(); Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint) }
-                        .font(.system(size: 13, weight: .semibold))
+                            Spacer(); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint) }
+                        .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 13).padding(.vertical, 10)
                         .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
@@ -285,9 +285,9 @@ struct FoodScanSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Scan a food photo").font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Text("Scan a food photo").font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
+                Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
                     .buttonStyle(KIconButtonStyle(size: 28))
             }
             ImageDropZone(
@@ -305,7 +305,7 @@ struct FoodScanSheet: View {
                 }
             }
             if let err = state.imageError {
-                Text(err).font(.system(size: 12)).foregroundStyle(Palette.red)
+                Text(err).font(.caption).foregroundStyle(Palette.red)
             }
         }
         .padding(20)
@@ -342,9 +342,9 @@ struct FoodScanReviewSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Review \(drafts.count) \(drafts.count == 1 ? "food" : "foods")")
-                    .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    .font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 if !summary.isEmpty {
-                    Text(summary).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text(summary).font(.caption).foregroundStyle(Palette.muted)
                 }
             }
             .padding(20)
@@ -353,9 +353,9 @@ struct FoodScanReviewSheet: View {
 
             if drafts.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "text.magnifyingglass").font(.system(size: 26)).foregroundStyle(Palette.faint)
-                    Text("Couldn't read a food from that image.").font(.system(size: 13)).foregroundStyle(Palette.muted)
-                    Text("Try a clearer, closer photo of the label.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    Image(systemName: "text.magnifyingglass").font(.title).foregroundStyle(Palette.faint)
+                    Text("Couldn't read a food from that image.").font(.footnote).foregroundStyle(Palette.muted)
+                    Text("Try a clearer, closer photo of the label.").font(.caption).foregroundStyle(Palette.faint)
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 40)
             } else {
@@ -372,12 +372,12 @@ struct FoodScanReviewSheet: View {
 
             VStack(spacing: 12) {
                 HStack {
-                    Text("\(included.count) selected").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.muted)
+                    Text("\(included.count) selected").font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
                     Spacer()
                     Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
                 }
                 if included.isEmpty {
-                    Text("Select at least one.").font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    Text("Select at least one.").font(.footnote).foregroundStyle(Palette.faint)
                 } else {
                     SlideToConfirm(label: "Slide to log \(included.count)", tint: Palette.brand) {
                         for d in included {
@@ -416,29 +416,29 @@ private struct ScanFoodRow: View {
             HStack(spacing: 10) {
                 Button { draft.include.toggle() } label: {
                     Image(systemName: draft.include ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18))
+                        .font(.body)
                         .foregroundStyle(draft.include ? Palette.green : Palette.faint)
                 }
                 .buttonStyle(KPressStyle())
                 FoodIcon(category: draft.food.category, name: draft.food.name, size: 28)
                 TextField("Name", text: $draft.food.name)
-                    .textFieldStyle(.plain).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                    .textFieldStyle(.plain).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                 Spacer()
                 Menu {
                     ForEach(MealKey.allCases, id: \.self) { m in Button(m.label) { draft.meal = m } }
                 } label: {
-                    Label(draft.meal.label, systemImage: draft.meal.icon).font(.system(size: 11, weight: .semibold))
+                    Label(draft.meal.label, systemImage: draft.meal.icon).font(.caption2.weight(.semibold))
                 }
                 .menuStyle(.borderlessButton).fixedSize()
             }
             HStack(spacing: 8) {
                 TextField("Serving", text: $draft.food.servingLabel)
-                    .textFieldStyle(.plain).font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .textFieldStyle(.plain).font(.caption2).foregroundStyle(Palette.muted)
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
                 Stepper(value: $draft.quantity, in: 0.5...20, step: 0.5) {
                     Text("× \(Fmt.trimKg(draft.quantity)) serving\(draft.quantity == 1 ? "" : "s")")
-                        .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                        .font(.caption2).foregroundStyle(Palette.muted)
                 }
                 .fixedSize()
             }
@@ -460,11 +460,11 @@ private struct ScanFoodRow: View {
 
     private func macroField(_ label: String, _ kp: WritableKeyPath<Macros, Double>) -> some View {
         HStack(spacing: 4) {
-            Text(label).font(.system(size: 10)).foregroundStyle(Palette.faint)
+            Text(label).font(.caption2).foregroundStyle(Palette.faint)
             TextField("0", value: Binding(get: { draft.food.perServing[keyPath: kp] },
                                           set: { draft.food.perServing[keyPath: kp] = $0 }),
                       format: .number)
-                .textFieldStyle(.plain).monospacedDigit().font(.system(size: 12, weight: .semibold))
+                .textFieldStyle(.plain).monospacedDigit().font(.caption.weight(.semibold))
                 .foregroundStyle(Palette.text)
         }
         .padding(.horizontal, 8).padding(.vertical, 5)

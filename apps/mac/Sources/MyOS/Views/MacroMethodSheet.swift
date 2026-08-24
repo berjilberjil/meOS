@@ -31,16 +31,16 @@ struct MacroMethodSheet: View {
                 block("GOLD AND SILVER") {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Spot is quoted in dollars per troy ounce. MyOS shows what you'd actually pay in:")
-                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                            .font(.footnote).foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                         Text("₹/g  =  $/oz × USD/INR ÷ 31.1035")
-                            .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                            .font(.footnote.weight(.heavy).monospaced())
                             .foregroundStyle(Palette.brand)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                         Text("That is the metal only. A jeweller's rate adds making charges and GST, so expect their number to be higher.")
-                            .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                            .font(.caption).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -48,7 +48,7 @@ struct MacroMethodSheet: View {
                 block("HOW THE REGIME SCORES ARE BUILT") {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Each is 0–100, computed from named inputs and printed with them underneath so it can be argued with. They are an analytical reading by the OS, not financial advice.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                            .font(.footnote).foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                         formula("Global risk", "VIX scaled between 11 and 34. Above 25 reads as risk, above 17 as watch.")
                         formula("Rupee pressure", "Starts at 50, then USD/INR's 1-month move weighted 12× and the dollar index's weighted 6×. Rupee weakening pushes it up.")
@@ -59,13 +59,13 @@ struct MacroMethodSheet: View {
                             ForEach(regime) { s in
                                 HStack(alignment: .top, spacing: 8) {
                                     Text("\(s.score)")
-                                        .font(.system(size: 12, weight: .heavy, design: .rounded)).monospacedDigit()
+                                        .font(.caption.weight(.heavy)).monospacedDigit()
                                         .foregroundStyle(s.tint).frame(width: 26, alignment: .trailing)
                                     VStack(alignment: .leading, spacing: 1) {
-                                        Text(s.label).font(.system(size: 12, weight: .semibold))
+                                        Text(s.label).font(.caption.weight(.semibold))
                                             .foregroundStyle(Palette.text)
                                         Text(s.inputs.joined(separator: "  ·  "))
-                                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                                            .font(.caption2).foregroundStyle(Palette.faint)
                                             .fixedSize(horizontal: false, vertical: true)
                                     }
                                     Spacer(minLength: 0)
@@ -89,11 +89,11 @@ struct MacroMethodSheet: View {
     private var header: some View {
         HStack {
             Text("How this is worked out")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.title3.weight(.bold))
                 .foregroundStyle(Palette.text)
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                Image(systemName: "xmark").font(.caption.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 28))
         }
@@ -102,7 +102,7 @@ struct MacroMethodSheet: View {
     private func block<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.8)
+                .font(.caption2.weight(.heavy)).tracking(0.8)
                 .foregroundStyle(Palette.faint)
             content()
         }
@@ -111,12 +111,12 @@ struct MacroMethodSheet: View {
     private func badge(_ q: MacroQuality, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 9) {
             Text(q.label.uppercased())
-                .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.5)
+                .font(.caption2.weight(.heavy)).tracking(0.5)
                 .foregroundStyle(q.tint)
                 .padding(.horizontal, 7).padding(.vertical, 4)
                 .background(q.tint.opacity(0.14), in: Capsule())
                 .frame(width: 92, alignment: .leading)
-            Text(text).font(.system(size: 12)).foregroundStyle(Palette.muted)
+            Text(text).font(.caption).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -124,17 +124,17 @@ struct MacroMethodSheet: View {
 
     private func line(_ title: String, _ body: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-            Text(body).font(.system(size: 12)).foregroundStyle(Palette.muted)
+            Text(title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
+            Text(body).font(.caption).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func formula(_ name: String, _ how: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(name).font(.system(size: 12, weight: .heavy, design: .rounded))
+            Text(name).font(.caption.weight(.heavy))
                 .foregroundStyle(Palette.blue)
-            Text(how).font(.system(size: 12)).foregroundStyle(Palette.muted)
+            Text(how).font(.caption).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

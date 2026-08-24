@@ -125,16 +125,16 @@ struct ProgramDayEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(d.name)
-                    .font(.system(size: 26, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.title.weight(.semibold)).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 Button { settings = true } label: {
-                    Image(systemName: "slider.horizontal.3").font(.system(size: 13, weight: .bold))
+                    Image(systemName: "slider.horizontal.3").font(.footnote.weight(.bold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help("Rename, schedule or make it a rest day")
             }
-            Text(subtitle(d)).font(.system(size: 13)).foregroundStyle(Palette.faint)
+            Text(subtitle(d)).font(.footnote).foregroundStyle(Palette.faint)
             if !d.isRestDay && !d.groups.isEmpty {
                 FlowLayout(spacing: 6, runSpacing: 6) {
                     ForEach(d.groups, id: \.self) { g in MuscleChip(group: g) }
@@ -155,13 +155,13 @@ struct ProgramDayEditorView: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 Label("Rest day", systemImage: "moon.zzz.fill")
-                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.blue)
+                    .font(.callout.weight(.semibold)).foregroundStyle(Palette.blue)
                 Text("Nothing scheduled. Turn it back into a training day whenever you want — anything you had planned is still here.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button { state.setDayRest(programId, dayId, false) } label: {
                     Label("Make it a training day", systemImage: "figure.strengthtraining.traditional")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(KSecondaryButtonStyle())
             }
@@ -176,9 +176,9 @@ struct ProgramDayEditorView: View {
                 Card {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Which muscles does this day train?")
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("Add a muscle group, then pick the exercises you use for it on this day. Another day can train the same muscle with completely different exercises.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                            .font(.footnote).foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -215,7 +215,7 @@ private struct MuscleBlockSection: View {
             VStack(alignment: .leading, spacing: 12) {
                 header
                 if block.items.isEmpty {
-                    Text("No exercises yet.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    Text("No exercises yet.").font(.caption).foregroundStyle(Palette.faint)
                 } else {
                     VStack(spacing: Gap.tight) {
                         ForEach(Array(block.items.enumerated()), id: \.element.id) { i, item in
@@ -235,16 +235,16 @@ private struct MuscleBlockSection: View {
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: block.group.icon)
-                .font(.system(size: 13, weight: .bold)).foregroundStyle(block.group.tint)
+                .font(.footnote.weight(.bold)).foregroundStyle(block.group.tint)
                 .frame(width: 28, height: 28)
                 .background(block.group.tint.opacity(0.15),
                             in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
             Text(block.group.label.uppercased())
-                .font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(0.7)
+                .font(.caption.weight(.heavy)).tracking(0.7)
                 .foregroundStyle(block.group.tint)
             Spacer(minLength: 4)
             Text("\(block.items.count)")
-                .font(.system(size: 11, weight: .heavy, design: .rounded)).monospacedDigit()
+                .font(.caption2.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(Palette.faint)
             Menu {
                 Button("Move up") { move(-1) }.disabled(index == 0)
@@ -252,7 +252,7 @@ private struct MuscleBlockSection: View {
                 Divider()
                 Button("Remove muscle group", role: .destructive) { showDelete = true }
             } label: {
-                Image(systemName: "ellipsis").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.faint)
+                Image(systemName: "ellipsis").font(.caption.weight(.bold)).foregroundStyle(Palette.faint)
                     .frame(width: 26, height: 26).contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 26)
@@ -309,16 +309,16 @@ private struct ProgramExerciseRow: View {
             ExerciseIcon(category: exercise?.category ?? .core, size: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(exercise?.name ?? "Exercise")
-                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(detail).font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                Text(detail).font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 6)
             Text("\(item.sets) × \(item.reps)")
-                .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                .font(.footnote.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(Palette.muted)
             Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                .font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.faint)
+                .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
         }
         .contentShape(Rectangle())
     }
@@ -357,7 +357,7 @@ private struct ProgramExerciseRow: View {
                     Button("Remove", role: .destructive) { showDelete = true }
                 } label: {
                     Label("More", systemImage: "ellipsis.circle")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.muted)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
                 }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 .holdToDelete(isPresented: $showDelete, title: "Remove \(exercise?.name ?? "exercise")?",
@@ -375,7 +375,7 @@ private struct ProgramExerciseRow: View {
         VStack(alignment: .leading, spacing: 5) {
             KFieldLabel(text: "Note")
             TextField("", text: $note, prompt: Text("e.g. pause at the bottom").foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .knField()
                 .onAppear { note = item.note ?? "" }
                 .onChange(of: note) { v in update { $0.note = v.nilIfBlank } }
@@ -412,16 +412,16 @@ struct MuscleGroupPickerSheet: View {
                     } label: {
                         HStack(spacing: 9) {
                             Image(systemName: g.icon)
-                                .font(.system(size: 13, weight: .bold)).foregroundStyle(g.tint)
+                                .font(.footnote.weight(.bold)).foregroundStyle(g.tint)
                                 .frame(width: 30, height: 30)
                                 .background(g.tint.opacity(0.15),
                                             in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
                             Text(g.label)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                                 .foregroundStyle(on ? Palette.faint : Palette.text)
                                 .lineLimit(1).minimumScaleFactor(0.8)
                             Spacer(minLength: 0)
-                            if on { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.faint) }
+                            if on { Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint) }
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity)
@@ -469,14 +469,14 @@ struct DaySettingsSheet: View {
                     Text(weekday == nil
                          ? "No weekday — this day takes its turn in the rotation."
                          : "Every \(Self.names[weekday!]).")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                 }
 
                 Toggle(isOn: $rest) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Rest day").font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("Rest day").font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("Keeps any exercises on it, just doesn't schedule them.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                            .font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
                 .toggleStyle(.switch).tint(Palette.brand)
@@ -501,7 +501,7 @@ struct DaySettingsSheet: View {
         let on = weekday == value
         return Button { weekday = value } label: {
             Text(label)
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .font(.caption2.weight(.heavy))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity).padding(.vertical, 9)
@@ -557,7 +557,7 @@ struct ProgramEditorSheet: View {
                         Text(byWeekday
                              ? "Days sit on Monday–Sunday. Today reads the calendar."
                              : "Days rotate in order from today, however many there are.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                            .font(.caption2).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     VStack(alignment: .leading, spacing: 8) {
@@ -571,7 +571,7 @@ struct ProgramEditorSheet: View {
                         Text(byWeekday
                              ? "The other \(max(0, 7 - dayCount)) day\(7 - dayCount == 1 ? "" : "s") start as rest. Add, rename or delete any of them after."
                              : "Named Day 1…Day \(dayCount). Rename them to anything.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                            .font(.caption2).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -633,14 +633,14 @@ struct SheetShell<Content: View>: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 20, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
                     if let subtitle {
-                        Text(subtitle).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text(subtitle).font(.footnote).foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 4)
-                Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
+                Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
                     .buttonStyle(KIconButtonStyle(size: 30))
             }
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 14)

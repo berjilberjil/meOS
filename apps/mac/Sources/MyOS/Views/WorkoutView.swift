@@ -55,7 +55,7 @@ struct WorkoutLibrarySection: View {
                 }
             }
             if libResults.isEmpty {
-                Card { Text("No exercises match.").font(.system(size: 13)).foregroundStyle(Palette.faint) }
+                Card { Text("No exercises match.").font(.footnote).foregroundStyle(Palette.faint) }
             }
         }
         .sheet(isPresented: $newExercise) { ExerciseEditor(exercise: nil) }
@@ -66,7 +66,7 @@ struct WorkoutLibrarySection: View {
         let on = libGroup == g
         let tint = g?.tint ?? Palette.brand
         return Button { libGroup = g } label: {
-            Text(label).font(.system(size: 12, weight: .heavy, design: .rounded))
+            Text(label).font(.caption.weight(.heavy))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
                 .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
@@ -79,15 +79,15 @@ struct WorkoutLibrarySection: View {
         HStack(spacing: 11) {
             ExerciseIcon(category: ex.category, size: 34)
             VStack(alignment: .leading, spacing: 2) {
-                Text(ex.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Text(ex.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Text("\(ex.equipment) · \(ex.primary.isEmpty ? ex.group.label : ex.primary)")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                    .font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 6)
             if ex.gifId != nil {
-                Image(systemName: "play.circle.fill").font(.system(size: 14)).foregroundStyle(Palette.blue)
+                Image(systemName: "play.circle.fill").font(.footnote).foregroundStyle(Palette.blue)
             }
-            if !ex.isDefault { Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint) }
+            if !ex.isDefault { Text("custom").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint) }
         }
         .padding(.vertical, 3)
         .frame(minHeight: 44)          // still a comfortable tap target
@@ -160,7 +160,7 @@ struct ExercisePickerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(title).font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Text(title).font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer()
                 Button { dismiss(); newCustom() } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(KGhostButtonStyle())
@@ -185,9 +185,9 @@ struct ExercisePickerSheet: View {
                     if results.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(group2 == nil ? "Nothing matches." : "No \(group2!.label.lowercased()) exercises yet.")
-                                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                             Text("Clear the filter to see everything, or add your own with New.")
-                                .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                                .font(.caption).foregroundStyle(Palette.muted)
                                 .fixedSize(horizontal: false, vertical: true)
                             if group2 != nil {
                                 Button { group2 = nil } label: { Label("Show all exercises", systemImage: "line.3.horizontal.decrease") }
@@ -202,15 +202,15 @@ struct ExercisePickerSheet: View {
                             HStack(spacing: 10) {
                                 ExerciseIcon(category: ex.category, size: 30)
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(ex.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                                    Text("\(ex.group.label) · \(ex.equipment)").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                                    Text(ex.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
+                                    Text("\(ex.group.label) · \(ex.equipment)").font(.caption2).foregroundStyle(Palette.faint)
                                 }
                                 Spacer()
                                 if ex.gifId != nil {
-                                    Image(systemName: "play.circle.fill").font(.system(size: 13)).foregroundStyle(Palette.blue)
+                                    Image(systemName: "play.circle.fill").font(.footnote).foregroundStyle(Palette.blue)
                                 }
-                                if !ex.isDefault { Text("custom").font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint) }
-                                Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.brand)
+                                if !ex.isDefault { Text("custom").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint) }
+                                Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.brand)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 7).contentShape(Rectangle())
                         }
@@ -235,7 +235,7 @@ struct ExercisePickerSheet: View {
         let on = group2 == g
         let tint = g?.tint ?? Palette.brand
         return Button { group2 = g } label: {
-            Text(label).font(.system(size: 12, weight: .heavy, design: .rounded))
+            Text(label).font(.caption.weight(.heavy))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
                 .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
@@ -263,7 +263,7 @@ struct ExerciseEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(exercise == nil ? "New exercise" : "Edit exercise")
-                .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.body.weight(.heavy)).foregroundStyle(Palette.text)
             KLabeledField(label: "Name", placeholder: "e.g. Incline dumbbell press", text: $draft.name)
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -310,8 +310,8 @@ struct ExerciseEditor: View {
 
     private func menuLabel(_ text: String) -> some View {
         HStack { Text(text).foregroundStyle(Palette.text)
-            Spacer(); Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint) }
-        .font(.system(size: 13, weight: .semibold))
+            Spacer(); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint) }
+        .font(.footnote.weight(.semibold))
         .padding(.horizontal, 13).padding(.vertical, 10)
         .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
@@ -328,12 +328,12 @@ struct ExerciseDetailSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(exercise.name).font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    Text(exercise.name).font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                     Text("\(exercise.category.label) · \(exercise.equipment) · \(exercise.primary)")
-                        .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        .font(.caption).foregroundStyle(Palette.muted)
                 }
                 Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
+                Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
                     .buttonStyle(KIconButtonStyle(size: 28))
             }
 
@@ -366,7 +366,7 @@ struct ExerciseDetailSheet: View {
                 ZStack { Palette.surface2.opacity(0.5)
                     VStack(spacing: 8) {
                         ExerciseIcon(category: exercise.category, size: 54)
-                        Text("No demo").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        Text("No demo").font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
             }
@@ -379,13 +379,13 @@ struct ExerciseDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             KFieldLabel(text: "Muscles worked")
             if exercise.muscles.isEmpty {
-                Text("—").font(.system(size: 13)).foregroundStyle(Palette.faint)
+                Text("—").font(.footnote).foregroundStyle(Palette.faint)
             } else {
                 MiniBody(slugs: exercise.muscles).frame(height: 200)
                 FlowLayout(spacing: 6, runSpacing: 6) {
                     ForEach(exercise.muscles, id: \.self) { slug in
                         Text(MuscleSlug.name(slug))
-                            .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.caption2.weight(.semibold)).foregroundStyle(Palette.text)
                             .padding(.horizontal, 9).padding(.vertical, 4)
                             .background(Palette.brand.opacity(0.15), in: Capsule())
                     }

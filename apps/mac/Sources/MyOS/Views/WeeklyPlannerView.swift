@@ -97,15 +97,15 @@ struct WeeklyPlannerView: View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("AI WEEK PLAN")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.7)
+                    .font(.caption2.weight(.heavy)).tracking(0.7)
                     .foregroundStyle(Palette.muted)
                 Text("Build my meals + training week around my goal.")
-                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                 HStack(spacing: 8) {
                     let goal = state.fitnessProfile.goal.label.uppercased()
                     let kcal = state.calorieTargets()?.goalCalories
                     Text(kcal == nil ? goal : "\(goal) · \(kcal!) KCAL")
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                     Spacer()
                     Button { askGenerate = true } label: {
@@ -118,11 +118,11 @@ struct WeeklyPlannerView: View {
                     .disabled(state.planBusy)
                 }
                 if let s = state.planSummary {
-                    Label(s, systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(Palette.green)
+                    Label(s, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(Palette.green)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let e = state.planError {
-                    Label(e, systemImage: "exclamationmark.triangle.fill").font(.system(size: 12)).foregroundStyle(Palette.amber)
+                    Label(e, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.amber)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -145,10 +145,10 @@ struct WeeklyPlannerView: View {
                 Card {
                     VStack(alignment: .leading, spacing: 10) {
                         Label(meal.label, systemImage: meal.icon)
-                            .font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                            .font(.footnote.weight(.heavy)).foregroundStyle(Palette.text)
                         let items = state.planItems(weekday, meal)
                         if items.isEmpty {
-                            Text("No foods planned.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                            Text("No foods planned.").font(.caption).foregroundStyle(Palette.faint)
                         }
                         ForEach(items) { item in
                             PlanMealRow(food: state.food(item.foodId)) {
@@ -175,12 +175,12 @@ private struct PlanMealRow: View {
         HStack(spacing: 10) {
             FoodIcon(category: food?.category ?? .other, name: food?.name ?? "", size: 30)
             VStack(alignment: .leading, spacing: 1) {
-                Text(food?.name ?? "Unknown").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Text(food?.name ?? "Unknown").font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Text("\(food?.servingLabel ?? "") · \(Int(food?.perServing.calories ?? 0)) kcal")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                    .font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer()
-            Button { showDelete = true } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .bold)) }
+            Button { showDelete = true } label: { Image(systemName: "xmark").font(.caption2.weight(.bold)) }
                 .buttonStyle(KIconButtonStyle(size: 22))
                 .holdToDelete(isPresented: $showDelete, title: "Remove \(food?.name ?? "food")?",
                               message: "Removes it from this day's plan.", confirmLabel: "Hold to remove") { remove() }

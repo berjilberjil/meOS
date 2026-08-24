@@ -48,10 +48,10 @@ struct NotificationsCard: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.label)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(r.enabled ? Palette.text : Palette.muted)
                 Text(r.body)
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .font(.caption).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
@@ -93,9 +93,9 @@ struct NotificationsCard: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("All reminders")
-                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                     Text("Eat, train, log weight and journal.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        .font(.footnote).foregroundStyle(Palette.muted)
                 }
                 Spacer()
                 Toggle("", isOn: master).labelsHidden().tint(Palette.brand)
@@ -106,8 +106,8 @@ struct NotificationsCard: View {
                     Divider().overlay(Palette.border)
                     HStack(alignment: .center, spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(r.label).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
-                            Text(r.body).font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            Text(r.label).font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
+                            Text(r.body).font(.footnote).foregroundStyle(Palette.faint)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 8)
@@ -122,7 +122,7 @@ struct NotificationsCard: View {
                 }
             } else {
                 Text("Turn on to get nudged at 6am, 8am, 12:30pm, 4pm and 7pm.")
-                    .font(.system(size: 14)).foregroundStyle(Palette.faint)
+                    .font(.footnote).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

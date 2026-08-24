@@ -14,7 +14,7 @@ struct TodayReorderEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Drag to reorder the Today page.")
-                .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 14)
 
             List {
@@ -22,7 +22,7 @@ struct TodayReorderEditor: View {
                     HStack(spacing: 14) {
                         SettingsIcon(symbol: s.icon, tint: s.tint)
                         Text(s.label)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.callout.weight(.semibold))
                             .foregroundStyle(Palette.text)
                         Spacer(minLength: 0)
                     }

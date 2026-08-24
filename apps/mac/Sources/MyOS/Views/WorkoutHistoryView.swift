@@ -15,11 +15,11 @@ struct WorkoutHistoryView: View {
                 Card(padding: 20) {
                     VStack(alignment: .leading, spacing: 10) {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.brand)
+                            .font(.title2.weight(.semibold)).foregroundStyle(Palette.brand)
                         Text("No workouts logged yet")
-                            .font(.system(size: 18, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("Start a workout from Today and every set you tick lands here.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                            .font(.footnote).foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -57,7 +57,7 @@ struct WorkoutHistoryView: View {
                 stat(volume >= 1000 ? "\(Int((volume / 1000).rounded()))t" : "\(Int(volume.rounded()))kg", "volume")
                 Spacer(minLength: 0)
                 Text("LAST 28 DAYS")
-                    .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .font(.caption2.weight(.heavy)).tracking(0.6)
                     .foregroundStyle(Palette.faint)
             }
         }
@@ -65,9 +65,9 @@ struct WorkoutHistoryView: View {
 
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.system(size: 20, weight: .bold, design: .rounded)).monospacedDigit()
+            Text(value).font(.title3.weight(.bold)).monospacedDigit()
                 .foregroundStyle(Palette.text)
-            Text(label.uppercased()).font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.5)
+            Text(label.uppercased()).font(.caption2.weight(.heavy)).tracking(0.5)
                 .foregroundStyle(Palette.faint)
         }
     }
@@ -101,25 +101,25 @@ private struct HistoryRow: View {
     private var summaryRow: some View {
         HStack(spacing: 12) {
             Image(systemName: log.done ? "checkmark.circle.fill" : "circle.dotted")
-                .font(.system(size: 16)).foregroundStyle(log.done ? Palette.green : Palette.amber)
+                .font(.callout).foregroundStyle(log.done ? Palette.green : Palette.amber)
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.title ?? "Workout")
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle).font(.system(size: 11)).foregroundStyle(Palette.faint)
+                Text(subtitle).font(.caption2).foregroundStyle(Palette.faint)
                 if !groups.isEmpty && !isOpen {
                     HStack(spacing: 4) {
                         ForEach(groups.prefix(4), id: \.self) { g in
                             Circle().fill(g.tint).frame(width: 6, height: 6)
                         }
                         Text(groups.map(\.label).joined(separator: " · "))
-                            .font(.system(size: 11)).foregroundStyle(Palette.muted).lineLimit(1)
+                            .font(.caption2).foregroundStyle(Palette.muted).lineLimit(1)
                     }
                 }
             }
             Spacer(minLength: 4)
             Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                .font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.faint)
+                .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
         }
         .contentShape(Rectangle())
     }
@@ -138,32 +138,32 @@ private struct HistoryRow: View {
         VStack(alignment: .leading, spacing: 10) {
             if entries.isEmpty {
                 Text("Marked done without logging sets.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .font(.caption).foregroundStyle(Palette.faint)
             }
             ForEach(entries) { e in
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 7) {
                         Circle().fill(e.group.tint).frame(width: 6, height: 6)
                         Text(state.exercise(e.exerciseId)?.name ?? "Exercise")
-                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         Spacer(minLength: 4)
                         Text(e.group.label)
-                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .font(.caption2.weight(.heavy))
                             .foregroundStyle(Palette.faint)
                     }
                     ForEach(Array(e.sets.enumerated()), id: \.element.id) { i, s in
                         HStack(spacing: 10) {
                             Text("Set \(i + 1)")
-                                .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                                .font(.caption2).foregroundStyle(Palette.faint)
                                 .frame(width: 42, alignment: .leading)
                             Text(s.summary)
-                                .font(.system(size: 13, weight: .semibold, design: .rounded)).monospacedDigit()
+                                .font(.footnote.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.text)
                             Spacer(minLength: 0)
                         }
                     }
                     if let n = e.note, !n.isEmpty {
-                        Text(n).font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        Text(n).font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
                 .padding(.vertical, 6)

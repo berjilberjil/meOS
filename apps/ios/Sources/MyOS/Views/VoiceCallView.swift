@@ -60,7 +60,7 @@ struct VoiceCallView: View {
             .frame(width: 132, height: 132)
             .overlay(
                 Image(systemName: icon)
-                    .font(.system(size: 40, weight: .semibold))
+                    .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(phase == .speaking ? Palette.bg : Palette.text)
             )
             .animation(.knPop, value: phase)
@@ -83,10 +83,10 @@ struct VoiceCallView: View {
     private var transcript: some View {
         VStack(spacing: Gap.tight) {
             Text(label)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(Palette.muted)
             Text(displayText)
-                .font(.system(size: 15))
+                .font(.subheadline)
                 .foregroundStyle(Palette.text)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)

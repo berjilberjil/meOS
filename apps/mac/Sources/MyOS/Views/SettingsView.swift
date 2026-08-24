@@ -48,12 +48,12 @@ struct SettingsView: View {
                 SectionTitle(text: "Account")
                 HStack(spacing: 10) {
                     Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 22)).foregroundStyle(Palette.blue)
+                        .font(.title2).foregroundStyle(Palette.blue)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(state.username.isEmpty ? "Signed in" : "@\(state.username)")
-                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("Signed in. Changes sync to iPhone.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            .font(.footnote).foregroundStyle(Palette.faint)
                     }
                     Spacer()
                     Button { Task { await state.refresh() } } label: { Text("Refresh") }
@@ -63,7 +63,7 @@ struct SettingsView: View {
                 }
                 if let err = state.lastSyncError ?? state.lastHydrateError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 12)).foregroundStyle(Palette.amber)
+                        .font(.caption).foregroundStyle(Palette.amber)
                 }
             }
         }
@@ -76,22 +76,22 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionTitle(text: "Security & encryption")
                 Text("Encrypted on this Mac. The server only stores ciphertext.")
-                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 // Export (plaintext backup / escape hatch)
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Export my data").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("Export my data").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("A decrypted JSON backup. Keep it somewhere safe.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            .font(.footnote).foregroundStyle(Palette.faint)
                     }
                     Spacer()
                     Button { exportData() } label: { Text("Export…") }
                         .buttonStyle(KSecondaryButtonStyle())
                 }
                 if let m = exportMsg {
-                    Text(m).font(.system(size: 11)).foregroundStyle(Palette.green)
+                    Text(m).font(.caption2).foregroundStyle(Palette.green)
                 }
 
                 Divider().overlay(Palette.ring)
@@ -99,9 +99,9 @@ struct SettingsView: View {
                 // New recovery code
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Recovery code").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text("Recovery code").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("A new code replaces the old one.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            .font(.footnote).foregroundStyle(Palette.faint)
                     }
                     Spacer()
                     Button { Task { await state.regenerateRecoveryCode() } } label: { Text("New code") }
@@ -111,13 +111,13 @@ struct SettingsView: View {
                 Divider().overlay(Palette.ring)
 
                 // Change passphrase
-                Text("Change passphrase").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("Change passphrase").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                 SecureField("", text: $newPass, prompt: Text("New passphrase").foregroundColor(Palette.faint))
                     .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
                 SecureField("", text: $newPassConfirm, prompt: Text("Confirm new passphrase").foregroundColor(Palette.faint))
                     .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
                 if let m = passMsg {
-                    Text(m).font(.system(size: 12)).foregroundStyle(passOK ? Palette.green : Palette.red)
+                    Text(m).font(.caption).foregroundStyle(passOK ? Palette.green : Palette.red)
                 }
                 Button { Task { await changePass() } } label: { Text("Update passphrase") }
                     .buttonStyle(KSecondaryButtonStyle())

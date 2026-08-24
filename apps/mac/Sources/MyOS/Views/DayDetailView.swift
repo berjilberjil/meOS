@@ -46,10 +46,10 @@ struct DayDetailView: View {
             // competing as a second piece of text.
             HStack(alignment: .firstTextBaseline, spacing: 9) {
                 Text(prettyDate(selected))
-                    .font(.system(size: 20, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(DayPaging.label(selected, today: state.todayKey).uppercased())
-                    .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .font(.caption2.weight(.heavy)).tracking(0.6)
                     .foregroundStyle(Palette.brand)
                     .padding(.horizontal, 7).padding(.vertical, 3)
                     .background(Palette.brand.opacity(0.14), in: Capsule())
@@ -77,10 +77,10 @@ struct DayDetailView: View {
                         .compactMap { state.food($0.foodId)?.name }
                     HStack(alignment: .top, spacing: 8) {
                         Text(meal.label)
-                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.muted)
+                            .font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
                             .frame(width: 74, alignment: .leading)
                         Text(names.isEmpty ? "—" : names.joined(separator: ", "))
-                            .font(.system(size: 12)).foregroundStyle(names.isEmpty ? Palette.faint : Palette.text)
+                            .font(.caption).foregroundStyle(names.isEmpty ? Palette.faint : Palette.text)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                     }
@@ -95,21 +95,21 @@ struct DayDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: "Events")
                 if onDay.isEmpty {
-                    Text("Nothing logged.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    Text("Nothing logged.").font(.caption).foregroundStyle(Palette.faint)
                 } else {
                     ForEach(onDay) { e in
                         HStack(spacing: 8) {
                             if let t = state.primaryTag(for: e) {
-                                Image(systemName: t.symbol).font(.system(size: 10, weight: .bold))
+                                Image(systemName: t.symbol).font(.caption2.weight(.bold))
                                     .foregroundStyle(t.color)
                             }
-                            Text(e.title).font(.system(size: 13, weight: .semibold))
+                            Text(e.title).font(.footnote.weight(.semibold))
                                 .foregroundStyle(Palette.text)
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 0)
                             if !e.media.isEmpty {
                                 Label("\(e.media.count)", systemImage: "photo")
-                                    .font(.system(size: 10)).foregroundStyle(Palette.faint)
+                                    .font(.caption2).foregroundStyle(Palette.faint)
                             }
                         }
                     }

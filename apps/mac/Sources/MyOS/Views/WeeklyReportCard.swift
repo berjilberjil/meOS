@@ -19,7 +19,7 @@ struct WeeklyReportCard: View {
                 empty
             }
             if let err = state.weeklyError {
-                Text(err).font(.system(size: 12)).foregroundStyle(Palette.amber)
+                Text(err).font(.caption).foregroundStyle(Palette.amber)
                     .fixedSize(horizontal: false, vertical: true)
             }
             generateButton
@@ -41,7 +41,7 @@ struct WeeklyReportCard: View {
             Spacer(minLength: 0)
             if let r = latest {
                 Text(Fmt.day(r.weekEnd))
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(Palette.faint)
             }
         }
@@ -50,9 +50,9 @@ struct WeeklyReportCard: View {
     private var empty: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("No report yet.")
-                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
             Text("Every Friday from 6pm, MyOS reads this week's progress photos against last week's — with your goal and what you actually logged — and tells you straight whether you moved.")
-                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -60,7 +60,7 @@ struct WeeklyReportCard: View {
     private var older: some View {
         VStack(alignment: .leading, spacing: Gap.tight) {
             Text("EARLIER WEEKS")
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                .font(.caption2.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
                 .padding(.top, 4)
             ForEach(state.weekly.dropFirst()) { r in
@@ -68,13 +68,13 @@ struct WeeklyReportCard: View {
                     HStack(spacing: 8) {
                         VerdictDot(verdict: r.kind)
                         Text(Fmt.day(r.weekEnd))
-                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.caption.weight(.semibold)).foregroundStyle(Palette.text)
                         Text(r.headline)
-                            .font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(1)
+                            .font(.caption).foregroundStyle(Palette.muted).lineLimit(1)
                         Spacer(minLength: 0)
                         if !r.percentLabel.isEmpty {
                             Text(r.percentLabel)
-                                .font(.system(size: 11, weight: .heavy, design: .rounded)).monospacedDigit()
+                                .font(.caption2.weight(.heavy)).monospacedDigit()
                                 .foregroundStyle(Palette.faint)
                         }
                     }
@@ -91,7 +91,7 @@ struct WeeklyReportCard: View {
                 if state.weeklyBusy {
                     ProgressView().controlSize(.small)
                 } else {
-                    Image(systemName: "arrow.clockwise").font(.system(size: 11, weight: .bold))
+                    Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                 }
                 Text(state.weeklyBusy ? "Reading your week…"
                                       : (latest == nil ? "Read my week now" : "Read it again"))
@@ -112,23 +112,23 @@ private struct ReportBody: View {
             HStack(spacing: 9) {
                 VerdictDot(verdict: report.kind)
                 Text(report.kind.label.uppercased())
-                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.8)
+                    .font(.caption2.weight(.heavy)).tracking(0.8)
                     .foregroundStyle(tint)
                 Spacer(minLength: 0)
                 if !report.percentLabel.isEmpty {
                     Text(report.percentLabel)
-                        .font(.system(size: 20, weight: .heavy, design: .rounded)).monospacedDigit()
+                        .font(.title3.weight(.heavy)).monospacedDigit()
                         .foregroundStyle(tint)
                 }
             }
 
             Text(report.headline)
-                .font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !report.read.isEmpty {
                 Text(report.read)
-                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -137,7 +137,7 @@ private struct ReportBody: View {
 
             if !report.cheer.isEmpty {
                 Text(report.cheer)
-                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -145,7 +145,7 @@ private struct ReportBody: View {
             }
 
             Text("\(report.photosThisWeek) photo\(report.photosThisWeek == 1 ? "" : "s") this week · \(report.photosLastWeek) last week")
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint)
         }
     }
@@ -155,12 +155,12 @@ private struct ReportBody: View {
     private func list(_ label: String, _ items: [String], tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                .font(.caption2.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
             ForEach(items, id: \.self) { item in
                 HStack(alignment: .top, spacing: 8) {
                     Circle().fill(tint).frame(width: 5, height: 5).padding(.top, 6)
-                    Text(item).font(.system(size: 14)).foregroundStyle(Palette.text)
+                    Text(item).font(.footnote).foregroundStyle(Palette.text)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
@@ -174,7 +174,7 @@ struct VerdictDot: View {
 
     var body: some View {
         Image(systemName: Self.icon(verdict))
-            .font(.system(size: 13, weight: .bold))
+            .font(.footnote.weight(.bold))
             .foregroundStyle(Self.color(verdict))
     }
 
@@ -206,11 +206,11 @@ private struct PastReportSheet: View {
             VStack(alignment: .leading, spacing: Gap.screen) {
                 HStack {
                     Text(Fmt.day(report.weekStart) + " – " + Fmt.day(report.weekEnd))
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                     Spacer()
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                        Image(systemName: "xmark").font(.caption.weight(.bold))
                     }
                     .buttonStyle(KIconButtonStyle(size: 28))
                 }

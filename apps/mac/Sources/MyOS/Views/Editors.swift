@@ -64,11 +64,11 @@ struct FitnessProfileEditor: View {
         } label: {
             HStack(spacing: 6) {
                 Text(state.fitnessProfile.activity.label)
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("· \(state.fitnessProfile.activity.hint)")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    .font(.caption2).foregroundStyle(Palette.faint)
                 Spacer()
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint)
+                Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
             }
             .padding(.horizontal, 13).padding(.vertical, 10)
             .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -152,22 +152,22 @@ struct PersonDetailsEditor: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayName)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(hasName ? Palette.text : Palette.faint)
                     .lineLimit(2).minimumScaleFactor(0.75)
                 if !workLine.isEmpty {
                     Text(workLine)
-                        .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                        .font(.subheadline).foregroundStyle(Palette.muted)
                         .lineLimit(1).truncationMode(.tail)
                 }
                 if !placeLine.isEmpty {
                     Text(placeLine)
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .lineLimit(1).truncationMode(.tail)
                 }
                 if workLine.isEmpty && placeLine.isEmpty {
                     Text("Fill this in and she stops guessing.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                 }
             }
             Spacer(minLength: 0)
@@ -203,7 +203,7 @@ struct PersonDetailsEditor: View {
                 photo.resizable().scaledToFill()
             } else {
                 Text(initials)
-                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(Palette.teal)
             }
         }
@@ -213,7 +213,7 @@ struct PersonDetailsEditor: View {
         .overlay(alignment: .bottomTrailing) {
             // Without this the avatar looks like decoration rather than a control.
             Image(systemName: "camera.fill")
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(Palette.text)
                 .frame(width: 22, height: 22)
                 .background(Palette.surface2, in: Circle())
@@ -326,7 +326,7 @@ private struct JournalPresetSection: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Circle().fill(tint).frame(width: 7, height: 7)
-                Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.text)
+                Text(title).font(.caption.weight(.semibold)).foregroundStyle(Palette.text)
             }
             if !items.isEmpty {
                 FlowLayout(spacing: 7, runSpacing: 7) {
@@ -338,11 +338,11 @@ private struct JournalPresetSection: View {
             HStack(spacing: 8) {
                 TextField("", text: $text,
                           prompt: Text("Add a chip…").foregroundColor(Palette.faint))
-                    .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                    .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                     .focused($focused)
                     .onSubmit(commit)
                 Button(action: commit) {
-                    Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(tint)
+                    Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(tint)
                 }
                 .buttonStyle(KPressStyle())
                 .opacity(text.isEmpty ? 0.35 : 1)

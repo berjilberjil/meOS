@@ -47,10 +47,10 @@ struct FoldView: View {
             .knRise(0)
 
             if let err = state.foldError {
-                Text(err).font(.system(size: 13)).foregroundStyle(Palette.amber)
+                Text(err).font(.footnote).foregroundStyle(Palette.amber)
             } else if !state.foldLinked, state.fold != nil {
                 Text("This is a saved snapshot, not a live pull. Tap Connect Fold, enter the OTP Fold texts you, then refresh. The date only changes after Fold answers.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.amber)
+                    .font(.footnote).foregroundStyle(Palette.amber)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let f = state.fold { dashboard(f) } else { connectState }
@@ -77,12 +77,12 @@ struct FoldView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(foldINR(f.netWorth, hidden: prefs.hideFoldNumbers))
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .font(.largeTitle.weight(.bold))
                             .monospacedDigit()
                             .foregroundStyle(Palette.text)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
-                        Text("Net worth").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text("Net worth").font(.footnote).foregroundStyle(Palette.muted)
                     }
                     Spacer()
                     if f.changeValue != 0 { changeChip(f) }
@@ -91,18 +91,18 @@ struct FoldView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text(inr(f.history.max() ?? 0))
-                                .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                                .font(.caption2.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.faint)
                             Spacer()
                             if !f.changeLabel.isEmpty {
                                 Text(f.changeLabel)
-                                    .font(.system(size: 10, weight: .semibold)).tracking(0.3)
+                                    .font(.caption2.weight(.semibold)).tracking(0.3)
                                     .foregroundStyle(Palette.faint)
                             }
                         }
                         Sparkline(values: f.history).frame(height: 92)
                         Text(inr(f.history.min() ?? 0))
-                            .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                            .font(.caption2.weight(.semibold)).monospacedDigit()
                             .foregroundStyle(Palette.faint)
                     }
                 }
@@ -133,10 +133,10 @@ struct FoldView: View {
                     SectionTitle(text: "Where your money is")
                     ForEach(f.banks) { b in
                         HStack(spacing: 8) {
-                            Text(b.name).font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.text)
-                            Text("••\(b.last4)").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                            Text(b.name).font(.footnote.weight(.medium)).foregroundStyle(Palette.text)
+                            Text("••\(b.last4)").font(.caption2).foregroundStyle(Palette.faint)
                             Spacer()
-                            Text(inr(b.balance)).font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                            Text(inr(b.balance)).font(.footnote.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -151,9 +151,9 @@ struct FoldView: View {
                     SectionTitle(text: "Top spends this month")
                     ForEach(f.topSpends.filter { !FoldSpend.isNonSpend($0.category) }) { s in
                         HStack {
-                            Text(s.category).font(.system(size: 13)).foregroundStyle(Palette.text)
+                            Text(s.category).font(.footnote).foregroundStyle(Palette.text)
                             Spacer()
-                            Text(inr(s.amount)).font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                            Text(inr(s.amount)).font(.footnote.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -168,7 +168,7 @@ struct FoldView: View {
                     .font(.system(size: state.foldBusy ? 11 : 6))
                     .foregroundStyle(Palette.green)
                 Text(FoldCaption.line(asOf: f.asOf, linked: state.foldLinked, error: state.foldError))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
             }
             .foregroundStyle(Palette.muted)
         }
@@ -180,9 +180,9 @@ struct FoldView: View {
         let up = f.changeValue >= 0
         let c = up ? Palette.green : Palette.red
         return HStack(spacing: 3) {
-            Image(systemName: up ? "arrow.up.right" : "arrow.down.right").font(.system(size: 10, weight: .bold))
-            Text(inr(abs(f.changeValue))).font(.system(size: 12, weight: .semibold)).monospacedDigit()
-            Text("· \(Int((abs(f.changePercent) * 100).rounded()))%").font(.system(size: 11)).opacity(0.85)
+            Image(systemName: up ? "arrow.up.right" : "arrow.down.right").font(.caption2.weight(.bold))
+            Text(inr(abs(f.changeValue))).font(.caption.weight(.semibold)).monospacedDigit()
+            Text("· \(Int((abs(f.changePercent) * 100).rounded()))%").font(.caption2).opacity(0.85)
         }
         .foregroundStyle(c)
         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -191,9 +191,9 @@ struct FoldView: View {
 
     private func heroStat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased()).font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6)
+            Text(label.uppercased()).font(.caption2.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
-            Text(value).font(.system(size: 15, weight: .semibold, design: .rounded)).monospacedDigit()
+            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
                 .foregroundStyle(Palette.text).lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -214,7 +214,7 @@ struct FoldView: View {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: "Connect your Fold account")
                 Text("Sign in with the same phone OTP Fold texts you. Refresh then pulls net worth, banks and this month’s spends.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button { showLogin = true } label: {
                     Label("Connect with phone OTP", systemImage: "iphone")
@@ -354,10 +354,10 @@ private struct FoldTile: View {
         Card {
             VStack(alignment: .leading, spacing: 6) {
                 Text(label.uppercased())
-                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.5)
+                    .font(.caption2.weight(.heavy)).tracking(0.5)
                     .foregroundStyle(Palette.faint)
-                Text("—").font(.system(size: 22, weight: .semibold, design: .rounded)).foregroundStyle(accent)
-                Text("Connect Fold").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                Text("—").font(.title2.weight(.semibold)).foregroundStyle(accent)
+                Text("Connect Fold").font(.caption2).foregroundStyle(Palette.faint)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -378,12 +378,12 @@ private struct FoldLoginSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Fold texts a 6-digit code to this number. Refresh then pulls live balances.")
-                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: 6) {
                     KFieldLabel(text: "Phone")
                     TextField("+91 98XXXXXXXX", text: $phone)
-                        .textFieldStyle(.plain).font(.system(size: 17)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                         .focused($focus, equals: .phone)
                         #if os(iOS)
                         .keyboardType(.phonePad)
@@ -397,7 +397,7 @@ private struct FoldLoginSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         KFieldLabel(text: "OTP")
                         TextField("123456", text: $otp)
-                            .textFieldStyle(.plain).font(.system(size: 17)).foregroundStyle(Palette.text)
+                            .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                             .focused($focus, equals: .otp)
                             #if os(iOS)
                             .keyboardType(.numberPad)
@@ -409,7 +409,7 @@ private struct FoldLoginSheet: View {
                     }
                 }
                 if let err = state.foldError {
-                    Text(err).font(.system(size: 13)).foregroundStyle(Palette.amber)
+                    Text(err).font(.footnote).foregroundStyle(Palette.amber)
                 }
                 if sent {
                     Button {

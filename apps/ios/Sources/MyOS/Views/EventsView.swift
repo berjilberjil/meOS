@@ -34,7 +34,7 @@ struct EventsView: View {
             if state.events.isEmpty {
                 Card {
                     Text("Nothing yet. Tap New to add a trip, a shoot, or any moment.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                 }
                 .onTapGesture(count: 2) { showNew = true }
             } else {
@@ -78,13 +78,13 @@ struct EventsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         if let tag = state.primaryTag(for: e) {
-                            Image(systemName: tag.symbol).font(.system(size: 11, weight: .bold)).foregroundStyle(tag.color)
+                            Image(systemName: tag.symbol).font(.caption2.weight(.bold)).foregroundStyle(tag.color)
                         }
                         Text(e.title.isEmpty ? "Untitled" : e.title)
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                        if e.special { Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Palette.amber) }
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                        if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber) }
                         Spacer()
-                        Text(Fmt.day(e.date)).font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        Text(Fmt.day(e.date)).font(.caption2).foregroundStyle(Palette.faint)
                     }
                     if !e.media.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -100,7 +100,7 @@ struct EventsView: View {
                         }
                     }
                     if !e.note.isEmpty {
-                        Text(e.note).font(.system(size: 12)).foregroundStyle(Palette.muted).lineLimit(2)
+                        Text(e.note).font(.caption).foregroundStyle(Palette.muted).lineLimit(2)
                     }
                 }
             }
@@ -117,7 +117,7 @@ struct EventsView: View {
                 Image(uiImage: img).resizable().scaledToFill()
                     .overlay {
                         if m.kind == .video {
-                            Image(systemName: "play.circle.fill").font(.system(size: 18)).foregroundStyle(.white)
+                            Image(systemName: "play.circle.fill").font(.body).foregroundStyle(.white)
                         }
                     }
             } else {
@@ -190,7 +190,7 @@ private struct EventEditorSheet: View {
                             Spacer()
                             PhotosPicker(selection: $pickerItems, maxSelectionCount: 8, matching: .images) {
                                 Label("Add", systemImage: "photo.badge.plus")
-                                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.brand)
+                                    .font(.caption.weight(.semibold)).foregroundStyle(Palette.brand)
                             }
                         }
                         if !media.isEmpty {
@@ -204,7 +204,7 @@ private struct EventEditorSheet: View {
                                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                             }
                                             Button { media.removeAll { $0.id == m.id } } label: {
-                                                Image(systemName: "xmark.circle.fill").font(.system(size: 16))
+                                                Image(systemName: "xmark.circle.fill").font(.callout)
                                                     .foregroundStyle(.white).background(Circle().fill(.black.opacity(0.4)))
                                             }
                                             .padding(3)
@@ -216,7 +216,7 @@ private struct EventEditorSheet: View {
                     }
 
                     Toggle(isOn: $special) {
-                        Text("Special — highlight this one").font(.system(size: 13)).foregroundStyle(Palette.text)
+                        Text("Special — highlight this one").font(.footnote).foregroundStyle(Palette.text)
                     }
                     .tint(Palette.brand)
                 }
@@ -263,8 +263,8 @@ private struct EventEditorSheet: View {
         let on = tagID == tag.id
         return Button { tagID = on ? "" : tag.id } label: {
             HStack(spacing: 5) {
-                Image(systemName: tag.symbol).font(.system(size: 10, weight: .bold))
-                Text(tag.name).font(.system(size: 12, weight: .semibold))
+                Image(systemName: tag.symbol).font(.caption2.weight(.bold))
+                Text(tag.name).font(.caption.weight(.semibold))
             }
             .foregroundStyle(on ? Palette.bg : tag.color)
             .padding(.horizontal, 11).padding(.vertical, 7)

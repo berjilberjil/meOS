@@ -35,7 +35,7 @@ struct SettingsIntro: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 14)).foregroundStyle(Palette.muted)
+            .font(.footnote).foregroundStyle(Palette.muted)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 4)
     }
@@ -53,7 +53,7 @@ struct SettingsGroup<Content: View>: View {
             Card(padding: 4) { VStack(spacing: 0) { content } }
             if let footer {
                 Text(footer)
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .font(.caption).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 6)
             }
@@ -81,7 +81,7 @@ struct SettingsIcon: View {
         ZStack {
             RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.opacity(0.18))
             Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold)).foregroundStyle(tint)
+                .font(.footnote.weight(.semibold)).foregroundStyle(tint)
         }
         .frame(width: SettingsMetrics.tile, height: SettingsMetrics.tile)
     }
@@ -112,10 +112,10 @@ struct SettingsRow<Trailing: View>: View {
             if let icon { SettingsIcon(symbol: icon, tint: tint) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(titleColor)
+                    .font(.callout.weight(.semibold)).foregroundStyle(titleColor)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        .font(.caption).foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -150,7 +150,7 @@ struct SettingsPickRow: View {
         SettingsRow(title: title, subtitle: subtitle, icon: icon,
                     tint: tint, action: action) {
             Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 19, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(selected ? Palette.green : Palette.border)
                 .animation(.knFast, value: selected)
         }
@@ -188,7 +188,7 @@ struct SettingsFieldRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(label)
-                .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                 .layoutPriority(1)
             Spacer(minLength: 12)
             field
@@ -232,13 +232,13 @@ struct SettingsTextArea: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             TextEditor(text: $text)
-                .font(.system(size: 15)).foregroundStyle(Palette.text)
+                .font(.subheadline).foregroundStyle(Palette.text)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: minHeight)
                 .focused($focused)
             if text.isEmpty {
                 Text(placeholder)
-                    .font(.system(size: 15)).foregroundStyle(Palette.faint)
+                    .font(.subheadline).foregroundStyle(Palette.faint)
                     .padding(.top, 8).padding(.leading, 5)
                     .allowsHitTesting(false)
             }
@@ -262,10 +262,10 @@ struct SettingsNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold)).foregroundStyle(tint)
+                .font(.footnote.weight(.bold)).foregroundStyle(tint)
                 .padding(.top, 1)
             Text(text)
-                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)

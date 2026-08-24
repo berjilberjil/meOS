@@ -90,7 +90,7 @@ struct ChatWidget: View {
             ZStack {
                 Circle().fill(Palette.surface2)
                     .overlay(Circle().strokeBorder(Palette.border, lineWidth: 1))
-                Image(systemName: "sparkles").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.muted)
+                Image(systemName: "sparkles").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.muted)
             }
             .frame(width: 40, height: 40)
             .overlay(alignment: .topTrailing) {
@@ -132,15 +132,15 @@ struct ChatWidget: View {
             ZStack {
                 Circle().fill(LinearGradient(colors: [Palette.brand, Palette.brandDeep],
                                              startPoint: .top, endPoint: .bottom))
-                Image(systemName: "sparkles").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.bg)
+                Image(systemName: "sparkles").font(.footnote.weight(.bold)).foregroundStyle(Palette.bg)
             }
             .frame(width: 30, height: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(showHistory ? "Chats" : agent.displayName)
-                    .font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.heavy)).foregroundStyle(Palette.text)
                 Text(showHistory ? "\(state.chat.threads.count) conversation\(state.chat.threads.count == 1 ? "" : "s")"
                                  : "What’s happening today")
-                    .font(.system(size: 10)).foregroundStyle(Palette.faint)
+                    .font(.caption2).foregroundStyle(Palette.faint)
             }
             Spacer()
             #if os(iOS)
@@ -165,7 +165,7 @@ struct ChatWidget: View {
     }
 
     private func iconButton(_ name: String, help: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: name).font(.system(size: 12, weight: .bold)) }
+        Button(action: action) { Image(systemName: name).font(.caption.weight(.bold)) }
             .buttonStyle(KIconButtonStyle(size: 28))
             .help(help)
     }
@@ -183,15 +183,15 @@ struct ChatWidget: View {
                     if state.chatBusy, (msgs.last?.content.isEmpty ?? true) {
                         HStack(spacing: 6) {
                             ProgressView().controlSize(.small)
-                            Text("Thinking…").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                            Text("Thinking…").font(.caption).foregroundStyle(Palette.faint)
                         }
                     }
                     if let err = state.chatError {
                         HStack(spacing: 8) {
                             Label(err, systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 11)).foregroundStyle(Palette.amber)
+                                .font(.caption2).foregroundStyle(Palette.amber)
                             Button("Retry") { Task { await state.retryLastChat() } }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(Palette.brand)
                                 .disabled(state.chatBusy)
                         }
@@ -226,7 +226,7 @@ struct ChatWidget: View {
             VStack(spacing: 6) {
                 if state.chat.threads.isEmpty {
                     Text("No conversations yet — tap the pencil to start one.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
                 }
                 ForEach(state.chat.threads.sorted { $0.updatedAt > $1.updatedAt }) { th in historyRow(th) }
@@ -242,12 +242,12 @@ struct ChatWidget: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(th.title.isEmpty ? "New chat" : th.title)
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                    Text(preview).font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                    Text(preview).font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
                 }
                 Spacer()
                 Button { pendingHistoryDelete = th.id } label: {
-                    Image(systemName: "trash").font(.system(size: 11))
+                    Image(systemName: "trash").font(.caption2)
                 }
                 .buttonStyle(KIconButtonStyle(size: 24, color: Palette.red))
                 .holdToDelete(
@@ -272,7 +272,7 @@ struct ChatWidget: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("TODAY")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(0.7)
+                    .font(.caption2.weight(.heavy)).tracking(0.7)
                     .foregroundStyle(Palette.muted)
                 Spacer()
                 if state.suggestBusy {
@@ -282,23 +282,23 @@ struct ChatWidget: View {
             if let s = state.suggestions {
                 if !s.headline.isEmpty {
                     Text(s.headline)
-                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(Array(s.suggestions.prefix(3).enumerated()), id: \.element.id) { _, item in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
-                        Text(item.why).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text(item.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
+                        Text(item.why).font(.footnote).foregroundStyle(Palette.muted)
                     }
                     .padding(.top, 2)
                 }
             } else if state.suggestBusy {
-                Text("Reading your day…").font(.system(size: 14)).foregroundStyle(Palette.faint)
+                Text("Reading your day…").font(.footnote).foregroundStyle(Palette.faint)
             } else if let err = state.suggestError {
-                Text(err).font(.system(size: 13)).foregroundStyle(Palette.amber)
+                Text(err).font(.footnote).foregroundStyle(Palette.amber)
             } else {
                 Text("Open this and I’ll tell you what’s going on.")
-                    .font(.system(size: 14)).foregroundStyle(Palette.faint)
+                    .font(.footnote).foregroundStyle(Palette.faint)
             }
         }
         .padding(14)
@@ -309,7 +309,7 @@ struct ChatWidget: View {
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Ask me anything after that.")
-                .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 7) {
                 starter("What should I focus on this week?")
@@ -324,8 +324,8 @@ struct ChatWidget: View {
     private func starter(_ text: String) -> some View {
         Button { draft = text; send() } label: {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold))
-                Text(text).font(.system(size: 12, weight: .medium)).multilineTextAlignment(.leading)
+                Image(systemName: "arrow.up.right").font(.caption2.weight(.bold))
+                Text(text).font(.caption.weight(.medium)).multilineTextAlignment(.leading)
             }
             .foregroundStyle(Palette.text)
             .padding(.horizontal, 11).padding(.vertical, 8)
@@ -342,7 +342,7 @@ struct ChatWidget: View {
         return HStack {
             if isUser { Spacer(minLength: 40) }
             Text(attributed(m.content))
-                .font(.system(size: 13)).foregroundStyle(isUser ? Palette.bg : Palette.text)
+                .font(.footnote).foregroundStyle(isUser ? Palette.bg : Palette.text)
                 .textSelection(.enabled)
                 .padding(.horizontal, 12).padding(.vertical, 9)
                 .background(isUser ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(Palette.surface2),
@@ -376,12 +376,12 @@ struct ChatWidget: View {
     private var inputBar: some View {
         HStack(spacing: 8) {
             TextField("", text: $draft, prompt: Text("Ask \(agent.displayName)…").foregroundColor(Palette.faint), axis: .vertical)
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .lineLimit(1...4)
                 .focused($inputFocused)
                 .onSubmit(send)
             Button(action: send) {
-                Image(systemName: "arrow.up").font(.system(size: 14, weight: .heavy))
+                Image(systemName: "arrow.up").font(.footnote.weight(.heavy))
                     .foregroundStyle(Palette.bg).frame(width: 30, height: 30)
                     .background(canSend ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(Palette.surface2), in: Circle())
             }

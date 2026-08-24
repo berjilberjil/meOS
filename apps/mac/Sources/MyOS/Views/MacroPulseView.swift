@@ -63,8 +63,8 @@ struct MacroPulseView: View {
         HStack(spacing: 10) {
             Button { close() } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
-                    Text("MyOS").font(.system(size: 13, weight: .semibold, design: .rounded))
+                    Image(systemName: "chevron.left").font(.caption2.weight(.bold))
+                    Text("MyOS").font(.footnote.weight(.semibold))
                 }
             }
             .buttonStyle(KGhostButtonStyle(color: Palette.muted))
@@ -73,11 +73,11 @@ struct MacroPulseView: View {
 
             VStack(spacing: 1) {
                 Text("MACRO PULSE")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(1.2)
+                    .font(.caption2.weight(.heavy)).tracking(1.2)
                     .foregroundStyle(Palette.brand)
                 if state.macroBusy {
                     Text("reading…")
-                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                 }
             }
@@ -85,13 +85,13 @@ struct MacroPulseView: View {
             Spacer(minLength: 0)
 
             Button { showMethod = true } label: {
-                Image(systemName: "info.circle").font(.system(size: 13, weight: .semibold))
+                Image(systemName: "info.circle").font(.footnote.weight(.semibold))
             }
             .buttonStyle(KIconButtonStyle(size: 28))
             .help("Where these numbers come from and how they are worked out")
 
             Button { Task { await state.loadMacro(date: date, refresh: true) } } label: {
-                Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .bold))
+                Image(systemName: "arrow.clockwise").font(.caption.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 28))
             .disabled(state.macroBusy)
@@ -104,13 +104,13 @@ struct MacroPulseView: View {
     private var dateBar: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Button { step(-1) } label: { Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold)) }
+                Button { step(-1) } label: { Image(systemName: "chevron.left").font(.caption.weight(.bold)) }
                     .buttonStyle(KIconButtonStyle(size: 28))
                 Text(Fmt.day(date))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.body.weight(.bold))
                     .foregroundStyle(Palette.text)
                     .frame(minWidth: 120)
-                Button { step(1) } label: { Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)) }
+                Button { step(1) } label: { Image(systemName: "chevron.right").font(.caption.weight(.bold)) }
                     .buttonStyle(KIconButtonStyle(size: 28))
                     .disabled(isToday)
                     .opacity(isToday ? 0.35 : 1)
@@ -124,7 +124,7 @@ struct MacroPulseView: View {
                 ForEach(MacroRange.allCases) { r in
                     Button { range = r } label: {
                         Text(r.rawValue)
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .font(.caption2.weight(.heavy))
                             .foregroundStyle(r == range ? Brandmark.ink : Palette.muted)
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(r == range ? Palette.brand : Palette.surface2, in: Capsule())
@@ -155,7 +155,7 @@ struct MacroPulseView: View {
             HStack(spacing: 6) {
                 blockTitle("MACRO REGIME", "OS reading, not advice")
                 Button { showMethod = true } label: {
-                    Image(systemName: "info.circle").font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "info.circle").font(.caption2.weight(.semibold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 20, color: Palette.faint))
                 .help("How each score is worked out")
@@ -166,16 +166,16 @@ struct MacroPulseView: View {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack(spacing: 8) {
                                 Text(s.label)
-                                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                                    .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                                 Spacer(minLength: 0)
                                 Text("\(s.score) / 100")
-                                    .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                                    .font(.footnote.weight(.heavy)).monospacedDigit()
                                     .foregroundStyle(s.tint)
                             }
                             MeterBar(fraction: Double(s.score) / 100, tint: s.tint, height: 6)
                             if !s.inputs.isEmpty {
                                 Text(s.inputs.joined(separator: "  ·  "))
-                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                    .font(.caption2.weight(.medium))
                                     .foregroundStyle(Palette.faint)
                             }
                         }
@@ -198,9 +198,9 @@ struct MacroPulseView: View {
                                         Circle().fill(Palette.brand).frame(width: 5, height: 5).padding(.top, 6)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(c.metric)
-                                                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                                                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                                             Text(c.move)
-                                                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                                                .font(.footnote).foregroundStyle(Palette.muted)
                                         }
                                         Spacer(minLength: 0)
                                     }
@@ -215,7 +215,7 @@ struct MacroPulseView: View {
                             HStack(spacing: 6) {
                                 ForEach(brief.watch, id: \.self) { w in
                                     Text(w)
-                                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                                        .font(.caption2.weight(.heavy))
                                         .foregroundStyle(Palette.purple)
                                         .padding(.horizontal, 8).padding(.vertical, 4)
                                         .background(Palette.purple.opacity(0.14), in: Capsule())
@@ -226,7 +226,7 @@ struct MacroPulseView: View {
                     }
                     if brief.speculative {
                         Text("The \"why\" here is inference from the numbers, not a reported cause.")
-                            .font(.system(size: 11)).foregroundStyle(Palette.amber)
+                            .font(.caption2).foregroundStyle(Palette.amber)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -240,10 +240,10 @@ struct MacroPulseView: View {
         let missing = snap.metrics.filter { !$0.available }.count
         return VStack(alignment: .leading, spacing: 4) {
             Text("\(verified) verified · \(estimated) estimated · \(missing) unavailable")
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint)
             Text("Verified figures come from FRED's published series. Estimated ones are read off the web and carry their source — treat them as a reading, not a feed.")
-                .font(.system(size: 10)).foregroundStyle(Palette.faint)
+                .font(.caption2).foregroundStyle(Palette.faint)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 4)
@@ -254,11 +254,11 @@ struct MacroPulseView: View {
     private func blockTitle(_ title: String, _ trailing: String) -> some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.8)
+                .font(.caption2.weight(.heavy)).tracking(0.8)
                 .foregroundStyle(Palette.faint)
             Spacer(minLength: 0)
             Text(trailing)
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint)
         }
     }
@@ -266,14 +266,14 @@ struct MacroPulseView: View {
     private func section<C: View>(_ label: String, @ViewBuilder content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                .font(.caption2.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
             content()
         }
     }
 
     private func body(_ s: String) -> some View {
-        Text(s).font(.system(size: 14)).foregroundStyle(Palette.text)
+        Text(s).font(.footnote).foregroundStyle(Palette.text)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -282,8 +282,8 @@ struct MacroPulseView: View {
         Card(padding: 12) {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12)).foregroundStyle(Palette.amber)
-                Text(err).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    .font(.caption).foregroundStyle(Palette.amber)
+                Text(err).font(.caption).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
@@ -294,7 +294,7 @@ struct MacroPulseView: View {
         VStack(spacing: 10) {
             ProgressView().controlSize(.large).tint(Palette.brand)
             Text("Reading the tape…")
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.muted)
+                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 60)
     }
@@ -302,9 +302,9 @@ struct MacroPulseView: View {
     private var empty: some View {
         VStack(spacing: 8) {
             Text("Nothing for this date.")
-                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
             Text("Verified series reconstruct for any past date. Estimated figures only exist for days MyOS has already snapshotted.")
-                .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                .font(.caption).foregroundStyle(Palette.faint)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -347,7 +347,7 @@ struct MacroMetricCard: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 5) {
                 Text(metric.name)
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(Palette.muted)
                     .lineLimit(1)
                 Spacer(minLength: 0)
@@ -355,18 +355,18 @@ struct MacroMetricCard: View {
             }
 
             Text(MacroFormat.value(metric))
-                .font(.system(size: 21, weight: .heavy, design: .rounded)).monospacedDigit()
+                .font(.title3.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(metric.available ? Palette.text : Palette.faint)
                 .lineLimit(1).minimumScaleFactor(0.7)
 
             HStack(spacing: 5) {
                 if metric.available, delta != nil {
                     Image(systemName: metric.direction >= 0 ? "arrow.up.right" : "arrow.down.right")
-                        .font(.system(size: 9, weight: .black))
+                        .font(.caption2.weight(.black))
                         .foregroundStyle(MacroFormat.tint(delta))
                 }
                 Text(metric.available ? MacroFormat.change(delta, isRate: metric.isRate) : "Data unavailable")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .font(.caption2.weight(.heavy)).monospacedDigit()
                     .foregroundStyle(metric.available ? MacroFormat.tint(delta) : Palette.faint)
                 Spacer(minLength: 0)
                 Sparkline(values: MacroFormat.series(metric.history, range: range).map(\.v),

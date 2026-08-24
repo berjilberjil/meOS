@@ -48,7 +48,7 @@ private struct MacImageDropZone: View {
         VStack(spacing: 12) {
             ZStack {
                 Image(systemName: busy ? "sparkles" : "photo.on.rectangle.angled")
-                    .font(.system(size: 26, weight: .semibold))
+                    .font(.title.weight(.semibold))
                     .foregroundStyle(busy ? tint : (targeted ? tint : Palette.muted))
                     .symbolEffect(.pulse, isActive: busy)
             }
@@ -56,10 +56,10 @@ private struct MacImageDropZone: View {
 
             VStack(spacing: 3) {
                 Text(busy ? "Reading it…" : title)
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .font(.footnote.weight(.heavy))
                     .foregroundStyle(Palette.text)
                 Text(busy ? "Gemini is pulling out the numbers." : subtitle)
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Palette.faint)
                     .multilineTextAlignment(.center)
             }
@@ -240,15 +240,15 @@ private struct IOSImageDropZone: View {
                             ProgressView().controlSize(.large).tint(.white)
                         } else {
                             Image(systemName: "viewfinder")
-                                .font(.system(size: 36, weight: .bold))
+                                .font(.largeTitle.weight(.bold))
                                 .foregroundStyle(.white)
                         }
                     }
                     VStack(spacing: 6) {
                         Text(busy ? "Reading…" : title)
-                            .font(.system(size: 22, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                         Text(busy ? "Catherine is looking at the photo." : subtitle)
-                            .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                            .font(.subheadline).foregroundStyle(Palette.muted)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -264,7 +264,7 @@ private struct IOSImageDropZone: View {
 
             HStack(spacing: 10) {
                 Label("Point the camera at food, a pack, or a receipt", systemImage: "lightbulb")
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .font(.caption).foregroundStyle(Palette.faint)
                 Spacer(minLength: 0)
             }
 

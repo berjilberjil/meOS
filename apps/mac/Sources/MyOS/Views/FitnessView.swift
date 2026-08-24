@@ -92,10 +92,10 @@ struct FitnessView: View {
             Button { withAnimation(.knNormal) { showFitnessSettings.toggle() } } label: {
                 HStack {
                     Label("Fitness settings", systemImage: "slider.horizontal.3")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.muted)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
                     Spacer()
                     Image(systemName: showFitnessSettings ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
+                        .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                 }
                 .padding(.vertical, 4).contentShape(Rectangle())
             }
@@ -125,16 +125,16 @@ struct FitnessView: View {
                     SectionTitle(text: "Steps")
                     Spacer()
                     Text("goal \(steps.formatted()) / \(target.formatted())")
-                        .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
+                        .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.muted)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(steps.formatted())
-                        .font(.system(size: 30, weight: .heavy, design: .rounded)).monospacedDigit()
+                        .font(.largeTitle.weight(.heavy)).monospacedDigit()
                         .foregroundStyle(Palette.text)
-                    Text("steps today").font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text("steps today").font(.caption).foregroundStyle(Palette.muted)
                     Spacer()
                     if steps >= target && target > 0 {
-                        Text("Goal hit").font(.system(size: 11, weight: .heavy, design: .rounded))
+                        Text("Goal hit").font(.caption2.weight(.heavy))
                             .foregroundStyle(Palette.flame)
                     }
                 }
@@ -143,7 +143,7 @@ struct FitnessView: View {
                     HStack(spacing: 6) {
                         TextField("", text: $stepsInput,
                                   prompt: Text("Set today's steps").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.system(size: 16, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .textFieldStyle(.plain).font(.callout.weight(.heavy)).monospacedDigit()
                             .foregroundStyle(Palette.text).frame(width: 140)
                             .focused($stepsFocused)
                             .onSubmit(saveSteps)
@@ -161,7 +161,7 @@ struct FitnessView: View {
                     Spacer()
                 }
                 Text("Manual for now — your iPhone syncs this from Apple Health once the phone app ships.")
-                    .font(.system(size: 10)).foregroundStyle(Palette.faint)
+                    .font(.caption2).foregroundStyle(Palette.faint)
             }
         }
     }
@@ -179,17 +179,17 @@ struct FitnessView: View {
                 HStack {
                     SectionTitle(text: "Weight")
                     Spacer()
-                    if let t = fp.targetWeightKg { Text("goal \(Fmt.trimKg(t)) kg").font(.system(size: 11)).foregroundStyle(Palette.faint) }
+                    if let t = fp.targetWeightKg { Text("goal \(Fmt.trimKg(t)) kg").font(.caption2).foregroundStyle(Palette.faint) }
                 }
                 HStack(spacing: 12) {
                     // Type today's weight directly — no tapping a stepper 40 times.
                     HStack(spacing: 6) {
                         TextField("", text: $weightInput, prompt: Text(today.weightKg.map { Fmt.trimKg($0) } ?? "Today's weight").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .textFieldStyle(.plain).font(.title2.weight(.heavy)).monospacedDigit()
                             .foregroundStyle(Palette.text).frame(width: 120)
                             .focused($weightFocused)
                             .onSubmit(saveWeight)
-                        Text("kg").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text("kg").font(.footnote).foregroundStyle(Palette.muted)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -225,8 +225,8 @@ struct FitnessView: View {
                     HStack(spacing: 8) {
                         ForEach(Array(dates), id: \.self) { d in
                             VStack(spacing: 2) {
-                                Text("\(Fmt.trimKg(state.fitness[d]?.weightKg ?? 0))").font(.system(size: 13, weight: .bold)).monospacedDigit().foregroundStyle(Palette.text)
-                                Text(Fmt.day(d)).font(.system(size: 9)).foregroundStyle(Palette.faint)
+                                Text("\(Fmt.trimKg(state.fitness[d]?.weightKg ?? 0))").font(.footnote.weight(.bold)).monospacedDigit().foregroundStyle(Palette.text)
+                                Text(Fmt.day(d)).font(.caption2).foregroundStyle(Palette.faint)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Palette.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
@@ -266,7 +266,7 @@ struct FitnessView: View {
                         KFieldLabel(text: "Vitamins covered today")
                         FlowLayout(spacing: 6, runSpacing: 6) {
                             ForEach(vits, id: \.self) { v in
-                                Text(v).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.green)
+                                Text(v).font(.caption2.weight(.semibold)).foregroundStyle(Palette.green)
                                     .padding(.horizontal, 9).padding(.vertical, 4)
                                     .background(Palette.green.opacity(0.14), in: Capsule())
                             }
@@ -288,16 +288,16 @@ struct FitnessView: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(label.uppercased())
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .font(.caption2.weight(.heavy)).tracking(0.6)
                     .foregroundStyle(tint)
                 Spacer(minLength: 8)
                 Text("\(Int(have.rounded()))")
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .font(.body.weight(.heavy))
                     .monospacedDigit().foregroundStyle(Palette.text)
                 if let target, target > 0 {
-                    Text("/ \(Int(target)) \(unit)").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    Text("/ \(Int(target)) \(unit)").font(.caption).foregroundStyle(Palette.faint)
                 } else {
-                    Text(unit).font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    Text(unit).font(.caption).foregroundStyle(Palette.faint)
                 }
             }
             if let target, target > 0 {
@@ -313,13 +313,13 @@ struct FitnessView: View {
         return VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("WATER")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .font(.caption2.weight(.heavy)).tracking(0.6)
                     .foregroundStyle(Palette.blue)
                 Spacer(minLength: 8)
                 Text(Fmt.trimKg(ml / 1000))
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .font(.body.weight(.heavy))
                     .monospacedDigit().foregroundStyle(Palette.text)
-                Text("/ \(Fmt.trimKg(target / 1000)) L").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                Text("/ \(Fmt.trimKg(target / 1000)) L").font(.caption).foregroundStyle(Palette.faint)
             }
             MeterBar(fraction: min(1, ml / target), tint: Palette.blue, height: 5)
             HStack(spacing: 6) {
@@ -358,7 +358,7 @@ struct FitnessView: View {
                         calCol("Bulk", c.bulk, Palette.green, on: fp.goal == .bulk)
                     }
                     Text("BMR \(c.bmr) · TDEE \(c.tdee) kcal · \(fp.activity.label.lowercased()) activity")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
 
                     Divider().overlay(Palette.border)
                     HStack(spacing: 10) {
@@ -377,7 +377,7 @@ struct FitnessView: View {
                     .buttonStyle(KSecondaryButtonStyle())
                 } else {
                     Text("Add your height, age, sex and a weight (above) to see your maintenance, cut and bulk calories.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -386,11 +386,11 @@ struct FitnessView: View {
 
     private func calCol(_ label: String, _ kcal: Int, _ tint: Color, on: Bool) -> some View {
         VStack(spacing: 4) {
-            Text(label.uppercased()).font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+            Text(label.uppercased()).font(.caption2.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(on ? tint : Palette.faint)
-            Text("\(kcal)").font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit()
+            Text("\(kcal)").font(.title2.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(on ? .white : Palette.text)
-            Text("kcal").font(.system(size: 10)).foregroundStyle(Palette.faint)
+            Text("kcal").font(.caption2).foregroundStyle(Palette.faint)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -402,9 +402,9 @@ struct FitnessView: View {
 
     private func macroPill(_ label: String, _ value: String, _ tint: Color) -> some View {
         VStack(spacing: 2) {
-            Text(value).font(.system(size: 14, weight: .heavy, design: .rounded)).monospacedDigit()
+            Text(value).font(.footnote.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(tint).lineLimit(1).minimumScaleFactor(0.6)
-            Text(label.uppercased()).font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.5)
+            Text(label.uppercased()).font(.caption2.weight(.heavy)).tracking(0.5)
                 .foregroundStyle(Palette.faint)
         }
         .frame(maxWidth: .infinity)
@@ -417,22 +417,22 @@ struct FitnessView: View {
                         set: @escaping (Double) -> Void) -> some View {
         Card(padding: 15) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(label.uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8)
+                Text(label.uppercased()).font(.caption2.weight(.semibold)).tracking(0.8)
                     .foregroundStyle(Palette.faint)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value != nil ? Fmt.trimKg(value!) : "—")
-                        .font(.system(size: 25, weight: .semibold)).monospacedDigit()
+                        .font(.title2.weight(.semibold)).monospacedDigit()
                         .foregroundStyle(accent)
-                    Text(unit).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text(unit).font(.caption).foregroundStyle(Palette.muted)
                 }
                 if let target, target > 0 {
                     VStack(alignment: .leading, spacing: 4) {
                         MeterBar(fraction: min(1, (value ?? 0) / target), tint: accent, height: 7)
                         Text("\(Fmt.trimKg(value ?? 0)) / \(Fmt.trimKg(target)) \(unit)")
-                            .font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.faint)
+                            .font(.caption2.weight(.medium)).foregroundStyle(Palette.faint)
                     }
                 } else if let note {
-                    Text(note).font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.faint)
+                    Text(note).font(.caption2.weight(.medium)).foregroundStyle(Palette.faint)
                 }
                 HStack(spacing: 8) {
                     KStepButton(icon: "minus", accent: accent) { set((value ?? 0) - step) }
@@ -448,14 +448,14 @@ struct FitnessView: View {
                 SectionTitle(text: "Recent weight")
                 let dates = state.fitness.keys.filter { state.fitness[$0]?.weightKg != nil }.sorted(by: >).prefix(7)
                 if dates.isEmpty {
-                    Text("No weigh-ins yet.").font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    Text("No weigh-ins yet.").font(.footnote).foregroundStyle(Palette.faint)
                 }
                 ForEach(Array(dates), id: \.self) { d in
                     HStack {
-                        Text(Fmt.day(d)).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        Text(Fmt.day(d)).font(.caption).foregroundStyle(Palette.muted)
                         Spacer()
                         Text("\(Fmt.trimKg(state.fitness[d]?.weightKg ?? 0)) kg")
-                            .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                            .font(.footnote.weight(.semibold)).monospacedDigit()
                             .foregroundStyle(Palette.text)
                     }
                     .padding(.vertical, 4)
@@ -533,7 +533,7 @@ struct ActivityStepsCard: View {
             if showsCalendar {
                 Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
                     Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.footnote.weight(.bold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
                 .help(showCalendar ? "Hide the record" : "See every day")
@@ -545,19 +545,19 @@ struct ActivityStepsCard: View {
     private var summary: some View {
         let n = steps(day ?? state.todayKey)
         return HStack(spacing: 12) {
-            Image(systemName: "figure.walk").font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.muted)
+            Image(systemName: "figure.walk").font(.callout.weight(.semibold)).foregroundStyle(Palette.muted)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Activity").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("Activity").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("\(n.formatted()) / \(target.formatted()) steps")
-                    .font(.system(size: 13)).monospacedDigit().foregroundStyle(Palette.faint)
+                    .font(.footnote).monospacedDigit().foregroundStyle(Palette.faint)
                 #if os(iOS)
-                Text("from Apple Health").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                Text("from Apple Health").font(.caption2).foregroundStyle(Palette.faint)
                 #endif
             }
             Spacer(minLength: 4)
             MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6).frame(width: 72)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
+                .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
         }
     }
 
@@ -599,9 +599,9 @@ struct ActivityStepsCard: View {
 
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(value).font(.system(size: 14, weight: .heavy, design: .rounded)).monospacedDigit()
+            Text(value).font(.footnote.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(Palette.text)
-            Text(label).font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+            Text(label).font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
         }
     }
 
@@ -617,7 +617,7 @@ struct ActivityStepsCard: View {
     private func legendDot(_ c: Color, _ label: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(c).frame(width: 6, height: 6)
-            Text(label).font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+            Text(label).font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
         }
     }
 
@@ -627,19 +627,19 @@ struct ActivityStepsCard: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Text(Fmt.day(selected))
-                    .font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer(minLength: 0)
                 if target > 0 && n > 0 {
                     Text("\(Int((Double(n) / Double(target) * 100).rounded()))% of goal")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(n >= target ? Palette.green : Palette.faint)
                 }
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(n.formatted())
-                    .font(.system(size: 24, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .font(.title2.weight(.heavy)).monospacedDigit()
                     .foregroundStyle(n > 0 ? Palette.text : Palette.faint)
-                Text("steps").font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text("steps").font(.caption2).foregroundStyle(Palette.muted)
                 Spacer(minLength: 0)
                 if !isFuture {
                     KStepButton(icon: "minus", accent: Palette.flame) {
@@ -653,7 +653,7 @@ struct ActivityStepsCard: View {
             MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6)
             Text(isFuture ? "Hasn\u{2019}t happened yet."
                           : (n > 0 ? "500 steps a tap." : "Nothing logged that day."))
-                .font(.system(size: 10)).foregroundStyle(Palette.faint)
+                .font(.caption2).foregroundStyle(Palette.faint)
         }
         // A floor so paging from a logged day to a blank one can't collapse the
         // panel and yank every card below it up the page.

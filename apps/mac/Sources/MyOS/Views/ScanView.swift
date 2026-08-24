@@ -14,7 +14,7 @@ struct ScanView: View {
             VStack(alignment: .leading, spacing: 6) {
                 ScreenTitle(text: "Scan")
                 Text("Food logs itself. Anything else — Catherine tells you if you actually want it.")
-                    .font(.system(size: 16)).foregroundStyle(Palette.muted)
+                    .font(.callout).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -63,9 +63,9 @@ struct ScanView: View {
             VStack(spacing: 14) {
                 ProgressView().controlSize(.large).tint(Palette.teal)
                 Text("Reading…")
-                    .font(.system(size: 22, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("Catherine is looking at the photo.")
-                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                    .font(.subheadline).foregroundStyle(Palette.muted)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
@@ -77,11 +77,11 @@ struct ScanView: View {
             Card(padding: 24) {
                 VStack(spacing: 12) {
                     Image(systemName: "viewfinder")
-                        .font(.system(size: 32, weight: .semibold)).foregroundStyle(Palette.amber)
+                        .font(.largeTitle.weight(.semibold)).foregroundStyle(Palette.amber)
                     Text("Couldn’t read that")
-                        .font(.system(size: 22, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                     Text(err)
-                        .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                        .font(.subheadline).foregroundStyle(Palette.muted)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }

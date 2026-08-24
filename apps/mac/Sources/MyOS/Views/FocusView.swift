@@ -145,7 +145,7 @@ struct FocusCard: View {
 
                 if items.isEmpty {
                     Text("Add the things you need to crush today. Start a focus block and go one at a time.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     progressBar
@@ -177,14 +177,14 @@ struct FocusCard: View {
             SectionTitle(text: "Today's focus")
             if !items.isEmpty {
                 Text("\(doneCount)/\(items.count)")
-                    .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                    .font(.caption2.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(doneCount == items.count ? Palette.green : Palette.faint)
             }
             let streak = state.focusStreak()
             if streak > 0 {
                 HStack(spacing: 3) {
-                    Image(systemName: "flame.fill").font(.system(size: 9, weight: .bold))
-                    Text("\(streak)").font(.system(size: 10, weight: .heavy, design: .rounded))
+                    Image(systemName: "flame.fill").font(.caption2.weight(.bold))
+                    Text("\(streak)").font(.caption2.weight(.heavy))
                 }
                 .foregroundStyle(Palette.flame)
                 .padding(.horizontal, 7).padding(.vertical, 3)
@@ -194,12 +194,12 @@ struct FocusCard: View {
             Spacer(minLength: 4)
             if focusedSecondsToday >= 60 {
                 Text("\(focusedSecondsToday / 60)m focused")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                    .font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
             }
             if showsCalendar {
             Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.footnote.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 26, color: showCalendar ? Palette.brand : Palette.faint))
             .help(showCalendar ? "Hide the record" : "See the record")
@@ -209,9 +209,9 @@ struct FocusCard: View {
                 Button { startSession() } label: {
                     HStack(spacing: 5) {
                         Image(systemName: timer.isActive ? "timer" : "play.fill")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                         Text(timer.isActive ? "Open" : "Task Mode")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .font(.caption2.weight(.heavy))
                     }
                 }
                 .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
@@ -235,15 +235,15 @@ struct FocusCard: View {
                 .frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item?.text ?? "Focus block")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(1)
                     Text(timer.finished ? "Time's up" : (timer.running ? "Focusing" : "Paused"))
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(timer.finished ? Palette.green : Palette.faint)
                 }
                 Spacer(minLength: 0)
                 Text(timer.clock)
-                    .font(.system(size: 17, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .font(.body.weight(.heavy)).monospacedDigit()
                     .foregroundStyle(timer.finished ? Palette.green : Palette.teal)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
@@ -272,20 +272,20 @@ struct FocusCard: View {
         return HStack(spacing: 10) {
             Button { state.toggleTodo(item.id) } label: {
                 Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(item.done ? Palette.green : Palette.teal)
             }
             .buttonStyle(KPressStyle())
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.text)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .strikethrough(item.done, color: Palette.faint)
                     .foregroundStyle(item.done ? Palette.faint : Palette.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if item.spent >= 60 {
                     Text("\(item.spent / 60)m focused")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                        .font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
                 }
             }
             .contentShape(Rectangle())
@@ -294,14 +294,14 @@ struct FocusCard: View {
             if !item.done {
                 Button { start(item) } label: {
                     Image(systemName: isCurrent ? "timer" : "play.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.callout.weight(.semibold))
                         .foregroundStyle(isCurrent ? Palette.teal : Palette.muted)
                 }
                 .buttonStyle(KPressStyle())
                 .help(isCurrent ? "Open the running block" : "Focus on this one")
             }
             Button { pendingDelete = item.id } label: {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                Image(systemName: "xmark").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 22))
         }
@@ -311,11 +311,11 @@ struct FocusCard: View {
         HStack(spacing: 8) {
             TextField("", text: $newFocus,
                       prompt: Text("Add a to-do…").foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 14)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .focused($addFieldActive)
                 .onSubmit(add)
             Button(action: add) {
-                Image(systemName: "plus.circle.fill").font(.system(size: 18))
+                Image(systemName: "plus.circle.fill").font(.body)
                     .foregroundStyle(Palette.teal)
             }
             .buttonStyle(KPressStyle())
@@ -409,18 +409,18 @@ struct FocusSessionView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text("TASK MODE")
-                .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(1.2)
+                .font(.caption2.weight(.heavy)).tracking(1.2)
                 .foregroundStyle(Palette.teal)
             if !items.isEmpty {
                 Text("\(TaskMode.doneCount(items))/\(items.count)")
-                    .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                    .font(.caption2.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(Palette.faint)
             }
             Spacer(minLength: 4)
             Button { endSession() } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
-                    Text("Exit").font(.system(size: 11, weight: .heavy, design: .rounded))
+                    Image(systemName: "xmark").font(.caption2.weight(.bold))
+                    Text("Exit").font(.caption2.weight(.heavy))
                 }
             }
             .buttonStyle(KSoftButtonStyle(tint: Palette.muted))
@@ -438,15 +438,15 @@ struct FocusSessionView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Text("NOW")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(1)
+                    .font(.caption2.weight(.heavy)).tracking(1)
                     .foregroundStyle(Palette.faint)
                 Circle().fill(stateColor).frame(width: 4, height: 4)
                 Text(stateWord)
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(stateColor)
             }
             Text(item.text)
-                .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -468,12 +468,12 @@ struct FocusSessionView: View {
         let empty = items.isEmpty
         VStack(spacing: 11) {
             Image(systemName: empty ? "list.bullet.rectangle" : "checkmark.seal.fill")
-                .font(.system(size: 38, weight: .semibold))
+                .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(empty ? Palette.teal : Palette.green)
             Text(empty ? "Nothing on today's list." : "Day crushed.")
-                .font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
             Text(subtitle(empty: empty))
-                .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                .font(.footnote).foregroundStyle(Palette.faint)
                 .fixedSize(horizontal: false, vertical: true)
             addField.padding(.top, 8)
         }
@@ -491,11 +491,11 @@ struct FocusSessionView: View {
         HStack(spacing: 8) {
             TextField("", text: $newTask,
                       prompt: Text("Add a to-do…").foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 15)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.subheadline).foregroundStyle(Palette.text)
                 .focused($addFieldActive)
                 .onSubmit(addTask)
             Button(action: addTask) {
-                Image(systemName: "plus.circle.fill").font(.system(size: 18))
+                Image(systemName: "plus.circle.fill").font(.body)
                     .foregroundStyle(Palette.teal)
             }
             .buttonStyle(KPressStyle())
@@ -538,10 +538,10 @@ struct FocusSessionView: View {
                 .animation(.linear(duration: 0.9), value: timer.remaining)
             VStack(spacing: 2) {
                 Text(timer.clock)
-                    .font(.system(size: 44, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .font(.largeTitle.weight(.heavy)).monospacedDigit()
                     .foregroundStyle(timer.finished ? Palette.green : Palette.text)
                 Text("of \(max(1, timer.total / 60))m")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(Palette.faint)
             }
         }
@@ -552,7 +552,7 @@ struct FocusSessionView: View {
         HStack(spacing: 8) {
             ForEach([10, 25, 45], id: \.self) { m in
                 Button { restart(minutes: m) } label: {
-                    Text("\(m)m").font(.system(size: 12, weight: .heavy, design: .rounded))
+                    Text("\(m)m").font(.caption.weight(.heavy))
                         .foregroundStyle(timer.total == m * 60 ? .white : Palette.muted)
                         .padding(.horizontal, 13).padding(.vertical, 7)
                         .background(timer.total == m * 60 ? Palette.teal : Palette.surface2, in: Capsule())
@@ -560,7 +560,7 @@ struct FocusSessionView: View {
                 .buttonStyle(KPressStyle())
             }
             Button { timer.add(minutes: 5) } label: {
-                Text("+5").font(.system(size: 12, weight: .heavy, design: .rounded))
+                Text("+5").font(.caption.weight(.heavy))
                     .foregroundStyle(Palette.teal)
                     .padding(.horizontal, 13).padding(.vertical, 7)
                     .background(Palette.teal.opacity(0.14), in: Capsule())
@@ -574,7 +574,7 @@ struct FocusSessionView: View {
             Button { toggleRun() } label: {
                 HStack(spacing: 6) {
                     Image(systemName: timer.running ? "pause.fill" : "play.fill")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.caption.weight(.bold))
                     Text(timer.running ? "Pause" : "Resume")
                 }
                 .frame(maxWidth: .infinity)
@@ -597,10 +597,10 @@ struct FocusSessionView: View {
             VStack(alignment: .leading, spacing: Gap.tight) {
                 HStack(spacing: 6) {
                     Text("TODAY")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.8)
+                        .font(.caption2.weight(.heavy)).tracking(0.8)
                         .foregroundStyle(Palette.faint)
                     Text(queue.isEmpty ? "· last one" : "· \(queue.count) left")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                     Spacer(minLength: 0)
                 }
@@ -615,21 +615,21 @@ struct FocusSessionView: View {
         return Button { jump(to: item) } label: {
             HStack(spacing: 9) {
                 Image(systemName: item.done ? "checkmark.circle.fill" : (isCurrent ? "timer" : "circle"))
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(item.done ? Palette.green : (isCurrent ? Palette.teal : Palette.border))
                 Text(item.text)
-                    .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
+                    .font(.footnote.weight(isCurrent ? .semibold : .regular))
                     .strikethrough(item.done, color: Palette.faint)
                     .foregroundStyle(item.done ? Palette.faint : (isCurrent ? Palette.text : Palette.muted))
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if item.done, item.spent >= 60 {
                     Text("\(item.spent / 60)m")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                 } else if !item.done {
                     Text("\(item.mins ?? defaultMinutes)m")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(isCurrent ? Palette.teal : Palette.faint)
                 }
             }
@@ -745,7 +745,7 @@ struct FocusCalendarPanel: View {
     private func legendDot(_ c: Color, _ label: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(c).frame(width: 6, height: 6)
-            Text(label).font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+            Text(label).font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
         }
     }
 
@@ -754,27 +754,27 @@ struct FocusCalendarPanel: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 7) {
                 Text(Fmt.day(selected))
-                    .font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.heavy)).foregroundStyle(Palette.text)
                 if !todos.isEmpty {
                     Text("\(todos.filter(\.done).count)/\(todos.count)")
-                        .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
+                        .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.faint)
                 }
                 Spacer(minLength: 0)
                 let mins = FocusRecord.focusedMinutes(todos)
                 if mins > 0 {
                     Text("\(mins)m focused")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.teal)
+                        .font(.caption2.weight(.heavy)).foregroundStyle(Palette.teal)
                 }
             }
             if todos.isEmpty {
                 Text("Nothing on the list that day.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .font(.caption).foregroundStyle(Palette.faint)
             } else {
                 ForEach(todos) { t in
                     HStack(spacing: 8) {
                         Image(systemName: t.done ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 12)).foregroundStyle(t.done ? Palette.green : Palette.border)
-                        Text(t.text).font(.system(size: 12))
+                            .font(.caption).foregroundStyle(t.done ? Palette.green : Palette.border)
+                        Text(t.text).font(.caption)
                             .strikethrough(t.done, color: Palette.faint)
                             .foregroundStyle(t.done ? Palette.faint : Palette.muted)
                             .lineLimit(1)

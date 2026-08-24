@@ -29,7 +29,7 @@ struct BodyPhotosCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 header
                 Text("Every photo you heart in Favorites lands here — or add one yourself.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    .font(.caption).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if showCalendar {
@@ -73,12 +73,12 @@ struct BodyPhotosCard: View {
                 withAnimation(.knNormal) { showCalendar.toggle() }
             } label: {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
             }
             .buttonStyle(KIconButtonStyle(size: 30, color: showCalendar ? Palette.brand : Palette.muted))
             .accessibilityLabel(showCalendar ? "Hide calendar" : "Show calendar")
             Button { adding = true } label: {
-                Image(systemName: "plus.circle.fill").font(.system(size: 18, weight: .semibold))
+                Image(systemName: "plus.circle.fill").font(.body.weight(.semibold))
             }
             .buttonStyle(KIconButtonStyle(size: 30, color: Palette.teal))
             .accessibilityLabel("Add photo")
@@ -89,10 +89,10 @@ struct BodyPhotosCard: View {
         if ProgressPhotoSync.isSyncing {
             ProgressView().controlSize(.mini)
         } else if !ProgressPhotoStore.pending().isEmpty {
-            Image(systemName: "icloud.and.arrow.up").font(.system(size: 12)).foregroundStyle(Palette.amber)
+            Image(systemName: "icloud.and.arrow.up").font(.caption).foregroundStyle(Palette.amber)
                 .accessibilityLabel("Some photos haven't uploaded yet")
         } else if !photos.isEmpty {
-            Image(systemName: "icloud.fill").font(.system(size: 12)).foregroundStyle(Palette.teal)
+            Image(systemName: "icloud.fill").font(.caption).foregroundStyle(Palette.teal)
                 .accessibilityLabel("All photos synced")
         }
     }
@@ -108,7 +108,7 @@ struct BodyPhotosCard: View {
             if stripPhotos.isEmpty {
                 Text(photos.isEmpty ? (status.isEmpty ? "No body photos yet." : status)
                                      : "No photo for \(Fmt.day(selectedDate)) yet.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    .font(.footnote).foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -131,11 +131,11 @@ struct BodyPhotosCard: View {
                             .fill(Palette.surface2)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                    Text(Fmt.day(p.date)).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.faint)
+                    Text(Fmt.day(p.date)).font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
                 }
                 if !ProgressPhotoStore.isSynced(p.id) {
                     Image(systemName: "icloud.and.arrow.up.fill")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(5)
                         .background(Palette.amber, in: Circle())
@@ -191,17 +191,17 @@ private struct ProgressGallery: View {
         VStack(spacing: 0) {
             HStack {
                 Button { confirmingDelete = true } label: {
-                    Image(systemName: "trash").font(.system(size: 14, weight: .bold))
+                    Image(systemName: "trash").font(.footnote.weight(.bold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
                 .accessibilityLabel("Delete photo")
 
                 Spacer()
-                Text(Fmt.day(currentDate)).font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                Text(Fmt.day(currentDate)).font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                 Spacer()
 
                 Button(action: onClose) {
-                    Image(systemName: "xmark").font(.system(size: 13, weight: .bold))
+                    Image(systemName: "xmark").font(.footnote.weight(.bold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
             }
@@ -223,13 +223,13 @@ private struct ProgressGallery: View {
             .onChange(of: page) { _, _ in saveStatus = "" }
 
             if !saveStatus.isEmpty {
-                Text(saveStatus).font(.system(size: 12, weight: .semibold))
+                Text(saveStatus).font(.caption.weight(.semibold))
                     .foregroundStyle(saveStatus == "Saved" ? Palette.green : Palette.amber)
             }
             Button { saveCurrent() } label: {
                 Label(saveStatus == "Saved" ? "Saved to Photos" : "Save to Photos",
                       systemImage: saveStatus == "Saved" ? "checkmark.circle.fill" : "square.and.arrow.down")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(KPrimaryButtonStyle(tint: Palette.teal, fullWidth: true))
@@ -248,9 +248,9 @@ private struct ProgressGallery: View {
     private var deleteSheet: some View {
         VStack(spacing: 16) {
             VStack(spacing: 4) {
-                Text("Delete this photo?").font(.system(size: 16, weight: .bold)).foregroundStyle(Palette.text)
+                Text("Delete this photo?").font(.callout.weight(.bold)).foregroundStyle(Palette.text)
                 Text("This removes it from this device and the cloud. It can't be undone.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    .font(.caption).foregroundStyle(Palette.muted)
                     .multilineTextAlignment(.center)
             }
             HoldToConfirmButton(label: "Hold to delete") {

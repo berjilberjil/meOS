@@ -82,11 +82,11 @@ struct MemoryCard: View {
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(state.memory.items.isEmpty ? "Nothing remembered yet" : "Nothing matches that")
-                .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
             Text(state.memory.items.isEmpty
                  ? "Tell her something durable — “remember that my main project is MyOS” — or add one by hand."
                  : "Try a different word, or clear the filter.")
-                .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                .font(.footnote).foregroundStyle(Palette.faint)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,7 +99,7 @@ struct MemoryCard: View {
         VStack(spacing: 10) {
             Button { editing = MemoryItem(content: "", source: .manual) } label: {
                 Label("Add a memory", systemImage: "plus.circle.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
@@ -107,7 +107,7 @@ struct MemoryCard: View {
             if state.lastTrace != nil {
                 Button { showTrace = true } label: {
                     Label("What the last answer was built from", systemImage: "waveform.path.ecg")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(KGhostButtonStyle())
@@ -124,11 +124,11 @@ struct MemoryCard: View {
                 Spacer()
                 Text(state.memory.items.isEmpty ? "nothing yet"
                                                 : "\(state.memory.items.count) remembered")
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .font(.caption).foregroundStyle(Palette.faint)
             }
 
             Text("What Catherine has learned about you. She uses only what’s relevant to each message — edit or delete anything that’s wrong.")
-                .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !state.memory.items.isEmpty { searchRow; categoryRow }
@@ -137,7 +137,7 @@ struct MemoryCard: View {
                 Text(state.memory.items.isEmpty
                      ? "Nothing yet. Tell her something durable — “remember that my main project is MyOS” — or add one by hand."
                      : "Nothing matches that.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    .font(.footnote).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 6)
             } else {
@@ -147,14 +147,14 @@ struct MemoryCard: View {
             HStack(spacing: 10) {
                 Button { editing = MemoryItem(content: "", source: .manual) } label: {
                     Label("Add a memory", systemImage: "plus.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(KSoftButtonStyle(tint: Palette.teal))
                 Spacer(minLength: 0)
                 if state.lastTrace != nil {
                     Button { showTrace = true } label: {
                         Label("Last answer", systemImage: "waveform.path.ecg")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                     }
                     .buttonStyle(KGhostButtonStyle())
                     .help("What the last reply was built from")
@@ -177,15 +177,15 @@ struct MemoryCard: View {
 
     private var searchRow: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").font(.system(size: 12, weight: .bold))
+            Image(systemName: "magnifyingglass").font(.caption.weight(.bold))
                 .foregroundStyle(Palette.faint)
             TextField("", text: $query,
                       prompt: Text("Search what she remembers…").foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 15)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.subheadline).foregroundStyle(Palette.text)
                 .focused($searchFocused)
             if !query.isEmpty {
                 Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 12))
+                    Image(systemName: "xmark.circle.fill").font(.caption)
                         .foregroundStyle(Palette.faint)
                 }
                 .buttonStyle(KPressStyle())
@@ -208,7 +208,7 @@ struct MemoryCard: View {
         let on = filter == c
         return Button { withAnimation(.knFast) { filter = on ? nil : c } } label: {
             Text(label)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
                 .background(on ? Palette.brand : Palette.surface2, in: Capsule())
@@ -222,17 +222,17 @@ struct MemoryCard: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: m.category.icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(Palette.teal)
                     .frame(width: 18)
                     .padding(.top, 3)
                 Text(m.content)
-                    .font(.system(size: 15)).foregroundStyle(Palette.text)
+                    .font(.subheadline).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if m.pinned {
                     Image(systemName: "pin.fill")
-                        .font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.amber)
+                        .font(.caption2.weight(.bold)).foregroundStyle(Palette.amber)
                         .padding(.top, 4)
                 }
             }
@@ -249,20 +249,20 @@ struct MemoryCard: View {
 
                 Button { togglePin(m) } label: {
                     Image(systemName: m.pinned ? "pin.slash" : "pin")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(m.pinned ? Palette.amber : Palette.faint)
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help(m.pinned ? "Stop always including it" : "Pin so it's always in context")
 
                 Button { editing = m } label: {
-                    Image(systemName: "pencil").font(.system(size: 12, weight: .bold))
+                    Image(systemName: "pencil").font(.caption.weight(.bold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help("Edit")
 
                 Button { pendingDelete = m.id } label: {
-                    Image(systemName: "trash").font(.system(size: 11, weight: .bold))
+                    Image(systemName: "trash").font(.caption2.weight(.bold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
                 .help("Forget this")
@@ -274,7 +274,7 @@ struct MemoryCard: View {
 
     private func tag(_ text: String, _ tint: Color) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .heavy, design: .rounded))
+            .font(.caption2.weight(.heavy))
             .foregroundStyle(tint)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(tint.opacity(0.14), in: Capsule())
@@ -318,7 +318,7 @@ private struct MemoryEditorSheet: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(isNew ? "Add a memory" : "Edit memory")
-                .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.body.weight(.heavy)).foregroundStyle(Palette.text)
 
             VStack(alignment: .leading, spacing: 5) {
                 KFieldLabel(text: "What she should remember")
@@ -326,12 +326,12 @@ private struct MemoryEditorSheet: View {
                           prompt: Text("e.g. Uses PostgreSQL for every project")
                             .foregroundColor(Palette.faint),
                           axis: .vertical)
-                    .textFieldStyle(.plain).font(.system(size: 15)).foregroundStyle(Palette.text)
+                    .textFieldStyle(.plain).font(.subheadline).foregroundStyle(Palette.text)
                     .lineLimit(2...5)
                     .focused($bodyFocused)
                     .knField(focused: bodyFocused)
                 Text("Write it as a standing fact about you, not as a message to her.")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    .font(.caption2).foregroundStyle(Palette.faint)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -341,7 +341,7 @@ private struct MemoryEditorSheet: View {
                         ForEach(MemoryCategory.allCases) { c in
                             Button { category = c } label: {
                                 Text(c.label)
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(category == c ? .white : Palette.muted)
                                     .padding(.horizontal, 11).padding(.vertical, 6)
                                     .background(category == c ? Palette.brand : Palette.surface2, in: Capsule())
@@ -355,15 +355,15 @@ private struct MemoryEditorSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 KFieldLabel(text: "How important")
                 Stepper("\(importance) of 5", value: $importance, in: 1...5)
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
             }
 
             Toggle(isOn: $pinned) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Always in context").font(.system(size: 14, weight: .semibold))
+                    Text("Always in context").font(.footnote.weight(.semibold))
                         .foregroundStyle(Palette.text)
                     Text("Pinned memories are included even when they don't match the question.")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                 }
             }
             .tint(Palette.brand)
@@ -413,11 +413,11 @@ private struct TraceSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text("How she answered")
-                        .font(.system(size: 18, weight: .heavy, design: .rounded))
+                        .font(.body.weight(.heavy))
                         .foregroundStyle(Palette.text)
                     Spacer()
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                        Image(systemName: "xmark").font(.caption.weight(.bold))
                     }
                     .buttonStyle(KIconButtonStyle(size: 28))
                 }
@@ -443,9 +443,9 @@ private struct TraceSheet: View {
 
     private func stat(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Text(label).font(.system(size: 11, weight: .heavy, design: .rounded))
+            Text(label).font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint).frame(width: 84, alignment: .leading)
-            Text(value.isEmpty ? "—" : value).font(.system(size: 13)).foregroundStyle(Palette.text)
+            Text(value.isEmpty ? "—" : value).font(.footnote).foregroundStyle(Palette.text)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -453,13 +453,13 @@ private struct TraceSheet: View {
 
     private func list(_ title: String, _ items: [String], empty: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.system(size: 11, weight: .heavy, design: .rounded))
+            Text(title).font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint)
             if items.isEmpty {
-                Text(empty).font(.system(size: 12)).foregroundStyle(Palette.faint)
+                Text(empty).font(.caption).foregroundStyle(Palette.faint)
             } else {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, line in
-                    Text("· \(line)").font(.system(size: 12, design: .monospaced))
+                    Text("· \(line)").font(.caption.monospaced())
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)

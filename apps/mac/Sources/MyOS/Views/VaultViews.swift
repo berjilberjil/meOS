@@ -23,12 +23,12 @@ struct VaultSetupView: View {
                 secure("Confirm passphrase", text: $confirm, field: .confirm)
 
                 Text("This is separate from your login password, and it can’t be reset. If you forget it, your recovery code is the only way back in — we’ll show it next.")
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Palette.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let err = state.vaultError {
-                    Text(err).font(.system(size: 13)).foregroundStyle(Palette.red)
+                    Text(err).font(.footnote).foregroundStyle(Palette.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -85,7 +85,7 @@ struct VaultUnlockView: View {
                 }
 
                 if let err = state.vaultError {
-                    Text(err).font(.system(size: 13)).foregroundStyle(Palette.red)
+                    Text(err).font(.footnote).foregroundStyle(Palette.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -99,12 +99,12 @@ struct VaultUnlockView: View {
                         withAnimation(.knFast) { useRecovery.toggle(); secret = ""; state.vaultError = nil }
                     } label: {
                         Text(useRecovery ? "Use passphrase instead" : "Forgot it? Use recovery code")
-                            .font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.muted)
+                            .font(.footnote.weight(.medium)).foregroundStyle(Palette.muted)
                     }
                     .buttonStyle(KPressStyle())
                     Spacer()
                     Button { Task { await state.logout() } } label: {
-                        Text("Log out").font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.muted)
+                        Text("Log out").font(.footnote.weight(.medium)).foregroundStyle(Palette.muted)
                     }
                     .buttonStyle(KPressStyle())
                 }
@@ -134,16 +134,16 @@ struct RecoveryCodeOverlay: View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
             VStack(spacing: 16) {
-                Image(systemName: "key.fill").font(.system(size: 34)).foregroundStyle(Palette.brand)
+                Image(systemName: "key.fill").font(.largeTitle).foregroundStyle(Palette.brand)
                 Text("Your recovery code")
-                    .font(.system(size: 20, weight: .bold)).foregroundStyle(Palette.text)
+                    .font(.title3.weight(.bold)).foregroundStyle(Palette.text)
                 Text("This is the only way back in if you forget your passphrase or lose this Mac. Save it in your password manager now — we can’t show it again.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(code)
-                    .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                    .font(.body.weight(.semibold).monospaced())
                     .foregroundStyle(Palette.text)
                     .textSelection(.enabled)
                     .padding(.vertical, 14).padding(.horizontal, 18)
@@ -161,12 +161,12 @@ struct RecoveryCodeOverlay: View {
                     withAnimation(.knFast) { copied = true }
                 } label: {
                     Label(copied ? "Copied" : "Copy code", systemImage: copied ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.muted)
+                        .font(.footnote.weight(.medium)).foregroundStyle(Palette.muted)
                 }
                 .buttonStyle(KPressStyle())
 
                 Toggle(isOn: $saved) {
-                    Text("I’ve saved this somewhere safe").font(.system(size: 13)).foregroundStyle(Palette.text)
+                    Text("I’ve saved this somewhere safe").font(.footnote).foregroundStyle(Palette.text)
                 }
                 #if os(macOS)
                 .toggleStyle(.checkbox)
@@ -200,11 +200,11 @@ private struct VaultShell<Content: View>: View {
         VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 12) {
-                Image(systemName: icon).font(.system(size: 34)).foregroundStyle(Palette.brand)
+                Image(systemName: icon).font(.largeTitle).foregroundStyle(Palette.brand)
                 VStack(spacing: 6) {
-                    Text(title).font(.system(size: 26, weight: .bold)).foregroundStyle(Palette.text)
+                    Text(title).font(.title.weight(.bold)).foregroundStyle(Palette.text)
                     Text(subtitle)
-                        .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        .font(.footnote).foregroundStyle(Palette.muted)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }

@@ -137,21 +137,21 @@ struct SettingsView: View {
                     ZStack {
                         Circle().fill(Palette.teal.opacity(0.18))
                         Image(systemName: "person.fill")
-                            .font(.system(size: 21, weight: .semibold)).foregroundStyle(Palette.teal)
+                            .font(.title3.weight(.semibold)).foregroundStyle(Palette.teal)
                     }
                     .frame(width: 50, height: 50)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(state.profile.name.isEmpty
                              ? (state.username.isEmpty ? "You" : "@\(state.username)")
                              : state.profile.name)
-                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                         Text(state.profile.role.isEmpty ? "Name, city, what you do" : state.profile.role)
-                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                            .font(.footnote).foregroundStyle(Palette.muted)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.faint)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.faint)
                 }
             }
         }
@@ -172,11 +172,11 @@ struct SettingsView: View {
             HStack(spacing: 14) {
                 iconTile(p.icon, p.tint)
                 Text(p.title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(p == .data ? Palette.red : Palette.text)
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.faint)
+                    .font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
             }
             .padding(.horizontal, 12).padding(.vertical, 13)
             .contentShape(Rectangle())
@@ -189,9 +189,9 @@ struct SettingsView: View {
             iconTile("lock.fill", Palette.ice)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Lock with \(BiometricLock.biometryName)")
-                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("Ask every time the app opens.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    .font(.caption).foregroundStyle(Palette.muted)
             }
             Spacer(minLength: 8)
             Toggle("", isOn: $faceIDEnabled).labelsHidden().tint(Palette.teal)
@@ -202,7 +202,7 @@ struct SettingsView: View {
     private func iconTile(_ symbol: String, _ tint: Color) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.opacity(0.18))
-            Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundStyle(tint)
+            Image(systemName: symbol).font(.footnote.weight(.semibold)).foregroundStyle(tint)
         }
         .frame(width: tile, height: tile)
     }
@@ -218,7 +218,7 @@ struct SettingsView: View {
     private var signOutButton: some View {
         Button { Task { await state.logout() } } label: {
             Text("Sign out")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.callout.weight(.semibold))
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
@@ -261,7 +261,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { page = nil }.font(.system(size: 17, weight: .semibold))
+                    Button("Done") { page = nil }.font(.body.weight(.semibold))
                         .foregroundStyle(Palette.accent)
                 }
             }

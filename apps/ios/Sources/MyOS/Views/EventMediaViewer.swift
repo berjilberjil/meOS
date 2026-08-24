@@ -31,11 +31,11 @@ struct EventMediaViewer: View {
             VStack(spacing: 0) {
                 HStack {
                     Text("\(currentIndex + 1) of \(media.count)")
-                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                     Spacer()
                     Button(action: onClose) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 26)).foregroundStyle(.white.opacity(0.85))
+                            .font(.title).foregroundStyle(.white.opacity(0.85))
                     }
                     .buttonStyle(.plain)
                 }
@@ -88,8 +88,8 @@ private struct VideoPage: View {
             } else if failed {
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 32)).foregroundStyle(Palette.amber)
-                    Text("Couldn't load video").font(.system(size: 14)).foregroundStyle(Palette.faint)
+                        .font(.largeTitle).foregroundStyle(Palette.amber)
+                    Text("Couldn't load video").font(.footnote).foregroundStyle(Palette.faint)
                 }
             } else {
                 ProgressView().tint(Palette.brand)

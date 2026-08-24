@@ -49,7 +49,7 @@ struct ProductivityView: View {
             HStack(spacing: 8) {
                 ScreenTitle(text: "Productivity")
                 Spacer()
-                Text("\(state.watch.count) videos").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                Text("\(state.watch.count) videos").font(.caption).foregroundStyle(Palette.faint)
                 if !state.watch.isEmpty {
                     Segmented(options: ViewMode.allCases.map { ($0, $0.label) }, selection: $mode)
                 }
@@ -78,10 +78,10 @@ struct ProductivityView: View {
                 SectionTitle(text: "Log a video")
                 HStack(spacing: 10) {
                     HStack(spacing: 8) {
-                        Image(systemName: "link").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.faint)
+                        Image(systemName: "link").font(.caption.weight(.bold)).foregroundStyle(Palette.faint)
                         TextField("", text: $urlInput,
                                   prompt: Text("Paste a YouTube link…").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                            .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                             .focused($urlFocused)
                             .onSubmit(addVideo)
                     }
@@ -99,7 +99,7 @@ struct ProductivityView: View {
                 }
                 if let err = addError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11)).foregroundStyle(Palette.amber)
+                        .font(.caption2).foregroundStyle(Palette.amber)
                 }
             }
         }
@@ -112,9 +112,9 @@ struct ProductivityView: View {
             HStack(spacing: 8) {
                 Button { showCal.toggle() } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "calendar").font(.system(size: 11, weight: .bold))
+                        Image(systemName: "calendar").font(.caption2.weight(.bold))
                         Text(dayFilter == nil ? "All days" : Fmt.day(dayFilter!))
-                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .font(.caption.weight(.heavy))
                     }
                     .foregroundStyle(dayFilter == nil ? Palette.muted : Palette.brand)
                     .padding(.horizontal, 11).padding(.vertical, 7)
@@ -126,14 +126,14 @@ struct ProductivityView: View {
 
                 if dayFilter != nil {
                     Button { withAnimation(.knFast) { dayFilter = nil } } label: {
-                        Image(systemName: "xmark.circle.fill").font(.system(size: 15)).foregroundStyle(Palette.faint)
+                        Image(systemName: "xmark.circle.fill").font(.subheadline).foregroundStyle(Palette.faint)
                     }
                     .buttonStyle(KPressStyle()).help("Clear day filter")
                 }
                 Spacer()
                 if toNoteCount > 0 {
                     Text("\(toNoteCount) need a takeaway")
-                        .font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.flame)
+                        .font(.caption2.weight(.heavy)).foregroundStyle(Palette.flame)
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(Palette.flame.opacity(0.14), in: Capsule())
                 }
@@ -195,14 +195,14 @@ struct ProductivityView: View {
         return AnyView(
             VStack(alignment: .leading, spacing: 5) {
                 Text("\(items.count) video\(items.count == 1 ? "" : "s")")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                    .font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
                 ForEach(items.prefix(4)) { v in
                     Text(v.title.isEmpty ? "Untitled video" : v.title)
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.text)
+                        .font(.caption.weight(.medium)).foregroundStyle(Palette.text)
                         .lineLimit(1)
                 }
                 if items.count > 4 {
-                    Text("+\(items.count - 4) more").font(.system(size: 10)).foregroundStyle(Palette.faint)
+                    Text("+\(items.count - 4) more").font(.caption2).foregroundStyle(Palette.faint)
                 }
             }
         )
@@ -214,7 +214,7 @@ struct ProductivityView: View {
         let count = days.reduce(0) { $0 + (groups[$1]?.count ?? 0) }
         return HStack(spacing: 8) {
             Text("\(count) video\(count == 1 ? "" : "s") over \(days.count) day\(days.count == 1 ? "" : "s")")
-                .font(.system(size: 12, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
+                .font(.caption.weight(.heavy)).foregroundStyle(Palette.muted)
             Spacer()
         }
     }
@@ -222,17 +222,17 @@ struct ProductivityView: View {
     private func daySection(day: String, items: [WatchItem]) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 8) {
-                Text(Fmt.day(day)).font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Text(Fmt.day(day)).font(.footnote.weight(.heavy)).foregroundStyle(Palette.text)
                 if !items.isEmpty {
                     Text("· \(items.count) video\(items.count == 1 ? "" : "s")")
-                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                        .font(.caption).foregroundStyle(Palette.faint)
                 }
                 Spacer()
             }
             if items.isEmpty {
                 Card {
                     Text("Nothing logged on \(Fmt.day(day)). Pick another day above.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
@@ -251,7 +251,7 @@ struct ProductivityView: View {
     private func filterChip(_ c: WatchCategory?, label: String, color: Color) -> some View {
         let on = filter == c
         return Button { withAnimation(.knFast) { filter = c } } label: {
-            Text(label).font(.system(size: 12, weight: .heavy, design: .rounded))
+            Text(label).font(.caption.weight(.heavy))
                 .foregroundStyle(on ? .white : color)
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(on ? color : color.opacity(0.14), in: Capsule())
@@ -265,22 +265,22 @@ struct ProductivityView: View {
         if state.watch.isEmpty {
             Card {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("No videos yet").font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    Text("No videos yet").font(.subheadline.weight(.heavy)).foregroundStyle(Palette.text)
                     Text("Paste a YouTube link above. The thumbnail, title and channel fill in automatically, the AI tags it — then add what you learned.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint).fixedSize(horizontal: false, vertical: true)
+                        .font(.footnote).foregroundStyle(Palette.faint).fixedSize(horizontal: false, vertical: true)
                 }
             }
         } else if displayGroups.isEmpty {
-            Text("Nothing matches. Clear a filter to see more.").font(.system(size: 13)).foregroundStyle(Palette.faint)
+            Text("Nothing matches. Clear a filter to see more.").font(.footnote).foregroundStyle(Palette.faint)
         } else {
             // A daily log — one dated section per day, newest first.
             VStack(alignment: .leading, spacing: 22) {
                 ForEach(displayGroups, id: \.0) { day, dayItems in
                     VStack(alignment: .leading, spacing: 11) {
                         HStack(spacing: 8) {
-                            Text(Fmt.day(day)).font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                            Text(Fmt.day(day)).font(.footnote.weight(.heavy)).foregroundStyle(Palette.text)
                             Text("· \(dayItems.count) video\(dayItems.count == 1 ? "" : "s")")
-                                .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                                .font(.caption).foregroundStyle(Palette.faint)
                             Spacer()
                         }
                         LazyVGrid(columns: cols, spacing: 14) {
@@ -340,11 +340,11 @@ private struct WatchCard: View {
                 thumbnail
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.title.isEmpty ? "Untitled video" : item.title)
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(2).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 6) {
                         if !item.channel.isEmpty {
-                            Text(item.channel).font(.system(size: 11)).foregroundStyle(Palette.muted).lineLimit(1)
+                            Text(item.channel).font(.caption2).foregroundStyle(Palette.muted).lineLimit(1)
                         }
                         Spacer(minLength: 0)
                         categoryChip
@@ -372,7 +372,7 @@ private struct WatchCard: View {
                 switch phase {
                 case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
                 case .empty: ProgressView().controlSize(.small).tint(Palette.faint)
-                default: Image(systemName: "play.rectangle.fill").font(.system(size: 28)).foregroundStyle(Palette.faint)
+                default: Image(systemName: "play.rectangle.fill").font(.title).foregroundStyle(Palette.faint)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -391,7 +391,7 @@ private struct WatchCard: View {
     }
 
     private func badge(icon: String, tint: Color) -> some View {
-        Image(systemName: icon).font(.system(size: 9, weight: .heavy))
+        Image(systemName: icon).font(.caption2.weight(.heavy))
             .foregroundStyle(.white).frame(width: 20, height: 20)
             .background(tint, in: Circle())
             .overlay(Circle().strokeBorder(.black.opacity(0.15), lineWidth: 1))
@@ -399,8 +399,8 @@ private struct WatchCard: View {
 
     private var categoryChip: some View {
         HStack(spacing: 4) {
-            Image(systemName: item.category.icon).font(.system(size: 8, weight: .bold))
-            Text(item.category.label).font(.system(size: 9, weight: .heavy, design: .rounded))
+            Image(systemName: item.category.icon).font(.caption2.weight(.bold))
+            Text(item.category.label).font(.caption2.weight(.heavy))
         }
         .foregroundStyle(item.category.color)
         .padding(.horizontal, 7).padding(.vertical, 3)
@@ -429,10 +429,10 @@ private struct WatchDetailSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
 
             Text(draft.title.isEmpty ? "Untitled video" : draft.title)
-                .font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 .fixedSize(horizontal: false, vertical: true)
             if !draft.channel.isEmpty {
-                Text(draft.channel).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                Text(draft.channel).font(.footnote).foregroundStyle(Palette.muted)
             }
 
             HStack(spacing: 10) {
@@ -461,7 +461,7 @@ private struct WatchDetailSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 KFieldLabel(text: "What I learned")
                 TextEditor(text: $draft.takeaway)
-                    .font(.system(size: 13)).foregroundStyle(Palette.text)
+                    .font(.footnote).foregroundStyle(Palette.text)
                     .scrollContentBackground(.hidden)
                     .frame(height: 90).padding(8)
                     .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -491,8 +491,8 @@ private struct WatchDetailSheet: View {
         let on = draft.category == c
         return Button { draft.category = c } label: {
             HStack(spacing: 4) {
-                Image(systemName: c.icon).font(.system(size: 9, weight: .bold))
-                Text(c.label).font(.system(size: 11, weight: .heavy, design: .rounded))
+                Image(systemName: c.icon).font(.caption2.weight(.bold))
+                Text(c.label).font(.caption2.weight(.heavy))
             }
             .foregroundStyle(on ? .white : c.color)
             .padding(.horizontal, 10).padding(.vertical, 6)

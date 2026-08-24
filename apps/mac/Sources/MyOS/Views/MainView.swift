@@ -122,13 +122,13 @@ struct MainView: View {
                 Group {
                     if collapsed {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 13)).help(err)
+                            .font(.footnote).help(err)
                     } else {
                         HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10))
+                            Image(systemName: "exclamationmark.triangle.fill").font(.caption2)
                             Text(err).lineLimit(2)
                         }
-                        .font(.system(size: 11))
+                        .font(.caption2)
                     }
                 }
                 .foregroundStyle(Palette.amber)
@@ -137,13 +137,13 @@ struct MainView: View {
 
             Button { state.setTaskMode(true) } label: {
                 if collapsed {
-                    Image(systemName: "target").font(.system(size: 15))
+                    Image(systemName: "target").font(.subheadline)
                         .frame(width: 44, height: 30)
                 } else {
                     HStack(spacing: 8) {
                         Image(systemName: "target")
                         Text("TASK MODE")
-                            .font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(0.6)
+                            .font(.caption.weight(.heavy)).tracking(0.6)
                         Spacer(minLength: 0)
                     }
                 }
@@ -154,7 +154,7 @@ struct MainView: View {
 
             Button { Task { await state.logout() } } label: {
                 if collapsed {
-                    Image(systemName: "rectangle.portrait.and.arrow.right").font(.system(size: 15))
+                    Image(systemName: "rectangle.portrait.and.arrow.right").font(.subheadline)
                         .frame(width: 44, height: 30)
                 } else {
                     HStack(spacing: 8) {
@@ -187,7 +187,7 @@ struct MainView: View {
             collapsed.toggle()
             UserDefaults.standard.set(collapsed, forKey: Self.kCollapsed)
         } label: {
-            Image(systemName: "sidebar.left").font(.system(size: 14, weight: .semibold))
+            Image(systemName: "sidebar.left").font(.footnote.weight(.semibold))
         }
         .buttonStyle(KIconButtonStyle(size: 28, color: Palette.faint))
         .help(collapsed ? "Expand sidebar" : "Collapse sidebar")
@@ -200,7 +200,7 @@ struct MainView: View {
                 HStack(spacing: 9) {
                     logo
                     Text("MyOS")
-                        .font(.system(size: 22, weight: .heavy, design: .rounded))
+                        .font(.title2.weight(.heavy))
                         .foregroundStyle(Palette.brand)
                     Spacer(minLength: 0)
                     toggle
@@ -226,7 +226,7 @@ private struct NavItem: View {
                 NavGlyph(tab: tab, size: 26)
                 if !collapsed {
                     Text(tab.title.uppercased())
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .font(.footnote.weight(.heavy))
                         .tracking(0.6)
                         .foregroundStyle(active ? tab.tint : (hover ? Palette.text : Palette.muted))
                     Spacer(minLength: 0)

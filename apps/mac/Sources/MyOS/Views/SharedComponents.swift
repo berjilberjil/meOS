@@ -54,9 +54,9 @@ struct PresetChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: "plus").font(.system(size: 8, weight: .heavy))
+                Image(systemName: "plus").font(.caption2.weight(.heavy))
                     .opacity(hover ? 1 : 0.55)
-                Text(text).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Text(text).font(.caption.weight(.semibold)).lineLimit(1)
             }
             .foregroundStyle(hover ? Palette.text : tint)
             .padding(.horizontal, 10).padding(.vertical, 6)
@@ -76,9 +76,9 @@ struct RemovableChip: View {
     let remove: () -> Void
     var body: some View {
         HStack(spacing: 6) {
-            Text(text).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+            Text(text).font(.caption.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
             Button(action: remove) {
-                Image(systemName: "xmark").font(.system(size: 8, weight: .heavy))
+                Image(systemName: "xmark").font(.caption2.weight(.heavy))
             }
             .buttonStyle(KIconButtonStyle(size: 16, color: Palette.faint))
         }
@@ -113,9 +113,9 @@ struct HoldToConfirmButton: View {
                     .fill(tint)
                     .frame(width: fill)
                 HStack(spacing: 8) {
-                    Image(systemName: "trash.fill").font(.system(size: 15, weight: .bold))
+                    Image(systemName: "trash.fill").font(.subheadline.weight(.bold))
                     Text(holding ? "Keep holding…" : label)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.callout.weight(.bold))
                 }
                 .foregroundStyle(progress > 0.38 ? Color.white : tint)
                 .frame(maxWidth: .infinity)
@@ -166,16 +166,16 @@ struct HoldDeleteCard: View {
             ZStack {
                 Circle().fill(Palette.red.opacity(0.14))
                 Image(systemName: "trash.fill")
-                    .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.red)
+                    .font(.title2.weight(.semibold)).foregroundStyle(Palette.red)
             }
             .frame(width: 64, height: 64)
             .padding(.bottom, 16)
             Text(title)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.title2.weight(.semibold))
                 .foregroundStyle(Palette.text)
                 .multilineTextAlignment(.center)
             Text(message)
-                .font(.system(size: 15))
+                .font(.subheadline)
                 .foregroundStyle(Palette.muted)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -184,7 +184,7 @@ struct HoldDeleteCard: View {
             HoldToConfirmButton(label: confirmLabel, action: onConfirm)
             if let onCancel {
                 Button("Cancel", action: onCancel)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(Palette.muted)
                     .padding(.top, 16)
             }
@@ -281,7 +281,7 @@ struct SlideToConfirm: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(tint.opacity(0.16))
                 Text(state.confirmed ? "Logged" : label)
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .font(.callout.weight(.heavy))
                     .foregroundStyle(tint)
                     .padding(.horizontal, thumb + 8)
                     .frame(maxWidth: .infinity)
@@ -290,7 +290,7 @@ struct SlideToConfirm: View {
                 Capsule().fill(tint)
                     .frame(width: thumb + state.progress * travel)
                 Image(systemName: state.confirmed ? "checkmark" : "chevron.right.2")
-                    .font(.system(size: 18, weight: .heavy))
+                    .font(.body.weight(.heavy))
                     .foregroundStyle(Palette.bg)
                     .frame(width: thumb, height: thumb)
                     .offset(x: state.progress * travel)
@@ -341,7 +341,7 @@ struct CopyDayMenu: View {
             Button("Pick days…") { picking = true }
             Button("Copy to all other days") { copy(WeekdayKeys.others(except: weekday)) }
         } label: {
-            Label("Copy day", systemImage: "doc.on.doc").font(.system(size: 13, weight: .semibold))
+            Label("Copy day", systemImage: "doc.on.doc").font(.footnote.weight(.semibold))
         }
         .menuStyle(.borderlessButton)
         .disabled(disabled)
@@ -363,13 +363,13 @@ struct CopyDayPickerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Copy \(dayNames[Int(weekday) ?? 0]) to…")
-                .font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.subheadline.weight(.heavy)).foregroundStyle(Palette.text)
             ForEach(WeekdayKeys.others(except: weekday), id: \.self) { d in
                 Toggle(dayNames[Int(d) ?? 0], isOn: Binding(
                     get: { picked.contains(d) },
                     set: { if $0 { picked.insert(d) } else { picked.remove(d) } }))
                     .toggleStyle(.switch).tint(Palette.brand)
-                    .font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.medium)).foregroundStyle(Palette.text)
             }
             SlideToConfirm(label: "Slide to copy", tint: Palette.brand) { copy(Array(picked)); dismiss() }
                 .opacity(picked.isEmpty ? 0.4 : 1)
@@ -388,7 +388,7 @@ struct KFieldLabel: View {
     let text: String
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 9, weight: .semibold)).tracking(0.7)
+            .font(.caption2.weight(.semibold)).tracking(0.7)
             .foregroundStyle(Palette.faint)
     }
 }
@@ -404,7 +404,7 @@ struct KLabeledField: View {
             KFieldLabel(text: label)
             TextField("", text: $text,
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .focused($focused)
                 .knField(focused: focused)
         }
@@ -425,7 +425,7 @@ struct KLabeledNumberField: View {
                 get: { Self.format(value, decimals: decimals) },
                 set: { value = Self.parse($0) }),
                 prompt: Text(placeholder).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .monospacedDigit()
                 .focused($focused)
                 .knField(focused: focused)
@@ -469,11 +469,11 @@ struct KLabeledMenuField: View {
             } label: {
                 HStack(spacing: 6) {
                     Text(text.isEmpty ? placeholder : text)
-                        .font(.system(size: 13, weight: text.isEmpty ? .regular : .semibold))
+                        .font(.footnote.weight(text.isEmpty ? .regular : .semibold))
                         .foregroundStyle(text.isEmpty ? Palette.faint : Palette.text)
                     Spacer()
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint)
+                        .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                 }
                 .padding(.horizontal, 13).padding(.vertical, 10)
                 .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -499,7 +499,7 @@ struct KLabeledPhoneField: View {
                 get: { text },
                 set: { text = String($0.filter { $0.isNumber }.prefix(10)) }),
                 prompt: Text(placeholder).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .monospacedDigit()
                 .focused($focused)
                 .knField(focused: focused)
@@ -536,7 +536,7 @@ struct KLabeledDateField: View {
                         .datePickerStyle(.compact).labelsHidden()
                     Spacer(minLength: 0)
                     Button { text = "" } label: {
-                        Image(systemName: "xmark.circle.fill").font(.system(size: 12))
+                        Image(systemName: "xmark.circle.fill").font(.caption)
                     }
                     .buttonStyle(KIconButtonStyle(size: 20)).help("Clear date of birth")
                 }
@@ -555,7 +555,7 @@ struct KLabeledDateField: View {
                         Spacer()
                         Image(systemName: "calendar").foregroundStyle(Palette.faint)
                     }
-                    .font(.system(size: 13))
+                    .font(.footnote)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(KPressStyle())
@@ -578,7 +578,7 @@ struct KStepButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold)).foregroundStyle(accent)
+                .font(.caption2.weight(.bold)).foregroundStyle(accent)
                 .frame(width: 32, height: 30)
                 .background(hover ? accent.opacity(0.14) : Palette.surface2,
                             in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
@@ -606,13 +606,13 @@ struct KStepper: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label.uppercased())
-                .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6)
+                .font(.caption2.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
                 .lineLimit(1)
             HStack(spacing: 4) {
                 KStepButton(icon: "minus", accent: accent, action: dec)
                 Text("\(value)")
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .font(.footnote.weight(.heavy))
                     .monospacedDigit().foregroundStyle(Palette.text)
                     .frame(minWidth: 22)
                 KStepButton(icon: "plus", accent: accent, action: inc)

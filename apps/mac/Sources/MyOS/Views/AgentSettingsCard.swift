@@ -53,7 +53,7 @@ struct AgentSettingsCard: View {
             HStack {
                 SectionTitle(text: "AI assistant")
                 Spacer()
-                Text("your in-app chat").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                Text("your in-app chat").font(.caption).foregroundStyle(Palette.faint)
             }
 
             KLabeledField(label: "Assistant name", placeholder: "Catherine", text: $agent.name)
@@ -63,7 +63,7 @@ struct AgentSettingsCard: View {
                 Segmented(options: AgentTone.allCases.map { ($0, $0.label) },
                           selection: Binding(get: { agent.tone }, set: { agent.tone = $0 }))
                 Text(agent.tone.directive)
-                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -73,14 +73,14 @@ struct AgentSettingsCard: View {
                           prompt: Text("e.g. keep it under 3 lines, mix Tamil, call me by my name")
                             .foregroundColor(Palette.faint),
                           axis: .vertical)
-                    .textFieldStyle(.plain).font(.system(size: 16)).foregroundStyle(Palette.text)
+                    .textFieldStyle(.plain).font(.callout).foregroundStyle(Palette.text)
                     .lineLimit(2...4)
                     .focused($customFocused)
                     .knField(focused: customFocused)
             }
 
             Text("\(agent.displayName) keeps answers short. Talk from the chat bubble on any screen.")
-                .font(.system(size: 14)).foregroundStyle(Palette.faint)
+                .font(.footnote).foregroundStyle(Palette.faint)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

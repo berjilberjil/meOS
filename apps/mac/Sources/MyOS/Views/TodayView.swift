@@ -107,16 +107,16 @@ struct TodayView: View {
         return Button { editingMeal = meal } label: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Image(systemName: meal.icon).font(.system(size: 12, weight: .semibold))
-                    Text(meal.label).font(.system(size: 13, weight: .semibold))
+                    Image(systemName: meal.icon).font(.caption.weight(.semibold))
+                    Text(meal.label).font(.footnote.weight(.semibold))
                     Spacer(minLength: 0)
                     if st == .logged {
-                        Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundStyle(Palette.green)
+                        Image(systemName: "checkmark.circle.fill").font(.footnote).foregroundStyle(Palette.green)
                     }
                 }
                 .foregroundStyle(Palette.text)
                 Text(mealSubtitle(st, names))
-                    .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                    .font(.caption2).foregroundStyle(Palette.muted)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(minHeight: 28, alignment: .top)
@@ -150,7 +150,7 @@ struct TodayView: View {
                 }
                 if state.nextEvents.isEmpty {
                     Text("Nothing coming up. Tap All events to add one.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                 } else {
                     ForEach(state.nextEvents) { e in
                         Button { go(.events) } label: { eventLine(e) }
@@ -167,18 +167,18 @@ struct TodayView: View {
         let icon = tag?.symbol ?? "calendar"
         return HStack(spacing: 11) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(color)
+                .font(.footnote.weight(.semibold)).foregroundStyle(color)
                 .frame(width: 30, height: 30)
                 .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    if e.special { Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Palette.amber) }
-                    Text(e.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                    if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber) }
+                    Text(e.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 }
-                Text(eventCountdown(e)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
+                Text(eventCountdown(e)).font(.caption2.weight(.heavy)).foregroundStyle(Palette.muted)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.faint)
+            Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
@@ -204,13 +204,13 @@ struct TodayView: View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
-                    Image(systemName: "newspaper.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.blue)
+                    Image(systemName: "newspaper.fill").font(.footnote.weight(.bold)).foregroundStyle(Palette.blue)
                     SectionTitle(text: "Tech & finance news")
                     Spacer()
                     Button { Task { await state.fetchNews() } } label: {
                         HStack(spacing: 5) {
                             if state.newsBusy { ProgressView().controlSize(.small) }
-                            Image(systemName: "arrow.clockwise").font(.system(size: 11, weight: .bold))
+                            Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                         }
                     }
                     .buttonStyle(KGhostButtonStyle())
@@ -219,13 +219,13 @@ struct TodayView: View {
                 if let n = state.news, !n.items.isEmpty {
                     newsColumns(n)
                     Text("Surfaced with AI · Google Search · tap a story for more")
-                        .font(.system(size: 9)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                 } else if state.newsBusy {
                     HStack(spacing: 8) { ProgressView().controlSize(.small)
-                        Text("Getting today's news…").font(.system(size: 13)).foregroundStyle(Palette.muted) }
+                        Text("Getting today's news…").font(.footnote).foregroundStyle(Palette.muted) }
                         .padding(.vertical, 6)
                 } else if let err = state.newsError {
-                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.system(size: 12)).foregroundStyle(Palette.amber)
+                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.amber)
                 } else {
                     Button { Task { await state.fetchNews() } } label: { Label("Get today's news", systemImage: "newspaper") }
                         .buttonStyle(KSecondaryButtonStyle())
@@ -255,12 +255,12 @@ struct TodayView: View {
     private func newsColumn(_ title: String, tint: Color, icon: String, items: [NewsResult.Item]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
-                Image(systemName: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(tint)
-                Text(title.uppercased()).font(.system(size: 11, weight: .heavy, design: .rounded))
+                Image(systemName: icon).font(.caption2.weight(.bold)).foregroundStyle(tint)
+                Text(title.uppercased()).font(.caption2.weight(.heavy))
                     .tracking(0.6).foregroundStyle(tint)
             }
             if items.isEmpty {
-                Text("Nothing today.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                Text("Nothing today.").font(.caption).foregroundStyle(Palette.faint)
             } else {
                 ForEach(items) { item in newsRow(item, tint: tint) }
             }
@@ -279,20 +279,20 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(item.category.uppercased())
-                            .font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.5)
+                            .font(.caption2.weight(.heavy)).tracking(0.5)
                             .foregroundStyle(newsColor(item.category))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(newsColor(item.category).opacity(0.15), in: Capsule())
                         if let t = item.time, !t.isEmpty {
-                            Text(t).font(.system(size: 9, weight: .medium)).foregroundStyle(Palette.faint)
+                            Text(t).font(.caption2.weight(.medium)).foregroundStyle(Palette.faint)
                         }
                         Spacer(minLength: 0)
                         Image(systemName: open ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 8, weight: .bold)).foregroundStyle(Palette.faint)
+                            .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                     }
-                    Text(item.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text(item.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
-                    Text(item.summary).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text(item.summary).font(.caption).foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
                 }
                 .contentShape(Rectangle())
@@ -301,7 +301,7 @@ struct TodayView: View {
 
             if open {
                 if let d = item.detail, !d.isEmpty {
-                    Text(d).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                    Text(d).font(.caption).foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
                 }
                 HStack(spacing: 8) {
@@ -310,9 +310,9 @@ struct TodayView: View {
                             if let u = item.url, let url = URL(string: u) { openURL(url) }
                         } label: {
                             HStack(spacing: 4) {
-                                Image(systemName: "link").font(.system(size: 9, weight: .bold))
-                                Text(s).font(.system(size: 10, weight: .heavy, design: .rounded)).lineLimit(1)
-                                if item.url != nil { Image(systemName: "arrow.up.right").font(.system(size: 8, weight: .bold)) }
+                                Image(systemName: "link").font(.caption2.weight(.bold))
+                                Text(s).font(.caption2.weight(.heavy)).lineLimit(1)
+                                if item.url != nil { Image(systemName: "arrow.up.right").font(.caption2.weight(.bold)) }
                             }
                             .foregroundStyle(tint)
                             .padding(.horizontal, 8).padding(.vertical, 5)
@@ -324,8 +324,8 @@ struct TodayView: View {
                     }
                     Button { askAboutNews(item) } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "sparkles").font(.system(size: 9, weight: .bold))
-                            Text("Ask AI").font(.system(size: 10, weight: .heavy, design: .rounded))
+                            Image(systemName: "sparkles").font(.caption2.weight(.bold))
+                            Text("Ask AI").font(.caption2.weight(.heavy))
                         }
                         .foregroundStyle(Palette.brand)
                         .padding(.horizontal, 8).padding(.vertical, 5)
@@ -364,14 +364,14 @@ struct TodayView: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
-                    Image(systemName: "sparkles").font(.system(size: 13, weight: .bold))
+                    Image(systemName: "sparkles").font(.footnote.weight(.bold))
                         .foregroundStyle(Palette.brand)
                     SectionTitle(text: "What to do now")
                     Spacer()
                     Button { Task { await state.fetchSuggestions() } } label: {
                         HStack(spacing: 5) {
                             if state.suggestBusy { ProgressView().controlSize(.small) }
-                            Image(systemName: "arrow.clockwise").font(.system(size: 11, weight: .bold))
+                            Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                         }
                     }
                     .buttonStyle(KGhostButtonStyle())
@@ -381,7 +381,7 @@ struct TodayView: View {
 
                 if let s = state.suggestions {
                     if !s.headline.isEmpty {
-                        Text(s.headline).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text(s.headline).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     ForEach(Array(s.suggestions.enumerated()), id: \.element.id) { i, item in
@@ -390,13 +390,13 @@ struct TodayView: View {
                 } else if state.suggestBusy {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text("Reading your day…").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text("Reading your day…").font(.footnote).foregroundStyle(Palette.muted)
                     }
                     .padding(.vertical, 6)
                 } else if let err = state.suggestError {
                     VStack(alignment: .leading, spacing: 8) {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12)).foregroundStyle(Palette.amber)
+                            .font(.caption).foregroundStyle(Palette.amber)
                         Button("Try again") { Task { await state.fetchSuggestions() } }
                             .buttonStyle(KSecondaryButtonStyle())
                     }
@@ -413,16 +413,16 @@ struct TodayView: View {
     private func suggestionRow(index: Int, item: SuggestResult.Item) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: areaIcon(item.area))
-                .font(.system(size: 13, weight: .bold)).foregroundStyle(areaColor(item.area))
+                .font(.footnote.weight(.bold)).foregroundStyle(areaColor(item.area))
                 .frame(width: 30, height: 30)
                 .background(areaColor(item.area).opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 7) {
-                    Text(item.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text(item.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .fixedSize(horizontal: false, vertical: true)
                     impactTag(item.impact)
                 }
-                Text(item.why).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                Text(item.why).font(.caption).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -433,7 +433,7 @@ struct TodayView: View {
     private func impactTag(_ impact: String) -> some View {
         let color: Color = impact == "high" ? Palette.red : (impact == "medium" ? Palette.amber : Palette.faint)
         return Text(impact.uppercased())
-            .font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.5)
+            .font(.caption2.weight(.heavy)).tracking(0.5)
             .foregroundStyle(color)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(color.opacity(0.15), in: Capsule())
@@ -478,16 +478,16 @@ struct TodayView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(greeting + ", " + state.profile.name)
-                    .font(.system(size: 15)).foregroundStyle(Palette.muted)
+                    .font(.subheadline).foregroundStyle(Palette.muted)
                 ScreenTitle(text: pagedWeekdayName)
                 HStack(spacing: 8) {
-                    Text(pagedPrettyDate).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    Text(pagedPrettyDate).font(.footnote).foregroundStyle(Palette.muted)
                     if selectedDate != state.todayKey {
                         // The only affordance for getting home — the page has no
                         // arrows by design, so leaving without one would strand you.
                         Button("Today") { withAnimation(.knNormal) { setDate(state.todayKey) } }
                             .buttonStyle(.plain)
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Palette.brand)
                     }
                 }
@@ -506,11 +506,11 @@ struct TodayView: View {
             HStack(spacing: 8) {
                 StreakFlame(day: ice ? .frozen : (n > 0 || todayDone ? .done : .none), size: 20)
                 Text("\(n)")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.title2.weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(Palette.text)
                 Text(n == 1 ? "day" : "days")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Palette.muted)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
@@ -545,7 +545,7 @@ struct TodayView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { showStreakCal = false }
-                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.brand)
+                        .font(.body.weight(.semibold)).foregroundStyle(Palette.brand)
                 }
             }
             #endif
@@ -572,14 +572,14 @@ struct TodayView: View {
                         SectionTitle(text: "Today")
                         Spacer()
                         Text("\(todayVideos.count)")
-                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                            .font(.title.weight(.semibold))
                             .foregroundStyle(Palette.text).monospacedDigit()
                     }
                     prodBar(label: "Logged", value: todayVideos.isEmpty ? 0 : 1, detail: todayVideos.isEmpty ? "No videos yet" : "\(todayVideos.count) video\(todayVideos.count == 1 ? "" : "s")")
                     prodBar(label: "Takeaways", value: openNotes == 0 && !state.watch.isEmpty ? 1 : 0,
                             detail: openNotes == 0 ? "Clear" : "\(openNotes) still open")
                     Text("Same log as Productivity on Mac.")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                 }
             }
         }
@@ -589,9 +589,9 @@ struct TodayView: View {
     private func prodBar(label: String, value: Double, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.muted)
+                Text(label).font(.caption2.weight(.semibold)).foregroundStyle(Palette.muted)
                 Spacer()
-                Text(detail).font(.system(size: 11)).foregroundStyle(Palette.faint)
+                Text(detail).font(.caption2).foregroundStyle(Palette.faint)
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {

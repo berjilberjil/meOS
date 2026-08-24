@@ -38,14 +38,14 @@ struct ProgressPhotoCalendar: View {
     private var header: some View {
         HStack {
             Button { shiftMonth(-1) } label: {
-                Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
+                Image(systemName: "chevron.left").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 24))
             Spacer()
-            Text(monthTitle).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+            Text(monthTitle).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             Spacer()
             Button { shiftMonth(1) } label: {
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
+                Image(systemName: "chevron.right").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 24))
             .disabled(isCurrentMonth)
@@ -56,7 +56,7 @@ struct ProgressPhotoCalendar: View {
     private var weekdayRow: some View {
         HStack(spacing: 0) {
             ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { _, d in
-                Text(d).font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.faint)
+                Text(d).font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -102,7 +102,7 @@ struct ProgressPhotoCalendar: View {
         } label: {
             VStack(spacing: 3) {
                 Text("\(dayNum)")
-                    .font(.system(size: 12, weight: isSelected ? .bold : .medium)).monospacedDigit()
+                    .font(.caption.weight(isSelected ? .bold : .medium)).monospacedDigit()
                     .foregroundStyle(isSelected ? .white : (isFuture ? Palette.faint : Palette.text))
                 Circle()
                     .fill(hasPhoto ? (isSelected ? Color.white : (isPending ? Palette.amber : Palette.teal)) : .clear)

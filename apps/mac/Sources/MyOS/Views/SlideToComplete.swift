@@ -29,7 +29,7 @@ struct SlideToComplete: View {
                     .frame(width: knob + offset + inset * 2)
 
                 Text(completed ? "Done" : title)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .font(.footnote.weight(.heavy))
                     .foregroundStyle(completed ? tint : Palette.muted)
                     .frame(maxWidth: .infinity)
                     // Fades out as the knob travels over it.
@@ -68,7 +68,7 @@ struct SlideToComplete: View {
         ZStack {
             Circle().fill(tint)
             Image(systemName: completed ? "checkmark" : "chevron.right")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.subheadline.weight(.heavy))
                 .foregroundStyle(.white)
         }
         .frame(width: knob, height: knob)

@@ -75,7 +75,7 @@ struct NotesView: View {
                         Text(state.notes.isEmpty
                              ? "No notes yet. Capture your first idea."
                              : "No notes match “\(query)”.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            .font(.footnote).foregroundStyle(Palette.faint)
                     }
                 } else {
                     ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, note in
@@ -96,7 +96,7 @@ struct NotesView: View {
                 .help("Double-click to write a note")
             if !state.notes.isEmpty {
                 Text("\(state.notes.count)")
-                    .font(.system(size: 13, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
+                    .font(.footnote.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             }
             Spacer()
             // A real, visible affordance. This used to be an invisible zero-sized
@@ -105,8 +105,8 @@ struct NotesView: View {
             // double-clicking the title works.
             Button(action: startNew) {
                 HStack(spacing: 5) {
-                    Image(systemName: "square.and.pencil").font(.system(size: 12, weight: .bold))
-                    Text("New note").font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "square.and.pencil").font(.caption.weight(.bold))
+                    Text("New note").font(.caption.weight(.semibold))
                 }
             }
             .buttonStyle(KPrimaryButtonStyle())
@@ -124,7 +124,7 @@ struct NotesView: View {
                 .focused($searchFocused)
             if !query.isEmpty {
                 Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 12))
+                    Image(systemName: "xmark.circle.fill").font(.caption)
                 }
                 .buttonStyle(KIconButtonStyle(size: 20))
             }
@@ -139,33 +139,33 @@ struct NotesView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         if note.pinned {
-                            Image(systemName: "pin.fill").font(.system(size: 10)).foregroundStyle(Palette.amber)
+                            Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
                         }
                         Text(note.title.isEmpty ? "Untitled" : note.title)
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                             .lineLimit(1)
                         if note.locked {
-                            Image(systemName: "lock.fill").font(.system(size: 10)).foregroundStyle(Palette.faint)
+                            Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Palette.faint)
                         }
                         Spacer()
                         Button { state.togglePinNote(note.id) } label: {
-                            Image(systemName: note.pinned ? "pin.slash" : "pin").font(.system(size: 11))
+                            Image(systemName: note.pinned ? "pin.slash" : "pin").font(.caption2)
                         }
                         .buttonStyle(KIconButtonStyle(size: 24))
                         .help(note.pinned ? "Unpin" : "Pin to top")
                         Button { pendingDelete = note } label: {
-                            Image(systemName: "trash").font(.system(size: 11))
+                            Image(systemName: "trash").font(.caption2)
                         }
                         .buttonStyle(KIconButtonStyle(size: 24))
                         .help("Delete")
                     }
                     let preview = hidden ? "Locked" : note.body
                     if !preview.isEmpty {
-                        Text(preview).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text(preview).font(.footnote).foregroundStyle(Palette.muted)
                             .lineLimit(3).multilineTextAlignment(.leading)
                     }
                     Text(Fmt.day(note.updatedAt))
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                 }
                 .frame(minHeight: 0, alignment: .topLeading)
             }
@@ -194,21 +194,21 @@ struct NotesView: View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Button { backToBrowse() } label: {
-                    Image(systemName: "square.grid.2x2").font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "square.grid.2x2").font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help("All notes")
-                Text("Notes").font(.system(size: 20, weight: .bold)).foregroundStyle(Palette.text)
+                Text("Notes").font(.title3.weight(.bold)).foregroundStyle(Palette.text)
                     .onTapGesture(count: 2) { startNew() }
                     .help("Double-click to write a note")
                 if !state.notes.isEmpty {
                     Text("\(state.notes.count)")
-                        .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                        .font(.caption.weight(.semibold)).monospacedDigit()
                         .foregroundStyle(Palette.faint)
                 }
                 Spacer()
                 Button(action: startNew) {
-                    Image(systemName: "square.and.pencil").font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "square.and.pencil").font(.footnote.weight(.semibold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help("New note (⌘N)")
@@ -221,7 +221,7 @@ struct NotesView: View {
                 Spacer()
                 VStack(spacing: 10) {
                     Text(state.notes.isEmpty ? "No notes yet." : "No matches for “\(query)”.")
-                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                        .font(.caption).foregroundStyle(Palette.faint)
                     if state.notes.isEmpty {
                         Button("Write your first note", action: startNew)
                             .buttonStyle(KSecondaryButtonStyle())
@@ -233,7 +233,7 @@ struct NotesView: View {
                     LazyVStack(alignment: .leading, spacing: 1) {
                         ForEach(sections) { section in
                             Text(section.title.uppercased())
-                                .font(.system(size: 11, weight: .heavy)).tracking(0.6)
+                                .font(.caption2.weight(.heavy)).tracking(0.6)
                                 .foregroundStyle(Palette.faint)
                                 .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 4)
                             ForEach(section.notes) { note in row(note) }
@@ -247,13 +247,13 @@ struct NotesView: View {
 
     private var searchField: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Palette.faint)
+            Image(systemName: "magnifyingglass").font(.caption).foregroundStyle(Palette.faint)
             TextField("", text: $query, prompt: Text("Search").foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .focused($searchFocused)
             if !query.isEmpty {
                 Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 12))
+                    Image(systemName: "xmark.circle.fill").font(.caption)
                 }
                 .buttonStyle(KIconButtonStyle(size: 18))
             }
@@ -271,21 +271,21 @@ struct NotesView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     if note.pinned {
-                        Image(systemName: "pin.fill").font(.system(size: 8)).foregroundStyle(Palette.amber)
+                        Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
                     }
                     Text(note.title.isEmpty ? "New Note" : note.title)
-                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                     if note.locked {
-                        Image(systemName: "lock.fill").font(.system(size: 9)).foregroundStyle(Palette.faint)
+                        Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
                 HStack(spacing: 6) {
                     Text(Fmt.day(note.updatedAt))
-                        .font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.muted)
+                        .font(.caption2.weight(.medium)).foregroundStyle(Palette.muted)
                     Text(hidden ? "Locked" : snippet(note))
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                        .font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
@@ -330,8 +330,8 @@ struct NotesView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             NoteGlyph(s: 64).opacity(0.5)
-            Text("No note selected").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.muted)
-            Text("Double-click Notes to write one.").font(.system(size: 12)).foregroundStyle(Palette.faint)
+            Text("No note selected").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.muted)
+            Text("Double-click Notes to write one.").font(.caption).foregroundStyle(Palette.faint)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
@@ -340,10 +340,10 @@ struct NotesView: View {
 
     private func lockedScreen(_ note: Note) -> some View {
         VStack(spacing: 14) {
-            Image(systemName: "lock.fill").font(.system(size: 42)).foregroundStyle(Palette.amber)
+            Image(systemName: "lock.fill").font(.largeTitle).foregroundStyle(Palette.amber)
             Text(note.title.isEmpty ? "Locked Note" : note.title)
-                .font(.system(size: 17, weight: .bold)).foregroundStyle(Palette.text)
-            Text("This note is locked.").font(.system(size: 13)).foregroundStyle(Palette.muted)
+                .font(.body.weight(.bold)).foregroundStyle(Palette.text)
+            Text("This note is locked.").font(.footnote).foregroundStyle(Palette.muted)
             Button { unlocked.insert(note.id) } label: { Label("Unlock", systemImage: "lock.open.fill") }
                 .buttonStyle(KPrimaryButtonStyle(tint: Palette.amber))
         }
@@ -356,19 +356,19 @@ struct NotesView: View {
                 Spacer()
                 Button { state.togglePinNote(id) } label: {
                     Image(systemName: note.pinned ? "pin.fill" : "pin")
-                        .font(.system(size: 13)).foregroundStyle(note.pinned ? Palette.amber : Palette.muted)
+                        .font(.footnote).foregroundStyle(note.pinned ? Palette.amber : Palette.muted)
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help(note.pinned ? "Unpin" : "Pin to top")
 
                 Button { findToken += 1 } label: {
-                    Image(systemName: "magnifyingglass").font(.system(size: 13))
+                    Image(systemName: "magnifyingglass").font(.footnote)
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help("Find in Note")
 
                 ShareLink(item: shareText(note)) {
-                    Image(systemName: "square.and.arrow.up").font(.system(size: 13))
+                    Image(systemName: "square.and.arrow.up").font(.footnote)
                 }
                 .buttonStyle(KIconButtonStyle(size: 30))
                 .help("Share")
@@ -376,7 +376,7 @@ struct NotesView: View {
                 Menu {
                     noteMenu(note)
                 } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 14, weight: .bold))
+                    Image(systemName: "ellipsis").font(.footnote.weight(.bold))
                 }
                 .menuStyle(.button)
                 .buttonStyle(KIconButtonStyle(size: 30))
@@ -388,7 +388,7 @@ struct NotesView: View {
 
             TextField("", text: $draftTitle, prompt: Text("Untitled").foregroundColor(Palette.faint))
                 .textFieldStyle(.plain)
-                .font(.system(size: 26, weight: .bold))
+                .font(.title.weight(.bold))
                 .foregroundStyle(Palette.text)
                 .padding(.horizontal, 26)
                 .focused($titleFocused)

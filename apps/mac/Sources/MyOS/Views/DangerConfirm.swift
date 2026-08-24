@@ -26,17 +26,17 @@ struct DangerConfirmSheet: View {
             ZStack {
                 Circle().fill(Palette.red.opacity(0.14))
                 Image(systemName: step == 0 ? "trash.fill" : "lock.fill")
-                    .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.red)
+                    .font(.title2.weight(.semibold)).foregroundStyle(Palette.red)
                     .contentTransition(.symbolEffect(.replace))
             }
             .frame(width: 64, height: 64)
             .padding(.bottom, 14)
 
             Text(title)
-                .font(.system(size: 21, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
                 .multilineTextAlignment(.center)
             Text(stepMessage)
-                .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
@@ -53,7 +53,7 @@ struct DangerConfirmSheet: View {
             .frame(maxWidth: .infinity)
 
             if let error {
-                Text(error).font(.system(size: 12, weight: .semibold))
+                Text(error).font(.caption.weight(.semibold))
                     .foregroundStyle(Palette.red)
                     .multilineTextAlignment(.center)
                     .padding(.top, 10)
@@ -61,7 +61,7 @@ struct DangerConfirmSheet: View {
 
             Button("Cancel", action: onCancel)
                 .buttonStyle(.plain)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Palette.muted)
                 .padding(.top, 16)
         }
@@ -129,7 +129,7 @@ struct DangerConfirmSheet: View {
                 .knField(focused: fieldFocused)
             Button(action: finish) {
                 HStack(spacing: 8) {
-                    Image(systemName: "trash.fill").font(.system(size: 14, weight: .bold))
+                    Image(systemName: "trash.fill").font(.footnote.weight(.bold))
                     Text(actionLabel)
                 }
                 .frame(maxWidth: .infinity)
@@ -213,7 +213,7 @@ struct DataManagementCard: View {
         VStack(alignment: .leading, spacing: 12) {
             if boxed { SectionTitle(text: "Data management") }
             Text("Three gates: hold to confirm, then your passphrase twice. Nothing here can be undone.")
-                .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                .font(.footnote).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
 
             DangerResetRow(title: "Reset journal",
@@ -268,7 +268,7 @@ struct DangerResetRow: View {
                 Text(title).font(.system(size: 15, weight: emphatic ? .heavy : .semibold,
                                          design: emphatic ? .rounded : .default))
                     .foregroundStyle(emphatic ? tint : Palette.text)
-                Text(subtitle).font(.system(size: 13)).foregroundStyle(Palette.faint)
+                Text(subtitle).font(.footnote).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)

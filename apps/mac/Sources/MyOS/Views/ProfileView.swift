@@ -34,9 +34,9 @@ struct ProfileView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(state.profile.name.isEmpty ? "Your name" : state.profile.name)
-                        .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                     Text(state.profile.role)
-                        .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        .font(.footnote).foregroundStyle(Palette.muted)
                     HStack(spacing: 8) {
                         if let age = state.profile.age { factChip("number", "\(age) yrs") }
                         if !state.profile.bloodGroup.isEmpty { factChip("drop.fill", state.profile.bloodGroup) }
@@ -67,8 +67,8 @@ struct ProfileView: View {
 
     private func factChip(_ icon: String, _ text: String) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 9, weight: .semibold))
-            Text(text).font(.system(size: 11, weight: .medium)).lineLimit(1)
+            Image(systemName: icon).font(.caption2.weight(.semibold))
+            Text(text).font(.caption2.weight(.medium)).lineLimit(1)
         }
         .foregroundStyle(Palette.muted)
         .padding(.horizontal, 9).padding(.vertical, 4)
@@ -86,7 +86,7 @@ struct ProfileView: View {
                 Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
             } else {
                 LinearGradient(colors: [Palette.brand, Palette.brandDeep], startPoint: .top, endPoint: .bottom)
-                Text(initials).font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
+                Text(initials).font(.title2.weight(.bold)).foregroundStyle(.white)
             }
         }
         .frame(width: 64, height: 64)
@@ -96,7 +96,7 @@ struct ProfileView: View {
         .overlay(alignment: .bottomTrailing) {
             if isEditing {
                 Button(action: pickPhoto) {
-                    Image(systemName: "camera.fill").font(.system(size: 9, weight: .bold))
+                    Image(systemName: "camera.fill").font(.caption2.weight(.bold))
                         .foregroundStyle(.white).frame(width: 22, height: 22)
                         .background(Palette.blue, in: Circle())
                         .overlay(Circle().strokeBorder(Palette.surface, lineWidth: 2))
@@ -196,7 +196,7 @@ struct ProfileView: View {
                     labelledEditable("Weight (kg)", value: todayWeightText) {
                         TextField("", text: $weightDraft,
                                   prompt: Text("72").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                            .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                             .knField(focused: weightFocused)
                             .focused($weightFocused)
                             .onSubmit(commitWeight)
@@ -250,7 +250,7 @@ struct ProfileView: View {
                 labelledEditable("What I do", value: state.profile.work) {
                     TextField("", text: bind(\.work),
                               prompt: Text("One line on the work…").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .knField()
                 }
             }
@@ -268,12 +268,12 @@ struct ProfileView: View {
                               prompt: Text("Your story, work, family, goals, positioning — anything your assistant should know about you. Private: stored in your account, never in the app's code.")
                                 .foregroundColor(Palette.faint),
                               axis: .vertical)
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .lineLimit(3...10)
                         .knField()
                 } else {
                     Text(state.profile.about.isEmpty ? "Nothing yet — tap Edit profile to add context for your assistant." : state.profile.about)
-                        .font(.system(size: 13))
+                        .font(.footnote)
                         .foregroundStyle(state.profile.about.isEmpty ? Palette.faint : Palette.text)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -338,23 +338,23 @@ struct ProfileView: View {
         let value = state.profile[keyPath: keyPath]
         return HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.muted)
+                .font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
                 .frame(width: 22)
-            Text(label).font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.muted)
+            Text(label).font(.caption.weight(.medium)).foregroundStyle(Palette.muted)
                 .frame(width: 74, alignment: .leading)
             if isEditing {
                 TextField("", text: bind(keyPath),
                           prompt: Text("https://…").foregroundColor(Palette.faint))
-                    .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                    .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
             } else {
                 Text(value.isEmpty ? "—" : value)
-                    .font(.system(size: 13)).foregroundStyle(value.isEmpty ? Palette.faint : Palette.text)
+                    .font(.footnote).foregroundStyle(value.isEmpty ? Palette.faint : Palette.text)
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
             if let url = URL(string: value), url.scheme?.hasPrefix("http") == true {
                 Button { NSWorkspace.shared.open(url) } label: {
-                    Image(systemName: "arrow.up.right").font(.system(size: 11, weight: .bold))
+                    Image(systemName: "arrow.up.right").font(.caption2.weight(.bold))
                 }
                 .buttonStyle(KIconButtonStyle(size: 24))
                 .help("Open \(label)")
@@ -379,7 +379,7 @@ struct ProfileView: View {
 
     @ViewBuilder private func readText(_ value: String) -> some View {
         Text(value.isEmpty ? "—" : value)
-            .font(.system(size: 13, weight: value.isEmpty ? .regular : .semibold))
+            .font(.footnote.weight(value.isEmpty ? .regular : .semibold))
             .foregroundStyle(value.isEmpty ? Palette.faint : Palette.text)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 10)
@@ -398,7 +398,7 @@ struct ProfileView: View {
         labelledEditable(label, value: state.profile[keyPath: keyPath]) {
             TextField("", text: bind(keyPath),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .knField()
         }
     }
@@ -430,7 +430,7 @@ struct ProfileView: View {
             TextField("", text: Binding(get: { get().map(String.init) ?? "" },
                                         set: { set(Int($0.trimmingCharacters(in: .whitespaces))) }),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .knField()
         }
     }
@@ -441,7 +441,7 @@ struct ProfileView: View {
             TextField("", text: Binding(get: { get().map { Fmt.trimKg($0) } ?? "" },
                                         set: { set(Double($0.trimmingCharacters(in: .whitespaces))) }),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
-                .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .knField()
         }
     }
@@ -450,10 +450,10 @@ struct ProfileView: View {
         labelled(label) {
             HStack(spacing: 8) {
                 Text(value)
-                    .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                    .font(.footnote.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
                 Spacer()
-                Text(hint).font(.system(size: 10)).foregroundStyle(Palette.faint)
+                Text(hint).font(.caption2).foregroundStyle(Palette.faint)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             .background(Palette.surface2.opacity(0.35),
@@ -466,7 +466,7 @@ struct ProfileView: View {
     private func labelled<V: View>(_ label: String, @ViewBuilder content: () -> V) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold)).tracking(0.7)
+                .font(.caption2.weight(.semibold)).tracking(0.7)
                 .foregroundStyle(Palette.faint)
             content()
         }
@@ -489,19 +489,19 @@ private struct GoalList: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Circle().fill(color).frame(width: 7, height: 7)
-                Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.text)
+                Text(title).font(.caption.weight(.semibold)).foregroundStyle(Palette.text)
             }
             if items.isEmpty && !editing {
-                Text("—").font(.system(size: 13)).foregroundStyle(Palette.faint).padding(.leading, 2)
+                Text("—").font(.footnote).foregroundStyle(Palette.faint).padding(.leading, 2)
             }
             ForEach(Array(items.enumerated()), id: \.offset) { i, item in
                 HStack(spacing: 9) {
-                    Image(systemName: "target").font(.system(size: 10)).foregroundStyle(color)
-                    Text(item).font(.system(size: 13)).foregroundStyle(Palette.text)
+                    Image(systemName: "target").font(.caption2).foregroundStyle(color)
+                    Text(item).font(.footnote).foregroundStyle(Palette.text)
                     Spacer()
                     if editing {
                         Button { remove(i) } label: {
-                            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                            Image(systemName: "xmark").font(.caption2.weight(.bold))
                         }
                         .buttonStyle(KIconButtonStyle(size: 22))
                     }
@@ -512,11 +512,11 @@ private struct GoalList: View {
                 HStack(spacing: 8) {
                     TextField("", text: $text,
                               prompt: Text("Add a \(title.lowercased()) goal…").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .focused($focused)
                         .onSubmit(commit)
                     Button(action: commit) {
-                        Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(color)
+                        Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(color)
                     }
                     .buttonStyle(KPressStyle())
                     .opacity(text.isEmpty ? 0.35 : 1)
@@ -551,20 +551,20 @@ private struct AchievementsEditor: View {
 
             if state.profile.achievements.isEmpty {
                 Text("Nothing yet — log the wins as they land.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    .font(.footnote).foregroundStyle(Palette.faint)
             }
 
             ForEach(state.profile.achievements) { m in
                 HStack(alignment: .top, spacing: 11) {
                     Text(m.year.isEmpty ? "—" : m.year)
-                        .font(.system(size: 11, weight: .bold)).monospacedDigit()
+                        .font(.caption2.weight(.bold)).monospacedDigit()
                         .foregroundStyle(Palette.amber)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Palette.amber.opacity(0.12), in: Capsule())
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(m.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                        Text(m.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         if !m.note.isEmpty {
-                            Text(m.note).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                            Text(m.note).font(.caption).foregroundStyle(Palette.muted)
                         }
                     }
                     Spacer()
@@ -572,7 +572,7 @@ private struct AchievementsEditor: View {
                         Button {
                             state.updateProfile { $0.achievements.removeAll { $0.id == m.id } }
                         } label: {
-                            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                            Image(systemName: "xmark").font(.caption2.weight(.bold))
                         }
                         .buttonStyle(KIconButtonStyle(size: 22))
                     }
@@ -582,16 +582,16 @@ private struct AchievementsEditor: View {
             if editing {
                 HStack(spacing: 8) {
                     TextField("", text: $year, prompt: Text("Year").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .frame(width: 52)
                     Rectangle().fill(Palette.border).frame(width: 1, height: 16)
                     TextField("", text: $title,
                               prompt: Text("What did you achieve?").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .focused($focused)
                         .onSubmit(commit)
                     Button(action: commit) {
-                        Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.amber)
+                        Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.amber)
                     }
                     .buttonStyle(KPressStyle())
                     .opacity(title.isEmpty ? 0.35 : 1)
@@ -624,7 +624,7 @@ private struct HealthEditor: View {
         if editing {
             TextEditor(text: Binding(get: { state.profile.healthNotes },
                                      set: { v in state.updateProfile { $0.healthNotes = v } }))
-                .font(.system(size: 13)).foregroundStyle(Palette.text)
+                .font(.footnote).foregroundStyle(Palette.text)
                 .scrollContentBackground(.hidden)
                 .focused($focused)
                 .frame(minHeight: 64)
@@ -636,7 +636,7 @@ private struct HealthEditor: View {
                 .animation(.knFast, value: focused)
         } else {
             Text(state.profile.healthNotes.isEmpty ? "—" : state.profile.healthNotes)
-                .font(.system(size: 13))
+                .font(.footnote)
                 .foregroundStyle(state.profile.healthNotes.isEmpty ? Palette.faint : Palette.text)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)

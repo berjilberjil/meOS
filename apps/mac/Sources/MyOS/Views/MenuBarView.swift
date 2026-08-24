@@ -37,9 +37,9 @@ struct MenuBarView: View {
     private var locked: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("MyOS is locked")
-                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             Text("Unlock the app to see today's list.")
-                .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                .font(.caption).foregroundStyle(Palette.faint)
         }
     }
 
@@ -49,10 +49,10 @@ struct MenuBarView: View {
                 ring
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.text)
-                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     Text(timer.finished ? "Time's up" : (timer.running ? "Focusing" : "Paused"))
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(timer.finished ? Palette.green : Palette.faint)
                 }
                 Spacer(minLength: 0)
@@ -60,7 +60,7 @@ struct MenuBarView: View {
 
             Button { doneAndNext() } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
+                    Image(systemName: "checkmark").font(.caption2.weight(.bold))
                     Text(queue.isEmpty ? "Done — finish up" : "Done & next")
                 }
                 .frame(maxWidth: .infinity)
@@ -71,7 +71,7 @@ struct MenuBarView: View {
                 Button { toggleRun() } label: {
                     HStack(spacing: 5) {
                         Image(systemName: timer.running ? "pause.fill" : "play.fill")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                         Text(timer.running ? "Pause" : "Resume")
                     }
                     .frame(maxWidth: .infinity)
@@ -95,15 +95,15 @@ struct MenuBarView: View {
             if let next = TaskMode.nextTask(in: items) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("UP NEXT")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                        .font(.caption2.weight(.heavy)).tracking(0.6)
                         .foregroundStyle(Palette.faint)
                     Text(next.text)
-                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
                 Button { start(next) } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "play.fill").font(.system(size: 10, weight: .bold))
+                        Image(systemName: "play.fill").font(.caption2.weight(.bold))
                         Text("Start \(next.mins ?? defaultMinutes)m block")
                     }
                     .frame(maxWidth: .infinity)
@@ -112,16 +112,16 @@ struct MenuBarView: View {
                 upNext
             } else if items.isEmpty {
                 Text("Nothing on today's list.")
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("Open MyOS and write down what you need to crush.")
-                    .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                    .font(.caption2).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(spacing: 7) {
                     Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 15)).foregroundStyle(Palette.green)
+                        .font(.subheadline).foregroundStyle(Palette.green)
                     Text("Day crushed.")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                 }
             }
         }
@@ -135,7 +135,7 @@ struct MenuBarView: View {
                         style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(timer.clock)
-                .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                .font(.footnote.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(timer.finished ? Palette.green : Palette.text)
         }
         .frame(width: 58, height: 58)
@@ -145,14 +145,14 @@ struct MenuBarView: View {
         if !queue.isEmpty {
             VStack(alignment: .leading, spacing: 5) {
                 Text("THEN")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .font(.caption2.weight(.heavy)).tracking(0.6)
                     .foregroundStyle(Palette.faint)
                 // Clicking one jumps the queue — the same as picking it in the app.
                 ForEach(queue.prefix(4)) { q in
                     Button { start(q) } label: {
                         HStack(spacing: 7) {
                             Circle().fill(Palette.border).frame(width: 4, height: 4)
-                            Text(q.text).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                            Text(q.text).font(.caption).foregroundStyle(Palette.muted)
                                 .lineLimit(1)
                             Spacer(minLength: 0)
                         }
@@ -163,7 +163,7 @@ struct MenuBarView: View {
                 }
                 if queue.count > 4 {
                     Text("+\(queue.count - 4) more")
-                        .font(.system(size: 10)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                 }
             }
         }
@@ -174,7 +174,7 @@ struct MenuBarView: View {
             Button { state.toggleTaskMode() } label: {
                 HStack(spacing: 5) {
                     Image(systemName: state.taskMode.on ? "checkmark.circle.fill" : "target")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.caption2.weight(.bold))
                     Text("Task Mode")
                 }
             }
@@ -185,7 +185,7 @@ struct MenuBarView: View {
             Spacer(minLength: 0)
 
             Button { openApp() } label: {
-                Text("Open MyOS").font(.system(size: 11, weight: .heavy, design: .rounded))
+                Text("Open MyOS").font(.caption2.weight(.heavy))
             }
             .buttonStyle(KGhostButtonStyle(color: Palette.faint))
         }

@@ -21,14 +21,14 @@ struct GeneralSettingsCard: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(tint)
                     .frame(width: 28)
-                Text(title).font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                Text(title).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                 Spacer()
                 if selected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20)).foregroundStyle(Palette.green)
+                        .font(.title3).foregroundStyle(Palette.green)
                 }
             }
             .padding(.vertical, 12)

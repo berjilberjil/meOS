@@ -38,7 +38,7 @@ struct LoginView: View {
                         Spacer(minLength: 24)
 
                         Text("Berjil Jacob")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.95))
                             .padding(.bottom, 30)
                     }
@@ -58,10 +58,10 @@ struct LoginView: View {
     private var wordmark: some View {
         VStack(spacing: 3) {
             Text("MyOS")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .font(.largeTitle.weight(.bold))
                 .foregroundStyle(.white)
             Text("Your second brain. Money · Body · Mind.")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.white.opacity(0.88))
                 .multilineTextAlignment(.center)
         }
@@ -76,7 +76,7 @@ struct LoginView: View {
 
             if let err = state.authError {
                 Text(err)
-                    .font(.system(size: 13))
+                    .font(.footnote)
                     .foregroundStyle(Palette.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -86,7 +86,7 @@ struct LoginView: View {
                 HStack(spacing: 8) {
                     if state.isWorking { ProgressView().controlSize(.small).tint(Brandmark.ink) }
                     Text(isRegister ? "CREATE ACCOUNT" : "LOG IN")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .font(.subheadline.weight(.heavy))
                         .tracking(0.6)
                 }
                 .frame(maxWidth: .infinity)
@@ -106,7 +106,7 @@ struct LoginView: View {
                 withAnimation(.knFast) { isRegister.toggle(); state.authError = nil }
             } label: {
                 Text(isRegister ? "Have an account? Log in" : "New here? Create your account")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(.white.opacity(0.85))
             }
             .buttonStyle(KPressStyle())
@@ -148,7 +148,7 @@ private struct BrandField: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .font(.system(size: 16, design: .rounded))
+            .font(.callout)
             .padding(.horizontal, 18).padding(.vertical, 14)
             .background(Brandmark.ink, in: Capsule())
             .overlay(

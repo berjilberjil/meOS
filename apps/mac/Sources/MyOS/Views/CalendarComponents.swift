@@ -243,12 +243,12 @@ struct KMonthHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("\(CalMath.monthName(month)) \(String(year))")
-                .font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.callout.weight(.heavy)).foregroundStyle(Palette.text)
             Spacer()
             if showToday { Button("Today", action: onToday).buttonStyle(KGhostButtonStyle()) }
-            Button(action: onPrev) { Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold)) }
+            Button(action: onPrev) { Image(systemName: "chevron.left").font(.caption2.weight(.bold)) }
                 .buttonStyle(KIconButtonStyle(size: 26))
-            Button(action: onNext) { Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold)) }
+            Button(action: onNext) { Image(systemName: "chevron.right").font(.caption2.weight(.bold)) }
                 .buttonStyle(KIconButtonStyle(size: 26))
         }
     }

@@ -37,7 +37,7 @@ struct JournalView: View {
                 if jseg == .journal {
                     Button { showPresets = true } label: {
                         Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.muted)
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.muted)
                     }
                 }
             }
@@ -182,15 +182,15 @@ struct JournalView: View {
     private var dateNavigator: some View {
         HStack(spacing: 4) {
             Button { withAnimation(.knFast) { viewedDate = AppState.addDays(-1, to: viewedDate) } } label: {
-                Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
+                Image(systemName: "chevron.left").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 26))
             .help("Previous day")
 
             Button { showCalendar = true } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "calendar").font(.system(size: 11))
-                    Text(dateLabel).font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "calendar").font(.caption2)
+                    Text(dateLabel).font(.caption.weight(.semibold))
                 }
                 .foregroundStyle(Palette.text)
                 .padding(.horizontal, 11).padding(.vertical, 6)
@@ -206,7 +206,7 @@ struct JournalView: View {
             }
 
             Button { withAnimation(.knFast) { viewedDate = AppState.addDays(1, to: viewedDate) } } label: {
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
+                Image(systemName: "chevron.right").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 26))
             .disabled(isToday)
@@ -292,15 +292,15 @@ private struct StreakCard: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
                     Text("\(info.count)")
-                        .font(.system(size: 34, weight: .bold)).monospacedDigit()
+                        .font(.largeTitle.weight(.bold)).monospacedDigit()
                         .foregroundStyle(info.count > 0 ? Palette.text : Palette.faint)
                     Text("day streak")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(info.count > 0 ? Palette.muted : Palette.faint)
                     Spacer(minLength: 0)
                 }
                 Text(subtitle(count: info.count, todayDone: todayDone))
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Palette.muted)
 
                 weekStrip
@@ -326,7 +326,7 @@ private struct StreakCard: View {
                 let isFuture = key > today
                 VStack(spacing: 6) {
                     Text(letters[i])
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(isToday ? Palette.amber : Palette.faint)
                     Group {
                         if isFuture {
@@ -336,7 +336,7 @@ private struct StreakCard: View {
                             // Outline flame under today so the highlight and the
                             // fire sit on the same column (not under yesterday).
                             Image(systemName: "flame")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                                 .foregroundStyle(Palette.amber.opacity(0.85))
                         } else {
                             StreakFlame(day: state.journalStreakDay(key), size: isToday ? 16 : 14)
@@ -409,17 +409,17 @@ struct StreakCalendar: View {
         HStack(spacing: 14) {
             HStack(spacing: 5) {
                 StreakFlame(day: .done, size: 10)
-                Text("Journalled").font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.muted)
+                Text("Journalled").font(.caption2.weight(.medium)).foregroundStyle(Palette.muted)
             }
             HStack(spacing: 5) {
                 StreakFlame(day: .frozen, size: 10)
-                Text("Streak freeze").font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.muted)
+                Text("Streak freeze").font(.caption2.weight(.medium)).foregroundStyle(Palette.muted)
             }
             Spacer()
             HStack(spacing: 4) {
-                Image(systemName: "flame.fill").font(.system(size: 9)).foregroundStyle(Palette.flame)
+                Image(systemName: "flame.fill").font(.caption2).foregroundStyle(Palette.flame)
                 Text("\(state.journalStreak)d")
-                    .font(.system(size: 10, weight: .bold)).monospacedDigit()
+                    .font(.caption2.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
             }
         }
@@ -429,15 +429,15 @@ struct StreakCalendar: View {
     private var header: some View {
         HStack {
             Button { shiftMonth(-1) } label: {
-                Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
+                Image(systemName: "chevron.left").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 24))
             Spacer()
             Text(monthTitle)
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             Spacer()
             Button { shiftMonth(1) } label: {
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold))
+                Image(systemName: "chevron.right").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 24))
             .disabled(isCurrentMonth)
@@ -449,7 +449,7 @@ struct StreakCalendar: View {
         HStack(spacing: 0) {
             ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { _, d in
                 Text(d)
-                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.faint)
+                    .font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -491,12 +491,12 @@ struct StreakCalendar: View {
         } label: {
             VStack(spacing: 3) {
                 Text("\(dayNum)")
-                    .font(.system(size: 12, weight: isViewed ? .bold : .medium)).monospacedDigit()
+                    .font(.caption.weight(isViewed ? .bold : .medium)).monospacedDigit()
                     .foregroundStyle(isViewed ? .white : (isFuture ? Palette.faint : Palette.text))
                 Group {
                     if isViewed && day != .none {
                         Image(systemName: "flame.fill")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(.white)
                     } else {
                         StreakFlame(day: day, size: 9)
@@ -602,14 +602,14 @@ private struct MoodSlider: View {
             HStack(spacing: 0) {
                 ForEach(1...5, id: \.self) { m in
                     Text("\(m)")
-                        .font(.system(size: 11, weight: .bold)).monospacedDigit()
+                        .font(.caption2.weight(.bold)).monospacedDigit()
                         .foregroundStyle(m == value ? moodTint(m) : Palette.faint)
                         .frame(maxWidth: .infinity)
                 }
             }
 
             Text(mood == nil ? "Slide to set — \(words[value - 1])" : words[value - 1])
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(mood == nil ? Palette.faint : moodTint(value))
         }
     }
@@ -629,7 +629,7 @@ private struct ReflectionEditor: View {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: title)
                 TextEditor(text: $text)
-                    .font(.system(size: 14)).foregroundStyle(Palette.text)
+                    .font(.footnote).foregroundStyle(Palette.text)
                     .scrollContentBackground(.hidden)
                     .focused($focused)
                     .frame(minHeight: 56)
@@ -640,7 +640,7 @@ private struct ReflectionEditor: View {
                         .strokeBorder(focused ? Palette.brand.opacity(0.7) : Palette.border, lineWidth: 1))
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
-                            Text(prompt).font(.system(size: 13)).foregroundStyle(Palette.faint)
+                            Text(prompt).font(.footnote).foregroundStyle(Palette.faint)
                                 .padding(.horizontal, 15).padding(.vertical, 18).allowsHitTesting(false)
                         }
                     }
@@ -685,21 +685,21 @@ private struct JournalListCard: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { i, item in
                     HStack(spacing: 9) {
                         Circle().fill(color).frame(width: 6, height: 6)
-                        Text(item).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        Text(item).font(.footnote).foregroundStyle(Palette.text)
                         Spacer()
                         Button { remove(i) } label: {
-                            Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                            Image(systemName: "xmark").font(.caption2.weight(.bold))
                         }
                         .buttonStyle(KIconButtonStyle(size: 22))
                     }
                 }
                 HStack(spacing: 8) {
                     TextField("", text: $text, prompt: Text("Add to \(title.lowercased())…").foregroundColor(Palette.faint))
-                        .textFieldStyle(.plain).font(.system(size: 13)).foregroundStyle(Palette.text)
+                        .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .focused($focused)
                         .onSubmit(commit)
                     Button(action: commit) {
-                        Image(systemName: "plus.circle.fill").font(.system(size: 17)).foregroundStyle(color)
+                        Image(systemName: "plus.circle.fill").font(.body).foregroundStyle(color)
                     }
                     .buttonStyle(KPressStyle())
                     .opacity(text.isEmpty ? 0.35 : 1)

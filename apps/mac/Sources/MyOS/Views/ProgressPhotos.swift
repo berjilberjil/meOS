@@ -47,7 +47,7 @@ struct ProgressPhotosCard: View {
                     if !photos.isEmpty {
                         Button { withAnimation(.knNormal) { showCalendar.toggle() } } label: {
                             Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.footnote.weight(.bold))
                         }
                         .buttonStyle(KIconButtonStyle(size: 28, color: showCalendar ? Palette.brand : Palette.faint))
                         .help(showCalendar ? "Hide the calendar" : "Pick a day")
@@ -58,7 +58,7 @@ struct ProgressPhotosCard: View {
                 if photos.isEmpty {
                     Text(dropTargeted ? "Drop it here."
                                       : "Drop a photo here (or click Add) to track how your body changes over time. Syncs from iPhone too.")
-                        .font(.system(size: 13)).foregroundStyle(dropTargeted ? Palette.brand : Palette.faint)
+                        .font(.footnote).foregroundStyle(dropTargeted ? Palette.brand : Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 14)
@@ -97,9 +97,9 @@ struct ProgressPhotosCard: View {
         if ProgressPhotoSync.isSyncing {
             ProgressView().controlSize(.small)
         } else if !ProgressPhotoStore.pending().isEmpty {
-            Image(systemName: "icloud.and.arrow.up").font(.system(size: 12)).foregroundStyle(Palette.amber)
+            Image(systemName: "icloud.and.arrow.up").font(.caption).foregroundStyle(Palette.amber)
         } else if !photos.isEmpty {
-            Image(systemName: "icloud.fill").font(.system(size: 12)).foregroundStyle(Palette.teal)
+            Image(systemName: "icloud.fill").font(.caption).foregroundStyle(Palette.teal)
         }
     }
 
@@ -113,7 +113,7 @@ struct ProgressPhotosCard: View {
         Group {
             if stripPhotos.isEmpty {
                 Text("No photo for \(Fmt.day(selectedDate)) yet.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                    .font(.caption).foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -175,11 +175,11 @@ struct ProgressPhotosCard: View {
                         .frame(width: 92, height: 122)
                         .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
-                    Text(Fmt.day(p.date)).font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.faint)
+                    Text(Fmt.day(p.date)).font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
                 }
                 if !ProgressPhotoStore.isSynced(p.id) {
                     Image(systemName: "icloud.and.arrow.up.fill")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(4)
                         .background(Palette.amber, in: Circle())
@@ -205,11 +205,11 @@ private struct DeleteWithConfirmButton: View {
     @State private var confirming = false
 
     var body: some View {
-        Button { confirming = true } label: { Image(systemName: "trash").font(.system(size: 13, weight: .bold)) }
+        Button { confirming = true } label: { Image(systemName: "trash").font(.footnote.weight(.bold)) }
             .buttonStyle(KIconButtonStyle(size: 30, color: Palette.red))
             .popover(isPresented: $confirming, arrowEdge: .bottom) {
                 VStack(spacing: 12) {
-                    Text("Delete this photo?").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.text)
+                    Text("Delete this photo?").font(.footnote.weight(.bold)).foregroundStyle(Palette.text)
                     HoldToConfirmButton(label: "Hold to delete") {
                         confirming = false
                         onDelete()
@@ -283,15 +283,15 @@ private struct ProgressPhotoViewer: View {
             Spacer()
             VStack(spacing: 2) {
                 Text(Fmt.day(current?.date ?? start.date))
-                    .font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    .font(.callout.weight(.heavy)).foregroundStyle(Palette.text)
                 if live.count > 1 {
                     Text("\(index + 1) of \(live.count)")
-                        .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                        .font(.caption2.weight(.semibold)).monospacedDigit()
                         .foregroundStyle(Palette.faint)
                 }
             }
             Spacer()
-            Button(action: onClose) { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
+            Button(action: onClose) { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
                 .buttonStyle(KIconButtonStyle(size: 30))
         }
     }
@@ -323,7 +323,7 @@ private struct ProgressPhotoViewer: View {
     }
 
     private func arrow(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: icon).font(.system(size: 14, weight: .bold)) }
+        Button(action: action) { Image(systemName: icon).font(.footnote.weight(.bold)) }
             .buttonStyle(KIconButtonStyle(size: 34))
             .disabled(!enabled)
             .opacity(enabled ? 0.85 : 0)

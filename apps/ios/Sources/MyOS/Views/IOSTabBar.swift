@@ -41,9 +41,9 @@ struct IOSTabBar: View {
         } label: {
             VStack(spacing: 3) {
                 Image(systemName: t.icon)
-                    .font(.system(size: 18, weight: on ? .semibold : .regular))
+                    .font(.body.weight(on ? .semibold : .regular))
                 Text(t.title)
-                    .font(.system(size: 10, weight: on ? .semibold : .medium))
+                    .font(.caption2.weight(on ? .semibold : .medium))
                     .lineLimit(1)
             }
             .foregroundStyle(on ? t.tint : Palette.muted)
@@ -63,7 +63,7 @@ struct IOSTabBar: View {
                     .frame(width: 46, height: 46)
                     .shadow(color: Palette.teal.opacity(0.28), radius: 6, y: 2)
                 Image(systemName: "viewfinder")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.body.weight(.bold))
                     .foregroundStyle(.white)
             }
             .offset(y: -10)

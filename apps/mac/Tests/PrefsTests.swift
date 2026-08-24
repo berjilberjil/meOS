@@ -103,20 +103,24 @@ final class PrefsTests: XCTestCase {
 
     // MARK: - Appearance
 
-    func testSettingsOffersOnlyLightAndDark() {
-        XCTAssertEqual(AppTheme.all.map(\.name), ["Dark", "Light"])
-        XCTAssertEqual(AppTheme.all.count, 2)
+    func testSettingsOffersSystemLightAndDark() {
+        XCTAssertEqual(AppTheme.all.map(\.name), ["System", "Light", "Dark"])
+        XCTAssertEqual(AppTheme.all.count, 3)
     }
 
-    func testLegacyMidnightMapsToDark() {
-        XCTAssertEqual(AppTheme.by(id: "midnight").id, "foldDark")
-        XCTAssertEqual(AppTheme.by(id: "foldDark").name, "Dark")
+    func testRetiredColourThemeIdsMigrateToSystem() {
+        // "foldDark" and "midnight" named colour SETS. Since the palette became
+        // the system's, an appearance is all that is left to choose, so anyone
+        // upgrading lands on System rather than an id that no longer exists.
+        XCTAssertEqual(AppTheme.by(id: "foldDark").id, "system")
+        XCTAssertEqual(AppTheme.by(id: "midnight").id, "system")
         XCTAssertEqual(AppTheme.by(id: "light").name, "Light")
     }
 
     func testThemeColorSchemeMatchesAppearance() {
-        XCTAssertEqual(AppTheme.foldDark.colorScheme, .dark)
+        // nil is the point: it hands the decision back to the OS.
+        XCTAssertNil(AppTheme.system.colorScheme)
+        XCTAssertEqual(AppTheme.dark.colorScheme, .dark)
         XCTAssertEqual(AppTheme.light.colorScheme, .light)
-        XCTAssertEqual(AppTheme.by(id: "midnight").colorScheme, .dark)
     }
 }

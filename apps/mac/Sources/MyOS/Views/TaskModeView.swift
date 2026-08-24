@@ -37,7 +37,7 @@ struct TaskModeView: View {
     @ViewBuilder private var origin: some View {
         if state.taskModeCameFromElsewhere {
             Text("Turned on from your \(state.taskMode.device)")
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint)
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Palette.surface2, in: Capsule())

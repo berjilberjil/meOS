@@ -16,20 +16,20 @@ struct DayMacroHero: View {
         return Card(padding: 18) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("INTAKE")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(0.8)
+                    .font(.caption.weight(.heavy)).tracking(0.8)
                     .foregroundStyle(Palette.muted)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(Int(eaten.calories.rounded()))")
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .font(.largeTitle.weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(Palette.amber)
                     Text(goal > 0 ? "/ \(goal) kcal" : "kcal")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Palette.muted)
                     Spacer()
                     if goal > 0 {
                         Text("\(remain) left")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(Palette.faint)
                     }
                 }
@@ -47,17 +47,17 @@ struct DayMacroHero: View {
     private func macro(_ label: String, _ have: Int, _ target: Int?, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
-                .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.4)
+                .font(.caption2.weight(.heavy)).tracking(0.4)
                 .foregroundStyle(tint)
             if let target, target > 0 {
                 Text("\(have)")
-                    .font(.system(size: 18, weight: .bold, design: .rounded)).monospacedDigit()
+                    .font(.body.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
-                Text("/ \(target)g").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                Text("/ \(target)g").font(.caption2).foregroundStyle(Palette.faint)
                 MeterBar(fraction: min(1, Double(have) / Double(target)), tint: tint, height: 5)
             } else {
                 Text("\(have)g")
-                    .font(.system(size: 18, weight: .bold, design: .rounded)).monospacedDigit()
+                    .font(.body.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
             }
         }
@@ -136,16 +136,16 @@ struct MealChecklistCard: View {
     @ViewBuilder private var header: some View {
         HStack(spacing: 8) {
             Label(meal.label, systemImage: meal.icon)
-                .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.body.weight(.semibold)).foregroundStyle(Palette.text)
             Spacer()
             switch st {
             case .logged:
                 let m = macros(logged)
                 Text("\(Int(m.calories)) kcal · \(Int(m.protein))g P")
-                    .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
-                Image(systemName: "checkmark.circle.fill").font(.system(size: 15)).foregroundStyle(Palette.green)
+                    .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.muted)
+                Image(systemName: "checkmark.circle.fill").font(.subheadline).foregroundStyle(Palette.green)
             case .skipped:
-                Image(systemName: "minus.circle.fill").font(.system(size: 15)).foregroundStyle(Palette.faint)
+                Image(systemName: "minus.circle.fill").font(.subheadline).foregroundStyle(Palette.faint)
             case .unconfirmed:
                 EmptyView()
             }
@@ -155,7 +155,7 @@ struct MealChecklistCard: View {
     @ViewBuilder private var unconfirmedBody: some View {
         if planned.isEmpty {
             Text("Nothing planned. Add, scan, or skip it.")
-                .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                .font(.caption).foregroundStyle(Palette.faint)
         } else {
             ForEach(planned) { item in itemRow(item, ghost: true) }
             SlideToConfirm(label: "Slide to log", tint: Palette.green) {
@@ -176,7 +176,7 @@ struct MealChecklistCard: View {
 
     @ViewBuilder private var skippedBody: some View {
         HStack {
-            Text("Skipped").font(.system(size: 13, weight: .semibold)).strikethrough().foregroundStyle(Palette.faint)
+            Text("Skipped").font(.footnote.weight(.semibold)).strikethrough().foregroundStyle(Palette.faint)
             Spacer()
             Button { state.unskipMeal(date: date, meal: meal) } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .buttonStyle(KGhostButtonStyle())
@@ -198,10 +198,10 @@ struct MealChecklistCard: View {
         let kcal = Int((f?.perServing.scaled(item.quantity).calories) ?? 0)
         return HStack(spacing: 10) {
             FoodIcon(category: f?.category ?? .other, name: f?.name ?? "", size: 28)
-            Text(f?.name ?? "Unknown").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+            Text(f?.name ?? "Unknown").font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
             Spacer()
             Text("\(Fmt.trimKg(item.quantity)) × · \(kcal) kcal")
-                .font(.system(size: 11)).monospacedDigit().foregroundStyle(Palette.faint).lineLimit(1)
+                .font(.caption2).monospacedDigit().foregroundStyle(Palette.faint).lineLimit(1)
         }
         .opacity(ghost ? 0.55 : 1)
     }
@@ -256,17 +256,17 @@ struct WorkoutChecklistCard: View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
                 Label("Workout", systemImage: "figure.strengthtraining.traditional")
-                    .font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    .font(.footnote.weight(.heavy)).foregroundStyle(Palette.text)
                 if let r = resolved {
                     Text(r.day.isRestDay ? r.program.name : "\(r.day.name) · \(r.program.name)")
-                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .font(.caption2).foregroundStyle(Palette.faint)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: 4)
             switch dayLog.state {
-            case .done:    Image(systemName: "checkmark.circle.fill").font(.system(size: 15)).foregroundStyle(Palette.green)
-            case .skipped: Image(systemName: "minus.circle.fill").font(.system(size: 15)).foregroundStyle(Palette.faint)
+            case .done:    Image(systemName: "checkmark.circle.fill").font(.subheadline).foregroundStyle(Palette.green)
+            case .skipped: Image(systemName: "minus.circle.fill").font(.subheadline).foregroundStyle(Palette.faint)
             case .unconfirmed: EmptyView()
             }
             if resolved != nil { optionsMenu }
@@ -300,7 +300,7 @@ struct WorkoutChecklistCard: View {
                 Button("Start the log over") { state.resetSession(date: date) }
             }
         } label: {
-            Image(systemName: "ellipsis").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.faint)
+            Image(systemName: "ellipsis").font(.footnote.weight(.bold)).foregroundStyle(Palette.faint)
                 .frame(width: 28, height: 28).contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
@@ -327,9 +327,9 @@ struct WorkoutChecklistCard: View {
             Text(state.programs.isEmpty
                  ? "No training program yet."
                  : "No program is active, so nothing is scheduled.")
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             Text("Build one in Fitness → Programs: name it, add your days, pick the muscles and exercises. After that Today always knows what's on.")
-                .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                .font(.caption).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -339,7 +339,7 @@ struct WorkoutChecklistCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "moon.zzz.fill").foregroundStyle(Palette.blue)
                 Text(dayLog.restOverride ? "Rest day — you called it." : "Rest day — nothing scheduled.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
             }
             Button { choosing = true } label: { Label("Train anyway", systemImage: "figure.run") }
                 .buttonStyle(KGhostButtonStyle())
@@ -353,7 +353,7 @@ struct WorkoutChecklistCard: View {
             if r.day.exerciseCount == 0 {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("\(r.day.name) has no exercises yet.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                     Button { editingDay = true } label: { Label("Build this day", systemImage: "plus") }
                         .buttonStyle(KSecondaryButtonStyle())
                 }
@@ -366,7 +366,7 @@ struct WorkoutChecklistCard: View {
                 } else {
                     Button { session = true } label: {
                         Label("Start workout", systemImage: "play.fill")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                     }
                     .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
                 }
@@ -381,9 +381,9 @@ struct WorkoutChecklistCard: View {
         return VStack(alignment: .leading, spacing: 8) {
             MeterBar(fraction: Double(done) / Double(max(1, total)), tint: Palette.brand, height: 6)
             Text("\(done) of \(total) sets logged")
-                .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
+                .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             Button { session = true } label: {
-                Label("Continue workout", systemImage: "play.fill").font(.system(size: 15, weight: .semibold))
+                Label("Continue workout", systemImage: "play.fill").font(.subheadline.weight(.semibold))
             }
             .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
         }
@@ -392,15 +392,15 @@ struct WorkoutChecklistCard: View {
     private func groupRow(_ block: ProgramMuscleBlock) -> some View {
         HStack(spacing: 10) {
             Image(systemName: block.group.icon)
-                .font(.system(size: 12, weight: .bold)).foregroundStyle(block.group.tint)
+                .font(.caption.weight(.bold)).foregroundStyle(block.group.tint)
                 .frame(width: 26, height: 26)
                 .background(block.group.tint.opacity(0.15),
                             in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
             Text(block.group.label)
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             Spacer(minLength: 4)
             Text("\(block.items.count) exercise\(block.items.count == 1 ? "" : "s")")
-                .font(.system(size: 11)).monospacedDigit().foregroundStyle(Palette.faint)
+                .font(.caption2).monospacedDigit().foregroundStyle(Palette.faint)
         }
     }
 
@@ -414,17 +414,17 @@ struct WorkoutChecklistCard: View {
                     groupRow(block)
                 }
             }
-            Text("Done as planned.").font(.system(size: 11)).foregroundStyle(Palette.faint)
+            Text("Done as planned.").font(.caption2).foregroundStyle(Palette.faint)
         } else {
             VStack(spacing: 6) {
                 ForEach(entries) { e in
                     HStack(spacing: 10) {
                         Circle().fill(e.group.tint).frame(width: 6, height: 6)
                         Text(state.exercise(e.exerciseId)?.name ?? "Exercise")
-                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                            .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                         Spacer(minLength: 4)
                         Text(e.topWeight.map { "\(e.doneSets) × \(Fmt.trimKg($0)) kg" } ?? "\(e.doneSets) sets")
-                            .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
+                            .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.faint)
                     }
                 }
             }
@@ -435,7 +435,7 @@ struct WorkoutChecklistCard: View {
 
     private var skippedBody: some View {
         HStack {
-            Text("Skipped").font(.system(size: 13, weight: .semibold)).strikethrough().foregroundStyle(Palette.faint)
+            Text("Skipped").font(.footnote.weight(.semibold)).strikethrough().foregroundStyle(Palette.faint)
             Spacer()
             Button { state.unskipWorkout(date: date) } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .buttonStyle(KGhostButtonStyle())
@@ -468,17 +468,17 @@ struct ProgramDayPickerSheet: View {
                             HStack(spacing: 10) {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(d.name)
-                                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                                        .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                                     Text(d.groupSummary.isEmpty ? "Nothing planned" : d.groupSummary)
-                                        .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                                        .font(.caption).foregroundStyle(Palette.muted)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                                 Spacer(minLength: 4)
                                 Text("\(d.exerciseCount)")
-                                    .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                                    .font(.footnote.weight(.heavy)).monospacedDigit()
                                     .foregroundStyle(Palette.faint)
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
+                                    .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                             }
                             .padding(13)
                             .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -498,7 +498,7 @@ struct ProgramDayPickerSheet: View {
                             .buttonStyle(KGhostButtonStyle())
                     }
                 } else {
-                    Text("No active program.").font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    Text("No active program.").font(.footnote).foregroundStyle(Palette.faint)
                 }
             }
         }
@@ -579,7 +579,7 @@ struct MealLogEditorSheet: View {
                     }
                     Button { adding = true } label: {
                         Label("Add food", systemImage: "plus")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.callout.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
@@ -613,26 +613,26 @@ struct MealLogEditorSheet: View {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).fill(mealTint.opacity(0.18))
-                    Image(systemName: meal.icon).font(.system(size: 18, weight: .semibold)).foregroundStyle(mealTint)
+                    Image(systemName: meal.icon).font(.body.weight(.semibold)).foregroundStyle(mealTint)
                 }
                 .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(meal.label)
-                        .font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                     Text(draft.isEmpty ? "Nothing logged" : "\(draft.count) food\(draft.count == 1 ? "" : "s")")
-                        .font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        .font(.footnote).foregroundStyle(Palette.muted)
                 }
                 Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 14, weight: .bold)) }
+                Button { dismiss() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)) }
                     .buttonStyle(KIconButtonStyle(size: 32))
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(Int(mealMacros.calories.rounded()))")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(.largeTitle.weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(mealTint)
                 Text("kcal")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(Palette.muted)
             }
             HStack(spacing: 8) {
@@ -651,10 +651,10 @@ struct MealLogEditorSheet: View {
     private func macroChip(_ label: String, _ grams: Int, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .font(.caption2.weight(.heavy))
                 .foregroundStyle(tint)
             Text("\(grams)g")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.callout.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(Palette.text)
         }
@@ -667,13 +667,13 @@ struct MealLogEditorSheet: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: meal.icon)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.title2.weight(.semibold))
                 .foregroundStyle(mealTint)
             Text("Nothing in this meal yet")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(Palette.text)
             Text("Add a food or scan a plate.")
-                .font(.system(size: 14))
+                .font(.footnote)
                 .foregroundStyle(Palette.muted)
         }
         .frame(maxWidth: .infinity)
@@ -689,7 +689,7 @@ struct MealLogEditorSheet: View {
                 state.setMealItems(date: date, meal: meal, items: draft); dismiss()
             }
             Button("Cancel") { dismiss() }
-                .font(.system(size: 16, weight: .semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(Palette.muted)
         }
         .padding(.horizontal, 20)
@@ -712,20 +712,20 @@ private struct DraftFoodRow: View {
             FoodIcon(category: food?.category ?? .other, name: food?.name ?? "", size: 46)
             VStack(alignment: .leading, spacing: 3) {
                 Text(food?.name ?? "Unknown")
-                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                    .font(.callout.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Text("\(food?.servingLabel ?? "serving") · \(Int(macros.calories.rounded())) kcal")
-                    .font(.system(size: 13)).monospacedDigit().foregroundStyle(Palette.faint).lineLimit(1)
+                    .font(.footnote).monospacedDigit().foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 8)
             HStack(spacing: 6) {
                 qtyBtn("minus") { item.quantity = max(0.5, item.quantity - 0.5) }
                 Text(Fmt.trimKg(item.quantity))
-                    .font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
+                    .font(.body.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text).frame(minWidth: 28)
                 qtyBtn("plus") { item.quantity += 0.5 }
             }
             Button { showDelete = true } label: {
-                Image(systemName: "xmark").font(.system(size: 11, weight: .bold))
+                Image(systemName: "xmark").font(.caption2.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 28))
             .holdToDelete(isPresented: $showDelete, title: "Remove \(food?.name ?? "food")?",
@@ -740,7 +740,7 @@ private struct DraftFoodRow: View {
 
     private func qtyBtn(_ icon: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.text)
+            Image(systemName: icon).font(.caption.weight(.bold)).foregroundStyle(Palette.text)
                 .frame(width: 34, height: 34)
                 .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }

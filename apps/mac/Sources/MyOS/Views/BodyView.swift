@@ -16,8 +16,8 @@ struct BodyView: View {
             } else if let err = state.anatomyError {
                 Card {
                     VStack(spacing: 10) {
-                        Text("Couldn't load body map").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
-                        Text(err).font(.system(size: 12)).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
+                        Text("Couldn't load body map").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                        Text(err).font(.caption).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
                         Button("Retry") { Task { state.anatomy = nil; state.anatomyError = nil; await state.loadAnatomy() } }
                             .buttonStyle(KSecondaryButtonStyle())
                     }
@@ -26,7 +26,7 @@ struct BodyView: View {
             } else {
                 Card {
                     HStack(spacing: 10) { ProgressView().controlSize(.small)
-                        Text("Loading anatomy…").font(.system(size: 13)).foregroundStyle(Palette.muted) }
+                        Text("Loading anatomy…").font(.footnote).foregroundStyle(Palette.muted) }
                         .frame(maxWidth: .infinity).padding(.vertical, 30)
                 }
             }
@@ -68,7 +68,7 @@ struct BodyView: View {
                 ForEach(groups) { g in
                     let on = g.id == sel
                     Button { selectedId = g.id; side = g.view } label: {
-                        Text(g.name).font(.system(size: 12, weight: .heavy, design: .rounded))
+                        Text(g.name).font(.caption.weight(.heavy))
                             .foregroundStyle(on ? .white : Palette.muted)
                             .padding(.horizontal, 12).padding(.vertical, 7)
                             .background(on ? Palette.brand : Palette.surface2.opacity(0.6), in: Capsule())
@@ -147,18 +147,18 @@ struct MuscleDetailCard: View {
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                Text(group.name).font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                Text(group.blurb).font(.system(size: 13)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                Text(group.name).font(.body.weight(.heavy)).foregroundStyle(Palette.text)
+                Text(group.blurb).font(.footnote).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                 ForEach(Array(group.muscles.enumerated()), id: \.offset) { i, m in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
-                            Text("\(i + 1)").font(.system(size: 11, weight: .heavy)).frame(width: 20, height: 20)
+                            Text("\(i + 1)").font(.caption2.weight(.heavy)).frame(width: 20, height: 20)
                                 .background(Palette.brand.opacity(0.15), in: Circle()).foregroundStyle(Palette.brand)
-                            Text(m.name).font(.system(size: 14, weight: .bold)).foregroundStyle(Palette.text)
+                            Text(m.name).font(.footnote.weight(.bold)).foregroundStyle(Palette.text)
                         }
-                        Text(m.what).font(.system(size: 12.5)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
-                        (Text("TRAIN  ").font(.system(size: 10, weight: .heavy)).foregroundColor(Palette.faint)
-                         + Text(m.train).font(.system(size: 12)).foregroundColor(Palette.text))
+                        Text(m.what).font(.caption).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                        (Text("TRAIN  ").font(.caption2.weight(.heavy)).foregroundColor(Palette.faint)
+                         + Text(m.train).font(.caption).foregroundColor(Palette.text))
                     }
                     .padding(.vertical, 3)
                 }
@@ -189,7 +189,7 @@ struct ActivationList: View {
                         // These come from a reference dataset, not from
                         // anything measured on you — the caption says so rather
                         // than letting "96%" imply a lab.
-                        Text("reference ranking").font(.system(size: 10)).foregroundStyle(Palette.faint)
+                        Text("reference ranking").font(.caption2).foregroundStyle(Palette.faint)
                     }
                     ForEach(Array(rows.enumerated()), id: \.offset) { i, r in
                         Button { demo = r.ex } label: { row(i, r.ex, r.percent) }.buttonStyle(KPressStyle())
@@ -202,14 +202,14 @@ struct ActivationList: View {
 
     private func row(_ i: Int, _ ex: Exercise, _ percent: Double) -> some View {
         HStack(spacing: 10) {
-            Text("\(i + 1)").font(.system(size: 12, weight: .heavy, design: .rounded))
+            Text("\(i + 1)").font(.caption.weight(.heavy))
                 .foregroundStyle(i == 0 ? Palette.brand : Palette.faint).frame(width: 16)
             ExerciseIcon(category: ex.category, size: 34)
             VStack(alignment: .leading, spacing: 5) {
-                Text(ex.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Text(ex.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 MeterBar(fraction: percent / 100, tint: Palette.brand, height: 5)
             }
-            Text("\(Int(percent))%").font(.system(size: 12, weight: .heavy, design: .rounded))
+            Text("\(Int(percent))%").font(.caption.weight(.heavy))
                 .foregroundStyle(i == 0 ? Palette.brand : Palette.muted).frame(width: 36, alignment: .trailing)
         }
         .padding(.horizontal, 10).padding(.vertical, 7)

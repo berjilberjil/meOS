@@ -44,7 +44,7 @@ struct ProgramsView: View {
     private var missing: some View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
-                Text("That program is gone.").font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("That program is gone.").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                 Button("Back to programs") { route = .list }.buttonStyle(KSecondaryButtonStyle())
             }
         }
@@ -77,7 +77,7 @@ struct ProgramListView: View {
 
                 Button { creating = true } label: {
                     Label("Create program", systemImage: "plus")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                 }
                 .buttonStyle(KSecondaryButtonStyle(fullWidth: true))
                 .knRise(1)
@@ -91,15 +91,15 @@ struct ProgramListView: View {
         Card(padding: 22) {
             VStack(alignment: .leading, spacing: 14) {
                 Image(systemName: "list.bullet.rectangle.portrait")
-                    .font(.system(size: 26, weight: .semibold)).foregroundStyle(Palette.brand)
+                    .font(.title.weight(.semibold)).foregroundStyle(Palette.brand)
                 Text("No programs yet")
-                    .font(.system(size: 20, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("A program holds your whole training week — the days, what each day trains, and which exercises you use for it. Build it once and Today knows what's on.")
-                    .font(.system(size: 14)).foregroundStyle(Palette.muted)
+                    .font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button { creating = true } label: {
                     Label("Create my first program", systemImage: "plus")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                 }
                 .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
             }
@@ -124,12 +124,12 @@ private struct ProgramCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Text(program.name)
-                                .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.text)
+                                .font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                                 .fixedSize(horizontal: false, vertical: true)
                             if isActive { ActivePill() }
                         }
                         Text(subtitle)
-                            .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                            .font(.caption).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 4)
@@ -137,7 +137,7 @@ private struct ProgramCard: View {
                 }
 
                 if let notes = program.notes, !notes.isEmpty {
-                    Text(notes).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                    Text(notes).font(.footnote).foregroundStyle(Palette.muted)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -153,19 +153,19 @@ private struct ProgramCard: View {
                     if isActive {
                         Button(action: open) {
                             Label("Continue", systemImage: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                         }
                         .buttonStyle(KPrimaryButtonStyle())
                     } else {
                         Button(action: open) {
                             Label("View", systemImage: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                         }
                         .buttonStyle(KSecondaryButtonStyle())
                     }
                     if !isActive {
                         Button { state.setActiveProgram(program.id) } label: {
-                            Label("Set active", systemImage: "bolt.fill").font(.system(size: 14, weight: .semibold))
+                            Label("Set active", systemImage: "bolt.fill").font(.footnote.weight(.semibold))
                         }
                         .buttonStyle(KGhostButtonStyle(color: Palette.brand))
                     }
@@ -202,7 +202,7 @@ private struct ProgramCard: View {
             Divider()
             Button("Delete", role: .destructive) { showDelete = true }
         } label: {
-            Image(systemName: "ellipsis").font(.system(size: 14, weight: .bold)).foregroundStyle(Palette.faint)
+            Image(systemName: "ellipsis").font(.footnote.weight(.bold)).foregroundStyle(Palette.faint)
                 .frame(width: 30, height: 30).contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 30)
@@ -216,7 +216,7 @@ private struct ProgramCard: View {
 struct ActivePill: View {
     var body: some View {
         Text("ACTIVE")
-            .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6)
+            .font(.caption2.weight(.heavy)).tracking(0.6)
             .foregroundStyle(Palette.brand)
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(Palette.brand.opacity(0.16), in: Capsule())
@@ -255,20 +255,20 @@ struct ProgramDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(p.name)
-                    .font(.system(size: 26, weight: .semibold)).foregroundStyle(Palette.text)
+                    .font(.title.weight(.semibold)).foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
                 if p.id == state.training.activeProgramId { ActivePill() }
                 Spacer(minLength: 0)
             }
-            Text(subtitle(p)).font(.system(size: 13)).foregroundStyle(Palette.faint)
+            Text(subtitle(p)).font(.footnote).foregroundStyle(Palette.faint)
             if let n = p.notes, !n.isEmpty {
-                Text(n).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                Text(n).font(.footnote).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
                 if p.id != state.training.activeProgramId {
                     Button { state.setActiveProgram(p.id) } label: {
-                        Label("Set as active", systemImage: "bolt.fill").font(.system(size: 14, weight: .semibold))
+                        Label("Set as active", systemImage: "bolt.fill").font(.footnote.weight(.semibold))
                     }
                     .buttonStyle(KPrimaryButtonStyle())
                 }
@@ -295,7 +295,7 @@ struct ProgramDetailView: View {
             if p.days.isEmpty {
                 Card {
                     Text("No days yet. Add one to start building the week.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                 }
             }
             ForEach(Array(p.days.enumerated()), id: \.element.id) { i, day in
@@ -336,12 +336,12 @@ private struct ProgramDayRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 7) {
                         Text(day.name)
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(day.isRestDay ? Palette.muted : Palette.text)
                             .fixedSize(horizontal: false, vertical: true)
                         if isToday {
                             Text("TODAY")
-                                .font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.6)
+                                .font(.caption2.weight(.heavy)).tracking(0.6)
                                 .foregroundStyle(Palette.brand)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                 .background(Palette.brand.opacity(0.16), in: Capsule())
@@ -349,21 +349,21 @@ private struct ProgramDayRow: View {
                     }
                     if day.isRestDay {
                         Label("Rest day", systemImage: "moon.zzz.fill")
-                            .font(.system(size: 12)).foregroundStyle(Palette.blue)
+                            .font(.caption).foregroundStyle(Palette.blue)
                     } else if day.exerciseCount == 0 {
-                        Text("Nothing planned yet").font(.system(size: 12)).foregroundStyle(Palette.faint)
+                        Text("Nothing planned yet").font(.caption).foregroundStyle(Palette.faint)
                     } else {
                         Text(day.groupSummary)
-                            .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                            .font(.caption).foregroundStyle(Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                         Text("\(day.exerciseCount) exercise\(day.exerciseCount == 1 ? "" : "s")")
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                            .font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
                 Spacer(minLength: 4)
                 menu
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
+                    .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                     .padding(.top, 8)
             }
         }
@@ -376,7 +376,7 @@ private struct ProgramDayRow: View {
         let label = day.weekday.map { Self.short[$0] } ?? "D\(index + 1)"
         let tint = day.isRestDay ? Palette.blue : Palette.brand
         return Text(label)
-            .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.4)
+            .font(.caption2.weight(.heavy)).tracking(0.4)
             .foregroundStyle(tint)
             .frame(width: 42, height: 30)
             .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
@@ -396,7 +396,7 @@ private struct ProgramDayRow: View {
             Divider()
             Button("Delete", role: .destructive) { showDelete = true }
         } label: {
-            Image(systemName: "ellipsis").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.faint)
+            Image(systemName: "ellipsis").font(.footnote.weight(.bold)).foregroundStyle(Palette.faint)
                 .frame(width: 28, height: 28).contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
@@ -418,8 +418,8 @@ struct BackBar: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
-                Text(title).font(.system(size: 13, weight: .semibold))
+                Image(systemName: "chevron.left").font(.caption.weight(.bold))
+                Text(title).font(.footnote.weight(.semibold))
             }
             .foregroundStyle(Palette.muted)
             .padding(.vertical, 4).contentShape(Rectangle())

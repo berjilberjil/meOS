@@ -45,15 +45,15 @@ struct MacroMetricDetail: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(metric.name)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(Palette.text)
                 Text("\(metric.category) · \(metric.country)")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(Palette.faint)
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 12, weight: .bold))
+                Image(systemName: "xmark").font(.caption.weight(.bold))
             }
             .buttonStyle(KIconButtonStyle(size: 28))
         }
@@ -62,11 +62,11 @@ struct MacroMetricDetail: View {
     private var headline: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(MacroFormat.value(metric))
-                .font(.system(size: 36, weight: .heavy, design: .rounded)).monospacedDigit()
+                .font(.largeTitle.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(metric.available ? Palette.text : Palette.faint)
             if metric.available {
                 Text(MacroFormat.change(metric.change1D, isRate: metric.isRate))
-                    .font(.system(size: 15, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .font(.subheadline.weight(.heavy)).monospacedDigit()
                     .foregroundStyle(MacroFormat.tint(metric.change1D))
             }
             Spacer(minLength: 0)
@@ -76,7 +76,7 @@ struct MacroMetricDetail: View {
 
     private var qualityBadge: some View {
         Text(metric.grade.label.uppercased())
-            .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.6)
+            .font(.caption2.weight(.heavy)).tracking(0.6)
             .foregroundStyle(metric.grade.tint)
             .padding(.horizontal, 7).padding(.vertical, 4)
             .background(metric.grade.tint.opacity(0.14), in: Capsule())
@@ -87,7 +87,7 @@ struct MacroMetricDetail: View {
             ForEach(MacroRange.allCases) { r in
                 Button { range = r } label: {
                     Text(r.rawValue)
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(r == range ? Brandmark.ink : Palette.muted)
                         .padding(.horizontal, 9).padding(.vertical, 5)
                         .background(r == range ? Palette.brand : Palette.surface2, in: Capsule())
@@ -106,10 +106,10 @@ struct MacroMetricDetail: View {
                 HStack(spacing: 8) {
                     if let h = hover {
                         Text(Fmt.day(h.d))
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .font(.caption2.weight(.heavy))
                             .foregroundStyle(Palette.faint)
                         Text(MacroFormat.reading(h.v, unit: metric.unit))
-                            .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .font(.footnote.weight(.heavy)).monospacedDigit()
                             .foregroundStyle(Palette.text)
                     }
                     Spacer(minLength: 0)
@@ -136,13 +136,13 @@ struct MacroMetricDetail: View {
                     AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                         AxisGridLine().foregroundStyle(Palette.border)
                         AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
-                            .font(.system(size: 9)).foregroundStyle(Palette.faint)
+                            .font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
                         AxisGridLine().foregroundStyle(Palette.border)
-                        AxisValueLabel().font(.system(size: 9)).foregroundStyle(Palette.faint)
+                        AxisValueLabel().font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
                 .chartOverlay { proxy in
@@ -171,7 +171,7 @@ struct MacroMetricDetail: View {
                 Text(metric.available
                      ? "Not enough history yet to chart this one."
                      : "Data unavailable for this date.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    .font(.footnote).foregroundStyle(Palette.faint)
                     .frame(maxWidth: .infinity)
             }
         }
@@ -197,10 +197,10 @@ struct MacroMetricDetail: View {
             ForEach(rows, id: \.0) { label, d in
                 VStack(spacing: 3) {
                     Text(label)
-                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
                     Text(MacroFormat.change(d, isRate: metric.isRate))
-                        .font(.system(size: 12, weight: .heavy, design: .rounded)).monospacedDigit()
+                        .font(.caption.weight(.heavy)).monospacedDigit()
                         .foregroundStyle(MacroFormat.tint(d))
                         .lineLimit(1).minimumScaleFactor(0.7)
                 }
@@ -214,8 +214,8 @@ struct MacroMetricDetail: View {
     private func noteBlock(_ note: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle.fill")
-                .font(.system(size: 11)).foregroundStyle(Palette.amber)
-            Text(note).font(.system(size: 12)).foregroundStyle(Palette.muted)
+                .font(.caption2).foregroundStyle(Palette.amber)
+            Text(note).font(.caption).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -229,7 +229,7 @@ struct MacroMetricDetail: View {
             if !metric.sourceUrl.isEmpty, let url = URL(string: metric.sourceUrl) {
                 Link(destination: url) {
                     Text(metric.sourceUrl)
-                        .font(.system(size: 11)).foregroundStyle(Palette.brand)
+                        .font(.caption2).foregroundStyle(Palette.brand)
                         .lineLimit(1).truncationMode(.middle)
                 }
             }
@@ -239,10 +239,10 @@ struct MacroMetricDetail: View {
     private func row(_ label: String, _ value: String) -> some View {
         HStack(spacing: 8) {
             Text(label.uppercased())
-                .font(.system(size: 9, weight: .heavy, design: .rounded)).tracking(0.5)
+                .font(.caption2.weight(.heavy)).tracking(0.5)
                 .foregroundStyle(Palette.faint)
                 .frame(width: 90, alignment: .leading)
-            Text(value).font(.system(size: 12)).foregroundStyle(Palette.muted)
+            Text(value).font(.caption).foregroundStyle(Palette.muted)
             Spacer(minLength: 0)
         }
     }
@@ -256,16 +256,16 @@ struct MacroMetricDetail: View {
         if !others.isEmpty {
             VStack(alignment: .leading, spacing: Gap.tight) {
                 Text("READ ALONGSIDE")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded)).tracking(0.6)
+                    .font(.caption2.weight(.heavy)).tracking(0.6)
                     .foregroundStyle(Palette.faint)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
                     ForEach(Array(others)) { m in
                         HStack(spacing: 6) {
-                            Text(m.name).font(.system(size: 11, weight: .semibold))
+                            Text(m.name).font(.caption2.weight(.semibold))
                                 .foregroundStyle(Palette.muted).lineLimit(1)
                             Spacer(minLength: 0)
                             Text(MacroFormat.value(m))
-                                .font(.system(size: 11, weight: .heavy, design: .rounded)).monospacedDigit()
+                                .font(.caption2.weight(.heavy)).monospacedDigit()
                                 .foregroundStyle(Palette.text)
                         }
                         .padding(.horizontal, 10).padding(.vertical, 8)
@@ -289,20 +289,20 @@ struct MacroEntryCard: View {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(Palette.blue.opacity(0.16))
                     Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.blue)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.blue)
                 }
                 .frame(width: 34, height: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Macro Intelligence")
-                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(Palette.text)
+                        .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
                     Text("Track global markets, economic indicators and macro conditions.")
-                        .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                        .font(.caption).foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.faint)
+                    .font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
             }
             .contentShape(Rectangle())
         }

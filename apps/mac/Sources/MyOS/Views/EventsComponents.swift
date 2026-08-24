@@ -100,14 +100,14 @@ struct EventsView: View {
             HStack(spacing: 8) {
                 SectionTitle(text: "\(CalMath.monthName(viewMonth)) memories")
                 if count > 0 {
-                    Text("\(count)").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                    Text("\(count)").font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
                 }
                 Spacer()
             }
             if days.isEmpty {
                 Card {
                     Text("Nothing logged this month yet — tap a day above to add a memory.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
@@ -133,18 +133,18 @@ struct EventsView: View {
             Card {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Text(String(viewYear)).font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                        Text(String(viewYear)).font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                         Spacer()
-                        Button { withAnimation(.knFast) { viewYear -= 1 } } label: { Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold)) }
+                        Button { withAnimation(.knFast) { viewYear -= 1 } } label: { Image(systemName: "chevron.left").font(.caption.weight(.bold)) }
                             .buttonStyle(KIconButtonStyle(size: 28))
-                        Button { withAnimation(.knFast) { viewYear += 1 } } label: { Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)) }
+                        Button { withAnimation(.knFast) { viewYear += 1 } } label: { Image(systemName: "chevron.right").font(.caption.weight(.bold)) }
                             .buttonStyle(KIconButtonStyle(size: 28))
                     }
                     LazyVGrid(columns: cols, spacing: 16) {
                         ForEach(1...12, id: \.self) { m in
                             VStack(spacing: 7) {
                                 Text(CalMath.monthName(m, short: true).uppercased())
-                                    .font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
+                                    .font(.caption2.weight(.heavy)).foregroundStyle(Palette.muted)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 KMonthGrid(year: viewYear, month: m, compact: true, dot: { colors[$0] }, onTap: { _ in
                                     withAnimation(.knPop) { viewMonth = m; mode = .month }
@@ -171,13 +171,13 @@ struct EventsView: View {
             if months.isEmpty {
                 Card {
                     Text("No memories logged in \(String(viewYear)) yet.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                        .font(.footnote).foregroundStyle(Palette.faint)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
                 ForEach(months, id: \.0) { (m, days) in
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(CalMath.monthName(m)).font(.system(size: 12, weight: .heavy, design: .rounded)).foregroundStyle(Palette.muted)
+                        Text(CalMath.monthName(m)).font(.caption.weight(.heavy)).foregroundStyle(Palette.muted)
                         Card {
                             VStack(spacing: 6) {
                                 ForEach(days, id: \.self) { day in
@@ -210,15 +210,15 @@ struct EventsView: View {
         guard let evs = byDay[key], !evs.isEmpty else { return nil }
         return AnyView(
             VStack(alignment: .leading, spacing: 10) {
-                Text(Fmt.day(key)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                Text(Fmt.day(key)).font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
                 ForEach(evs) { e in
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
-                            if e.special { Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(Palette.amber) }
+                            if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber) }
                             if let t = state.primaryTag(for: e) {
-                                Image(systemName: t.symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(t.color)
+                                Image(systemName: t.symbol).font(.caption2.weight(.bold)).foregroundStyle(t.color)
                             }
-                            Text(e.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                            Text(e.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                         }
                         if !e.media.isEmpty {
@@ -261,21 +261,21 @@ private struct EventRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
                     if event.special {
-                        Image(systemName: "star.fill").font(.system(size: 11)).foregroundStyle(Palette.amber)
+                        Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber)
                     }
-                    Text(event.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text(event.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     ForEach(tags) { t in tagChip(t) }
                 }
                 if !event.note.isEmpty {
-                    Text(event.note).font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                    Text(event.note).font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
                 }
                 if !event.media.isEmpty { mediaStrip }
             }
             Spacer(minLength: 0)
-            Button(action: edit) { Image(systemName: "pencil").font(.system(size: 11, weight: .bold)) }
+            Button(action: edit) { Image(systemName: "pencil").font(.caption2.weight(.bold)) }
                 .buttonStyle(KIconButtonStyle(size: 24)).opacity(hover ? 1 : 0.001).help("Edit")
-            Button { showConfirm = true } label: { Image(systemName: "trash").font(.system(size: 10, weight: .bold)) }
+            Button { showConfirm = true } label: { Image(systemName: "trash").font(.caption2.weight(.bold)) }
                 .buttonStyle(KIconButtonStyle(size: 24, color: Palette.red)).opacity(hover ? 1 : 0.001).help("Delete")
                 .holdToDelete(isPresented: $showConfirm, title: "Delete this memory?",
                               message: "\(event.title) — this can't be undone.") { delete() }
@@ -297,9 +297,9 @@ private struct EventRow: View {
 
     private var dateBadge: some View {
         VStack(spacing: 0) {
-            Text(dayNumber).font(.system(size: 16, weight: .heavy, design: .rounded)).monospacedDigit()
+            Text(dayNumber).font(.callout.weight(.heavy)).monospacedDigit()
                 .foregroundStyle(Palette.text)
-            Text(monthLabel.uppercased()).font(.system(size: 8, weight: .heavy, design: .rounded)).tracking(0.4)
+            Text(monthLabel.uppercased()).font(.caption2.weight(.heavy)).tracking(0.4)
                 .foregroundStyle(accent)
         }
         .frame(width: 42, height: 42)
@@ -309,8 +309,8 @@ private struct EventRow: View {
 
     private func tagChip(_ t: EventTag) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: t.symbol).font(.system(size: 8, weight: .bold))
-            Text(t.name).font(.system(size: 9, weight: .heavy, design: .rounded))
+            Image(systemName: t.symbol).font(.caption2.weight(.bold))
+            Text(t.name).font(.caption2.weight(.heavy))
         }
         .foregroundStyle(t.color)
         .padding(.horizontal, 7).padding(.vertical, 2)
@@ -323,7 +323,7 @@ private struct EventRow: View {
                 MediaThumb(media: m, size: 30, onOpen: open)
             }
             if event.media.count > 5 {
-                Text("+\(event.media.count - 5)").font(.system(size: 10, weight: .heavy, design: .rounded))
+                Text("+\(event.media.count - 5)").font(.caption2.weight(.heavy))
                     .foregroundStyle(Palette.faint)
             }
         }
@@ -375,7 +375,7 @@ private struct MediaThumb: View {
 
             if let onRemove, hover {
                 Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 15)).foregroundStyle(.white, Palette.red)
+                    Image(systemName: "xmark.circle.fill").font(.subheadline).foregroundStyle(.white, Palette.red)
                 }
                 .buttonStyle(.plain).padding(3)
             }
@@ -414,7 +414,7 @@ private struct MediaViewer: View {
             Palette.bg.ignoresSafeArea()
             content.padding(24)
             Button { dismiss() } label: {
-                Image(systemName: "xmark.circle.fill").font(.system(size: 24)).foregroundStyle(.white.opacity(0.85))
+                Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.white.opacity(0.85))
             }
             .buttonStyle(.plain).padding(14).keyboardShortcut(.cancelAction)
         }
@@ -430,7 +430,7 @@ private struct MediaViewer: View {
         } else if let img = EventMediaIO.image(media) {
             Image(nsImage: img).resizable().scaledToFit()
         } else {
-            Text("Couldn't load this media.").font(.system(size: 13)).foregroundStyle(Palette.faint)
+            Text("Couldn't load this media.").font(.footnote).foregroundStyle(Palette.faint)
         }
     }
 
@@ -483,7 +483,7 @@ private struct EventEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(isNew ? "Log a memory" : "Edit memory")
-                .font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                .font(.body.weight(.heavy)).foregroundStyle(Palette.text)
 
             KLabeledField(label: "What happened?", placeholder: "Trip home, a wedding, a small win…", text: $title)
 
@@ -492,9 +492,9 @@ private struct EventEditor: View {
                     KFieldLabel(text: "Date")
                     Button { showCal.toggle() } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "calendar").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.brand)
-                            Text(prettyDate).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                            Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.faint)
+                            Image(systemName: "calendar").font(.caption.weight(.bold)).foregroundStyle(Palette.brand)
+                            Text(prettyDate).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
+                            Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                         }
                         .padding(.horizontal, 13).padding(.vertical, 10)
                         .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -509,8 +509,8 @@ private struct EventEditor: View {
                 Spacer()
                 Button { special.toggle() } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: special ? "star.fill" : "star").font(.system(size: 12))
-                        Text("Special").font(.system(size: 12, weight: .heavy, design: .rounded))
+                        Image(systemName: special ? "star.fill" : "star").font(.caption)
+                        Text("Special").font(.caption.weight(.heavy))
                     }
                     .foregroundStyle(special ? .white : Palette.amber)
                     .padding(.horizontal, 12).padding(.vertical, 9)
@@ -526,8 +526,8 @@ private struct EventEditor: View {
                     ForEach(state.eventTags) { tag in tagChip(tag) }
                     Button { showTags = true } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "plus").font(.system(size: 9, weight: .heavy))
-                            Text("New tag").font(.system(size: 12, weight: .heavy, design: .rounded))
+                            Image(systemName: "plus").font(.caption2.weight(.heavy))
+                            Text("New tag").font(.caption.weight(.heavy))
                         }
                         .foregroundStyle(Palette.muted)
                         .padding(.horizontal, 11).padding(.vertical, 8)
@@ -567,7 +567,7 @@ private struct EventEditor: View {
             HStack(spacing: 6) {
                 KFieldLabel(text: "Photos & videos")
                 Text(dropTargeted ? "drop to add" : "drag them in, or click Add")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(dropTargeted ? Palette.brand : Palette.faint)
             }
             FlowLayout(spacing: 8, runSpacing: 8) {
@@ -577,8 +577,8 @@ private struct EventEditor: View {
                 ForEach(uploads) { u in uploadTile(u) }
                 Button { chooseFiles() } label: {
                     VStack(spacing: 5) {
-                        Image(systemName: "plus").font(.system(size: 16, weight: .bold))
-                        Text("Add").font(.system(size: 10, weight: .heavy, design: .rounded))
+                        Image(systemName: "plus").font(.callout.weight(.bold))
+                        Text("Add").font(.caption2.weight(.heavy))
                     }
                     .foregroundStyle(dropTargeted ? Palette.brand : Palette.muted)
                     .frame(width: 72, height: 72)
@@ -598,7 +598,7 @@ private struct EventEditor: View {
             .onDrop(of: Self.dropTypes, isTargeted: $dropTargeted) { handleDrop($0) }
             .animation(.knFast, value: dropTargeted)
             if let mediaError {
-                Text(mediaError).font(.system(size: 11)).foregroundStyle(Palette.red)
+                Text(mediaError).font(.caption2).foregroundStyle(Palette.red)
             }
         }
     }
@@ -606,18 +606,18 @@ private struct EventEditor: View {
     private func uploadTile(_ u: MediaUpload) -> some View {
         VStack(spacing: 5) {
             if u.failed {
-                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 16)).foregroundStyle(Palette.red)
-                Text("Failed").font(.system(size: 9, weight: .heavy, design: .rounded)).foregroundStyle(Palette.red)
+                Image(systemName: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(Palette.red)
+                Text("Failed").font(.caption2.weight(.heavy)).foregroundStyle(Palette.red)
             } else {
                 ZStack {
                     Circle().stroke(Palette.surface2, lineWidth: 3)
                     Circle().trim(from: 0, to: max(0.02, u.progress))
                         .stroke(Palette.brand, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                    Text("\(Int(u.progress * 100))").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                    Text("\(Int(u.progress * 100))").font(.caption2.weight(.heavy)).foregroundStyle(Palette.text)
                 }
                 .frame(width: 34, height: 34)
-                Text(u.kind == .video ? "Video" : "Photo").font(.system(size: 9, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                Text(u.kind == .video ? "Video" : "Photo").font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
             }
         }
         .frame(width: 72, height: 72)
@@ -634,8 +634,8 @@ private struct EventEditor: View {
             if on { selectedTags.remove(tag.id) } else { selectedTags.insert(tag.id) }
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: tag.symbol).font(.system(size: 10, weight: .bold))
-                Text(tag.name).font(.system(size: 12, weight: .heavy, design: .rounded))
+                Image(systemName: tag.symbol).font(.caption2.weight(.bold))
+                Text(tag.name).font(.caption.weight(.heavy))
             }
             .foregroundStyle(on ? .white : tag.color)
             .padding(.horizontal, 11).padding(.vertical, 8)
@@ -794,7 +794,7 @@ private struct TagManagerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Tags").font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Text("Tags").font(.body.weight(.heavy)).foregroundStyle(Palette.text)
                 Spacer()
                 Button { isAdding = true; editing = EventTag(name: "", symbol: "star.fill", colorHex: "1CB0F6") } label: {
                     Label("New tag", systemImage: "plus")
@@ -829,19 +829,19 @@ private struct TagManagerSheet: View {
 
     private func tagRow(_ tag: EventTag) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: tag.symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(tag.color)
+            Image(systemName: tag.symbol).font(.footnote.weight(.semibold)).foregroundStyle(tag.color)
                 .frame(width: 34, height: 34)
                 .background(tag.color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            Text(tag.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+            Text(tag.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             if tag.builtIn {
-                Text("built-in").font(.system(size: 9, weight: .heavy, design: .rounded)).foregroundStyle(Palette.faint)
+                Text("built-in").font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
                     .padding(.horizontal, 6).padding(.vertical, 2).background(Palette.surface2, in: Capsule())
             }
             Spacer()
-            Button { editing = tag; isAdding = false } label: { Image(systemName: "pencil").font(.system(size: 11, weight: .bold)) }
+            Button { editing = tag; isAdding = false } label: { Image(systemName: "pencil").font(.caption2.weight(.bold)) }
                 .buttonStyle(KIconButtonStyle(size: 26)).help("Edit")
             if !tag.builtIn {
-                Button { state.deleteTag(tag.id) } label: { Image(systemName: "trash").font(.system(size: 10, weight: .bold)) }
+                Button { state.deleteTag(tag.id) } label: { Image(systemName: "trash").font(.caption2.weight(.bold)) }
                     .buttonStyle(KIconButtonStyle(size: 26, color: Palette.red)).help("Delete tag")
             }
         }
@@ -911,7 +911,7 @@ private struct SymbolPicker: View {
                 ForEach(symbols, id: \.self) { s in
                     let on = selection == s
                     Button { selection = s } label: {
-                        Image(systemName: s).font(.system(size: 15, weight: .semibold))
+                        Image(systemName: s).font(.subheadline.weight(.semibold))
                             .foregroundStyle(on ? .white : tint)
                             .frame(width: 38, height: 38)
                             .background(on ? tint : tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))

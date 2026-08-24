@@ -26,15 +26,15 @@ struct WatchLogCard: View {
                     SectionTitle(text: "Videos")
                     Spacer()
                     Text("\(todayVideos.count) today")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.faint)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Palette.faint)
                 }
 
                 HStack(spacing: 8) {
                     HStack(spacing: 8) {
-                        Image(systemName: "link").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.faint)
+                        Image(systemName: "link").font(.footnote.weight(.bold)).foregroundStyle(Palette.faint)
                         TextField("", text: $urlInput,
                                   prompt: Text("Paste a YouTube link…").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.system(size: 15)).foregroundStyle(Palette.text)
+                            .textFieldStyle(.plain).font(.subheadline).foregroundStyle(Palette.text)
                             .focused($urlFocused)
                             .onSubmit { addVideo() }
                     }
@@ -48,12 +48,12 @@ struct WatchLogCard: View {
                 }
 
                 if let err = addError {
-                    Text(err).font(.system(size: 13)).foregroundStyle(Palette.amber)
+                    Text(err).font(.footnote).foregroundStyle(Palette.amber)
                 }
 
                 if todayVideos.isEmpty {
                     Text("Nothing logged today.")
-                        .font(.system(size: 15)).foregroundStyle(Palette.faint)
+                        .font(.subheadline).foregroundStyle(Palette.faint)
                 } else {
                     ForEach(todayVideos) { item in videoRow(item) }
                 }
@@ -83,10 +83,10 @@ struct WatchLogCard: View {
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(2).multilineTextAlignment(.leading)
                     Text(item.channel.isEmpty ? item.category.label : item.channel)
-                        .font(.system(size: 12)).foregroundStyle(Palette.faint)
+                        .font(.caption).foregroundStyle(Palette.faint)
                 }
                 Spacer(minLength: 0)
             }

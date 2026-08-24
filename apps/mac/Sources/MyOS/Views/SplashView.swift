@@ -62,7 +62,7 @@ struct SplashView: View {
                 }
 
                 Text("Berjil Jacob")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(.white)
                     .opacity(name * 0.95)
                     .padding(.bottom, 34)
@@ -75,7 +75,7 @@ struct SplashView: View {
     @ViewBuilder private var statusLine: some View {
         let text = failed ? "Face not recognised" : (status ?? "")
         Text(text)
-            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .font(.footnote.weight(.medium))
             .foregroundStyle(.white.opacity(failed ? 0.95 : 0.8))
             .opacity(text.isEmpty ? 0 : name)
     }
@@ -119,7 +119,7 @@ enum SplashTimeline {
 struct KDarkPillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, 26).padding(.vertical, 13)
             .background(Brandmark.ink.opacity(configuration.isPressed ? 0.75 : 1), in: Capsule())
