@@ -20,11 +20,12 @@ private func platformComponents(_ color: Color, fallback: PlatformColor) -> (r: 
     #endif
 }
 
-// MyOS design language — Duolingo-inspired. Dark teal-navy canvas, bright candy
-// feature colors, chunky rounded cards with a visible 2px border, SF Rounded
-// (Feather-substitute) type, and the signature 3D "press-down" button: a flat
-// bright face sitting on a solid darker edge that sinks on tap. Playful, tactile,
-// gamified — a second brain that feels like a game.
+// MyOS design language — the system's. Chrome, type, motion and controls all come
+// from AppKit/UIKit rather than from values typed in here, which is what makes the
+// app track Light/Dark, Increase Contrast, Dynamic Type and vibrancy for free.
+// Converted 2026-08-24 at Berjil's explicit request (see feat/native-ui): the
+// Fold black + green skin and the earlier Duolingo look are both gone. The green
+// survives only as the app tint. Do not reintroduce hardcoded hex chrome.
 extension Color {
     init(hex: UInt32, alpha: Double = 1) {
         self.init(
@@ -49,50 +50,33 @@ extension Color {
     }
 }
 
-/// A named colour scheme. The chrome (canvas / surfaces / text / accent) varies per
-/// theme; the semantic feature colours (red/blue/amber/…) are shared across themes.
+/// Appearance preference. MyOS no longer ships colour values, so a "theme" is
+/// only the question of whether we follow the OS or pin light/dark.
 struct AppTheme: Identifiable, Hashable {
     let id: String
     let name: String
-    let bg, sidebar, surface, surface2, elevated: Color
-    let border, borderStrong, ring: Color
-    let text, muted, faint: Color
-    let brand, brandDeep, green: Color
+    let symbol: String
+    /// nil = follow the system Appearance.
+    let scheme: ColorScheme?
 
-    static let foldDark = AppTheme(
-        id: "foldDark", name: "Dark",
-        bg: Color(hex: 0x000000), sidebar: Color(hex: 0x000000),
-        surface: Color(hex: 0x151515), surface2: Color(hex: 0x242424), elevated: Color(hex: 0x1B1B1B),
-        border: Color(hex: 0x242424), borderStrong: Color(hex: 0x333333), ring: Color(hex: 0x242424),
-        text: Color(hex: 0xFFFFFF), muted: Color(hex: 0x9A9A9A), faint: Color(hex: 0x5E5E5E),
-        brand: Color(hex: 0x56BB06), brandDeep: Color(hex: 0x3F8A04), green: Color(hex: 0x56BB06))
+    static let system = AppTheme(id: "system", name: "System", symbol: "circle.lefthalf.filled", scheme: nil)
+    static let light  = AppTheme(id: "light",  name: "Light",  symbol: "sun.max", scheme: .light)
+    static let dark   = AppTheme(id: "dark",   name: "Dark",   symbol: "moon",    scheme: .dark)
 
-    static let light = AppTheme(
-        id: "light", name: "Light",
-        bg: Color(hex: 0xF6F7F9), sidebar: Color(hex: 0xEFF1F4),
-        surface: Color(hex: 0xFFFFFF), surface2: Color(hex: 0xEDEFF3), elevated: Color(hex: 0xFFFFFF),
-        border: Color(hex: 0xE3E6EB), borderStrong: Color(hex: 0xCED3DB), ring: Color(hex: 0xE3E6EB),
-        text: Color(hex: 0x0B0D12), muted: Color(hex: 0x5C6470), faint: Color(hex: 0x99A1AE),
-        brand: Color(hex: 0x56BB06), brandDeep: Color(hex: 0x3F8A04), green: Color(hex: 0x56BB06))
+    static let all: [AppTheme] = [system, light, dark]
+    /// Unknown ids (the retired "foldDark" / "midnight") migrate to System.
+    static func by(id: String) -> AppTheme { all.first { $0.id == id } ?? system }
 
-    static let all: [AppTheme] = [foldDark, light]
-    static func by(id: String) -> AppTheme {
-        if id == light.id { return light }
-        return foldDark
-    }
-
-    /// Drives system chrome (status bar, sheets, keyboards). Light is the only
-    /// light scheme; everything else — including a leftover Midnight id — is dark.
-    var colorScheme: ColorScheme { id == AppTheme.light.id ? .light : .dark }
+    /// Drives `.preferredColorScheme`. nil hands the decision back to the OS.
+    var colorScheme: ColorScheme? { scheme }
 }
 
-/// Holds the active theme app-wide and persists the choice. Views pick up a change
-/// because the root re-renders (see AppState.setTheme / RootView).
+/// Holds the appearance preference app-wide and persists it.
 final class ThemeStore: ObservableObject {
     static let shared = ThemeStore()
     private static let key = "myos.theme"
     @Published private(set) var theme: AppTheme
-    private init() { theme = AppTheme.by(id: UserDefaults.standard.string(forKey: Self.key) ?? "foldDark") }
+    private init() { theme = AppTheme.by(id: UserDefaults.standard.string(forKey: Self.key) ?? "system") }
     func set(_ t: AppTheme) {
         guard t.id != theme.id else { return }
         theme = t
@@ -100,34 +84,55 @@ final class ThemeStore: ObservableObject {
     }
 }
 
+/// Every colour in MyOS. Chrome forwards to the system semantic colours; macOS
+/// and iOS spell those differently, so the platform split lives here and nowhere
+/// else in the app.
 enum Palette {
-    private static var t: AppTheme { ThemeStore.shared.theme }
-    // Chrome — varies per theme.
-    static var bg: Color          { t.bg }
-    static var sidebar: Color     { t.sidebar }
-    static var surface: Color     { t.surface }
-    static var surface2: Color    { t.surface2 }
-    static var elevated: Color    { t.elevated }
-    static var border: Color      { t.border }
-    static var borderStrong: Color { t.borderStrong }
-    static var ring: Color        { t.ring }
-    static var text: Color        { t.text }
-    static var muted: Color       { t.muted }
-    static var faint: Color       { t.faint }
-    static var brand: Color       { t.brand }
-    static var brandDeep: Color   { t.brandDeep }
-    static var green: Color       { t.green }
-    // Semantic feature colours — shared across themes.
-    static let red    = Color(hex: 0xFF5A5F)
-    static let blue   = Color(hex: 0x4AA8FF)
-    static let amber  = Color(hex: 0xFFC24B)
-    static let purple = Color(hex: 0xB98CFF)
-    static let flame  = Color(hex: 0xFF8A3D)
-    static let ice    = Color(hex: 0x7FD1FF)
-    static let rose   = Color(hex: 0xFF6B9A)
-    static let teal   = Color(hex: 0x2DD4BF)
-    static let gold   = Color(hex: 0xF5C451)
-    static let coral  = Color(hex: 0xFF7A59)
+    /// The one colour MyOS still owns. Applied as the app `.tint` so it lands on
+    /// controls the way an accent colour is meant to.
+    static let accent = Color(hex: 0x56BB06)
+
+    #if os(macOS)
+    static var bg: Color           { Color(nsColor: .windowBackgroundColor) }
+    static var sidebar: Color      { Color(nsColor: .underPageBackgroundColor) }
+    static var surface: Color      { Color(nsColor: .controlBackgroundColor) }
+    static var surface2: Color     { Color(nsColor: .unemphasizedSelectedContentBackgroundColor) }
+    static var elevated: Color     { Color(nsColor: .controlBackgroundColor) }
+    static var border: Color       { Color(nsColor: .separatorColor) }
+    static var borderStrong: Color { Color(nsColor: .separatorColor) }
+    static var text: Color         { Color(nsColor: .labelColor) }
+    static var muted: Color        { Color(nsColor: .secondaryLabelColor) }
+    static var faint: Color        { Color(nsColor: .tertiaryLabelColor) }
+    #else
+    static var bg: Color           { Color(uiColor: .systemGroupedBackground) }
+    static var sidebar: Color      { Color(uiColor: .secondarySystemGroupedBackground) }
+    static var surface: Color      { Color(uiColor: .secondarySystemGroupedBackground) }
+    static var surface2: Color     { Color(uiColor: .tertiarySystemFill) }
+    static var elevated: Color     { Color(uiColor: .secondarySystemGroupedBackground) }
+    static var border: Color       { Color(uiColor: .separator) }
+    static var borderStrong: Color { Color(uiColor: .opaqueSeparator) }
+    static var text: Color         { Color(uiColor: .label) }
+    static var muted: Color        { Color(uiColor: .secondaryLabel) }
+    static var faint: Color        { Color(uiColor: .tertiaryLabel) }
+    #endif
+
+    static var ring: Color         { accent }
+    static var brand: Color        { accent }
+    static var brandDeep: Color    { accent }
+    static var green: Color        { accent }
+
+    // Feature colours — system hues, so they shift correctly between light and
+    // dark and respond to Increase Contrast.
+    static let red    = Color.red
+    static let blue   = Color.blue
+    static let amber  = Color.orange
+    static let purple = Color.purple
+    static let flame  = Color.orange
+    static let ice    = Color.cyan
+    static let rose   = Color.pink
+    static let teal   = Color.teal
+    static let gold   = Color.yellow
+    static let coral  = Color.orange
 }
 
 /// Vertical rhythm. Screens differed by a few points each — 14 here, 16 there,
@@ -187,58 +192,48 @@ extension Animation {
 // MARK: - Elevation
 
 extension View {
-    /// Soft, layered shadow for floating surfaces. Toned down from the original
-    /// 0.5/0.3 opacity + 26/14 radius, which read as too heavy.
-    func knShadow(_ strong: Bool = false) -> some View {
-        let light = ThemeStore.shared.theme.id == "light"
-        return shadow(color: light ? .clear : .black.opacity(strong ? 0.4 : 0.25),
-                      radius: light ? 0 : (strong ? 16 : 7),
-                      x: 0, y: light ? 0 : (strong ? 8 : 3))
-    }
+    /// Native surfaces carry no app-drawn shadow: grouped content sits flat on
+    /// the grouped background, and floating chrome takes its depth from a
+    /// material. Kept as a no-op so the call sites read unchanged.
+    func knShadow(_ strong: Bool = false) -> some View { self }
 }
 
 // MARK: - Card
 
-/// The standard MyOS surface: a filled card with a chunky 2px border and a soft
-/// shadow — the Duolingo card look.
+/// The standard MyOS surface — a grouped-content cell. The 2px border, the
+/// Duolingo fill and the drop shadow are gone; on both platforms this is now the
+/// same shape the system draws behind an inset-grouped row.
 struct Card<Content: View>: View {
     var padding: CGFloat = 18
     var radius: CGFloat = Radius.lg
-    @ObservedObject private var themeStore = ThemeStore.shared
     @ViewBuilder var content: Content
     var body: some View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Palette.surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Palette.border, lineWidth: 1)
-            )
-            .knShadow()
-            .animation(.knTheme, value: themeStore.theme.id)
     }
 }
 
 // MARK: - Labels
 
-/// The name of a screen. Titles ran at both 24 and 28 depending on which screen
-/// you were on — sometimes both inside one file — so this is the only size.
+/// The name of a screen, at the system's large-title style so it tracks Dynamic
+/// Type instead of sitting at a fixed 28pt.
 struct ScreenTitle: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 28, weight: .semibold))
+            .font(.largeTitle.bold())
             .foregroundStyle(Palette.text)
     }
 }
 
+/// A grouped-section header, matching the system's footnote-uppercase-secondary.
 struct SectionTitle: View {
     let text: String
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 12, weight: .heavy, design: .rounded))
-            .tracking(0.8)
+            .font(.footnote.weight(.semibold))
             .foregroundStyle(Palette.muted)
     }
 }

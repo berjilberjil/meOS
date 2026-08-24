@@ -13,7 +13,7 @@ struct MyOSApp: App {
             RootView()
                 .environmentObject(state)
                 .preferredColorScheme(themeStore.theme.colorScheme)
-                .tint(themeStore.theme.brand)
+                .tint(Palette.accent)
                 .animation(.knTheme, value: themeStore.theme.id)
                 .task { await ReminderStore.shared.syncOnLaunch() }
         }

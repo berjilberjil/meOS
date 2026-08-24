@@ -262,7 +262,7 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { page = nil }.font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(themeStore.theme.brand)
+                        .foregroundStyle(Palette.accent)
                 }
             }
         }

@@ -39,7 +39,7 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.28), value: state.phase)
         .fontDesign(.rounded)   // Feather-substitute: rounds all text app-wide
         .preferredColorScheme(themeStore.theme.colorScheme)
-        .tint(themeStore.theme.brand)
+        .tint(Palette.accent)
         .animation(.knTheme, value: themeStore.theme.id)
         .task {
             #if os(iOS)

@@ -1,20 +1,37 @@
 import SwiftUI
 
-/// Theme picker — two live previews, tap to switch. Shared by mac and iOS.
-/// Selection is a critically damped color settle (see `Animation.knTheme`), not
-/// a view remount, so Dark ↔ Light interpolates from the on-screen colors.
+/// Appearance picker. MyOS used to ship its own colour sets, so this card drew
+/// two miniature previews of the app to choose between. Since the conversion to
+/// system colours there is nothing to preview — the choice is only whether we
+/// follow the OS or pin light/dark — so it is a plain segmented control, which
+/// is what Settings.app uses for exactly this setting.
 struct AppearanceCard: View {
     var boxed = true
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
 
+    private var selection: Binding<String> {
+        Binding(
+            get: { themeStore.theme.id },
+            set: { state.setTheme(AppTheme.by(id: $0)) }
+        )
+    }
+
     var body: some View {
-        let inner = VStack(alignment: .leading, spacing: 16) {
+        let inner = VStack(alignment: .leading, spacing: Gap.row) {
             if boxed { SectionTitle(text: "Appearance") }
-            HStack(spacing: 12) {
-                ForEach(AppTheme.all) { preview($0) }
+            Picker("Appearance", selection: selection) {
+                ForEach(AppTheme.all) { theme in
+                    Label(theme.name, systemImage: theme.symbol).tag(theme.id)
+                }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Text(hint)
+                .font(.footnote)
+                .foregroundStyle(Palette.muted)
         }
+
         // `boxed` off means this is already a full settings PAGE on iOS, which
         // supplies its own padding and background. Wrapping in a Card there adds
         // a second surface and shoves the content 18pt further in than the pages
@@ -29,58 +46,11 @@ struct AppearanceCard: View {
         }
     }
 
-    private func preview(_ theme: AppTheme) -> some View {
-        let on = themeStore.theme.id == theme.id
-        return Button { state.setTheme(theme) } label: {
-            VStack(spacing: 11) {
-                ZStack(alignment: .bottomTrailing) {
-                    // A miniature of the app rather than three grey bars: a
-                    // title, a hero card, two rows. You are choosing a look, so
-                    // the preview should look like the thing.
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(theme.bg)
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack(spacing: 5) {
-                            Capsule().fill(theme.brand).frame(width: 26, height: 5)
-                            Capsule().fill(theme.border).frame(width: 12, height: 5)
-                        }
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(theme.surface)
-                            .frame(maxHeight: .infinity)
-                        HStack(spacing: 6) {
-                            RoundedRectangle(cornerRadius: 5, style: .continuous).fill(theme.surface2)
-                            RoundedRectangle(cornerRadius: 5, style: .continuous).fill(theme.surface2)
-                        }
-                        .frame(height: 16)
-                    }
-                    .padding(11)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                    if on {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(theme.brand)
-                            .background(Circle().fill(theme.bg).padding(2))
-                            .padding(9)
-                            .transition(.opacity)
-                    }
-                }
-                .frame(height: boxed ? 96 : nil)
-                .aspectRatio(boxed ? nil : 0.82, contentMode: .fit)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(on ? theme.brand : theme.border, lineWidth: on ? 2.5 : 1)
-                )
-                Text(theme.name)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(on ? Palette.text : Palette.muted)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-            .animation(.knFast, value: on)
-        }
-        .buttonStyle(KPressStyle())
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .onHover { h in cursor(h) }
+    private var hint: String {
+        #if os(macOS)
+        "System follows your Mac's Appearance setting."
+        #else
+        "System follows your iPhone's Display setting."
+        #endif
     }
 }
