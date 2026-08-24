@@ -44,6 +44,9 @@ struct MainView: View {
                                     screen { BelongingsView() }
                                         .navigationTitle(NavTab.stuff.title)
                                         .navigationBarTitleDisplayMode(.inline)
+                                        .toolbarBackground(Palette.bg, for: .navigationBar)
+                                        .toolbarBackground(.visible, for: .navigationBar)
+                                        .toolbarBackground(Palette.bg, for: .tabBar)
                                         .toolbarBackground(.visible, for: .tabBar)
                                 } label: {
                                     Label(NavTab.stuff.title, systemImage: NavTab.stuff.icon)
@@ -78,6 +81,9 @@ struct MainView: View {
                                     // the Events/Journal segment.
                                     screen { JournalView() }
                                         .navigationBarTitleDisplayMode(.inline)
+                                        .toolbarBackground(Palette.bg, for: .navigationBar)
+                                        .toolbarBackground(.visible, for: .navigationBar)
+                                        .toolbarBackground(Palette.bg, for: .tabBar)
                                         .toolbarBackground(.visible, for: .tabBar)
                                 } label: {
                                     Label(NavTab.journal.title, systemImage: NavTab.journal.icon)
@@ -156,7 +162,12 @@ private extension View {
         self
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            // Palette.bg, not `.visible`: the default bar material renders a
+            // grey slab over a page whose background is black, so the top of
+            // every screen read as a different colour from the content.
+            .toolbarBackground(Palette.bg, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
+            .toolbarBackground(Palette.bg, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

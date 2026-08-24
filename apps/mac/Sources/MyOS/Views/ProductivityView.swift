@@ -62,8 +62,7 @@ struct ProductivityView: View {
         .safeAreaInset(edge: .bottom) {
             addCard
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 6)
+                .padding(.vertical, 8)
                 .background(.bar)
         }
         .sheet(item: $selected) { item in WatchDetailSheet(item: item) }
@@ -105,6 +104,35 @@ struct ProductivityView: View {
     // MARK: - Add
 
     private var addCard: some View {
+        #if os(iOS)
+        // Pinned over the tab bar, so it is an input BAR: one rounded field and
+        // a send button. The boxed card below belongs on Mac, where it sits
+        // inline in the page instead of hovering over the chrome.
+        VStack(spacing: 6) {
+            HStack(spacing: 10) {
+                TextField("Paste a YouTube link", text: $urlInput)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .submitLabel(.done)
+                    .focused($urlFocused)
+                    .onSubmit(addVideo)
+                Button(action: addVideo) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.plain)
+                .disabled(urlInput.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if let err = addError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2).foregroundStyle(Palette.amber)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        #else
         Card {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: "Log a video")
@@ -135,6 +163,7 @@ struct ProductivityView: View {
                 }
             }
         }
+        #endif
     }
 
     // MARK: - Filter
