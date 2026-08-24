@@ -172,7 +172,7 @@ struct MacroPulseView: View {
                                     .font(.footnote.weight(.heavy)).monospacedDigit()
                                     .foregroundStyle(s.tint)
                             }
-                            MeterBar(fraction: Double(s.score) / 100, tint: s.tint, height: 6)
+                            ProgressView(value: Double(s.score) / 100).progressViewStyle(.linear).tint(s.tint)
                             if !s.inputs.isEmpty {
                                 Text(s.inputs.joined(separator: "  ·  "))
                                     .font(.caption2.weight(.medium))

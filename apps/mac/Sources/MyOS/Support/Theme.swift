@@ -274,34 +274,6 @@ struct PrimaryButton: View {
     }
 }
 
-// MARK: - Meter
-
-/// A chunky progress bar (gold-loan / emergency fund), animating to its fraction.
-struct MeterBar: View {
-    var fraction: Double            // 0...1
-    var tint: Color = Palette.green
-    var height: CGFloat = 14
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Palette.surface2)
-                Capsule()
-                    .fill(tint)
-                    .overlay(alignment: .top) {
-                        // Duolingo's meters have a lighter top sheen.
-                        Capsule().fill(.white.opacity(0.25))
-                            .frame(height: height * 0.34)
-                            .padding(.horizontal, height * 0.28)
-                            .padding(.top, height * 0.18)
-                    }
-                    .frame(width: max(fraction > 0 ? height : 0, min(1, fraction) * geo.size.width))
-                    .animation(.knEntrance, value: fraction)
-            }
-        }
-        .frame(height: height)
-    }
-}
-
 // MARK: - Text field styling
 
 extension View {

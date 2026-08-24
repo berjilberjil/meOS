@@ -138,7 +138,7 @@ struct FitnessView: View {
                             .foregroundStyle(Palette.flame)
                     }
                 }
-                MeterBar(fraction: frac, tint: Palette.flame)
+                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.flame)
                 HStack(spacing: 10) {
                     HStack(spacing: 6) {
                         TextField("", text: $stepsInput,
@@ -301,7 +301,7 @@ struct FitnessView: View {
                 }
             }
             if let target, target > 0 {
-                MeterBar(fraction: min(1, have / target), tint: tint, height: 5)
+                ProgressView(value: min(1, have / target)).progressViewStyle(.linear).tint(tint)
             }
         }
         .padding(.vertical, 11)
@@ -321,7 +321,7 @@ struct FitnessView: View {
                     .monospacedDigit().foregroundStyle(Palette.text)
                 Text("/ \(Fmt.trimKg(target / 1000)) L").font(.caption).foregroundStyle(Palette.faint)
             }
-            MeterBar(fraction: min(1, ml / target), tint: Palette.blue, height: 5)
+            ProgressView(value: min(1, ml / target)).progressViewStyle(.linear).tint(Palette.blue)
             HStack(spacing: 6) {
                 KStepButton(icon: "minus", accent: Palette.blue) {
                     state.updateFitness(state.todayKey) { $0.waterMl = max(0, ml - 250) }
@@ -427,7 +427,7 @@ struct FitnessView: View {
                 }
                 if let target, target > 0 {
                     VStack(alignment: .leading, spacing: 4) {
-                        MeterBar(fraction: min(1, (value ?? 0) / target), tint: accent, height: 7)
+                        ProgressView(value: min(1, (value ?? 0) / target)).progressViewStyle(.linear).tint(accent)
                         Text("\(Fmt.trimKg(value ?? 0)) / \(Fmt.trimKg(target)) \(unit)")
                             .font(.caption2.weight(.medium)).foregroundStyle(Palette.faint)
                     }
@@ -555,7 +555,7 @@ struct ActivityStepsCard: View {
                 #endif
             }
             Spacer(minLength: 4)
-            MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6).frame(width: 72)
+            ProgressView(value: fraction(n)).progressViewStyle(.linear).tint(Palette.flame).frame(width: 72)
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
         }
@@ -650,7 +650,7 @@ struct ActivityStepsCard: View {
                     }
                 }
             }
-            MeterBar(fraction: fraction(n), tint: Palette.flame, height: 6)
+            ProgressView(value: fraction(n)).progressViewStyle(.linear).tint(Palette.flame)
             Text(isFuture ? "Hasn\u{2019}t happened yet."
                           : (n > 0 ? "500 steps a tap." : "Nothing logged that day."))
                 .font(.caption2).foregroundStyle(Palette.faint)

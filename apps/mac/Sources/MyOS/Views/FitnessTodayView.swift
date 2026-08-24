@@ -33,7 +33,7 @@ struct DayMacroHero: View {
                             .foregroundStyle(Palette.faint)
                     }
                 }
-                MeterBar(fraction: frac, tint: Palette.amber, height: 10)
+                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.amber)
                 HStack(spacing: 8) {
                     macro("Protein", Int(eaten.protein.rounded()), t?.proteinG, Palette.green)
                     macro("Carbs", Int(eaten.carbs.rounded()), t?.carbG, Palette.blue)
@@ -54,7 +54,7 @@ struct DayMacroHero: View {
                     .font(.body.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
                 Text("/ \(target)g").font(.caption2).foregroundStyle(Palette.faint)
-                MeterBar(fraction: min(1, Double(have) / Double(target)), tint: tint, height: 5)
+                ProgressView(value: min(1, Double(have) / Double(target))).progressViewStyle(.linear).tint(tint)
             } else {
                 Text("\(have)g")
                     .font(.body.weight(.bold)).monospacedDigit()
@@ -379,7 +379,7 @@ struct WorkoutChecklistCard: View {
         let done = entries.reduce(0) { $0 + $1.doneSets }
         let total = entries.reduce(0) { $0 + $1.sets.count }
         return VStack(alignment: .leading, spacing: 8) {
-            MeterBar(fraction: Double(done) / Double(max(1, total)), tint: Palette.brand, height: 6)
+            ProgressView(value: Double(done) / Double(max(1, total))).progressViewStyle(.linear).tint(Palette.brand)
             Text("\(done) of \(total) sets logged")
                 .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             Button { session = true } label: {

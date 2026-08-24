@@ -120,7 +120,7 @@ struct WorkoutSessionView: View {
                                 .foregroundStyle(Palette.faint)
                         }
                     }
-                    MeterBar(fraction: Double(doneSets) / Double(max(1, totalSets)), tint: Palette.brand, height: 6)
+                    ProgressView(value: Double(doneSets) / Double(max(1, totalSets))).progressViewStyle(.linear).tint(Palette.brand)
                 }
             }
         }

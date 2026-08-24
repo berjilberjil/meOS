@@ -94,7 +94,7 @@ struct BelongingsView: View {
                     healthChip(health)
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    MeterBar(fraction: burn, tint: healthTint, height: 8)
+                    ProgressView(value: burn).progressViewStyle(.linear).tint(healthTint)
                     Text(salary > 0
                          ? "\(Int((burn * 100).rounded()))% of monthly salary"
                          : "Set a salary to judge the burn")
@@ -235,7 +235,7 @@ struct BelongingsView: View {
                 .font(.footnote).foregroundStyle(Palette.muted)
             Text(BelongingINR.format(snap.actualPerDay, decimals: snap.actualPerDay < 100 ? 2 : 0) + " / day")
                 .font(.callout.weight(.bold)).foregroundStyle(tint)
-            MeterBar(fraction: snap.progress, tint: snap.progress >= 1 ? Palette.green : tint, height: 6)
+            ProgressView(value: snap.progress).progressViewStyle(.linear).tint(snap.progress >= 1 ? Palette.green : tint)
             Text(snap.daysLeft == 0 ? "Full ROI" : BelongingINR.span(snap.daysLeft))
                 .font(.caption).foregroundStyle(snap.daysLeft == 0 ? Palette.green : Palette.faint)
         }
@@ -260,7 +260,7 @@ struct BelongingsView: View {
                 Text(BelongingINR.format(snap.actualPerDay, decimals: snap.actualPerDay < 100 ? 2 : 0) + " / day")
                     .font(.body.weight(.bold))
                     .foregroundStyle(tint)
-                MeterBar(fraction: snap.progress, tint: snap.progress >= 1 ? Palette.green : tint, height: 6)
+                ProgressView(value: snap.progress).progressViewStyle(.linear).tint(snap.progress >= 1 ? Palette.green : tint)
                 Text(snap.daysLeft == 0 ? "Full ROI" : BelongingINR.span(snap.daysLeft))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(snap.daysLeft == 0 ? Palette.green : Palette.faint)

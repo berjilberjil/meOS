@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 /// Activity, opened up. The card on Today answers "am I near my goal"; this
 /// answers "how has the week actually gone" — which is a different question and
@@ -133,37 +134,46 @@ struct ActivitySheet: View {
     /// day that beat the goal still has somewhere to go.
     private var bars: some View {
         let counts = week.map { steps($0) }
-        let ceiling = max(target, counts.max() ?? 0, 1)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Text("LAST 7 DAYS")
-                    .font(.caption2.weight(.heavy)).tracking(0.6)
+                Text("Last 7 days")
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(Palette.faint)
                 Spacer(minLength: 0)
                 if target > 0 {
                     Text("goal \(target.formatted())")
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(Palette.faint)
                 }
             }
-            HStack(alignment: .bottom, spacing: 8) {
+            // Swift Charts, not seven hand-sized Capsules. The x value is the
+            // ISO key (unique) and the axis label is the weekday initial —
+            // initials repeat across a week, so they cannot be the value.
+            Chart {
                 ForEach(Array(week.enumerated()), id: \.element) { i, key in
-                    let n = counts[i]
-                    VStack(spacing: 6) {
-                        Text(n > 0 ? compact(n) : "–")
-                            .font(.caption2.weight(.heavy)).monospacedDigit()
-                            .foregroundStyle(Palette.faint)
-                        Capsule()
-                            .fill(tint(n))
-                            .frame(height: max(3, 96 * CGFloat(n) / CGFloat(ceiling)))
-                        Text(Fmt.weekdayInitial(key))
-                            .font(.caption2.weight(.heavy))
-                            .foregroundStyle(key == day ? Palette.text : Palette.faint)
-                    }
-                    .frame(maxWidth: .infinity)
+                    BarMark(x: .value("Day", key), y: .value("Steps", counts[i]))
+                        .foregroundStyle(tint(counts[i]))
+                        .cornerRadius(4)
+                }
+                if target > 0 {
+                    RuleMark(y: .value("Goal", target))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .foregroundStyle(Palette.faint)
                 }
             }
-            .frame(height: 128, alignment: .bottom)
+            .chartXAxis {
+                AxisMarks { value in
+                    AxisValueLabel {
+                        if let key = value.as(String.self) {
+                            Text(Fmt.weekdayInitial(key))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(key == day ? Palette.text : Palette.faint)
+                        }
+                    }
+                }
+            }
+            .chartYAxis { AxisMarks(position: .leading) }
+            .frame(height: 148)
         }
     }
 

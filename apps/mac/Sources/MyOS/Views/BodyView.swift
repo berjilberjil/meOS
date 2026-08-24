@@ -207,7 +207,7 @@ struct ActivationList: View {
             ExerciseIcon(category: ex.category, size: 34)
             VStack(alignment: .leading, spacing: 5) {
                 Text(ex.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                MeterBar(fraction: percent / 100, tint: Palette.brand, height: 5)
+                ProgressView(value: percent / 100).progressViewStyle(.linear).tint(Palette.brand)
             }
             Text("\(Int(percent))%").font(.caption.weight(.heavy))
                 .foregroundStyle(i == 0 ? Palette.brand : Palette.muted).frame(width: 36, alignment: .trailing)
