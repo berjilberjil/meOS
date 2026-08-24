@@ -8,12 +8,16 @@ struct FitnessView: View {
 
     private var fp: FitnessProfile { state.fitnessProfile }
 
+    /// Today first, then the thing that decides what Today says. Training got
+    /// its own tab (programs + history) because it is a hierarchy now, not a
+    /// list of exercises hanging off a weekday.
     enum FitSub: String, CaseIterable, Hashable {
-        case today, plan, library, body
+        case today, train, meals, library, body
         var label: String {
             switch self {
             case .today: return "Today"
-            case .plan: return "Plan"
+            case .train: return "Train"
+            case .meals: return "Meals"
             case .library: return "Library"
             case .body: return "Body"
             }
@@ -21,23 +25,48 @@ struct FitnessView: View {
     }
     @State private var sub: FitSub = .today
 
+    enum TrainSub: String, CaseIterable, Hashable {
+        case programs, history
+        var label: String { self == .programs ? "Programs" : "History" }
+    }
+    @State private var trainSub: TrainSub = .programs
+
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
             ScreenTitle(text: "Fitness")
                 .knRise(0)
 
+            #if os(iOS)
+            Segmented(options: FitSub.allCases.map { ($0, $0.label) }, selection: $sub, fillsWidth: true)
+                .knRise(1)
+            #else
             Segmented(options: FitSub.allCases.map { ($0, $0.label) }, selection: $sub)
                 .knRise(1)
+            #endif
 
             Group {
                 switch sub {
                 case .today:   todayContent
-                case .plan:    WeeklyPlannerView()
+                case .train:   trainContent
+                case .meals:   WeeklyPlannerView()
                 case .library: FitnessLibraryView()
                 case .body:    BodyView()
                 }
             }
             .id(sub)
+        }
+    }
+
+    @ViewBuilder private var trainContent: some View {
+        VStack(alignment: .leading, spacing: Gap.screen) {
+            Segmented(options: TrainSub.allCases.map { ($0, $0.label) }, selection: $trainSub)
+            Group {
+                switch trainSub {
+                case .programs: ProgramsView()
+                case .history:  WorkoutHistoryView()
+                }
+            }
+            .id(trainSub)
         }
     }
 

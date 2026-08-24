@@ -8,13 +8,15 @@ struct WorkoutLibrarySection: View {
     @State private var newExercise = false
     @State private var detail: Exercise?
     @State private var libQuery = ""
-    @State private var libCat: WorkoutCategory?
+    /// Filed by muscle group now — "Arms" was one shelf holding both the curls
+    /// and the pushdowns, which is not how anyone looks for an exercise.
+    @State private var libGroup: MuscleGroup?
     @FocusState private var libSearchFocused: Bool
 
     private var libResults: [Exercise] {
         let q = libQuery.lowercased().trimmingCharacters(in: .whitespaces)
         return state.allExercises.filter { ex in
-            (libCat == nil || ex.category == libCat) &&
+            (libGroup == nil || ex.group == libGroup) &&
             (q.isEmpty || ex.name.lowercased().contains(q) || ex.primary.lowercased().contains(q))
         }
     }
@@ -33,17 +35,20 @@ struct WorkoutLibrarySection: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    libCatChip(nil, "All")
-                    ForEach(WorkoutCategory.allCases, id: \.self) { c in libCatChip(c, c.label) }
+                    libGroupChip(nil, "All")
+                    ForEach(MuscleGroup.allCases) { g in libGroupChip(g, g.label) }
                 }
                 .padding(.vertical, 1)
             }
-            ForEach(WorkoutCategory.allCases, id: \.self) { cat in
-                let items = libResults.filter { $0.category == cat }
+            ForEach(MuscleGroup.allCases.sorted { $0.sortRank < $1.sortRank }) { grp in
+                let items = libResults.filter { $0.group == grp }
                 if !items.isEmpty {
                     Card {
                         VStack(alignment: .leading, spacing: 8) {
-                            SectionTitle(text: "\(cat.label) · \(items.count)")
+                            HStack(spacing: 8) {
+                                Circle().fill(grp.tint).frame(width: 7, height: 7)
+                                SectionTitle(text: "\(grp.label) · \(items.count)")
+                            }
                             ForEach(items) { ex in libRow(ex) }
                         }
                     }
@@ -57,13 +62,14 @@ struct WorkoutLibrarySection: View {
         .sheet(item: $detail) { ex in ExerciseDetailSheet(exercise: ex) }
     }
 
-    private func libCatChip(_ c: WorkoutCategory?, _ label: String) -> some View {
-        let on = libCat == c
-        return Button { libCat = c } label: {
+    private func libGroupChip(_ g: MuscleGroup?, _ label: String) -> some View {
+        let on = libGroup == g
+        let tint = g?.tint ?? Palette.brand
+        return Button { libGroup = g } label: {
             Text(label).font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(on ? Palette.brand : Palette.surface2.opacity(0.6), in: Capsule())
+                .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
         }
         .buttonStyle(KPressStyle())
         .onHover { h in cursor(h) }
@@ -74,7 +80,8 @@ struct WorkoutLibrarySection: View {
             ExerciseIcon(category: ex.category, size: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(ex.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                Text("\(ex.equipment) · \(ex.primary)").font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
+                Text("\(ex.equipment) · \(ex.primary.isEmpty ? ex.group.label : ex.primary)")
+                    .font(.system(size: 11)).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer(minLength: 6)
             if ex.gifId != nil {
@@ -131,16 +138,21 @@ struct ExerciseIcon: View {
 struct ExercisePickerSheet: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
+    /// Opened from a muscle-group block: start on that group's exercises so
+    /// picking a chest variation is one tap, not a search.
+    var group: MuscleGroup? = nil
+    var title: String = "Add exercise"
     let add: (Exercise) -> Void
     let newCustom: () -> Void
     @State private var query = ""
-    @State private var category: WorkoutCategory?
+    @State private var group2: MuscleGroup?
+    @State private var didSeed = false
     @FocusState private var searchFocused: Bool
 
     private var results: [Exercise] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         return state.allExercises.filter { ex in
-            (category == nil || ex.category == category) &&
+            (group2 == nil || ex.group == group2) &&
             (q.isEmpty || ex.name.lowercased().contains(q) || ex.primary.lowercased().contains(q))
         }
     }
@@ -148,7 +160,7 @@ struct ExercisePickerSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Add exercise").font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                Text(title).font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
                 Spacer()
                 Button { dismiss(); newCustom() } label: { Label("New", systemImage: "plus") }
                     .buttonStyle(KGhostButtonStyle())
@@ -162,8 +174,8 @@ struct ExercisePickerSheet: View {
             .knField(focused: searchFocused).padding(.horizontal, 16)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    catChip(nil, "All")
-                    ForEach(WorkoutCategory.allCases, id: \.self) { c in catChip(c, c.label) }
+                    groupChip(nil, "All")
+                    ForEach(MuscleGroup.allCases) { g in groupChip(g, g.label) }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
             }
@@ -176,7 +188,7 @@ struct ExercisePickerSheet: View {
                                 ExerciseIcon(category: ex.category, size: 30)
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(ex.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
-                                    Text("\(ex.category.label) · \(ex.equipment)").font(.system(size: 11)).foregroundStyle(Palette.faint)
+                                    Text("\(ex.group.label) · \(ex.equipment)").font(.system(size: 11)).foregroundStyle(Palette.faint)
                                 }
                                 Spacer()
                                 if ex.gifId != nil {
@@ -201,15 +213,17 @@ struct ExercisePickerSheet: View {
         .frame(maxWidth: .infinity)
         #endif
         .background(Palette.elevated)
+        .onAppear { if !didSeed { group2 = group; didSeed = true } }
     }
 
-    private func catChip(_ c: WorkoutCategory?, _ label: String) -> some View {
-        let on = category == c
-        return Button { category = c } label: {
+    private func groupChip(_ g: MuscleGroup?, _ label: String) -> some View {
+        let on = group2 == g
+        let tint = g?.tint ?? Palette.brand
+        return Button { group2 = g } label: {
             Text(label).font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(on ? Palette.brand : Palette.surface2.opacity(0.6), in: Capsule())
+                .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
         }
         .buttonStyle(KPressStyle())
         .onHover { h in cursor(h) }
@@ -227,7 +241,8 @@ struct ExerciseEditor: View {
 
     init(exercise: Exercise?) {
         self.exercise = exercise
-        _draft = State(initialValue: exercise ?? Exercise(name: "", category: .chest, equipment: "Barbell", primary: ""))
+        _draft = State(initialValue: exercise ?? Exercise(name: "", category: .chest, equipment: "Barbell",
+                                                         primary: "", muscleGroup: .chest))
     }
 
     var body: some View {
@@ -237,10 +252,12 @@ struct ExerciseEditor: View {
             KLabeledField(label: "Name", placeholder: "e.g. Incline dumbbell press", text: $draft.name)
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    KFieldLabel(text: "Category")
+                    KFieldLabel(text: "Muscle group")
                     Menu {
-                        ForEach(WorkoutCategory.allCases, id: \.self) { c in Button(c.label) { draft.category = c } }
-                    } label: { menuLabel(draft.category.label) }
+                        ForEach(MuscleGroup.allCases) { g in
+                            Button(g.label) { draft.muscleGroup = g; draft.category = g.category }
+                        }
+                    } label: { menuLabel(draft.group.label) }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden)
                 }
                 KLabeledField(label: "Equipment", placeholder: "Barbell / Dumbbell / …", text: $draft.equipment)

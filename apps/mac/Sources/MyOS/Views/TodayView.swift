@@ -18,7 +18,6 @@ struct TodayView: View {
 
     @State private var expandedNews: Set<String> = []
     @State private var editingMeal: MealKey?
-    @State private var editingWorkout = false
     @State private var showStreakCal = false
     /// The day this page is showing when nobody outside is driving it.
     @State private var ownDate: String = ""
@@ -61,9 +60,6 @@ struct TodayView: View {
             MealLogEditorSheet(date: selectedDate, meal: meal,
                                initialItems: state.mealEditorItems(date: selectedDate, meal: meal))
         }
-        .sheet(isPresented: $editingWorkout) {
-            WorkoutDayEditorSheet(date: selectedDate, initialItems: state.workoutItemsForDay(selectedDate))
-        }
         .sheet(isPresented: $showStreakCal) { streakCalendarSheet }
     }
 
@@ -77,7 +73,7 @@ struct TodayView: View {
         case .meals:
             mealsCard
         case .workout:
-            WorkoutChecklistCard(day: selectedDate, edit: { editingWorkout = true })
+            WorkoutChecklistCard(day: selectedDate)
         case .comingUp:
             comingUpCard
         case .bodyPhotos:

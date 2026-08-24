@@ -73,7 +73,6 @@ struct DayMacroHero: View {
 struct FitnessTodayView: View {
     @EnvironmentObject var state: AppState
     @State private var editingMeal: MealKey?
-    @State private var editingWorkout = false
     @State private var scanningMeal: MealKey?
     @State private var scanPayload: FoodScanPayload?
 
@@ -87,13 +86,10 @@ struct FitnessTodayView: View {
                                   edit: { editingMeal = meal },
                                   scan: { scanningMeal = meal })
             }
-            WorkoutChecklistCard(edit: { editingWorkout = true })
+            WorkoutChecklistCard()
         }
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: date, meal: meal, initialItems: seed(meal))
-        }
-        .sheet(isPresented: $editingWorkout) {
-            WorkoutDayEditorSheet(date: date, initialItems: state.workoutItemsForDay(date))
         }
         .sheet(item: $scanningMeal) { meal in
             FoodScanSheet { summary, foods in
@@ -217,79 +213,227 @@ struct MealChecklistCard: View {
 
 // MARK: - The workout checklist card
 
+/// Today's training, resolved from the active program — you never pick a
+/// workout, you just do the one that's on. The card owns its own sheets so
+/// Today, the Fitness tab and the day detail all behave identically.
 struct WorkoutChecklistCard: View {
     /// The day being shown. Today unless the Today page has been swiped.
     var day: String? = nil
     @EnvironmentObject var state: AppState
-    let edit: () -> Void
+
+    @State private var session = false
+    @State private var choosing = false
+    @State private var editingDay = false
+    @State private var movingDay = false
 
     private var date: String { day ?? state.todayKey }
-    /// The plan for **the day being shown**. This used to read
-    /// `state.todayWeekday` while `items` read the paged date, so swiping to
-    /// another day showed today's rest-day banner over that day's exercises.
-    private var plan: WorkoutDayPlan { state.workoutPlan(AppState.weekdayKey(date)) }
+    private var resolved: (program: WorkoutProgram, day: ProgramDay)? { state.programDay(for: date) }
     private var dayLog: WorkoutDayLog { state.workoutDayLog(date) }
-    private var items: [PlanExercise] { state.workoutItemsForDay(date) }
+    private var isRest: Bool { state.isRestDay(date) }
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 header
-                if plan.isRestDay && dayLog.state == .unconfirmed {
-                    HStack(spacing: 8) {
-                        Image(systemName: "moon.zzz.fill").foregroundStyle(Palette.blue)
-                        Text("Rest day — no workout scheduled.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.muted)
-                    }
-                } else {
-                    switch dayLog.state {
-                    case .unconfirmed: unconfirmedBody
-                    case .done:        doneBody
-                    case .skipped:     skippedBody
-                    }
-                }
+                content
             }
+        }
+        .sheet(isPresented: $session) { WorkoutSessionView(date: date) }
+        .sheet(isPresented: $choosing) {
+            ProgramDayPickerSheet(date: date) { session = true }
+        }
+        .sheet(isPresented: $editingDay) {
+            if let r = resolved { ProgramDaySheet(programId: r.program.id, dayId: r.day.id) }
+        }
+        .sheet(isPresented: $movingDay) {
+            if let r = resolved { DaySettingsSheet(programId: r.program.id, day: r.day) }
         }
     }
 
+    // MARK: Header
+
     @ViewBuilder private var header: some View {
-        HStack(spacing: 8) {
-            Label("Workout", systemImage: "figure.strengthtraining.traditional")
-                .font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-            Spacer()
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
+                Label("Workout", systemImage: "figure.strengthtraining.traditional")
+                    .font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
+                if let r = resolved {
+                    Text(r.day.isRestDay ? r.program.name : "\(r.day.name) · \(r.program.name)")
+                        .font(.system(size: 11)).foregroundStyle(Palette.faint)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 4)
             switch dayLog.state {
             case .done:    Image(systemName: "checkmark.circle.fill").font(.system(size: 15)).foregroundStyle(Palette.green)
             case .skipped: Image(systemName: "minus.circle.fill").font(.system(size: 15)).foregroundStyle(Palette.faint)
             case .unconfirmed: EmptyView()
             }
+            if resolved != nil { optionsMenu }
         }
     }
 
-    @ViewBuilder private var unconfirmedBody: some View {
-        if items.isEmpty {
-            Text("No workout planned. Add exercises or skip it.")
-                .font(.system(size: 12)).foregroundStyle(Palette.faint)
-        } else {
-            ForEach(items) { pe in exerciseRow(pe, ghost: true) }
-            SlideToConfirm(label: "Slide to log", tint: Palette.green) { state.tickWorkout(date: date) }
+    /// Everything you might want to do to today's workout without rebuilding it.
+    private var optionsMenu: some View {
+        Menu {
+            if let r = resolved, !r.day.isRestDay {
+                Button("Edit this workout") { editingDay = true }
+                Button("Move it to another day") { movingDay = true }
+            }
+            Button(isRest ? "Train anyway" : "Choose another workout") { choosing = true }
+            if !isRest && dayLog.state != .done {
+                Button("Mark done as planned") { state.markWorkoutDone(date: date) }
+            }
+            Divider()
+            if dayLog.restOverride {
+                Button("Undo rest day") { state.setRestOverride(date: date, false) }
+            } else {
+                Button("Make today a rest day") { state.setRestOverride(date: date, true) }
+            }
+            if dayLog.state == .skipped {
+                Button("Undo skip") { state.unskipWorkout(date: date) }
+            } else if !isRest {
+                Button("Skip today", role: .destructive) { state.skipWorkout(date: date) }
+            }
+            if dayLog.entries != nil {
+                Divider()
+                Button("Start the log over") { state.resetSession(date: date) }
+            }
+        } label: {
+            Image(systemName: "ellipsis").font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.faint)
+                .frame(width: 28, height: 28).contentShape(Rectangle())
         }
-        HStack(spacing: 8) {
-            Button(action: edit) { Label("Edit", systemImage: "pencil") }.buttonStyle(KGhostButtonStyle())
-            Spacer()
-            Button { state.skipWorkout(date: date) } label: { Label("Skip", systemImage: "xmark") }
-                .buttonStyle(KGhostButtonStyle(color: Palette.faint))
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
+    }
+
+    // MARK: Body
+
+    @ViewBuilder private var content: some View {
+        if resolved == nil {
+            noProgram
+        } else if dayLog.state == .skipped {
+            skippedBody
+        } else if isRest && !dayLog.hasSession {
+            restBody
+        } else if dayLog.state == .done {
+            doneBody
+        } else {
+            plannedBody
+        }
+    }
+
+    private var noProgram: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(state.programs.isEmpty
+                 ? "No training program yet."
+                 : "No program is active, so nothing is scheduled.")
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+            Text("Build one in Fitness → Programs: name it, add your days, pick the muscles and exercises. After that Today always knows what's on.")
+                .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var restBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "moon.zzz.fill").foregroundStyle(Palette.blue)
+                Text(dayLog.restOverride ? "Rest day — you called it." : "Rest day — nothing scheduled.")
+                    .font(.system(size: 13)).foregroundStyle(Palette.muted)
+            }
+            Button { choosing = true } label: { Label("Train anyway", systemImage: "figure.run") }
+                .buttonStyle(KGhostButtonStyle())
+        }
+    }
+
+    /// What's on today, by muscle — the thing you actually want to read before
+    /// you leave the house.
+    @ViewBuilder private var plannedBody: some View {
+        if let r = resolved {
+            if r.day.exerciseCount == 0 {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("\(r.day.name) has no exercises yet.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.faint)
+                    Button { editingDay = true } label: { Label("Build this day", systemImage: "plus") }
+                        .buttonStyle(KSecondaryButtonStyle())
+                }
+            } else {
+                VStack(spacing: Gap.tight) {
+                    ForEach(r.day.blocks.filter { !$0.items.isEmpty }) { block in groupRow(block) }
+                }
+                if dayLog.hasSession {
+                    inProgress
+                } else {
+                    Button { session = true } label: {
+                        Label("Start workout", systemImage: "play.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
+                }
+            }
+        }
+    }
+
+    private var inProgress: some View {
+        let entries = dayLog.entries ?? []
+        let done = entries.reduce(0) { $0 + $1.doneSets }
+        let total = entries.reduce(0) { $0 + $1.sets.count }
+        return VStack(alignment: .leading, spacing: 8) {
+            MeterBar(fraction: Double(done) / Double(max(1, total)), tint: Palette.brand, height: 6)
+            Text("\(done) of \(total) sets logged")
+                .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
+            Button { session = true } label: {
+                Label("Continue workout", systemImage: "play.fill").font(.system(size: 15, weight: .semibold))
+            }
+            .buttonStyle(KPrimaryButtonStyle(fullWidth: true))
+        }
+    }
+
+    private func groupRow(_ block: ProgramMuscleBlock) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: block.group.icon)
+                .font(.system(size: 12, weight: .bold)).foregroundStyle(block.group.tint)
+                .frame(width: 26, height: 26)
+                .background(block.group.tint.opacity(0.15),
+                            in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+            Text(block.group.label)
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+            Spacer(minLength: 4)
+            Text("\(block.items.count) exercise\(block.items.count == 1 ? "" : "s")")
+                .font(.system(size: 11)).monospacedDigit().foregroundStyle(Palette.faint)
         }
     }
 
     @ViewBuilder private var doneBody: some View {
-        ForEach(items) { pe in exerciseRow(pe, ghost: false) }
-        HStack {
-            Button(action: edit) { Label("Edit", systemImage: "pencil") }.buttonStyle(KGhostButtonStyle())
-            Spacer()
+        let entries = (dayLog.entries ?? []).filter { $0.doneSets > 0 }
+        if entries.isEmpty {
+            // Marked done as planned — there are no set logs to show, so show
+            // what the plan was rather than the word "Logged".
+            VStack(spacing: Gap.tight) {
+                ForEach(resolved?.day.blocks.filter { !$0.items.isEmpty } ?? []) { block in
+                    groupRow(block)
+                }
+            }
+            Text("Done as planned.").font(.system(size: 11)).foregroundStyle(Palette.faint)
+        } else {
+            VStack(spacing: 6) {
+                ForEach(entries) { e in
+                    HStack(spacing: 10) {
+                        Circle().fill(e.group.tint).frame(width: 6, height: 6)
+                        Text(state.exercise(e.exerciseId)?.name ?? "Exercise")
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                        Spacer(minLength: 4)
+                        Text(e.topWeight.map { "\(e.doneSets) × \(Fmt.trimKg($0)) kg" } ?? "\(e.doneSets) sets")
+                            .font(.system(size: 11, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.faint)
+                    }
+                }
+            }
         }
+        Button { session = true } label: { Label("Edit what I logged", systemImage: "pencil") }
+            .buttonStyle(KGhostButtonStyle())
     }
 
-    @ViewBuilder private var skippedBody: some View {
+    private var skippedBody: some View {
         HStack {
             Text("Skipped").font(.system(size: 13, weight: .semibold)).strikethrough().foregroundStyle(Palette.faint)
             Spacer()
@@ -297,16 +441,93 @@ struct WorkoutChecklistCard: View {
                 .buttonStyle(KGhostButtonStyle())
         }
     }
+}
 
-    private func exerciseRow(_ pe: PlanExercise, ghost: Bool) -> some View {
-        let ex = state.exercise(pe.exerciseId)
-        return HStack(spacing: 10) {
-            ExerciseIcon(category: ex?.category ?? .core, size: 28)
-            Text(ex?.name ?? "Exercise").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
-            Spacer()
-            Text("\(pe.sets) × \(pe.reps)").font(.system(size: 12, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
+// MARK: - Run a different day from the active program
+
+/// "Choose another workout" — every day in the active program, pick one for
+/// this date. The program's schedule is untouched; only this date moves.
+struct ProgramDayPickerSheet: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    let date: String
+    var thenStart: () -> Void = {}
+
+    var body: some View {
+        SheetShell(title: "Choose today\u{2019}s workout",
+                   subtitle: "Runs it for \(Fmt.day(date)) only — your program keeps its schedule.") {
+            VStack(alignment: .leading, spacing: Gap.tight) {
+                if let p = state.activeProgram {
+                    ForEach(p.days.filter { !$0.isRestDay }) { d in
+                        Button {
+                            state.setWorkoutOverride(date: date, dayId: d.id)
+                            state.resetSession(date: date)
+                            dismiss()
+                            thenStart()
+                        } label: {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(d.name)
+                                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                                    Text(d.groupSummary.isEmpty ? "Nothing planned" : d.groupSummary)
+                                        .font(.system(size: 12)).foregroundStyle(Palette.muted)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 4)
+                                Text("\(d.exerciseCount)")
+                                    .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                                    .foregroundStyle(Palette.faint)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.faint)
+                            }
+                            .padding(13)
+                            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                                .strokeBorder(Palette.border, lineWidth: 1))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(KPressStyle())
+                        .onHover { h in cursor(h) }
+                    }
+                    if state.workoutDayLog(date).dayId != nil {
+                        Button {
+                            state.setWorkoutOverride(date: date, dayId: nil)
+                            state.resetSession(date: date)
+                            dismiss()
+                        } label: { Label("Back to the scheduled day", systemImage: "arrow.uturn.backward") }
+                            .buttonStyle(KGhostButtonStyle())
+                    }
+                } else {
+                    Text("No active program.").font(.system(size: 13)).foregroundStyle(Palette.faint)
+                }
+            }
         }
-        .opacity(ghost ? 0.55 : 1)
+    }
+}
+
+/// The day editor, in a sheet — so "change one exercise" from Today never
+/// costs a trip through the Programs tab.
+struct ProgramDaySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let programId: String
+    let dayId: String
+
+    var body: some View {
+        ScrollView {
+            ProgramDayEditorView(programId: programId, dayId: dayId, back: { dismiss() })
+                .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 28)
+        }
+        #if os(macOS)
+        .frame(width: 560)
+        .frame(minHeight: 620)
+        .background(Palette.bg)
+        #else
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.bg)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Palette.bg)
+        #endif
     }
 }
 
@@ -524,90 +745,5 @@ private struct DraftFoodRow: View {
                 .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
         .buttonStyle(KPressStyle(scale: 0.9))
-    }
-}
-
-// MARK: - Edit today's workout
-
-struct WorkoutDayEditorSheet: View {
-    @EnvironmentObject var state: AppState
-    @Environment(\.dismiss) private var dismiss
-    let date: String
-    @State private var draft: [PlanExercise]
-    @State private var adding = false
-    @State private var newExercise = false
-
-    init(date: String, initialItems: [PlanExercise]) {
-        self.date = date
-        _draft = State(initialValue: initialItems.map { PlanExercise(exerciseId: $0.exerciseId, sets: $0.sets, reps: $0.reps) })
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Label("Edit workout", systemImage: "figure.strengthtraining.traditional")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(Palette.text)
-                Spacer()
-                Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
-                    .buttonStyle(KIconButtonStyle(size: 28))
-            }
-            .padding(16)
-            Divider().overlay(Palette.border)
-            ScrollView {
-                VStack(spacing: 8) {
-                    if draft.isEmpty {
-                        Text("Nothing yet — add an exercise.").font(.system(size: 12)).foregroundStyle(Palette.faint)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    ForEach($draft) { $item in
-                        DraftExerciseRow(item: $item, exercise: state.exercise(item.exerciseId)) {
-                            draft.removeAll { $0.id == item.id }
-                        }
-                    }
-                    Button { adding = true } label: { Label("Add exercise", systemImage: "plus.circle.fill") }
-                        .buttonStyle(KGhostButtonStyle(color: Palette.brand))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(16)
-            }
-            .frame(maxHeight: 420)
-            Divider().overlay(Palette.border)
-            VStack(spacing: 12) {
-                SlideToConfirm(label: "Slide to log", tint: Palette.brand) {
-                    state.tickWorkout(date: date, items: draft); dismiss()
-                }
-                Button("Cancel") { dismiss() }.buttonStyle(KGhostButtonStyle())
-            }
-            .padding(16)
-        }
-        #if os(macOS)
-        .frame(width: 460)
-        #else
-        .frame(maxWidth: .infinity)
-        #endif
-        .background(Palette.elevated)
-        .sheet(isPresented: $adding) {
-            ExercisePickerSheet(add: { ex in draft.append(PlanExercise(exerciseId: ex.id)) },
-                                newCustom: { newExercise = true })
-        }
-        .sheet(isPresented: $newExercise) { ExerciseEditor(exercise: nil) }
-    }
-}
-
-private struct DraftExerciseRow: View {
-    @Binding var item: PlanExercise
-    let exercise: Exercise?
-    let remove: () -> Void
-
-    var body: some View {
-        ExercisePlanRow(
-            name: exercise?.name ?? "Exercise",
-            subtitle: [exercise?.category.label, exercise?.primary].compactMap { $0 }
-                .filter { !$0.isEmpty }.joined(separator: " · "),
-            category: exercise?.category ?? .core,
-            sets: item.sets, reps: item.reps,
-            onSets: { item.sets = max(1, $0) },
-            onReps: { item.reps = max(1, $0) },
-            remove: remove)
     }
 }

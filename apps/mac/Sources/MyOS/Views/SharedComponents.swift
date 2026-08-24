@@ -624,61 +624,6 @@ struct KStepper: View {
     }
 }
 
-/// One exercise inside a plan — what it is, and how many sets and reps.
-///
-/// The planner and the day editor each had their own version of this row. The
-/// editor's put the name, both steppers and the delete button on one line, so
-/// on a phone the name collapsed to "Incline…" and the steppers crushed. Name
-/// and controls are on separate lines here, which is the only layout that holds
-/// at every width.
-struct ExercisePlanRow: View {
-    let name: String
-    let subtitle: String
-    let category: WorkoutCategory
-    let sets: Int
-    let reps: Int
-    let onSets: (Int) -> Void
-    let onReps: (Int) -> Void
-    let remove: () -> Void
-
-    @State private var showDelete = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                ExerciseIcon(category: category, size: 34)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.system(size: 11)).foregroundStyle(Palette.faint)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer(minLength: 8)
-                Button { showDelete = true } label: {
-                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                }
-                .buttonStyle(KIconButtonStyle(size: 28))
-                .holdToDelete(isPresented: $showDelete,
-                              title: "Remove \(name)?",
-                              message: "Removes it from this day.",
-                              confirmLabel: "Hold to remove") { remove() }
-            }
-
-            HStack(spacing: 16) {
-                KStepper(label: "Sets", value: sets, dec: { onSets(sets - 1) }, inc: { onSets(sets + 1) })
-                KStepper(label: "Reps", value: reps, dec: { onReps(reps - 1) }, inc: { onReps(reps + 1) })
-                Spacer(minLength: 0)
-            }
-            .padding(.leading, 44)
-        }
-        .padding(.vertical, 6)
-    }
-}
-
 /// A minimal filled area sparkline. Started life in Fold; Macro Intelligence
 /// reads the same way, so it lives here rather than existing twice.
 struct Sparkline: View {

@@ -61,7 +61,7 @@ struct DayDetailView: View {
             ActivityStepsCard(day: selected, showsCalendar: false)
             DayMacroHero(day: selected)
             mealsRow
-            WorkoutChecklistCard(day: selected, edit: {})
+            WorkoutChecklistCard(day: selected)
             WatchLogCard(day: selected)
             FocusCard(day: selected, showsCalendar: false)
             eventsCard

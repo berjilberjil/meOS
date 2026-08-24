@@ -119,6 +119,9 @@ final class AppState: ObservableObject {
               let payload = try? api.decodePayload(fromRaw: raw) else { return }
         apply(payload)
         isHydrated = true
+        // No training migration here: this is the on-disk cache, which can be
+        // older than the server. `hydrate()` runs next and migrates from the
+        // authoritative copy.
         phase = .loggedIn
         DietBridge.shared.start(state: self)
         startLiveSync()
@@ -232,6 +235,7 @@ final class AppState: ObservableObject {
             let payload = try api.decodePayload(fromRaw: raw)
             apply(payload)
             isHydrated = true
+            migrateTrainingIfNeeded()
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
@@ -297,6 +301,7 @@ final class AppState: ObservableObject {
             // unlock silently next launch (decode tolerates a plaintext/encrypted mix).
             vault.cacheToKeychain(username: username)
             isHydrated = true
+            migrateTrainingIfNeeded()
             await migrateEncryptExisting(raw: raw)
             // Refresh the on-disk cache so it holds ciphertext, not the old plaintext.
             _ = try? await api.fetchStateRaw()
@@ -359,6 +364,7 @@ final class AppState: ObservableObject {
             let payload = try api.decodePayload(fromRaw: raw)
             apply(payload)
             isHydrated = true
+            migrateTrainingIfNeeded()
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
@@ -1053,37 +1059,14 @@ final class AppState: ObservableObject {
         push(StateKey.training, training)
     }
 
+    /// Read-only survivor of the pre-program model: still answers for a date on
+    /// a save that has not been migrated yet. Nothing writes `weekPlan` any more
+    /// — see `migrateTrainingIfNeeded()` and `AppState+Program.swift`.
     func workoutPlan(_ weekday: String) -> WorkoutDayPlan { training.weekPlan[weekday] ?? WorkoutDayPlan() }
-    private func mutatePlan(_ weekday: String, _ f: (inout WorkoutDayPlan) -> Void) {
-        var p = training.weekPlan[weekday] ?? WorkoutDayPlan()
-        f(&p)
-        training.weekPlan[weekday] = p
-        push(StateKey.training, training)
-    }
-    func setRestDay(_ weekday: String, _ rest: Bool) {
-        mutatePlan(weekday) {
-            $0.rest = rest
-            // Rest means no work — keep the list empty so Plan never shows
-            // "Rest day" above a stack of exercises.
-            if rest { $0.items = [] }
-        }
-    }
-    func addPlanExercise(weekday: String, exerciseId: String) {
-        mutatePlan(weekday) { $0.rest = false; $0.items.append(PlanExercise(exerciseId: exerciseId)) }
-    }
-    func setPlanSets(weekday: String, itemId: String, sets: Int) {
-        mutatePlan(weekday) { if let i = $0.items.firstIndex(where: { $0.id == itemId }) { $0.items[i].sets = max(1, sets) } }
-    }
-    func setPlanReps(weekday: String, itemId: String, reps: Int) {
-        mutatePlan(weekday) { if let i = $0.items.firstIndex(where: { $0.id == itemId }) { $0.items[i].reps = max(1, reps) } }
-    }
-    func removePlanExercise(weekday: String, itemId: String) {
-        mutatePlan(weekday) { $0.items.removeAll { $0.id == itemId } }
-    }
 
     // Workout day log (tick / edit / skip). The weekly template is never mutated.
     func workoutDayLog(_ date: String) -> WorkoutDayLog { training.dayLog[date] ?? WorkoutDayLog() }
-    private func mutateDayLog(_ date: String, _ f: (inout WorkoutDayLog) -> Void) {
+    func mutateDayLog(_ date: String, _ f: (inout WorkoutDayLog) -> Void) {
         var l = training.dayLog[date] ?? WorkoutDayLog()
         f(&l)
         training.dayLog[date] = l
@@ -1092,20 +1075,17 @@ final class AppState: ObservableObject {
     func tickWorkout(date: String, items: [PlanExercise]? = nil) { mutateDayLog(date) { $0.tick(items: items) } }
     func skipWorkout(date: String)   { mutateDayLog(date) { $0.skip() } }
     func unskipWorkout(date: String) { mutateDayLog(date) { $0.unskip() } }
-    /// The exercises for a date: the edited actual if present, else the weekday plan.
+    /// The exercises for a date, in falling order of truth: what you logged,
+    /// then what the active program schedules, then the legacy weekday plan
+    /// (which only still answers on a save that predates programs).
     func workoutItemsForDay(_ date: String) -> [PlanExercise] {
-        if let items = workoutDayLog(date).items { return items }
+        let log = workoutDayLog(date)
+        if let items = log.loggedItems, !items.isEmpty { return items }
+        if let (_, day) = programDay(for: date) {
+            return day.allItems.map { PlanExercise(exerciseId: $0.exerciseId, sets: $0.sets, reps: $0.reps) }
+        }
         return workoutPlan(Self.weekdayKey(date)).items
     }
-    func copyWorkoutDay(from: String, to weekdays: [String]) {
-        let src = workoutPlan(from)
-        for wd in weekdays where wd != from {
-            training.weekPlan[wd] = WorkoutDayPlan(rest: src.rest,
-                items: src.items.map { PlanExercise(exerciseId: $0.exerciseId, sets: $0.sets, reps: $0.reps) })
-        }
-        push(StateKey.training, training)
-    }
-
     // MARK: - AI plan generation ("Generate my week")
 
     @Published var planBusy = false
@@ -1151,21 +1131,40 @@ final class AppState: ObservableObject {
     private func applyGeneratedPlan(_ plan: GeneratedPlan) {
         let exList = allExercises, foodList = allFoods
 
-        // Workout
-        var newWorkout: [String: WorkoutDayPlan] = [:]
-        for day in plan.workout {
-            let wd = String(max(0, min(6, day.weekday)))
-            if day.rest || day.exercises.isEmpty {
-                newWorkout[wd] = WorkoutDayPlan(rest: true, items: [])
+        // Workout — written as a weekday-bound program, grouped by muscle. The
+        // AI returns a flat list per day; the blocks are derived here so the
+        // generated week reads like a hand-built one.
+        var newDays: [ProgramDay] = []
+        for wd in 0..<7 {
+            let src = plan.workout.first { max(0, min(6, $0.weekday)) == wd }
+            let name = ProgramMigration.weekdayNames[wd]
+            guard let src, !src.rest, !src.exercises.isEmpty else {
+                newDays.append(ProgramDay(name: "Rest", weekday: wd, rest: true))
+                continue
+            }
+            var blocks: [ProgramMuscleBlock] = []
+            for e in src.exercises {
+                guard let id = matchId(e.name, in: exList, id: { $0.id }, label: { $0.name }) else { continue }
+                let g = group(ofExercise: id)
+                let item = ProgramExercise(exerciseId: id, sets: max(1, e.sets), reps: max(1, e.reps))
+                if let i = blocks.firstIndex(where: { $0.group == g }) { blocks[i].items.append(item) }
+                else { blocks.append(ProgramMuscleBlock(group: g, items: [item])) }
+            }
+            newDays.append(blocks.isEmpty
+                           ? ProgramDay(name: "Rest", weekday: wd, rest: true)
+                           : ProgramDay(name: name, weekday: wd, blocks: blocks))
+        }
+        if newDays.contains(where: { !$0.isRestDay }) {
+            if let activeId = training.activeProgramId,
+               let i = training.programs.firstIndex(where: { $0.id == activeId }) {
+                // Rewrite the active program's schedule; its name and history stay.
+                training.programs[i].days = newDays
+                push(StateKey.training, training)
             } else {
-                let items: [PlanExercise] = day.exercises.compactMap { e in
-                    guard let id = matchId(e.name, in: exList, id: { $0.id }, label: { $0.name }) else { return nil }
-                    return PlanExercise(exerciseId: id, sets: max(1, e.sets), reps: max(1, e.reps))
-                }
-                newWorkout[wd] = WorkoutDayPlan(rest: items.isEmpty, items: items)
+                createProgram(name: "AI week", notes: plan.summary.nilIfBlank,
+                              goal: fitnessProfile.goal.label, days: newDays)
             }
         }
-        if !newWorkout.isEmpty { training.weekPlan = newWorkout; push(StateKey.training, training) }
 
         // Meals
         var newMeals: [String: [String: [PlanItem]]] = [:]

@@ -220,16 +220,20 @@ struct Exercise: Codable, Identifiable, Hashable {
     var gifId: String?
     var weighted: Bool
     var isDefault: Bool
+    /// The muscle-group section this files under in a workout day. nil means
+    /// "derive it" — see `Exercise.group`, which reads the anatomy slugs. Seed
+    /// exercises leave it nil on purpose so one slug table stays the source.
+    var muscleGroup: MuscleGroup?
 
     init(id: String = UUID().uuidString.lowercased(), name: String, category: WorkoutCategory,
          equipment: String, primary: String, muscles: [String] = [], gifId: String? = nil,
-         weighted: Bool = true, isDefault: Bool = false) {
+         weighted: Bool = true, isDefault: Bool = false, muscleGroup: MuscleGroup? = nil) {
         self.id = id; self.name = name; self.category = category; self.equipment = equipment
         self.primary = primary; self.muscles = muscles; self.gifId = gifId
-        self.weighted = weighted; self.isDefault = isDefault
+        self.weighted = weighted; self.isDefault = isDefault; self.muscleGroup = muscleGroup
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, category, equipment, primary, muscles, gifId, weighted, isDefault }
+    enum CodingKeys: String, CodingKey { case id, name, category, equipment, primary, muscles, gifId, weighted, isDefault, muscleGroup }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id        = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString.lowercased()
@@ -241,6 +245,7 @@ struct Exercise: Codable, Identifiable, Hashable {
         gifId     = try c.decodeIfPresent(String.self, forKey: .gifId)
         weighted  = try c.decodeIfPresent(Bool.self, forKey: .weighted) ?? true
         isDefault = try c.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
+        muscleGroup = try? c.decodeIfPresent(MuscleGroup.self, forKey: .muscleGroup)
     }
 
     /// The remote demo GIF (ExerciseDB open mirror) — nil for custom exercises.
@@ -290,13 +295,32 @@ struct WorkoutDayLog: Codable, Hashable {
     var done: Bool = false
     var skipped: Bool = false
     var items: [PlanExercise]? = nil
+    /// Which program day ran on this date. Set when you pick a different
+    /// workout for today — the program's own schedule is never rewritten.
+    var dayId: String? = nil
+    var programId: String? = nil
+    /// The day's name as it was when you trained it, so history survives a
+    /// rename or a deleted program.
+    var title: String? = nil
+    /// What you actually lifted, set by set. nil = never started a session.
+    var entries: [ExerciseLog]? = nil
+    /// "Make today a rest day" — distinct from skipping a workout you owed.
+    var restOverride: Bool = false
+
     init() {}
-    enum CodingKeys: String, CodingKey { case done, skipped, items }
+    enum CodingKeys: String, CodingKey {
+        case done, skipped, items, dayId, programId, title, entries, restOverride
+    }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         done    = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
         skipped = try c.decodeIfPresent(Bool.self, forKey: .skipped) ?? false
         items   = try c.decodeIfPresent([PlanExercise].self, forKey: .items)
+        dayId       = try c.decodeIfPresent(String.self, forKey: .dayId)
+        programId   = try c.decodeIfPresent(String.self, forKey: .programId)
+        title       = try c.decodeIfPresent(String.self, forKey: .title)
+        entries     = try c.decodeIfPresent([ExerciseLog].self, forKey: .entries)
+        restOverride = try c.decodeIfPresent(Bool.self, forKey: .restOverride) ?? false
     }
 }
 
@@ -304,21 +328,49 @@ extension WorkoutDayLog {
     enum DayState: Equatable, Hashable { case unconfirmed, done, skipped }
     var state: DayState { done ? .done : (skipped ? .skipped : .unconfirmed) }
     mutating func tick(items: [PlanExercise]?) { done = true; skipped = false; self.items = items }
-    mutating func skip() { done = false; skipped = true; items = nil }
+    mutating func skip() { done = false; skipped = true; items = nil; entries = nil }
     mutating func unskip() { skipped = false }
+
+    /// The exercises actually performed, if a session was logged.
+    var loggedItems: [PlanExercise]? {
+        guard let entries, !entries.isEmpty else { return items }
+        return WorkoutSessionBuilder.planItems(from: entries)
+    }
+    /// A session exists the moment any set is ticked — that's what makes the
+    /// day show up in History even if you never slid to finish.
+    var hasSession: Bool { (entries?.contains { $0.sets.contains(where: \.done) }) ?? false }
 }
 
 struct TrainingState: Codable, Hashable {
     var customExercises: [Exercise] = []
+    /// Legacy single weekday plan. Kept so old saves still decode and can be
+    /// migrated once into `programs`; nothing writes it any more.
     var weekPlan: [String: WorkoutDayPlan] = [:]           // weekday "0".."6" → plan
     var dayLog: [String: WorkoutDayLog] = [:]              // date → per-day status
+    /// Every program, independent of every other. Order is the user's.
+    var programs: [WorkoutProgram] = []
+    var activeProgramId: String? = nil
+    /// Set once the legacy `weekPlan` has been folded into a program, so an
+    /// emptied-out program is never "helpfully" refilled from the old plan.
+    var migratedWeekPlan: Bool = false
+
     init() {}
-    enum CodingKeys: String, CodingKey { case customExercises, weekPlan, dayLog }
+    enum CodingKeys: String, CodingKey {
+        case customExercises, weekPlan, dayLog, programs, activeProgramId, migratedWeekPlan
+    }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         customExercises = try c.decodeIfPresent([Exercise].self, forKey: .customExercises) ?? []
         weekPlan        = try c.decodeIfPresent([String: WorkoutDayPlan].self, forKey: .weekPlan) ?? [:]
         dayLog          = try c.decodeIfPresent([String: WorkoutDayLog].self, forKey: .dayLog) ?? [:]
+        programs        = try c.decodeIfPresent([WorkoutProgram].self, forKey: .programs) ?? []
+        activeProgramId = try c.decodeIfPresent(String.self, forKey: .activeProgramId)
+        migratedWeekPlan = try c.decodeIfPresent(Bool.self, forKey: .migratedWeekPlan) ?? false
+    }
+
+    var activeProgram: WorkoutProgram? {
+        guard let id = activeProgramId else { return nil }
+        return programs.first { $0.id == id }
     }
 }
 

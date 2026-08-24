@@ -42,6 +42,10 @@ targets:
       - path: ../mac/Sources/MyOS/Views/FitnessLibraryView.swift
       - path: ../mac/Sources/MyOS/Views/FoodView.swift
       - path: ../mac/Sources/MyOS/Views/WorkoutView.swift
+      - path: ../mac/Sources/MyOS/Views/ProgramsView.swift
+      - path: ../mac/Sources/MyOS/Views/ProgramDayView.swift
+      - path: ../mac/Sources/MyOS/Views/WorkoutSessionView.swift
+      - path: ../mac/Sources/MyOS/Views/WorkoutHistoryView.swift
       - path: ../mac/Sources/MyOS/Views/GIFView.swift
       - path: ../mac/Sources/MyOS/Views/BodyView.swift
       - path: ../mac/Sources/MyOS/Views/JournalView.swift
