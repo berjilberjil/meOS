@@ -49,7 +49,10 @@ enum TodaySection: String, CaseIterable, Identifiable {
         switch self {
         case .focusNow:   return .activity
         case .activity:   return .green    // fitness
-        case .intake:     return .nutrition
+        // The one deliberate exception, by owner's decision: Intake is a solid
+        // orange card. Everything else on Today is green, which is what makes
+        // this one read as "the number you came here for".
+        case .intake:     return .orange
         case .meals:      return .nutrition
         case .workout:    return .green    // fitness
         case .bodyPhotos: return .green    // fitness

@@ -1,8 +1,15 @@
 import SwiftUI
 
-/// Calories + macros first — intake vs target. Nutrition is orange, and the
-/// four macros are told apart by their bars and labels rather than by four
-/// unrelated colours.
+/// Calories + macros first — intake vs target.
+///
+/// This is the one **filled** card in MyOS: a solid block of orange with black
+/// ink, by the owner's explicit decision. Today is otherwise black, white and
+/// green, and that is exactly what makes this card the thing your eye lands on
+/// when the page opens. Everything inside inherits its ink from `CardLook`, so
+/// nothing here names a colour for text.
+///
+/// The four macros are still told apart by their bars and labels rather than by
+/// four unrelated colours.
 struct DayMacroHero: View {
     /// The day being shown. Today unless the Today page has been swiped.
     var day: String? = nil
@@ -15,27 +22,30 @@ struct DayMacroHero: View {
         let goal = t?.goalCalories ?? Int(state.fitnessProfile.calorieTargetKcal ?? 0)
         let remain = goal > 0 ? max(0, goal - Int(eaten.calories.rounded())) : 0
         let frac = goal > 0 ? min(1, eaten.calories / Double(goal)) : 0
-        return Card(padding: 18) {
+        return Card(padding: 18, accent: .orange, look: .filled) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("INTAKE")
                     .font(.caption.weight(.heavy)).tracking(0.8)
-                    .foregroundStyle(Palette.muted)
+                    .opacity(0.7)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(Int(eaten.calories.rounded()))")
                         .font(.largeTitle.weight(.bold))
                         .monospacedDigit()
-                        .foregroundStyle(Palette.attention)
                     Text(goal > 0 ? "/ \(goal) kcal" : "kcal")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(Palette.muted)
+                        .opacity(0.75)
                     Spacer()
                     if goal > 0 {
                         Text("\(remain) left")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(Palette.faint)
+                            .opacity(0.65)
                     }
                 }
-                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.attention)
+                // On a filled card the bar is ink-on-colour: the track is the
+                // card showing through, the fill is the same ink as the type.
+                ProgressView(value: frac)
+                    .progressViewStyle(.linear)
+                    .tint(Accent.orange.ink)
                 // Four macros, one visual system. They are told apart by their
                 // labels and their bars, not by four unrelated colours.
                 HStack(spacing: Space.sm) {
@@ -48,22 +58,23 @@ struct DayMacroHero: View {
         }
     }
 
+    /// Inside a filled card, hierarchy is opacity rather than colour — there is
+    /// only one ink here and three weights of it.
     private func macro(_ label: String, _ have: Int, _ target: Int?) -> some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Text(label.uppercased())
                 .font(.myCaption).tracking(0.4)
-                .foregroundStyle(Palette.faint)
+                .opacity(0.65)
             if let target, target > 0 {
                 Text("\(have)")
                     .font(.body.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
-                Text("/ \(target)g").font(.caption2).foregroundStyle(Palette.faint)
+                Text("/ \(target)g").font(.caption2).opacity(0.65)
                 ProgressView(value: min(1, Double(have) / Double(target)))
-                    .progressViewStyle(.linear).tint(Palette.nutrition)
+                    .progressViewStyle(.linear)
+                    .tint(Accent.orange.ink)
             } else {
                 Text("\(have)g")
                     .font(.body.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

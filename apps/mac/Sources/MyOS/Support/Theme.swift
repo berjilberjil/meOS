@@ -170,6 +170,11 @@ enum CardLook {
     /// where the content genuinely belongs to one meaning (activity, nutrition,
     /// events), never for decoration.
     case accent
+    /// The whole card IS the accent — a solid block of colour with ink chosen
+    /// to be legible on it. The loudest thing the design system can do, so at
+    /// most one card on a screen may use it, and only when that card is the
+    /// reason you opened the screen.
+    case filled
 }
 
 /// The standard MyOS surface.
@@ -243,6 +248,15 @@ struct CardSkin: ViewModifier {
                         .clipShape(shape)
                         .allowsHitTesting(false)
                 }
+        case .filled:
+            content
+                // No border: a solid block of colour does not also need an
+                // outline to separate it from the canvas.
+                .background(accent.tint, in: shape)
+                // Everything inside inherits legible ink, so a filled card
+                // never needs its children to know they are on colour.
+                .foregroundStyle(accent.ink)
+                .tint(accent.ink)
         }
     }
 }
