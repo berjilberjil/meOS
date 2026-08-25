@@ -55,6 +55,7 @@ struct NotificationsCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
+            soundPicker(r)
             timePicker(r)
             Toggle("", isOn: Binding(get: { r.enabled },
                                      set: { store.setEnabled(id: r.id, $0) }))
@@ -62,6 +63,41 @@ struct NotificationsCard: View {
         }
         .padding(.horizontal, SettingsMetrics.rowPadH)
         .padding(.vertical, 11)
+    }
+
+    /// Each reminder gets its own voice. Five that all go "ding" are five you
+    /// learn to ignore without looking; a different sound for lunch and for the
+    /// workout means the phone in your pocket has already told you which.
+    ///
+    /// Picking one plays it, because a list of sound names is not a way to
+    /// choose a sound.
+    private func soundPicker(_ r: Reminder) -> some View {
+        Menu {
+            ForEach(ReminderSound.available) { choice in
+                Button {
+                    store.setSound(id: r.id, choice)
+                    ReminderSoundPreview.play(choice)
+                } label: {
+                    if choice == r.sound {
+                        Label(choice.label, systemImage: "checkmark")
+                    } else {
+                        Text(choice.label)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: r.sound == .silent ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.caption2)
+                Text(r.sound.label).font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(r.enabled ? Palette.muted : Palette.faint)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(!r.enabled)
+        .opacity(r.enabled ? 1 : 0.35)
+        .help("Notification sound")
     }
 
     private func timePicker(_ r: Reminder) -> some View {

@@ -1,8 +1,82 @@
 import Foundation
 import UserNotifications
 
+/// What a reminder sounds like.
+///
+/// Five reminders that all go "ding" are five reminders you learn to ignore
+/// without looking. Giving each one its own voice means the phone in your
+/// pocket can tell you it is lunch without you taking it out.
+///
+/// The catch is platform: macOS can name any of the system sounds, while iOS
+/// resolves a named sound only against files inside the app bundle. So the
+/// cross-platform set is Standard, MyOS's own `drop.wav`, and Silent; the rest
+/// are macOS system sounds and are only offered there.
+enum ReminderSound: String, Codable, CaseIterable, Identifiable, Hashable {
+    case standard, drop, silent
+    case ping, glass, hero, submarine, funk, tink, pop, sosumi, purr, morse, bottle, blow, frog, basso
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .standard: return "Standard"
+        case .drop:     return "MyOS"
+        case .silent:   return "Silent"
+        default:        return rawValue.prefix(1).uppercased() + rawValue.dropFirst()
+        }
+    }
+
+    /// True for the three that exist on both platforms.
+    var isPortable: Bool {
+        switch self {
+        case .standard, .drop, .silent: return true
+        default: return false
+        }
+    }
+
+    /// The system sound file behind a macOS-only case.
+    var systemName: String? {
+        isPortable ? nil : label
+    }
+
+    /// What this device can actually offer.
+    static var available: [ReminderSound] {
+        #if os(macOS)
+        return allCases
+        #else
+        return allCases.filter(\.isPortable)
+        #endif
+    }
+
+    /// What `UNNotificationContent` should be handed.
+    ///
+    /// `nil` is not a missing value here — it is how the notification API says
+    /// "no sound", which is exactly what Silent means.
+    var notificationSound: UNNotificationSound? {
+        switch resolved {
+        case .silent:   return nil
+        case .standard: return .default
+        case .drop:     return UNNotificationSound(named: UNNotificationSoundName("drop.wav"))
+        default:
+            guard let name = systemName else { return .default }
+            return UNNotificationSound(named: UNNotificationSoundName(name))
+        }
+    }
+
+    /// Fall back rather than go silent by accident: a sound saved on the Mac
+    /// and synced to a phone that has never heard of it becomes Standard.
+    var resolved: ReminderSound {
+        #if os(macOS)
+        return self
+        #else
+        return isPortable ? self : .standard
+        #endif
+    }
+}
+
 /// One daily reminder — a fixed set of ids (wake / breakfast / lunch / workout /
-/// dinner); the user can move the time or switch each off. Device-local.
+/// dinner); the user can move the time, switch each off, and give each its own
+/// sound. Device-local.
 struct Reminder: Codable, Identifiable, Hashable {
     var id: String
     var label: String
@@ -10,6 +84,27 @@ struct Reminder: Codable, Identifiable, Hashable {
     var hour: Int
     var minute: Int
     var enabled: Bool
+    var sound: ReminderSound = .standard
+
+    init(id: String, label: String, body: String, hour: Int, minute: Int,
+         enabled: Bool, sound: ReminderSound = .standard) {
+        self.id = id; self.label = label; self.body = body
+        self.hour = hour; self.minute = minute; self.enabled = enabled; self.sound = sound
+    }
+
+    /// Tolerant: reminders saved before sounds existed have no `sound` key.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id      = try c.decode(String.self, forKey: .id)
+        label   = try c.decode(String.self, forKey: .label)
+        body    = try c.decode(String.self, forKey: .body)
+        hour    = try c.decode(Int.self, forKey: .hour)
+        minute  = try c.decode(Int.self, forKey: .minute)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        sound   = ReminderSound(rawValue: (try? c.decode(String.self, forKey: .sound)) ?? "") ?? .standard
+    }
+
+    enum CodingKeys: String, CodingKey { case id, label, body, hour, minute, enabled, sound }
 }
 
 /// The default reminder set + pure merge logic (kept off the @MainActor store so
@@ -18,7 +113,8 @@ enum ReminderDefaults {
     static func all() -> [Reminder] {
         [
             Reminder(id: "wake", label: "Start the day",
-                     body: "Log your weight, journal, and check MyOS.", hour: 6, minute: 0, enabled: true),
+                     body: "Log your weight, journal, and check MyOS.", hour: 6, minute: 0, enabled: true,
+                     sound: .standard),
             Reminder(id: "breakfast", label: "Breakfast",
                      body: "Time to eat — log your breakfast.", hour: 8, minute: 0, enabled: true),
             Reminder(id: "lunch", label: "Lunch",
@@ -37,6 +133,7 @@ enum ReminderDefaults {
             guard let s = saved.first(where: { $0.id == def.id }) else { return def }
             var out = def
             out.hour = s.hour; out.minute = s.minute; out.enabled = s.enabled
+            out.sound = s.sound
             return out
         }
     }
@@ -95,7 +192,7 @@ final class ReminderStore: ObservableObject {
             let content = UNMutableNotificationContent()
             content.title = r.label
             content.body = r.body
-            content.sound = .default
+            content.sound = r.sound.notificationSound
             var comps = DateComponents(); comps.hour = r.hour; comps.minute = r.minute
             let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
             let req = UNNotificationRequest(identifier: "myos.reminder.\(r.id)", content: content, trigger: trigger)
@@ -112,6 +209,12 @@ final class ReminderStore: ObservableObject {
         guard let i = reminders.firstIndex(where: { $0.id == id }) else { return }
         reminders[i].enabled = on
     }
+
+    func setSound(id: String, _ sound: ReminderSound) {
+        guard let i = reminders.firstIndex(where: { $0.id == id }) else { return }
+        reminders[i].sound = sound
+    }
+
 
     private func persist() {
         UserDefaults.standard.set(enabled, forKey: kEnabled)
