@@ -18,11 +18,20 @@ import UIKit
 // The rule now is that COLOUR MUST HAVE MEANING. There are three accents and no
 // decorative colour at all:
 //
-//   GREEN  → go / good / complete / action / fitness / productive
-//   ORANGE → activity / attention / time / food / warning
+//   GREEN  → go / good / complete / action / fitness / productive / activity /
+//            time / food. This is the app's colour; a screen with nothing to
+//            warn about is black, white and green.
+//   ORANGE → the only three things worth interrupting for: a warning, a failure,
+//            and time you wasted. Nothing decorative is ever orange.
 //   BLUE   → information / events / system data
 //   WHITE  → content
 //   BLACK  → environment
+//
+// 2026-08-25 evening: orange used to carry activity, attention, time and food as
+// well, which put it on the steps chart, the intake bar, every pin and star and
+// half the section labels — and the verdict was that the app looked randomly
+// orange. Green took all of those. What is left in orange is only ever bad news,
+// which is what makes it readable as bad news.
 //
 // If you are about to add a colour because a card looks plain, don't. Add
 // hierarchy instead: a heavier weight, more space, or an accent that is already
@@ -82,9 +91,9 @@ enum Palette {
 
     // MARK: Accents — three, and only three.
 
-    /// GO / GOOD / COMPLETE / ACTION / FITNESS / PRODUCTIVE.
+    /// GO / GOOD / COMPLETE / ACTION / FITNESS / PRODUCTIVE / ACTIVITY / TIME / FOOD.
     static let green  = Color.dynamic(lightColor: Light.green, darkColor: Dark.green)
-    /// ACTIVITY / ATTENTION / TIME / FOOD / WARNING.
+    /// WARNING / FAILURE / WASTED TIME. Never decoration.
     static let orange = Color.dynamic(lightColor: Light.orange, darkColor: Dark.orange)
     /// INFORMATION / EVENTS / SYSTEM DATA. Used sparingly.
     static let blue   = Color.dynamic(lightColor: Light.blue, darkColor: Dark.blue)
@@ -99,11 +108,15 @@ enum Palette {
     static var complete:    Color { green }
     static var fitness:     Color { green }
     static var productive:  Color { green }
+    static var activity:    Color { green }
+    static var attention:   Color { green }
+    static var nutrition:   Color { green }
 
-    static var activity:    Color { orange }
-    static var attention:   Color { orange }
+    /// Something is wrong, or about to be — an error, a destructive action, a
+    /// risk. The only reason to reach for orange.
     static var warning:     Color { orange }
-    static var nutrition:   Color { orange }
+    /// Time that did nothing for you. Orange because it has to read *against*
+    /// the productive green sitting next to it in the same breakdown.
     static var distracting: Color { orange }
 
     static var information: Color { blue }
@@ -190,9 +203,16 @@ enum Accent: String, CaseIterable, Identifiable, Hashable {
     var wash: Color { tint.opacity(0.12) }
 
     /// Semantic constructors, so call sites read as meaning rather than colour.
+    /// Nothing outside this file should name `.orange` — say `.warning` and the
+    /// meaning survives the next time the palette moves.
     static var productive: Accent { .green }
-    static var activity: Accent { .orange }
+    static var activity: Accent { .green }
+    static var nutrition: Accent { .green }
+    static var complete: Accent { .green }
+    static var attention: Accent { .green }
     static var information: Accent { .blue }
+    static var warning: Accent { .orange }
+    static var distracting: Accent { .orange }
 }
 
 // MARK: - Ambient accent

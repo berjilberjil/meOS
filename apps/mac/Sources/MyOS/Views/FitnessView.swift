@@ -260,7 +260,7 @@ struct FitnessView: View {
                     macroDivider
                     macroRow("Fiber", eaten.fiber, 30, "g", Palette.information)
                     macroDivider
-                    macroRow("Fats", eaten.fats, t.map { Double($0.fatG) }, "g", Palette.warning)
+                    macroRow("Fats", eaten.fats, t.map { Double($0.fatG) }, "g", Palette.nutrition)
                     macroDivider
                     waterRow
                 }
@@ -367,7 +367,7 @@ struct FitnessView: View {
                     HStack(spacing: 10) {
                         macroPill("Protein", "\(c.proteinG)g", Palette.green)
                         macroPill("Carbs", "\(c.carbG)g", Palette.attention)
-                        macroPill("Fat", "\(c.fatG)g", Palette.warning)
+                        macroPill("Fat", "\(c.fatG)g", Palette.nutrition)
                         macroPill("Target", "\(c.goalCalories) kcal", Palette.action)
                     }
 
@@ -503,8 +503,8 @@ struct ActivityStepsCard: View {
         guard target > 0 else { return Palette.green }
         let f = Double(n) / Double(target)
         if f >= 1 { return Palette.green }
-        if f >= 0.5 { return Palette.attention }
-        return Palette.warning.opacity(0.8)
+        if f >= 0.5 { return Palette.muted }
+        return Palette.warning
     }
 
     var body: some View {
@@ -659,8 +659,8 @@ struct ActivityStepsCard: View {
     private var legend: some View {
         HStack(spacing: 12) {
             legendDot(Palette.green, "goal")
-            legendDot(Palette.attention, "halfway")
-            legendDot(Palette.warning.opacity(0.8), "short")
+            legendDot(Palette.muted, "halfway")
+            legendDot(Palette.warning, "short")
             Spacer(minLength: 0)
         }
     }

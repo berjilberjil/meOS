@@ -226,7 +226,7 @@ struct MacroPulseView: View {
                     }
                     if brief.speculative {
                         Text("The \"why\" here is inference from the numbers, not a reported cause.")
-                            .font(.caption2).foregroundStyle(Palette.attention)
+                            .font(.caption2).foregroundStyle(Palette.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -282,7 +282,7 @@ struct MacroPulseView: View {
         Card(padding: 12) {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(Palette.attention)
+                    .font(.caption).foregroundStyle(Palette.warning)
                 Text(err).font(.caption).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)

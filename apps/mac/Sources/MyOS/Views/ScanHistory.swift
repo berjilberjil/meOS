@@ -148,7 +148,7 @@ enum ScanVerdict {
         switch n {
         case .yes: return Palette.green
         case .no: return Palette.warning
-        case .maybe: return Palette.attention
+        case .maybe: return Palette.muted
         }
     }
 }
@@ -265,7 +265,7 @@ private struct ScanHistoryRow: View {
         switch record.object?.needed {
         case "yes": return Palette.green
         case "no": return Palette.warning
-        default: return Palette.attention
+        default: return Palette.muted
         }
     }
 }

@@ -47,10 +47,10 @@ struct FoldView: View {
             .knRise(0)
 
             if let err = state.foldError {
-                Text(err).font(.footnote).foregroundStyle(Palette.attention)
+                Text(err).font(.footnote).foregroundStyle(Palette.warning)
             } else if !state.foldLinked, state.fold != nil {
                 Text("This is a saved snapshot, not a live pull. Tap Connect Fold, enter the OTP Fold texts you, then refresh. The date only changes after Fold answers.")
-                    .font(.footnote).foregroundStyle(Palette.attention)
+                    .font(.footnote).foregroundStyle(Palette.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let f = state.fold { dashboard(f) } else { connectState }
@@ -413,7 +413,7 @@ private struct FoldLoginSheet: View {
                     }
                 }
                 if let err = state.foldError {
-                    Text(err).font(.footnote).foregroundStyle(Palette.attention)
+                    Text(err).font(.footnote).foregroundStyle(Palette.warning)
                 }
                 if sent {
                     Button {

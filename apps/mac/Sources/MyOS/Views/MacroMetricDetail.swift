@@ -214,7 +214,7 @@ struct MacroMetricDetail: View {
     private func noteBlock(_ note: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle.fill")
-                .font(.caption2).foregroundStyle(Palette.attention)
+                .font(.caption2).foregroundStyle(Palette.information)
             Text(note).font(.caption).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)

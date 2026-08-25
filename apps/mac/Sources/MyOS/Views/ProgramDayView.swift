@@ -9,7 +9,7 @@ import SwiftUI
 extension MuscleGroup {
     var tint: Color {
         switch self {
-        case .chest: return Palette.warning
+        case .chest: return Palette.fitness
         case .back: return Palette.blue
         case .shoulders: return Palette.attention
         case .biceps: return Palette.information

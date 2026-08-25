@@ -137,7 +137,7 @@ struct ProductivityView: View {
             }
             if let err = addError {
                 Label(err, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2).foregroundStyle(Palette.attention)
+                    .font(.caption2).foregroundStyle(Palette.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -168,7 +168,7 @@ struct ProductivityView: View {
                 }
                 if let err = addError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption2).foregroundStyle(Palette.attention)
+                        .font(.caption2).foregroundStyle(Palette.warning)
                 }
             }
         }

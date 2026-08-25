@@ -188,7 +188,7 @@ struct ChatWidget: View {
                     if let err = state.chatError {
                         HStack(spacing: 8) {
                             Label(err, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption2).foregroundStyle(Palette.attention)
+                                .font(.caption2).foregroundStyle(Palette.warning)
                             Button("Retry") { Task { await state.retryLastChat() } }
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(Palette.action)
@@ -294,7 +294,7 @@ struct ChatWidget: View {
             } else if state.suggestBusy {
                 Text("Reading your day…").font(.footnote).foregroundStyle(Palette.faint)
             } else if let err = state.suggestError {
-                Text(err).font(.footnote).foregroundStyle(Palette.attention)
+                Text(err).font(.footnote).foregroundStyle(Palette.warning)
             } else {
                 Text("Open this and I’ll tell you what’s going on.")
                     .font(.footnote).foregroundStyle(Palette.faint)

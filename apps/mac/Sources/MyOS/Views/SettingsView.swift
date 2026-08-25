@@ -65,7 +65,7 @@ struct SettingsView: View {
                 }
                 if let err = state.lastSyncError ?? state.lastHydrateError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(Palette.attention)
+                        .font(.caption).foregroundStyle(Palette.warning)
                 }
             }
         }

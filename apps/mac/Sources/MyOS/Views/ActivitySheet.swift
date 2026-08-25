@@ -62,7 +62,7 @@ struct ActivitySheet: View {
             .padding(20)
         }
         .background(Palette.background)
-        .cardAccent(.orange)
+        .cardAccent(.activity)
 
         #if os(iOS)
         content.presentationDetents([.large]).presentationBackground(Palette.background)

@@ -19,7 +19,7 @@ struct WeeklyReportCard: View {
                 empty
             }
             if let err = state.weeklyError {
-                Text(err).font(.caption).foregroundStyle(Palette.attention)
+                Text(err).font(.caption).foregroundStyle(Palette.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             generateButton
@@ -133,7 +133,7 @@ private struct ReportBody: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if !report.workouts.isEmpty { list("TRAIN", report.workouts, tint: Palette.attention) }
+            if !report.workouts.isEmpty { list("TRAIN", report.workouts, tint: Palette.fitness) }
             if !report.diet.isEmpty { list("EAT", report.diet, tint: Palette.green) }
 
             if !report.cheer.isEmpty {
@@ -188,7 +188,7 @@ struct VerdictDot: View {
     static func color(_ v: WeeklyReport.Verdict) -> Color {
         switch v {
         case .gaining: return Palette.green
-        case .holding: return Palette.attention
+        case .holding: return Palette.muted
         case .slipping: return Palette.warning
         case .unknown: return Palette.muted
         }

@@ -62,7 +62,7 @@ enum MacroQuality: String, Codable {
     var tint: Color {
         switch self {
         case .verified: return Palette.green
-        case .estimated: return Palette.attention
+        case .estimated: return Palette.warning
         case .delayed: return Palette.blue
         case .unavailable: return Palette.faint
         }
@@ -80,7 +80,7 @@ struct MacroScore: Codable, Identifiable, Hashable {
     var tint: Color {
         switch state {
         case "good": return Palette.green
-        case "watch": return Palette.attention
+        case "watch": return Palette.muted
         case "risk": return Palette.warning
         default: return Palette.blue
         }

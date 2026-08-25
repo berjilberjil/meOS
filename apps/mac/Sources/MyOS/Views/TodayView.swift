@@ -240,7 +240,7 @@ struct TodayView: View {
                         Text("Getting today's news…").font(.footnote).foregroundStyle(Palette.muted) }
                         .padding(.vertical, 6)
                 } else if let err = state.newsError {
-                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.attention)
+                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.warning)
                 } else {
                     Button { Task { await state.fetchNews() } } label: { Label("Get today's news", systemImage: "newspaper") }
                         .buttonStyle(.bordered)
@@ -446,7 +446,7 @@ struct TodayView: View {
     }
 
     private func impactTag(_ impact: String) -> some View {
-        let color: Color = impact == "high" ? Palette.warning : (impact == "medium" ? Palette.attention : Palette.faint)
+        let color: Color = impact == "high" ? Palette.warning : (impact == "medium" ? Palette.muted : Palette.faint)
         return Text(impact.uppercased())
             .font(.caption2.weight(.heavy)).tracking(0.5)
             .foregroundStyle(color)

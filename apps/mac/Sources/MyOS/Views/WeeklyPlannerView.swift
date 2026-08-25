@@ -118,7 +118,7 @@ struct WeeklyPlannerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let e = state.planError {
-                    Label(e, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.attention)
+                    Label(e, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.warning)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

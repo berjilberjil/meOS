@@ -2,7 +2,10 @@ import SwiftUI
 
 /// Shared mood ramp (1 rough → 5 great), used by the slider and the calendar dots.
 func moodTint(_ m: Int) -> Color {
-    [Palette.warning, Color(hex: 0xF59E0B), Palette.attention, Color(hex: 0x7DD37D), Palette.green][max(1, min(5, m)) - 1]
+    // A ramp needs five distinguishable stops, so this is one of the few
+    // places allowed to name a colour outside the design system: rough is the
+    // warning orange, great is the accent green, and the middle is neutral.
+    [Palette.warning, Color(hex: 0xF59E0B), Palette.muted, Color(hex: 0x7DD37D), Palette.green][max(1, min(5, m)) - 1]
 }
 
 /// Which 1...5 mood stop a horizontal position `x` (0..<width) falls on. Pure so

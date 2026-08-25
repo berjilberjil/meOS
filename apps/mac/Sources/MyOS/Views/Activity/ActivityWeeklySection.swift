@@ -43,13 +43,13 @@ struct ActivityWeeklySection: View {
 
         if week.isEmpty {
             VStack(alignment: .leading, spacing: Space.xs) {
-                SectionLabel(text: "Time & productivity", accent: .orange)
+                SectionLabel(text: "Time & productivity", accent: .activity)
                 Text("No activity was recorded this week.")
                     .font(.myBody).foregroundStyle(Palette.faint)
             }
         } else {
             VStack(alignment: .leading, spacing: Gap.row) {
-                SectionLabel(text: "Time & productivity", accent: .orange)
+                SectionLabel(text: "Time & productivity", accent: .activity)
 
                 totals(week)
                 WorthBreakdown(productive: week.seconds(.productive),

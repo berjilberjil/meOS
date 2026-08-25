@@ -121,14 +121,14 @@ struct ExerciseIcon: View {
     }
     var color: Color {
         switch category {
-        case .chest: return Palette.warning
+        case .chest: return Palette.fitness
         case .back: return Palette.blue
         case .shoulders: return Palette.attention
         case .arms: return Palette.information
         case .legs: return Palette.green
         case .core: return Palette.attention
         case .cardio: return Palette.activity
-        case .boxing: return Palette.warning
+        case .boxing: return Palette.fitness
         }
     }
 }

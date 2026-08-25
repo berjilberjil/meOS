@@ -70,7 +70,7 @@ struct BelongingsView: View {
         let healthTint: Color = {
             switch health {
             case .good: return Palette.green
-            case .tight: return Palette.attention
+            case .tight: return Palette.muted
             case .over: return Palette.warning
             }
         }()
@@ -135,7 +135,7 @@ struct BelongingsView: View {
         let (t, c): (String, Color) = {
             switch h {
             case .good: return ("On track", Palette.green)
-            case .tight: return ("Tight", Palette.attention)
+            case .tight: return ("Tight", Palette.muted)
             case .over: return ("Over salary", Palette.warning)
             }
         }()

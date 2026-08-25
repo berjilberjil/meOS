@@ -41,15 +41,16 @@ enum TodaySection: String, CaseIterable, Identifiable {
     }
 
     /// The accent this section has earned, by meaning — not by position in the
-    /// list. Nine sections do NOT get nine colours: activity and food are
-    /// orange, fitness and completion are green, events and information are
-    /// blue, and anything without a semantic claim stays uncoloured.
+    /// list. Nine sections do NOT get nine colours: activity, food, fitness and
+    /// completion are green, events and information are blue, and anything
+    /// without a semantic claim stays uncoloured. Nothing on Today is orange —
+    /// orange is reserved for what has gone wrong.
     var accent: Accent {
         switch self {
-        case .focusNow:   return .orange   // activity / time
+        case .focusNow:   return .activity
         case .activity:   return .green    // fitness
-        case .intake:     return .orange   // nutrition
-        case .meals:      return .orange   // nutrition
+        case .intake:     return .nutrition
+        case .meals:      return .nutrition
         case .workout:    return .green    // fitness
         case .bodyPhotos: return .green    // fitness
         case .focus:      return .green    // completion

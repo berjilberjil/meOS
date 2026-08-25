@@ -22,6 +22,6 @@ extension EventTag {
 // are the same kind of thing and belong to the same visual system.
 
 extension MealKey {
-    /// Every meal is nutrition, and nutrition is orange.
-    var accent: Accent { .orange }
+    /// Every meal is nutrition, and nutrition is green.
+    var accent: Accent { .nutrition }
 }

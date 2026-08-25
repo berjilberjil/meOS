@@ -643,7 +643,7 @@ struct MealLogEditorSheet: View {
             HStack(spacing: 8) {
                 macroChip("P", Int(mealMacros.protein.rounded()), Palette.green)
                 macroChip("C", Int(mealMacros.carbs.rounded()), Palette.blue)
-                macroChip("F", Int(mealMacros.fats.rounded()), Palette.warning)
+                macroChip("F", Int(mealMacros.fats.rounded()), Palette.nutrition)
                 macroChip("Fib", Int(mealMacros.fiber.rounded()), Palette.information)
             }
         }

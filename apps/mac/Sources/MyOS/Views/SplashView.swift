@@ -80,7 +80,7 @@ struct SplashView: View {
         let text = failed ? "Face not recognised" : (status ?? "")
         Text(text)
             .font(.myBody)
-            .foregroundStyle(failed ? Palette.attention : Palette.muted)
+            .foregroundStyle(failed ? Palette.warning : Palette.muted)
             .opacity(text.isEmpty ? 0 : name)
     }
 

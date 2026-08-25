@@ -460,7 +460,7 @@ struct FocusSessionView: View {
 
     private var stateColor: Color {
         if timer.finished { return Palette.green }
-        return timer.running ? Palette.success : Palette.attention
+        return timer.running ? Palette.success : Palette.muted
     }
 
     /// Nothing running: either the list is empty (write one) or the day is done.
@@ -716,8 +716,8 @@ struct FocusCalendarPanel: View {
         switch FocusRecord.verdict(state.plan(for: key).todos) {
         case .empty:   return nil
         case .done:    return Palette.green
-        case .partial: return Palette.attention
-        case .missed:  return Palette.warning.opacity(0.8)
+        case .partial: return Palette.muted
+        case .missed:  return Palette.warning
         }
     }
 
@@ -736,8 +736,8 @@ struct FocusCalendarPanel: View {
     private var legend: some View {
         HStack(spacing: 12) {
             legendDot(Palette.green, "all done")
-            legendDot(Palette.attention, "partly")
-            legendDot(Palette.warning.opacity(0.8), "missed")
+            legendDot(Palette.muted, "partly")
+            legendDot(Palette.warning, "missed")
             Spacer(minLength: 0)
         }
     }

@@ -62,12 +62,38 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(Palette.action,      Palette.green)
         XCTAssertEqual(Palette.fitness,     Palette.green)
         XCTAssertEqual(Palette.productive,  Palette.green)
-        XCTAssertEqual(Palette.activity,    Palette.orange)
-        XCTAssertEqual(Palette.attention,   Palette.orange)
-        XCTAssertEqual(Palette.nutrition,   Palette.orange)
-        XCTAssertEqual(Palette.distracting, Palette.orange)
+        XCTAssertEqual(Palette.activity,    Palette.green)
+        XCTAssertEqual(Palette.attention,   Palette.green)
+        XCTAssertEqual(Palette.nutrition,   Palette.green)
         XCTAssertEqual(Palette.information, Palette.blue)
         XCTAssertEqual(Palette.events,      Palette.blue)
+        // Orange is bad news and nothing else.
+        XCTAssertEqual(Palette.warning,     Palette.orange)
+        XCTAssertEqual(Palette.distracting, Palette.orange)
+    }
+
+    /// The semantic `Accent` constructors have to agree with the `Palette`
+    /// aliases, or a section label and the value under it end up different
+    /// colours — which is exactly how the app drifted orange the first time.
+    func testAccentConstructorsAgreeWithPalette() {
+        XCTAssertEqual(Accent.activity,    .green)
+        XCTAssertEqual(Accent.nutrition,   .green)
+        XCTAssertEqual(Accent.attention,   .green)
+        XCTAssertEqual(Accent.productive,  .green)
+        XCTAssertEqual(Accent.complete,    .green)
+        XCTAssertEqual(Accent.information, .blue)
+        XCTAssertEqual(Accent.warning,     .orange)
+        XCTAssertEqual(Accent.distracting, .orange)
+    }
+
+    /// Today is the screen Berjil actually looks at every day, and it is the one
+    /// that went orange. Nothing on it may claim orange: orange there would mean
+    /// something has gone wrong, and eating lunch has not gone wrong.
+    func testNoTodaySectionIsOrange() {
+        for section in TodaySection.allCases {
+            XCTAssertNotEqual(section.accent, .orange,
+                              "\(section.rawValue) is orange — Today is green, white and black")
+        }
     }
 
     /// Spacing and radius are scales, not free numbers.

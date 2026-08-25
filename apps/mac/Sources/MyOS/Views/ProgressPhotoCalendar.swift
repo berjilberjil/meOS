@@ -105,7 +105,7 @@ struct ProgressPhotoCalendar: View {
                     .font(.caption.weight(isSelected ? .bold : .medium)).monospacedDigit()
                     .foregroundStyle(isSelected ? .white : (isFuture ? Palette.faint : Palette.text))
                 Circle()
-                    .fill(hasPhoto ? (isSelected ? Color.white : (isPending ? Palette.attention : Palette.success)) : .clear)
+                    .fill(hasPhoto ? (isSelected ? Color.white : (isPending ? Palette.muted : Palette.success)) : .clear)
                     .frame(width: 6, height: 6)
                     .frame(height: 8)
             }

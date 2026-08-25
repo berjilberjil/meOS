@@ -101,7 +101,7 @@ private struct HistoryRow: View {
     private var summaryRow: some View {
         HStack(spacing: 12) {
             Image(systemName: log.done ? "checkmark.circle.fill" : "circle.dotted")
-                .font(.callout).foregroundStyle(log.done ? Palette.green : Palette.attention)
+                .font(.callout).foregroundStyle(log.done ? Palette.green : Palette.muted)
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.title ?? "Workout")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)

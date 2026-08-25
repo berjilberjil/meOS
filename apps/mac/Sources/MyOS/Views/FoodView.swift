@@ -102,13 +102,13 @@ struct FoodIcon: View {
     }
     private var color: Color {
         switch category {
-        case .protein: return Palette.warning
+        case .protein: return Palette.nutrition
         case .carb: return Palette.attention
         case .veg: return Palette.green
         case .dairy: return Palette.blue
         case .fruit: return Palette.information
         case .drink: return Palette.blue
-        case .junk: return Palette.activity
+        case .junk: return Palette.warning
         case .other: return Palette.muted
         }
     }

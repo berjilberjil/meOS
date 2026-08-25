@@ -79,7 +79,7 @@ struct ScanView: View {
             Card(padding: 24) {
                 VStack(spacing: 12) {
                     Image(systemName: "viewfinder")
-                        .font(.largeTitle.weight(.semibold)).foregroundStyle(Palette.attention)
+                        .font(.largeTitle.weight(.semibold)).foregroundStyle(Palette.warning)
                     Text("Couldn’t read that")
                         .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                     Text(err)

@@ -48,7 +48,7 @@ struct WatchLogCard: View {
                 }
 
                 if let err = addError {
-                    Text(err).font(.footnote).foregroundStyle(Palette.attention)
+                    Text(err).font(.footnote).foregroundStyle(Palette.warning)
                 }
 
                 if todayVideos.isEmpty {
