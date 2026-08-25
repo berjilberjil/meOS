@@ -1,11 +1,6 @@
 import { env } from '$env/dynamic/private';
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  ListObjectsV2Command,
-  DeleteObjectsCommand
-} from '@aws-sdk/client-s3';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Cloudflare R2 (S3-compatible) client for all private media — progress
@@ -18,6 +13,38 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 //   R2_ACCESS_KEY_ID       R2 API token's S3 access key id
 //   R2_SECRET_ACCESS_KEY   R2 API token's S3 secret access key
 //   R2_BUCKET              bucket name, e.g. "myos-media"
+
+/// Minimal structural view of the R2 binding we use.
+export interface R2Bucket {
+  list(options?: { prefix?: string; cursor?: string }): Promise<{
+    objects: { key: string; uploaded?: Date }[];
+    truncated: boolean;
+    cursor?: string;
+  }>;
+  delete(keys: string | string[]): Promise<void>;
+}
+
+/// The R2 binding arrives per-request on `platform.env`, exactly like D1, so it
+/// travels the same AsyncLocalStorage route (see lib/server/db.ts).
+///
+/// Why a binding and not the S3 client: the AWS SDK deserialises S3's XML
+/// responses with `DOMParser`, which does not exist in the Workers runtime. Any
+/// command that returns an XML body — ListObjectsV2, DeleteObjects — therefore
+/// threw `ReferenceError: DOMParser is not defined` and 500'd from the moment
+/// this moved off Netlify. PutObject has no XML body, which is why uploads kept
+/// working and only reads broke. Signing stays on the S3 client: it builds and
+/// signs a URL locally and never parses a response.
+const mediaCtx = new AsyncLocalStorage<R2Bucket>();
+
+export function withMedia<T>(bucket: R2Bucket, fn: () => T): T {
+  return mediaCtx.run(bucket, fn);
+}
+
+function media(): R2Bucket {
+  const b = mediaCtx.getStore();
+  if (!b) throw new Error('R2 MEDIA binding is not available on this request');
+  return b;
+}
 
 let cachedClient: S3Client | null = null;
 
@@ -52,10 +79,21 @@ export async function uploadObject(key: string, bytes: Uint8Array, contentType: 
 /// Objects under `prefix`, with `name` relative to it (mirrors how callers
 /// used the old Supabase Storage `list` response).
 export async function listObjects(prefix: string): Promise<{ name: string; updatedAt?: string }[]> {
-  const res = await client().send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: prefix }));
-  return (res.Contents ?? [])
-    .map((o) => ({ name: (o.Key ?? '').slice(prefix.length), updatedAt: o.LastModified?.toISOString() }))
-    .filter((o) => /\.jpe?g$/i.test(o.name));
+  const out: { name: string; updatedAt?: string }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await media().list({ prefix, cursor });
+    for (const o of page.objects) {
+      const name = o.key.slice(prefix.length);
+      if (!/\.jpe?g$/i.test(name)) continue;
+      out.push({
+        name,
+        updatedAt: o.uploaded instanceof Date ? o.uploaded.toISOString() : undefined
+      });
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return out;
 }
 
 /// One signed GET URL per full object key, valid for `expiresIn` seconds.
@@ -73,9 +111,7 @@ export async function signObjects(keys: string[], expiresIn = 3600): Promise<Rec
 
 export async function removeObjects(keys: string[]): Promise<void> {
   if (!keys.length) return;
-  await client().send(
-    new DeleteObjectsCommand({ Bucket: bucket(), Delete: { Objects: keys.map((Key) => ({ Key })) } })
-  );
+  await media().delete(keys);
 }
 
 /// R2 key for one sealed event photo/video. The bytes are AES-GCM ciphertext

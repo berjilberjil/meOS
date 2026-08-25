@@ -1,16 +1,23 @@
 import type { Handle } from '@sveltejs/kit';
 import { sql, nowISO, withDB, type D1Database } from '$lib/server/db';
+import { withMedia, type R2Bucket } from '$lib/server/storage';
 import { SESSION_COOKIE } from '$lib/server/auth';
 
 // Resolve the session cookie into event.locals.user for every request.
 export const handle: Handle = async ({ event, resolve }) => {
   // D1 arrives per-request on platform.env, so every request runs inside a
   // context that carries the binding down to `sql` (see lib/server/db.ts).
-  const db = (event.platform as { env?: { DB?: D1Database } } | undefined)?.env?.DB;
+  const env = (event.platform as { env?: { DB?: D1Database; MEDIA?: R2Bucket } } | undefined)?.env;
+  const db = env?.DB;
   if (!db) {
     return new Response('Database binding missing', { status: 503 });
   }
-  return withDB(db, () => handleRequest({ event, resolve }));
+  // MEDIA rides along the same way, so R2 list/delete can use the native
+  // binding instead of the AWS SDK's XML path (which Workers cannot parse).
+  const bucket = env?.MEDIA;
+  return withDB(db, () =>
+    bucket ? withMedia(bucket, () => handleRequest({ event, resolve })) : handleRequest({ event, resolve })
+  );
 };
 
 const handleRequest: Handle = async ({ event, resolve }) => {
