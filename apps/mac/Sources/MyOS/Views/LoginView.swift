@@ -14,7 +14,7 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Brandmark.green.ignoresSafeArea()
+            Palette.background.ignoresSafeArea()
 
             // The block is centred in the window and the name sits on the floor.
             // `minHeight` tied to the viewport is what makes the spacers push:
@@ -26,11 +26,15 @@ struct LoginView: View {
                     VStack(spacing: 0) {
                         Spacer(minLength: 24)
 
+                        // The mark has its green baked in, so on the black
+                        // canvas it is drawn as a tile rather than bled to the
+                        // edges. See `Brandmark`.
                         Image("LogoMark")
                             .resizable()
                             .interpolation(.high)
                             .aspectRatio(1, contentMode: .fit)
-                            .frame(maxWidth: 190)
+                            .frame(width: 108, height: 108)
+                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
 
                         wordmark.padding(.top, 4)
                         form.padding(.top, 18)
@@ -39,7 +43,7 @@ struct LoginView: View {
 
                         Text("Berjil Jacob")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.95))
+                            .foregroundStyle(Palette.faint)
                             .padding(.bottom, 30)
                     }
                     .frame(maxWidth: 420)
@@ -119,8 +123,9 @@ struct LoginView: View {
         else { await state.login(username: u, password: password) }
     }
 
-    // The app's own field chrome is tuned for a dark surface; on this card it
-    // needs its own, darker still than the card it sits on.
+    // The login fields sit directly on the canvas rather than inside a card, so
+    // they take the elevated surface and a hairline — a near-black pill on a
+    // black screen would be invisible.
     private func field(_ placeholder: String, text: Binding<String>, field: Field) -> some View {
         TextField("", text: text, prompt: Text(placeholder).foregroundColor(.white.opacity(0.42)))
             .textFieldStyle(.plain)
@@ -146,10 +151,10 @@ private struct BrandField: ViewModifier {
         content
             .font(.callout)
             .padding(.horizontal, 18).padding(.vertical, 14)
-            .background(Brandmark.ink, in: Capsule())
+            .background(Palette.surfaceElevated, in: Capsule())
             .overlay(
-                Capsule().strokeBorder(focused ? .white.opacity(0.55) : .clear,
-                                       lineWidth: 1.5)
+                Capsule().strokeBorder(focused ? Palette.action : Palette.border,
+                                       lineWidth: focused ? 2 : 1)
             )
             .animation(.knFast, value: focused)
     }

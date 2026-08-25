@@ -1,15 +1,18 @@
 import SwiftUI
 
-/// The logo's own green. Fixed, never themed: the mark ships with this exact
-/// background baked into it, so any screen it sits on has to match or the
-/// square shows up as a patch.
+/// The logo's own green.
+///
+/// `logo.png` has no alpha — the green is baked into the file — so the mark
+/// cannot simply be dropped on a black screen without its square showing. The
+/// answer is to stop hiding the square: the mark is drawn as a rounded tile, the
+/// way an app icon sits on a home screen, and the canvas behind it is the same
+/// true black as the rest of MyOS. That keeps one background colour across the
+/// whole app instead of two branded screens that are the exception.
 enum Brandmark {
-    /// The one green in the app. Sampled from the logo, which ships with this
-    /// background baked in — so a screen the mark sits on matches exactly and
-    /// the square never shows.
+    /// Sampled from the logo file. The only place this exact green appears is
+    /// inside the mark itself and on the controls that sit on top of it.
     static let green = Color(hex: 0x56BB06)
-    /// On green, the app's surface tokens are the wrong contrast — these are the
-    /// two the branded screens use instead.
+    /// Legible on that green — it is far too light to carry white text.
     static let ink = Color(hex: 0x0B0B0B)
     static let inkSoft = Color(hex: 0x1A1A1A)
 }
@@ -33,7 +36,7 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
-            Brandmark.green.ignoresSafeArea()
+            Palette.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
@@ -42,7 +45,8 @@ struct SplashView: View {
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(1, contentMode: .fit)
-                    .frame(maxWidth: 280)
+                    .frame(width: 132, height: 132)
+                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
                     .opacity(mark)
                     // Arrives from just under full size. Anything more than this
                     // reads as a bounce, and a logo should not bounce.
@@ -50,7 +54,7 @@ struct SplashView: View {
 
                 statusLine
                     .frame(height: 18)
-                    .padding(.top, 4)
+                    .padding(.top, Space.xl)
 
                 Spacer(minLength: 0)
 
@@ -62,9 +66,9 @@ struct SplashView: View {
                 }
 
                 Text("Berjil Jacob")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .opacity(name * 0.95)
+                    .font(.myCaption)
+                    .foregroundStyle(Palette.faint)
+                    .opacity(name)
                     .padding(.bottom, 34)
             }
             .padding(.horizontal, 32)
@@ -75,8 +79,8 @@ struct SplashView: View {
     @ViewBuilder private var statusLine: some View {
         let text = failed ? "Face not recognised" : (status ?? "")
         Text(text)
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(.white.opacity(failed ? 0.95 : 0.8))
+            .font(.myBody)
+            .foregroundStyle(failed ? Palette.attention : Palette.muted)
             .opacity(text.isEmpty ? 0 : name)
     }
 

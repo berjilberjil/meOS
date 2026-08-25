@@ -149,7 +149,7 @@ struct RecoveryCodeOverlay: View {
                     .padding(.vertical, 14).padding(.horizontal, 18)
                     .frame(maxWidth: .infinity)
                     .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.action, lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
 
                 Button {
                     #if os(macOS)
@@ -182,7 +182,7 @@ struct RecoveryCodeOverlay: View {
             .padding(26)
             .frame(width: 400)
             .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.action, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
             .knShadow(true)
         }
     }
@@ -216,7 +216,7 @@ private struct VaultShell<Content: View>: View {
                 .padding(24)
                 .frame(width: 360)
                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.action, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
                 .knShadow(true)
             Spacer(); Spacer()
         }
