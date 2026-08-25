@@ -34,18 +34,6 @@ struct JournalView: View {
     var body: some View {
         #if os(iOS)
         VStack(alignment: .leading, spacing: Gap.screen) {
-            HStack {
-                #if os(macOS)   // iOS: the navigation bar owns the title
-                ScreenTitle(text: jseg == .events ? "Events" : "Journal").lineLimit(1)
-                #endif
-                Spacer()
-                if jseg == .journal {
-                    Button { showPresets = true } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.muted)
-                    }
-                }
-            }
             HStack(spacing: 10) {
                 Picker("", selection: $jseg) { ForEach(JSeg.allCases.map { ($0, $0.rawValue.capitalized) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
                 Spacer(minLength: 8)
@@ -58,6 +46,26 @@ struct JournalView: View {
             if jseg == .events { EventsView() } else { journalBody }
         }
         .navigationTitle(jseg == .events ? "Events" : "Journal")
+        // One place for the screen's action, on both halves of the tab, and it
+        // is the place iOS puts it. Before this, Events had a filled "New"
+        // button floating in its content under the segmented picker and Journal
+        // had a bare glyph a row higher — two different controls at two
+        // different heights that swapped as you switched segment.
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if jseg == .events {
+                    Button { signals.pendingNewEvent = true } label: {
+                        Label("New event", systemImage: "plus")
+                    }
+                    .accessibilityLabel("New event")
+                } else {
+                    Button { showPresets = true } label: {
+                        Label("Journal presets", systemImage: "slider.horizontal.3")
+                    }
+                    .accessibilityLabel("Journal presets")
+                }
+            }
+        }
         .sheet(isPresented: $showPresets) {
             NavigationStack {
                 ScrollView {
@@ -152,18 +160,22 @@ struct JournalView: View {
             StreakCard().knRise(1)
 
             moodCard.knRise(2)
+            // Six cards do NOT get six colours. A reflection is not a colour and
+            // neither is gratitude — these read as one page because they are one
+            // page. Only the two that carry a judgement keep an accent: wins are
+            // green because they went well, mistakes orange because they didn't.
             reflectionCard(title: "Morning reflection",
                            text: Binding(get: { entry.morning },
                                          set: { v in state.updateJournal(viewedDate) { $0.morning = v } }),
                            prompt: "What matters today? How do you want to show up?",
-                           presets: state.journalPresets.morning, tint: Palette.attention).knRise(3)
+                           presets: state.journalPresets.morning, tint: Palette.muted).knRise(3)
             reflectionCard(title: "Night reflection",
                            text: Binding(get: { entry.night },
                                          set: { v in state.updateJournal(viewedDate) { $0.night = v } }),
                            prompt: "How did today actually go?",
-                           presets: state.journalPresets.night, tint: Palette.blue).knRise(4)
+                           presets: state.journalPresets.night, tint: Palette.muted).knRise(4)
 
-            listCard(title: "Wins", color: Palette.green, items: entry.wins,
+            listCard(title: "Wins", color: Palette.success, items: entry.wins,
                      presets: state.journalPresets.wins,
                      add: { s in state.updateJournal(viewedDate) { $0.wins.append(s) } },
                      remove: { i in state.updateJournal(viewedDate) { $0.wins.remove(at: i) } }).knRise(5)
@@ -171,11 +183,11 @@ struct JournalView: View {
                      presets: state.journalPresets.mistakes,
                      add: { s in state.updateJournal(viewedDate) { $0.mistakes.append(s) } },
                      remove: { i in state.updateJournal(viewedDate) { $0.mistakes.remove(at: i) } }).knRise(6)
-            listCard(title: "Lessons", color: Palette.blue, items: entry.lessons,
+            listCard(title: "Lessons", color: Palette.muted, items: entry.lessons,
                      presets: state.journalPresets.lessons,
                      add: { s in state.updateJournal(viewedDate) { $0.lessons.append(s) } },
                      remove: { i in state.updateJournal(viewedDate) { $0.lessons.remove(at: i) } }).knRise(7)
-            listCard(title: "Gratitude", color: Palette.information, items: entry.gratitude,
+            listCard(title: "Gratitude", color: Palette.muted, items: entry.gratitude,
                      presets: state.journalPresets.gratitude,
                      add: { s in state.updateJournal(viewedDate) { $0.gratitude.append(s) } },
                      remove: { i in state.updateJournal(viewedDate) { $0.gratitude.remove(at: i) } }).knRise(8)

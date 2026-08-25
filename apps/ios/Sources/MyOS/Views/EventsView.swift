@@ -27,12 +27,9 @@ struct EventsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
-            HStack {
-                // Title comes from the navigation bar (JournalView sets it).
-                Spacer()
-                Button { editTarget = EditTarget(nil) } label: { Label("New", systemImage: "plus") }
-                    .buttonStyle(.borderedProminent)
-            }
+            // No "New" button here. `JournalView` puts it in the navigation bar
+            // for both halves of the tab, which is where iOS puts a screen's
+            // action and the only way the two halves look like one screen.
             if state.events.isEmpty {
                 Card {
                     Text("Nothing yet. Tap New to add a trip, a shoot, or any moment.")
