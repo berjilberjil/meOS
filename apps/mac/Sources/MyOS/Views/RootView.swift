@@ -37,7 +37,6 @@ struct RootView: View {
         // Splash and app are one continuous moment, not two screens: the phase
         // change cross-fades instead of cutting.
         .animation(.easeInOut(duration: 0.28), value: state.phase)
-        .fontDesign(.rounded)   // Feather-substitute: rounds all text app-wide
         .preferredColorScheme(themeStore.theme.colorScheme)
         .tint(Palette.accent)
         .animation(.knTheme, value: themeStore.theme.id)
@@ -56,6 +55,9 @@ struct RootView: View {
             if newPhase == .active {
                 Task {
                     await state.pullRemote()
+                    // Don't wait up to a full poll interval for a photo taken on
+                    // the other device while this one was in the background.
+                    await ProgressPhotoSync.syncAll()
                     // Friday 6pm: the first time the app is open and unlocked
                     // after it, the week gets read back.
                     await state.generateWeeklyReportIfDue()

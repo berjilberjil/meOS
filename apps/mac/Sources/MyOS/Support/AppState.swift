@@ -579,6 +579,13 @@ final class AppState: ObservableObject {
                 try? await Task.sleep(nanoseconds: Self.livePollInterval)
                 guard !Task.isCancelled else { return }
                 await self?.pullRemote()
+                // Progress photos live in R2, keyed by filename, and are NOT part
+                // of the state blob — so a state poll, ETag or not, can never
+                // reveal a photo added on the other device. Before this, the Mac
+                // only listed them when a photo view appeared, which is why a
+                // shot taken on the iPhone could sit invisible indefinitely.
+                // Detached so a slow upload cannot stall the tick.
+                Task { await ProgressPhotoSync.syncAll() }
                 // Cheap guard when there's nothing inline, so newly added media
                 // moves to R2 within one tick without extra wiring.
                 await self?.migrateEventMediaToR2()
