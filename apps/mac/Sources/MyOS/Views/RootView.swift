@@ -47,6 +47,12 @@ struct RootView: View {
             #if os(iOS)
             SoundPlayer.open()   // cold launch — scenePhase is already .active by now
             #endif
+            // The sensor starts BEFORE the vault is unlocked, and deliberately.
+            // The Mac asks for the passphrase every launch, so a sensor that
+            // waited for `.loggedIn` recorded nothing on any day the app sat at
+            // the lock screen. Sessions go to `ActivityJournal` on disk until
+            // there is a document to fold them into.
+            ActivityCoordinator.shared.begin()
             await state.bootstrap()
             if state.phase == .loggedIn {
                 DietBridge.shared.start(state: state)

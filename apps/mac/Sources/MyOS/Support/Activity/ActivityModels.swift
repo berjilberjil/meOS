@@ -15,6 +15,43 @@ enum DeviceType: String, Codable, CaseIterable, Hashable, Identifiable {
     var icon: String { self == .mac ? "laptopcomputer" : "iphone" }
 }
 
+/// Which device's time is being read.
+///
+/// The Mac and the iPhone are separate sensors with very different reach — the
+/// Mac sees every app, the iPhone only sees what a Shortcuts automation reports
+/// — so which of the two you are looking at changes the answer enough to be a
+/// control on the card rather than a footnote under it.
+enum ActivityDeviceFilter: String, Codable, CaseIterable, Hashable, Identifiable {
+    case all, mac, iphone
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .all:    return "Both"
+        case .mac:    return "Mac"
+        case .iphone: return "iPhone"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .all:    return "square.on.square"
+        case .mac:    return "laptopcomputer"
+        case .iphone: return "iphone"
+        }
+    }
+    /// nil means "don't filter".
+    var device: DeviceType? {
+        switch self {
+        case .all:    return nil
+        case .mac:    return .mac
+        case .iphone: return .iphone
+        }
+    }
+    func matches(_ event: ActivityEvent) -> Bool {
+        guard let device else { return true }
+        return event.deviceType == device
+    }
+}
+
 /// What a session is worth. Deliberately three: a scale with more points invites
 /// arguing about the middle instead of acting on the ends.
 enum ProductivityType: String, Codable, CaseIterable, Hashable, Identifiable {

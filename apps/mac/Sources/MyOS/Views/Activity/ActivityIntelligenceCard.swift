@@ -2,10 +2,14 @@ import SwiftUI
 
 /// Today's activity card.
 ///
-/// It answers three questions in order and nothing else: what am I doing right
-/// now, is it any good, and what should I do next. Anything that answers "where
-/// did my time actually go" belongs on the Productivity tab — putting it here
-/// would turn the top of Today into a dashboard.
+/// It answers, in order: what am I doing right now, where has today's time
+/// actually gone, and what should I do about it. The middle one is a Screen
+/// Time answer — per app, per device — because "3 hours tracked" is a number
+/// you can't act on and "1h 20m in CapCut" is.
+///
+/// The device switch is a control rather than two tiles: the Mac and the iPhone
+/// are separate sensors feeding one model, and which of them you are reading
+/// changes every number under it.
 struct ActivityIntelligenceCard: View {
     /// The day being shown. Today unless the Today page has been swiped.
     var day: String? = nil
@@ -15,16 +19,30 @@ struct ActivityIntelligenceCard: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var coordinator = ActivityCoordinator.shared
 
+    /// Which device's time is on screen. Per device and not synced — reading the
+    /// phone's day on the Mac is a thing you do for a moment, not a preference
+    /// worth pushing to the other machine.
+    @AppStorage("myos.activity.deviceFilter") private var deviceRaw = ActivityDeviceFilter.all.rawValue
+
+    private var device: Binding<ActivityDeviceFilter> {
+        Binding(get: { ActivityDeviceFilter(rawValue: deviceRaw) ?? .all },
+                set: { deviceRaw = $0.rawValue })
+    }
+
     var body: some View {
         // One pass over the day's sessions, not three: this card is alive on
         // three Today pages at once.
         let key = day ?? state.todayKey
-        let summary = state.activitySummaryLive(key)
+        let summary = state.activitySummaryLive(key, device: device.wrappedValue)
         let live = key == state.todayKey ? state.liveActivity : nil
-        let read = ActivityInsights.dayIntelligence(summary: summary, current: live,
+        // The verdict is always about the whole day, whichever device is being
+        // read — a good afternoon on the Mac is not undone by looking at the
+        // phone's tab.
+        let whole = device.wrappedValue == .all ? summary : state.activitySummaryLive(key)
+        let read = ActivityInsights.dayIntelligence(summary: whole, current: live,
                                                     todos: state.todayPriorities, now: Date())
 
-        Card(accent: .orange, look: .accent) {
+        Card(accent: .activity, look: .accent) {
             VStack(alignment: .leading, spacing: Gap.row) {
                 if let focus = read.focusNow {
                     FocusNowHeader(focus: focus)
@@ -36,15 +54,14 @@ struct ActivityIntelligenceCard: View {
                     idleHeader
                 }
 
-                if summary.isEmpty {
-                    emptyState
+                if whole.isEmpty && !coordinator.enabled {
+                    offState
                 } else {
                     Divider().overlay(Palette.divider)
-                    totals(summary)
-                    WorthBreakdown(productive: summary.seconds(.productive),
-                                   neutral: summary.seconds(.neutral),
-                                   distracting: summary.seconds(.distracting))
-                    ActivityTimelineChart(timeline: summary.timeline)
+                    ScreenTimeBreakdown(summary: summary,
+                                        device: device,
+                                        appLimit: 6,
+                                        trailing: detailsButton)
                 }
 
                 if let action = read.action {
@@ -54,11 +71,25 @@ struct ActivityIntelligenceCard: View {
         }
     }
 
+    private var detailsButton: AnyView? {
+        guard let go else { return nil }
+        return AnyView(
+            Button { go(.productivity) } label: {
+                HStack(spacing: Space.xs) {
+                    Text("Details").font(.myCaption)
+                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Palette.faint)
+        )
+    }
+
     /// Nothing in front of us — either tracking is off, or this is a past day,
     /// or the machine is idle. Each of those is a different sentence.
     private var idleHeader: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
-            SectionLabel(text: "Activity", accent: .orange)
+            SectionLabel(text: "Activity", accent: .activity)
             Text(idleLine)
                 .font(.myBody)
                 .foregroundStyle(Palette.muted)
@@ -72,49 +103,19 @@ struct ActivityIntelligenceCard: View {
         return "Nothing in front of you right now."
     }
 
-    private func totals(_ summary: ActivitySummary) -> some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
-                Text("Today").font(.myCaption).foregroundStyle(Palette.faint)
-                Text(Fmt.duration(summary.totalSeconds))
-                    .font(.title2.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
-                Spacer(minLength: 0)
-                if let go {
-                    Button { go(.productivity) } label: {
-                        HStack(spacing: Space.xs) {
-                            Text("Details").font(.myCaption)
-                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Palette.faint)
-                }
-            }
-            DeviceSplit(mac: summary.seconds(.mac), iphone: summary.seconds(.iphone), showsTotal: false)
-        }
-    }
-
     /// Honest about which of the two possible nothings this is. A zero here
     /// would be a claim that nothing happened, which is not the same as MyOS
     /// not having watched.
-    @ViewBuilder
-    private var emptyState: some View {
-        if !coordinator.enabled {
-            VStack(alignment: .leading, spacing: Space.md) {
-                Text("MyOS isn't recording where your time goes yet. Turn it on and this card starts answering what you're focused on and whether it's worth doing.")
-                    .font(.myBody)
-                    .foregroundStyle(Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Start tracking") { coordinator.setEnabled(true) }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Palette.action)
-                    .foregroundStyle(Accent.green.ink)
-            }
-        } else {
-            Text("Nothing recorded yet today.")
+    private var offState: some View {
+        VStack(alignment: .leading, spacing: Space.md) {
+            Text("MyOS isn't recording where your time goes yet. Turn it on and this card starts answering what you're focused on and whether it's worth doing.")
                 .font(.myBody)
-                .foregroundStyle(Palette.faint)
+                .foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Start tracking") { coordinator.setEnabled(true) }
+                .buttonStyle(.borderedProminent)
+                .tint(Palette.action)
+                .foregroundStyle(Accent.green.ink)
         }
     }
 }

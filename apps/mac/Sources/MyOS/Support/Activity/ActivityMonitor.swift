@@ -68,6 +68,13 @@ final class MacActivityMonitor {
     /// How often the current session is checked and extended.
     private static let tick: TimeInterval = 20
 
+    /// A session that has been running this long is banked and immediately
+    /// restarted. Nothing about the day changes — `ActivityJournal` merges the
+    /// two halves straight back together — but it means a crash, a force-quit
+    /// or a power cut can never cost more than this, instead of costing however
+    /// long you had been heads-down in one app.
+    private static let bankInterval: TimeInterval = 5 * 60
+
     private var currentApp: (id: String, name: String)?
     private var startedAt: Date?
     /// When we last saw real input, so an idle stretch can be trimmed off the
@@ -117,6 +124,13 @@ final class MacActivityMonitor {
             MainActor.assumeIsolated { self?.switched(to: NSWorkspace.shared.frontmostApplication) }
         })
 
+        // Quitting is the most common way a session used to be lost: the app
+        // goes away mid-session and the clock is simply never stopped.
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.close(reason: .stopped) }
+            })
+
         timer = Timer.scheduledTimer(withTimeInterval: Self.tick, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pulse() }
         }
@@ -130,7 +144,11 @@ final class MacActivityMonitor {
         timer?.invalidate(); timer = nil
         let center = NSWorkspace.shared.notificationCenter
         let distributed = DistributedNotificationCenter.default()
-        for o in observers { center.removeObserver(o); distributed.removeObserver(o) }
+        for o in observers {
+            center.removeObserver(o)
+            distributed.removeObserver(o)
+            NotificationCenter.default.removeObserver(o)
+        }
         observers = []
         onLiveChange?(nil)
     }
@@ -145,13 +163,40 @@ final class MacActivityMonitor {
     }
 
     private func pulse() {
-        if systemIdle < Self.idleThreshold {
-            lastActive = Date()
-            onLiveChange?(liveSession())
-        } else if startedAt != nil {
+        guard systemIdle < Self.idleThreshold else {
             // Idle: bank what was real and wait for the machine to come back.
-            close(reason: .stopped)
+            if startedAt != nil { close(reason: .stopped) }
+            return
         }
+        lastActive = Date()
+
+        // Back at the keyboard after being away. Idle cleared the current app,
+        // and `NSWorkspace` only speaks when the frontmost app *changes* — so
+        // without this the clock stays stopped until the next app switch. Come
+        // back from lunch to the same window you left and the whole afternoon
+        // used to go unrecorded. This is the single biggest reason the numbers
+        // were wrong.
+        if currentApp == nil {
+            switched(to: NSWorkspace.shared.frontmostApplication)
+            return
+        }
+
+        if let started = startedAt, Date().timeIntervalSince(started) >= Self.bankInterval {
+            bankLive()
+            return
+        }
+        onLiveChange?(liveSession())
+    }
+
+    /// Close the running session and start a fresh one in the same app, so the
+    /// time so far is on disk. The journal merges them back into one row.
+    private func bankLive() {
+        guard let app = currentApp else { return }
+        close(reason: .switched)
+        currentApp = app
+        startedAt = Date()
+        lastActive = Date()
+        onLiveChange?(liveSession())
     }
 
     private func switched(to app: NSRunningApplication?) {

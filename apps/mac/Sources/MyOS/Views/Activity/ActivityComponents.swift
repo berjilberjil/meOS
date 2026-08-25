@@ -5,14 +5,16 @@ import Charts
 // number never gets two different treatments in two places.
 //
 // Colour here is entirely semantic: productive is green, distracting is orange,
-// neutral is muted white. Nothing is coloured to look interesting.
+// neutral is muted white. Nothing is coloured to look interesting. Distracting
+// is the one place in the app that still earns orange — it has to read against
+// the green sitting directly above it in the same breakdown.
 
 extension ProductivityType {
     var accent: Accent {
         switch self {
         case .productive:  return .green
         case .neutral:     return .none
-        case .distracting: return .orange
+        case .distracting: return .distracting
         }
     }
     var tint: Color {
@@ -30,7 +32,7 @@ struct FocusNowHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
-            SectionLabel(text: "Focusing now", accent: .orange)
+            SectionLabel(text: "Focusing now", accent: .activity)
 
             HStack(alignment: .firstTextBaseline, spacing: Space.md) {
                 Text(focus.appName)
@@ -172,7 +174,7 @@ struct ActionCallout: View {
         switch action.kind {
         case .goodMove:   return .green
         case .nextMove:   return .none
-        case .fixThisNow: return .orange
+        case .fixThisNow: return .warning
         }
     }
 
@@ -238,30 +240,34 @@ struct AppUsageRow: View {
     let peak: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            HStack(spacing: Space.sm) {
-                Text(usage.appName)
-                    .font(.myBody.weight(.medium))
-                    .foregroundStyle(Palette.text)
-                    .lineLimit(1)
-                Spacer(minLength: Space.sm)
-                Text(Fmt.duration(usage.seconds))
-                    .font(.myBody.weight(.semibold)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
+        HStack(alignment: .top, spacing: Space.md) {
+            AppIconTile(appId: usage.appId, appName: usage.appName,
+                        worth: usage.productivity, size: 28)
+            VStack(alignment: .leading, spacing: Space.xs) {
+                HStack(spacing: Space.sm) {
+                    Text(usage.appName)
+                        .font(.myBody.weight(.medium))
+                        .foregroundStyle(Palette.text)
+                        .lineLimit(1)
+                    Spacer(minLength: Space.sm)
+                    Text(Fmt.duration(usage.seconds))
+                        .font(.myBody.weight(.semibold)).monospacedDigit()
+                        .foregroundStyle(Palette.text)
+                }
+                HStack(spacing: Space.sm) {
+                    Text(usage.category.label)
+                        .font(.myCaption)
+                        .foregroundStyle(Palette.faint)
+                        .lineLimit(1)
+                    Spacer(minLength: Space.sm)
+                    Text(usage.productivity.label)
+                        .font(.myCaption)
+                        .foregroundStyle(usage.productivity.tint)
+                }
+                ProgressView(value: peak > 0 ? min(1, Double(usage.seconds) / Double(peak)) : 0)
+                    .progressViewStyle(.linear)
+                    .tint(usage.productivity.tint)
             }
-            HStack(spacing: Space.sm) {
-                Text(usage.category.label)
-                    .font(.myCaption)
-                    .foregroundStyle(Palette.faint)
-                    .lineLimit(1)
-                Spacer(minLength: Space.sm)
-                Text(usage.productivity.label)
-                    .font(.myCaption)
-                    .foregroundStyle(usage.productivity.tint)
-            }
-            ProgressView(value: peak > 0 ? min(1, Double(usage.seconds) / Double(peak)) : 0)
-                .progressViewStyle(.linear)
-                .tint(usage.productivity.tint)
         }
     }
 }
@@ -290,11 +296,11 @@ struct VerdictBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
-            SectionLabel(text: heading, accent: verdict.isPositive ? .green : .orange)
+            SectionLabel(text: heading, accent: verdict.isPositive ? .green : .warning)
             Text(verdict.label.uppercased())
                 .font(.title2.weight(.bold))
                 .tracking(0.5)
-                .foregroundStyle(verdict.isPositive ? Palette.success : Palette.attention)
+                .foregroundStyle(verdict.isPositive ? Palette.success : Palette.warning)
             Text(line)
                 .font(.myBody)
                 .foregroundStyle(Palette.muted)

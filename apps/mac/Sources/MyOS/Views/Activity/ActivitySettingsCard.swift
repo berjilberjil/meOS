@@ -1,4 +1,39 @@
 import SwiftUI
+#if os(macOS)
+import ServiceManagement
+#endif
+
+#if os(macOS)
+/// Whether MyOS starts with the Mac.
+///
+/// This belongs next to the activity toggle because it is the difference
+/// between tracking that works and tracking that mostly works: the Mac's sensor
+/// is `NSWorkspace` inside this process, so a MyOS that is not running is a Mac
+/// that is not being watched. Everything else about the feature can be right and
+/// the numbers will still be missing the first four hours of the day.
+@MainActor
+final class LoginItemStore: ObservableObject {
+    static let shared = LoginItemStore()
+
+    @Published private(set) var enabled: Bool
+    /// Registration can be refused — this app is ad-hoc signed — and a toggle
+    /// that silently springs back is worse than one that says why.
+    @Published private(set) var error: String?
+
+    private init() { enabled = SMAppService.mainApp.status == .enabled }
+
+    func set(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() }
+            else { try SMAppService.mainApp.unregister() }
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+        enabled = SMAppService.mainApp.status == .enabled
+    }
+}
+#endif
 
 /// Settings → Activity. What is recorded, on which devices, and how to make the
 /// iPhone report anything at all.
@@ -25,6 +60,10 @@ struct ActivitySettingsCard: View {
                     }
                 }
                 .tint(Palette.action)
+
+                #if os(macOS)
+                launchAtLogin
+                #endif
 
                 Divider().overlay(Palette.divider)
                 devices
@@ -57,6 +96,38 @@ struct ActivitySettingsCard: View {
         #endif
     }
 
+    #if os(macOS)
+    @ObservedObject private var loginItem = LoginItemStore.shared
+
+    private var launchAtLogin: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Toggle(isOn: Binding(get: { loginItem.enabled },
+                                 set: { loginItem.set($0) })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Open MyOS at login").font(.myBody.weight(.medium)).foregroundStyle(Palette.text)
+                    Text("The Mac is only watched while MyOS is running. Without this, every morning before you open it is a gap in the day.")
+                        .font(.myCaption).foregroundStyle(Palette.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(Palette.action)
+            if let error = loginItem.error {
+                Text(error).font(.myCaption).foregroundStyle(Palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+    #endif
+
+    /// Which iPhone apps have actually reported. The automations are set up one
+    /// at a time on the phone and it is genuinely hard to remember which ones
+    /// are done — so this is the answer, taken from what has arrived.
+    private var reportingApps: [String] {
+        var names = Set(state.activity.events.filter { $0.deviceType == .iphone }.map(\.appName))
+        names.remove("MyOS")
+        return names.sorted()
+    }
+
     private var devices: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
             SectionLabel(text: "Devices reporting")
@@ -79,10 +150,18 @@ struct ActivitySettingsCard: View {
 
     private var iphoneSetup: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
-            SectionLabel(text: "iPhone apps", accent: .orange)
+            SectionLabel(text: "iPhone apps", accent: .activity)
             Text("iOS gives no app permission to read another app's usage — Apple's Screen Time data is walled off behind an entitlement that needs a paid developer account, and even then it can only be drawn, not read. A Shortcuts automation is the way round it.")
                 .font(.myCaption).foregroundStyle(Palette.faint)
                 .fixedSize(horizontal: false, vertical: true)
+            if reportingApps.isEmpty {
+                Text("No iPhone app has reported yet.")
+                    .font(.myCaption).foregroundStyle(Palette.faint)
+            } else {
+                Text("Reporting: \(reportingApps.joined(separator: ", "))")
+                    .font(.myCaption).foregroundStyle(Palette.success)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Button("How to set it up") { showingSetup = true }
                 .buttonStyle(.borderless)
                 .tint(Palette.action)
@@ -104,7 +183,7 @@ struct ActivitySettingsCard: View {
                 }
             }
             .buttonStyle(.borderless)
-            .tint(Palette.attention)
+            .tint(Palette.warning)
         }
     }
 }
@@ -143,7 +222,7 @@ struct IPhoneActivitySetupSheet: View {
                     HStack(alignment: .top, spacing: Space.md) {
                         Text("\(index + 1)")
                             .font(.myCaption.weight(.bold))
-                            .foregroundStyle(Accent.orange.ink)
+                            .foregroundStyle(Accent.activity.ink)
                             .frame(width: 22, height: 22)
                             .background(Palette.activity, in: Circle())
                         VStack(alignment: .leading, spacing: 2) {

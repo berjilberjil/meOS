@@ -29,14 +29,36 @@ final class ActivityCoordinator: ObservableObject {
     private let monitor = MacActivityMonitor()
     #endif
 
+    /// Whether the sensor is already wired up, so a second `begin()` — the app
+    /// re-entering the foreground, a re-login — is a no-op rather than a second
+    /// set of workspace observers.
+    private var begun = false
+
     private init() {
-        enabled = UserDefaults.standard.bool(forKey: ActivityCoordinator.enabledKey)
+        let defaults = UserDefaults.standard
+        // Tracking used to default to off, which meant the honest answer on the
+        // Today card was "Not tracking on this device" until it was found and
+        // switched on in Settings — a feature that has to be discovered before
+        // it records anything records nothing. It is opt-*out* now. The toggle
+        // is still there and an explicit "off" is still remembered, because the
+        // key is only defaulted when it has never been set.
+        if defaults.object(forKey: ActivityCoordinator.enabledKey) == nil {
+            defaults.set(true, forKey: ActivityCoordinator.enabledKey)
+        }
+        enabled = defaults.bool(forKey: ActivityCoordinator.enabledKey)
     }
 
-    func configure(state: AppState) {
-        self.state = state
+    /// Start the sensor. Called at launch, *before* the vault is unlocked.
+    ///
+    /// This is deliberate. The Mac asks for the passphrase on every launch, so a
+    /// sensor that only started at unlock recorded nothing at all on the days
+    /// the app sat at the lock screen. Sessions go to `ActivityJournal` — an app
+    /// name and two timestamps, on disk, in the clear — and are folded into the
+    /// encrypted document the moment there is one to fold them into.
+    func begin() {
+        guard !begun else { return }
+        begun = true
         #if os(macOS)
-        monitor.rules = state.activity.rules
         monitor.onSession = { [weak self] event in
             MainActor.assumeIsolated { self?.record(event) }
         }
@@ -44,6 +66,23 @@ final class ActivityCoordinator: ObservableObject {
             MainActor.assumeIsolated { self?.state?.liveActivity = live }
         }
         #endif
+        if enabled { start() }
+    }
+
+    func configure(state: AppState) {
+        self.state = state
+        begin()
+        #if os(macOS)
+        monitor.rules = state.activity.rules
+        #endif
+        // Anything recorded while the app was locked, offline, or between the
+        // last push and the last quit is still on disk. Take it.
+        var doc = state.activity
+        if ActivityJournal.fold(into: &doc) > 0 {
+            ActivityEngine.compact(&doc, today: state.todayKey)
+            state.activity = doc
+            pendingPush = true
+        }
         registerDevice()
         drainInbox()
         if enabled { start() }
@@ -82,31 +121,23 @@ final class ActivityCoordinator: ObservableObject {
     /// straight back is one stretch of work, and keeping it as two would both
     /// inflate the switch count and bloat a blob that syncs on every change.
     func record(_ event: ActivityEvent) {
-        guard let state else { return }
         guard event.duration > 0 else { return }
+        // Disk first, always — including while the vault is locked, when there
+        // is no document to write into and `state` is nil. The journal owns the
+        // merge and hands back the row as it now stands on disk, so the document
+        // upserts that one row by id instead of growing a second one.
+        let stored = ActivityJournal.record(event)
+
+        guard let state else { return }
         var doc = state.activity
-
-        if let last = doc.events.last,
-           last.appId == event.appId,
-           last.deviceId == event.deviceId,
-           last.day == event.day,
-           gap(from: last.endedAt, to: event.startedAt) <= 90 {
-            var merged = last
-            merged.endedAt = event.endedAt
-            merged.duration += event.duration
-            doc.events[doc.events.count - 1] = merged
+        if let i = doc.events.lastIndex(where: { $0.id == stored.id }) {
+            doc.events[i] = stored
         } else {
-            doc.events.append(event)
+            doc.events.append(stored)
         }
-
         ActivityEngine.compact(&doc, today: state.todayKey)
         state.activity = doc
         pendingPush = true
-    }
-
-    private func gap(from end: String, to start: String) -> Int {
-        guard let a = ActivityTime.date(end), let b = ActivityTime.date(start) else { return .max }
-        return max(0, Int(b.timeIntervalSince(a)))
     }
 
     /// Fold whatever the iPhone's Shortcuts automations queued into sessions.
@@ -167,6 +198,7 @@ final class ActivityCoordinator: ObservableObject {
         state.activity = ActivityDoc()
         state.liveActivity = nil
         ActivityInbox.clear()
+        ActivityJournal.clear()
         registerDevice()
         pendingPush = true
         flush()
@@ -190,8 +222,8 @@ extension AppState {
         (days[todayKey]?.todos ?? []).filter { !$0.done }.map(\.text)
     }
 
-    func activitySummary(_ day: String) -> ActivitySummary {
-        ActivityEngine.summary(activity.events, day: day)
+    func activitySummary(_ day: String, device: ActivityDeviceFilter = .all) -> ActivitySummary {
+        ActivityEngine.summary(activity.events, day: day, device: device)
     }
 
     /// The seven days ending on `day`, oldest first.
@@ -220,11 +252,11 @@ extension AppState {
 
     /// Summary including the unbanked live session, for the surfaces that show
     /// totals next to "focusing now".
-    func activitySummaryLive(_ day: String) -> ActivitySummary {
+    func activitySummaryLive(_ day: String, device: ActivityDeviceFilter = .all) -> ActivitySummary {
         if day == todayKey, let live = liveActivity {
-            return ActivityEngine.summary(activity.events + [live], day: day)
+            return ActivityEngine.summary(activity.events + [live], day: day, device: device)
         }
-        return activitySummary(day)
+        return activitySummary(day, device: device)
     }
 
     func eraseActivity() { ActivityCoordinator.shared.erase() }

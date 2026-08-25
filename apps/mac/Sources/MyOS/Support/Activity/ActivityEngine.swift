@@ -4,6 +4,17 @@ import Foundation
 // its own, nothing platform-specific — so every number the three screens show
 // can be pinned by a test.
 
+/// One category's share of a period. The legend under the timeline reads in
+/// categories rather than app names, because "an hour of content creation" is a
+/// fact about the day and "an hour of CapCut" is a fact about a tool.
+struct CategoryUsage: Identifiable, Hashable {
+    var category: ActivityCategory
+    var seconds: Int
+    /// What the majority of the time in this category was worth.
+    var productivity: ProductivityType
+    var id: String { category.rawValue }
+}
+
 /// One app's share of a period.
 struct AppUsage: Identifiable, Hashable {
     var appId: String
@@ -49,6 +60,7 @@ struct ActivitySummary: Hashable {
     var byDevice: [DeviceType: Int] = [:]
     var byProductivity: [ProductivityType: Int] = [:]
     var apps: [AppUsage] = []
+    var categories: [CategoryUsage] = []
     var timeline: [TimelineHour] = []
     var switches: Int = 0
     var switchesInWorkHours: Int = 0
@@ -75,6 +87,7 @@ struct ActivityWeekSummary: Hashable {
     var byDevice: [DeviceType: Int] = [:]
     var byProductivity: [ProductivityType: Int] = [:]
     var apps: [AppUsage] = []
+    var categories: [CategoryUsage] = []
     var dailyTotals: [String: Int] = [:]
     var dailyProductive: [String: Int] = [:]
     var longestFocus: FocusBlock?
@@ -111,12 +124,14 @@ enum ActivityEngine {
 
     // MARK: - Day
 
-    static func sessions(_ events: [ActivityEvent], on day: String) -> [ActivityEvent] {
-        events.filter { $0.day == day }.sorted { $0.startedAt < $1.startedAt }
+    static func sessions(_ events: [ActivityEvent], on day: String,
+                         device: ActivityDeviceFilter = .all) -> [ActivityEvent] {
+        events.filter { $0.day == day && device.matches($0) }.sorted { $0.startedAt < $1.startedAt }
     }
 
-    static func summary(_ events: [ActivityEvent], day: String) -> ActivitySummary {
-        let sessions = sessions(events, on: day)
+    static func summary(_ events: [ActivityEvent], day: String,
+                        device: ActivityDeviceFilter = .all) -> ActivitySummary {
+        let sessions = sessions(events, on: day, device: device)
         var out = ActivitySummary(day: day)
         out.sessionCount = sessions.count
         guard !sessions.isEmpty else { return out }
@@ -142,11 +157,30 @@ enum ActivityEngine {
         }
 
         out.apps = apps.values.sorted { $0.seconds > $1.seconds }
+        out.categories = categories(from: out.apps)
         out.timeline = hours
         out.switches = countSwitches(sessions)
         out.switchesInWorkHours = countSwitches(sessions.filter { inWorkHours($0) })
         out.focusBlocks = focusBlocks(sessions)
         return out
+    }
+
+    /// Roll apps up into categories, keeping the worth the majority of the
+    /// time in each one carried — so a category that is mostly wasted reads as
+    /// wasted even when one productive app sits inside it.
+    static func categories(from apps: [AppUsage]) -> [CategoryUsage] {
+        var seconds: [ActivityCategory: Int] = [:]
+        var worth: [ActivityCategory: [ProductivityType: Int]] = [:]
+        for a in apps {
+            seconds[a.category, default: 0] += a.seconds
+            worth[a.category, default: [:]][a.productivity, default: 0] += a.seconds
+        }
+        return seconds.map { category, total in
+            let dominant = worth[category]?.max { $0.value < $1.value }?.key
+                ?? category.defaultProductivity
+            return CategoryUsage(category: category, seconds: total, productivity: dominant)
+        }
+        .sorted { $0.seconds > $1.seconds }
     }
 
     /// A session can straddle midnight-adjacent hours; its time is credited to
@@ -235,15 +269,16 @@ enum ActivityEngine {
 
     /// Summarise a set of days, reading raw sessions where they are still held
     /// and the compacted rollups where they are not.
-    static func weekSummary(doc: ActivityDoc, days: [String]) -> ActivityWeekSummary {
+    static func weekSummary(doc: ActivityDoc, days: [String],
+                            device: ActivityDeviceFilter = .all) -> ActivityWeekSummary {
         var out = ActivityWeekSummary(days: days)
         var apps: [String: AppUsage] = [:]
         var productiveByHour = [Int](repeating: 0, count: 24)
 
         for day in days {
-            let daySessions = sessions(doc.events, on: day)
+            let daySessions = sessions(doc.events, on: day, device: device)
             if !daySessions.isEmpty {
-                let s = summary(doc.events, day: day)
+                let s = summary(doc.events, day: day, device: device)
                 guard s.totalSeconds > 0 else { continue }
                 out.daysTracked += 1
                 out.totalSeconds += s.totalSeconds
@@ -260,18 +295,32 @@ enum ActivityEngine {
                 if let longest = s.longestFocus,
                    longest.seconds > (out.longestFocus?.seconds ?? 0) { out.longestFocus = longest }
             } else if let rollup = doc.days[day], rollup.totalSeconds > 0 {
-                // Compacted history: totals survive, per-hour detail does not.
+                // Compacted history: day totals and the device split survive,
+                // per-hour and per-app detail does not. A rollup can therefore
+                // answer a filtered question only as far as its device split
+                // goes — the apps in it are not attributed to a device, so a
+                // Mac-only or iPhone-only read deliberately leaves them out
+                // rather than crediting them to the wrong machine.
+                let deviceSeconds = device.device.map { rollup.seconds($0) } ?? rollup.totalSeconds
+                guard deviceSeconds > 0 else { continue }
+                let share = rollup.totalSeconds > 0
+                    ? Double(deviceSeconds) / Double(rollup.totalSeconds) : 0
+
                 out.daysTracked += 1
-                out.totalSeconds += rollup.totalSeconds
-                out.dailyTotals[day] = rollup.totalSeconds
-                out.dailyProductive[day] = rollup.seconds(.productive)
-                out.switches += rollup.switches
+                out.totalSeconds += deviceSeconds
+                out.dailyTotals[day] = deviceSeconds
+                out.dailyProductive[day] = Int(Double(rollup.seconds(.productive)) * share)
+                out.switches += Int(Double(rollup.switches) * share)
                 for (k, v) in rollup.byDevice {
-                    if let d = DeviceType(rawValue: k) { out.byDevice[d, default: 0] += v }
+                    guard let d = DeviceType(rawValue: k), device.device == nil || device.device == d else { continue }
+                    out.byDevice[d, default: 0] += v
                 }
                 for (k, v) in rollup.byProductivity {
-                    if let p = ProductivityType(rawValue: k) { out.byProductivity[p, default: 0] += v }
+                    if let p = ProductivityType(rawValue: k) {
+                        out.byProductivity[p, default: 0] += Int(Double(v) * share)
+                    }
                 }
+                guard device == .all else { continue }
                 for (name, v) in rollup.byApp {
                     let id = ActivityCatalog.slug(name)
                     if var e = apps[id] { e.seconds += v; apps[id] = e }
@@ -285,6 +334,7 @@ enum ActivityEngine {
         }
 
         out.apps = apps.values.sorted { $0.seconds > $1.seconds }
+        out.categories = categories(from: out.apps)
         // The best window is the two-hour pair with the most productive time.
         if out.totalSeconds > 0 {
             var best = (hour: 0, seconds: -1)

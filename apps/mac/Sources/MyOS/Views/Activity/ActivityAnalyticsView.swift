@@ -13,6 +13,14 @@ struct ActivityAnalyticsView: View {
     @ObservedObject private var coordinator = ActivityCoordinator.shared
     @State private var range: ActivityRange = .today
     @State private var editingApp: AppUsage?
+    /// Shared with the Today card, so switching device in one place does not
+    /// disagree with the other.
+    @AppStorage("myos.activity.deviceFilter") private var deviceRaw = ActivityDeviceFilter.all.rawValue
+
+    private var device: Binding<ActivityDeviceFilter> {
+        Binding(get: { ActivityDeviceFilter(rawValue: deviceRaw) ?? .all },
+                set: { deviceRaw = $0.rawValue })
+    }
 
     enum ActivityRange: String, CaseIterable, Identifiable {
         case today, week, month
@@ -56,9 +64,11 @@ struct ActivityAnalyticsView: View {
         (0..<range.days).reversed().map { AppState.addDays(-$0, to: state.todayKey) }
     }
 
-    private var daySummary: ActivitySummary { state.activitySummaryLive(state.todayKey) }
+    private var daySummary: ActivitySummary {
+        state.activitySummaryLive(state.todayKey, device: device.wrappedValue)
+    }
     private var multiDay: ActivityWeekSummary {
-        ActivityEngine.weekSummary(doc: state.activity, days: dayKeys)
+        ActivityEngine.weekSummary(doc: state.activity, days: dayKeys, device: device.wrappedValue)
     }
 
     private var totalSeconds: Int { range == .today ? daySummary.totalSeconds : multiDay.totalSeconds }
@@ -76,7 +86,7 @@ struct ActivityAnalyticsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Space.md) {
-            SectionLabel(text: "Productivity", accent: .orange)
+            SectionLabel(text: "Productivity", accent: .activity)
             HStack(alignment: .firstTextBaseline, spacing: Space.md) {
                 Text(Fmt.duration(totalSeconds))
                     .font(.myDisplay).monospacedDigit()
@@ -91,21 +101,53 @@ struct ActivityAnalyticsView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            if range != .today {
+                Picker("Device", selection: device) {
+                    ForEach(ActivityDeviceFilter.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
         }
     }
 
     @ViewBuilder
     private var content: some View {
-        devices
-        breakdown
         if range == .today {
-            timelineCard
+            screenTimeCard
         } else {
+            devices
+            breakdown
             dailyCard
+            appsCard
         }
-        appsCard
         timeManagement
         verdictCard
+    }
+
+    /// Today gets the full Screen Time read in one card — device, hours, worth,
+    /// kinds of time, and the apps themselves — because that is one question
+    /// asked at four resolutions, not four cards.
+    private var screenTimeCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: Gap.row) {
+                SectionTitle(text: "Where the time went")
+                ScreenTimeBreakdown(summary: daySummary,
+                                    device: device,
+                                    appLimit: 10,
+                                    chartHeight: 140,
+                                    showsCategories: true,
+                                    onApp: { editingApp = $0 })
+                if device.wrappedValue != .mac && daySummary.seconds(.iphone) == 0 {
+                    Text("iPhone activity needs a Shortcuts automation per app — iOS gives no app permission to read another app's usage. Set it up in Settings.")
+                        .font(.myCaption)
+                        .foregroundStyle(Palette.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Tap an app to change what it counts as.")
+                    .font(.myCaption).foregroundStyle(Palette.faint)
+            }
+        }
     }
 
     // MARK: Devices
