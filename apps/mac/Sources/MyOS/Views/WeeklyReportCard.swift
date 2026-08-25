@@ -106,6 +106,7 @@ struct WeeklyReportCard: View {
 /// One report, rendered. Shared by the card and the past-report sheet.
 private struct ReportBody: View {
     let report: WeeklyReport
+    @EnvironmentObject var state: AppState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -145,8 +146,14 @@ private struct ReportBody: View {
             }
 
             Text("\(report.photosThisWeek) photo\(report.photosThisWeek == 1 ? "" : "s") this week · \(report.photosLastWeek) last week")
-                .font(.caption2.weight(.heavy))
+                .font(.myCaption)
                 .foregroundStyle(Palette.faint)
+
+            // The activity half of the same week. Computed live rather than
+            // frozen into the stored report — a Friday report opened on Sunday
+            // must not be quietly wrong about Saturday.
+            Divider().overlay(Palette.divider)
+            ActivityWeeklySection(weekStart: report.weekStart, weekEnd: report.weekEnd)
         }
     }
 

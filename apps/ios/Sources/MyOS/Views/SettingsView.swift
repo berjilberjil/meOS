@@ -19,7 +19,7 @@ struct SettingsView: View {
     private var textInset: CGFloat { tile + 14 + 12 }
 
     private enum Page: String, Identifiable {
-        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data, calendar, weekly
+        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data, calendar, weekly, activity
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -34,6 +34,7 @@ struct SettingsView: View {
             case .reorder: return "Reorder Today"
             case .data: return "Data & resets"
             case .weekly: return "Weekly report"
+            case .activity: return "Activity tracking"
             }
         }
         var icon: String {
@@ -49,6 +50,7 @@ struct SettingsView: View {
             case .reorder: return "arrow.up.arrow.down"
             case .data: return "trash.fill"
             case .weekly: return "chart.line.uptrend.xyaxis"
+            case .activity: return "timer"
             }
         }
         var tint: Color {
@@ -64,6 +66,7 @@ struct SettingsView: View {
             case .reorder: return Palette.information
             case .data: return Palette.warning
             case .weekly: return Palette.attention
+            case .activity: return Palette.activity
             }
         }
     }
@@ -107,6 +110,7 @@ struct SettingsView: View {
                 row(.appearance); divider
                 row(.launch); divider
                 row(.weekly); divider
+                row(.activity); divider
                 row(.reminders)
             }
 
@@ -243,6 +247,7 @@ struct SettingsView: View {
                             case .memory: MemoryCard(boxed: false)
                             case .keys: AIProvidersCard(boxed: false)
                             case .weekly: WeeklyReportCard(boxed: false)
+                            case .activity: ActivitySettingsCard()
                             case .data: DataManagementCard(boxed: false)
                             case .reorder: EmptyView()
                             }

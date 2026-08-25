@@ -74,20 +74,29 @@ struct ProductivityView: View {
 
     private var stack: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
-            HStack(spacing: 8) {
-                #if os(macOS)   // iOS: the navigation bar owns the title
-                ScreenTitle(text: "Productivity")
-                #endif
+            #if os(macOS)   // iOS: the navigation bar owns the title
+            ScreenTitle(text: "Productivity").knRise(0)
+            #endif
+
+            // Where the time actually went. This is the tab's headline now; the
+            // watch log keeps everything it had, underneath.
+            ActivityAnalyticsView().knRise(1)
+
+            Divider().overlay(Palette.divider).padding(.vertical, Space.sm)
+
+            HStack(spacing: Space.sm) {
+                SectionTitle(text: "Watch log")
                 Spacer()
-                Text("\(state.watch.count) videos").font(.caption).foregroundStyle(Palette.faint)
+                Text("\(state.watch.count) videos").font(.myCaption).foregroundStyle(Palette.faint)
                 if !state.watch.isEmpty {
                     Picker("", selection: $mode) { ForEach(ViewMode.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
+                        .frame(maxWidth: 220)
                 }
             }
-            .knRise(0)
+            .knRise(2)
 
             #if os(macOS)
-            addCard.knRise(1)
+            addCard.knRise(2)
             #endif
             if !state.watch.isEmpty { filterRow.knRise(2) }
             Group {

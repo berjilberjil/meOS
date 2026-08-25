@@ -5,6 +5,9 @@ struct RootView: View {
     @ObservedObject private var themeStore = ThemeStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var unlocked = false
+    /// When MyOS itself came to the front on the phone. iOS lets an app time
+    /// exactly one app — itself — and this is that measurement.
+    @State private var foregroundSince: Date?
 
     var body: some View {
         ZStack {
@@ -47,11 +50,30 @@ struct RootView: View {
             await state.bootstrap()
             if state.phase == .loggedIn {
                 DietBridge.shared.start(state: state)
+                // Sensors last: they need a hydrated state to write into.
+                ActivityCoordinator.shared.configure(state: state)
+                foregroundSince = Date()
                 await state.generateWeeklyReportIfDue()
             }
         }
         .onChange(of: scenePhase) { old, newPhase in
             if newPhase == .background { unlocked = false }
+
+            // Activity: bank this device's own foreground stretch, take whatever
+            // the iPhone's automations queued, and get it synced before the app
+            // is suspended.
+            if newPhase == .active {
+                foregroundSince = Date()
+                ActivityCoordinator.shared.drainInbox()
+            }
+            if newPhase == .background {
+                if let since = foregroundSince {
+                    ActivityCoordinator.shared.recordOwnForeground(from: since, to: Date())
+                    foregroundSince = nil
+                }
+                ActivityCoordinator.shared.flush()
+            }
+
             if newPhase == .active {
                 Task {
                     await state.pullRemote()

@@ -3,13 +3,17 @@ import SwiftUI
 /// Persisted order for Today tab sections.
 /// Stored as JSON in UserDefaults; decoded with any new sections appended at the end.
 enum TodaySection: String, CaseIterable, Identifiable {
-    case activity, intake, meals, workout, comingUp, bodyPhotos, watchLog, focus, news
+    /// `focusNow` is the activity-intelligence card. `activity` predates it and
+    /// is about *walking* — the two were both called "Activity", which is why
+    /// the older one now reads as "Steps".
+    case focusNow, activity, intake, meals, workout, comingUp, bodyPhotos, watchLog, focus, news
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .activity: return "Activity"
+        case .focusNow: return "Activity"
+        case .activity: return "Steps"
         case .intake: return "Intake"
         case .meals: return "Meals"
         case .workout: return "Workout"
@@ -23,6 +27,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .focusNow: return "timer"
         case .activity: return "figure.walk"
         case .intake: return "flame.fill"
         case .meals: return "fork.knife"
@@ -41,7 +46,8 @@ enum TodaySection: String, CaseIterable, Identifiable {
     /// blue, and anything without a semantic claim stays uncoloured.
     var accent: Accent {
         switch self {
-        case .activity:   return .orange   // activity / time
+        case .focusNow:   return .orange   // activity / time
+        case .activity:   return .green    // fitness
         case .intake:     return .orange   // nutrition
         case .meals:      return .orange   // nutrition
         case .workout:    return .green    // fitness
@@ -58,8 +64,14 @@ enum TodaySection: String, CaseIterable, Identifiable {
     var available: Bool { true }
 
     private static let defaultOrder: [TodaySection] = [
-        .activity, .intake, .meals, .workout, .comingUp, .bodyPhotos, .watchLog, .focus, .news
+        .focusNow, .activity, .intake, .meals, .workout, .comingUp, .bodyPhotos, .watchLog, .focus, .news
     ]
+
+    /// Sections that belong at the top when they first appear, rather than at
+    /// the bottom where a newly-added case would otherwise land. Today's whole
+    /// job is "what should I know right now", and an answer to that below the
+    /// fold is not an answer.
+    private static let pinnedToTop: Set<TodaySection> = [.focusNow]
 
     static let storageKey = "today.sectionOrder"
 
@@ -83,7 +95,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
         }
         var sections = ids.compactMap { TodaySection(rawValue: $0) }
         for s in TodaySection.allCases where !sections.contains(s) {
-            sections.append(s)
+            if pinnedToTop.contains(s) { sections.insert(s, at: 0) } else { sections.append(s) }
         }
         return sections.filter(\.available)
     }

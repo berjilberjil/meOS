@@ -760,6 +760,7 @@ struct AppStatePayload: Codable {
     var scans: [ScanRecord]?
     var taskMode: TaskModeState?
     var weekly: [WeeklyReport]?
+    var activity: ActivityDoc?
 
     init() {}
 
@@ -783,6 +784,7 @@ struct AppStatePayload: Codable {
         case scans          = "myos.scans"
         case taskMode       = "myos.taskMode"
         case weekly         = "myos.weekly"
+        case activity       = "myos.activity"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -809,6 +811,7 @@ struct AppStatePayload: Codable {
         scans          = try? c.decodeIfPresent([ScanRecord].self, forKey: .scans)
         taskMode       = try? c.decodeIfPresent(TaskModeState.self, forKey: .taskMode)
         weekly         = try? c.decodeIfPresent([WeeklyReport].self, forKey: .weekly)
+        activity       = try? c.decodeIfPresent(ActivityDoc.self, forKey: .activity)
     }
 }
 
@@ -892,4 +895,5 @@ enum StateKey {
     static let scans          = "myos.scans"
     static let taskMode       = "myos.taskMode"
     static let weekly         = "myos.weekly"
+    static let activity       = "myos.activity"
 }

@@ -60,6 +60,12 @@ final class AppState: ObservableObject {
     /// Friday progress reports, newest first. See `Support/WeeklyReport.swift`.
     @Published var weekly: [WeeklyReport] = []
     @Published var weeklyBusy = false
+    /// Where time actually went, on every device. See `Support/Activity/`.
+    @Published var activity = ActivityDoc()
+    /// The session happening right now on THIS device. Never synced — it is a
+    /// live reading, and by the time it reached another device it would be a
+    /// claim about the past.
+    @Published var liveActivity: ActivityEvent?
     @Published var weeklyError: String?
     /// In memory only: stops a failing report from re-running on every
     /// return to the foreground. See `generateWeeklyReportIfDue`.
@@ -153,6 +159,9 @@ final class AppState: ObservableObject {
         scans     = s.scans ?? []
         taskMode  = s.taskMode ?? TaskModeState()
         weekly    = s.weekly ?? []
+        // Merged, not replaced: the other device has been appending sessions to
+        // the same key. See `ActivityDoc.merged(with:)`.
+        activity  = activity.merged(with: s.activity ?? ActivityDoc())
         belongings = s.belongings ?? BelongingsState()
         if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
@@ -269,6 +278,7 @@ final class AppState: ObservableObject {
         nutrition = NutritionState(); training = TrainingState()
         events = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
         scans = []; taskMode = TaskModeState(); weekly = []
+        activity = ActivityDoc(); liveActivity = nil
         fold = nil
         username = ""; isHydrated = false; lastSyncError = nil
         pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
@@ -324,7 +334,8 @@ final class AppState: ObservableObject {
             (StateKey.events, events), (StateKey.eventTags, eventTags),
             (StateKey.watch, watch), (StateKey.belongings, belongings),
             (StateKey.memory, memory), (StateKey.scans, scans),
-            (StateKey.taskMode, taskMode), (StateKey.weekly, weekly)
+            (StateKey.taskMode, taskMode), (StateKey.weekly, weekly),
+            (StateKey.activity, activity)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -426,6 +437,7 @@ final class AppState: ObservableObject {
         add("memory", memory)
         add("belongings", belongings)
         add("scans", scans); add("taskMode", taskMode); add("weekly", weekly)
+        add("activity", activity)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -527,6 +539,13 @@ final class AppState: ObservableObject {
         // the Mac lands here on the phone within one poll.
         if let v = s.taskMode,       !hasPendingPush(StateKey.taskMode),       v != taskMode       { taskMode = v }
         if let v = s.weekly,         !hasPendingPush(StateKey.weekly),         v != weekly         { weekly = v }
+        // Activity merges rather than replaces even on a live pull: both devices
+        // append to this key, so taking the remote copy wholesale would drop
+        // whatever this one recorded since the last push.
+        if let v = s.activity {
+            let merged = activity.merged(with: v)
+            if merged != activity { activity = merged }
+        }
         if let v = s.fold, !hasPendingPush(StateKey.fold), v != fold {
             if FoldSnapshotBuilder.isBare(v) {
                 restoreFoldIfBare()

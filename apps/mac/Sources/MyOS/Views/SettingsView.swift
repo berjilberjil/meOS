@@ -34,6 +34,7 @@ struct SettingsView: View {
             AgentSettingsCard().knRise(3)
             MemoryCard().knRise(3)
             AIProvidersCard().knRise(3)
+            ActivitySettingsCard().knRise(3)
             // Both of these can lose you data. They are the only red on the page.
             securityCard.knRise(4)
             DataManagementCard().knRise(5)

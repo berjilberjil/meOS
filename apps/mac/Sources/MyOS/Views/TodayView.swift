@@ -75,6 +75,8 @@ struct TodayView: View {
     @ViewBuilder
     private func todaySection(_ section: TodaySection) -> some View {
         switch section {
+        case .focusNow:
+            ActivityIntelligenceCard(day: selectedDate, go: go)
         case .activity:
             ActivityStepsCard(day: selectedDate, showsCalendar: false)
         case .intake:
