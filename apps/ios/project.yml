@@ -68,6 +68,8 @@ targets:
       - path: ../mac/Sources/MyOS/Views/TaskModeView.swift
       - path: ../mac/Sources/MyOS/Views/SlideToComplete.swift
       - path: ../mac/Sources/MyOS/Views/ScanHistory.swift
+      # One grid for every picture and video the app holds — no AppKit in it.
+      - path: ../mac/Sources/MyOS/Views/GalleryView.swift
       - path: ../mac/Sources/MyOS/Views/ActivitySheet.swift
       - path: ../mac/Sources/MyOS/Views/MacroPulseView.swift
       - path: ../mac/Sources/MyOS/Views/MacroMetricDetail.swift

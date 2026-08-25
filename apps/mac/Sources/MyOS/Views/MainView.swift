@@ -41,6 +41,7 @@ struct MainView: View {
                             case .events:  EventsView()
                             case .fold: FoldView()
                             case .stuff: BelongingsView()
+                            case .gallery: GalleryView()
                             case .fitness: FitnessView()
                             case .productivity: ProductivityView()
                             case .journal: JournalView()

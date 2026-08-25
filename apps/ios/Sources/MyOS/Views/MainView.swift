@@ -39,6 +39,17 @@ struct MainView: View {
                     ProductivityView()
                         .chrome(NavTab.productivity)
                         .toolbar {
+                            // Gallery sits beside Stuff, where Berjil asked for
+                            // it — the two things this tab can push to.
+                            ToolbarItem(placement: .topBarTrailing) {
+                                NavigationLink {
+                                    screen { GalleryView() }
+                                        .navigationTitle(NavTab.gallery.title)
+                                        .pushedChrome(NavTab.gallery)
+                                } label: {
+                                    Label(NavTab.gallery.title, systemImage: NavTab.gallery.icon)
+                                }
+                            }
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
                                     screen { BelongingsView() }
