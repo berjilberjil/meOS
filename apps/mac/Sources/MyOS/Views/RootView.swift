@@ -62,6 +62,19 @@ struct RootView: View {
                 await state.generateWeeklyReportIfDue()
             }
         }
+        // The sensor needs a hydrated `AppState` to write into, and on the Mac
+        // that does NOT happen during `.task`. The Mac is ad-hoc signed, so the
+        // data-protection Keychain always refuses — `unlockFromKeychain` can
+        // never succeed and bootstrap therefore always lands on `.locked`. The
+        // one-shot `if phase == .loggedIn` above was consequently never true on
+        // this machine, `configure(state:)` was never called, and the Mac
+        // recorded nothing: "Not tracking on this device" on Today and an empty
+        // Productivity tab. Wiring it to the transition covers every route in —
+        // cached hydrate, fresh hydrate, first-run setup, and unlock.
+        .onChange(of: state.phase) { _, phase in
+            guard phase == .loggedIn else { return }
+            ActivityCoordinator.shared.configure(state: state)
+        }
         .onChange(of: scenePhase) { old, newPhase in
             if newPhase == .background { unlocked = false }
 
