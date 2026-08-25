@@ -3,6 +3,9 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
+    /// Observed so the app tint follows a colour change without waiting for
+    /// something else to invalidate this view.
+    @ObservedObject private var appearance = AppearanceStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var unlocked = false
     /// When MyOS itself came to the front on the phone. iOS lets an app time
@@ -78,6 +81,12 @@ struct RootView: View {
         .onChange(of: scenePhase) { old, newPhase in
             if newPhase == .background { unlocked = false }
 
+            // Which of the two poll speeds live sync runs at. Fast only while
+            // the app is the thing you are looking at — that is the only time a
+            // sync delay is something you can see, and the only time it is
+            // worth spending requests on.
+            state.isForeground = (newPhase == .active)
+
             // Activity: bank this device's own foreground stretch, take whatever
             // the iPhone's automations queued, and get it synced before the app
             // is suspended.
@@ -95,10 +104,10 @@ struct RootView: View {
 
             if newPhase == .active {
                 Task {
-                    await state.pullRemote()
-                    // Don't wait up to a full poll interval for a photo taken on
-                    // the other device while this one was in the background.
-                    await ProgressPhotoSync.syncAll()
+                    // Everything, now — state and media both — rather than
+                    // waiting out a tick for something that changed while this
+                    // device was away.
+                    await state.syncNow()
                     // Friday 6pm: the first time the app is open and unlocked
                     // after it, the week gets read back.
                     await state.generateWeeklyReportIfDue()

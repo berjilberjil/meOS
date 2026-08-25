@@ -49,19 +49,82 @@ enum Palette {
         static let surface    = Color(hex: 0x0A0A0A)
         static let elevated   = Color(hex: 0x131313)
         static let text       = Color.white
-        static let green      = Color(hex: 0x39FF14)
-        static let orange     = Color(hex: 0xFF7A00)
-        static let blue       = Color(hex: 0x2196FF)
+        /// The primary — whatever Berjil chose in Settings. Green out of the box.
+        static var green: Color { Palette.accentRaw(.primary, dark: true) }
+        static var orange: Color { Palette.accentRaw(.warning, dark: true) }
+        static var blue: Color { Palette.accentRaw(.info, dark: true) }
+        /// The palette's own defaults, for anything that needs the shipped
+        /// values rather than the chosen ones.
+        static let defaultGreen  = Color(hex: 0x39FF14)
+        static let defaultOrange = Color(hex: 0xFF7A00)
+        static let defaultBlue   = Color(hex: 0x2196FF)
     }
     enum Light {
         static let background = Color(hex: 0xFFFFFF)
         static let surface    = Color(hex: 0xF6F6F8)
         static let elevated   = Color(hex: 0xFFFFFF)
         static let text       = Color.black
-        static let green      = Color(hex: 0x18A400)
-        static let orange     = Color(hex: 0xE06A00)
-        static let blue       = Color(hex: 0x0B72D8)
+        static var green: Color { Palette.accentRaw(.primary, dark: false) }
+        static var orange: Color { Palette.accentRaw(.warning, dark: false) }
+        static var blue: Color { Palette.accentRaw(.info, dark: false) }
+        static let defaultGreen  = Color(hex: 0x18A400)
+        static let defaultOrange = Color(hex: 0xE06A00)
+        static let defaultBlue   = Color(hex: 0x0B72D8)
     }
+
+    // MARK: The chosen appearance
+    //
+    // `AppearanceStore` owns the setting and calls `apply` on the main thread;
+    // everything here only ever reads. The three dynamic `Color`s are CACHED
+    // rather than rebuilt per access: `Color.dynamic` allocates a platform
+    // colour with a provider closure, and these are read thousands of times a
+    // frame.
+
+    /// Which of the three meanings a raw value is being asked for.
+    enum AccentSlot { case primary, warning, info }
+
+    nonisolated(unsafe) private(set) static var appearance = AppearanceSettings()
+
+    /// Install a new appearance. Main thread only — `AppearanceStore` is the
+    /// only caller, and it is `@MainActor`.
+    static func apply(_ next: AppearanceSettings) {
+        appearance = next
+        greenCache  = build(.primary)
+        orangeCache = build(.warning)
+        blueCache   = build(.info)
+    }
+
+    /// One appearance's raw value for a slot. Contrast maths and tests use this
+    /// — never introspect a dynamic colour, it re-enters its provider and is
+    /// pathologically slow.
+    static func accentRaw(_ slot: AccentSlot, dark: Bool) -> Color {
+        // Mono is not "grey everything": the three meanings still have to be
+        // told apart, so they become three steps of the ink instead of three
+        // hues. Primary is full strength, information three-quarters, warning
+        // just over half — which is still the one that looks *wrong* on a page
+        // of solid ink, which is what a warning needs to do.
+        if appearance.mono {
+            let ink: Color = dark ? .white : .black
+            switch slot {
+            case .primary: return ink
+            case .info:    return ink.opacity(0.75)
+            case .warning: return ink.opacity(0.55)
+            }
+        }
+        switch slot {
+        case .primary: return Color(hex: dark ? appearance.primaryDark : appearance.primaryLight)
+        case .warning: return dark ? Dark.defaultOrange : Light.defaultOrange
+        case .info:    return dark ? Dark.defaultBlue : Light.defaultBlue
+        }
+    }
+
+    private static func build(_ slot: AccentSlot) -> Color {
+        .dynamic(lightColor: accentRaw(slot, dark: false), darkColor: accentRaw(slot, dark: true))
+    }
+
+    nonisolated(unsafe) private static var greenCache  = build(.primary)
+    nonisolated(unsafe) private static var orangeCache = build(.warning)
+    nonisolated(unsafe) private static var blueCache   = build(.info)
 
     /// Whichever of black or white is actually legible on `tint`. Not a guess —
     /// neon green wants black, the light-mode blue wants white, and hard-coding
@@ -92,11 +155,14 @@ enum Palette {
     // MARK: Accents — three, and only three.
 
     /// GO / GOOD / COMPLETE / ACTION / FITNESS / PRODUCTIVE / ACTIVITY / TIME / FOOD.
-    static let green  = Color.dynamic(lightColor: Light.green, darkColor: Dark.green)
-    /// WARNING / FAILURE / WASTED TIME. Never decoration.
-    static let orange = Color.dynamic(lightColor: Light.orange, darkColor: Dark.orange)
+    /// The app's primary, and the one Settings can change.
+    static var green: Color { greenCache }
+    /// WARNING / FAILURE / WASTED TIME. Never decoration, and deliberately NOT
+    /// derived from the primary — a warning that matches the rest of the app is
+    /// a warning you stop seeing.
+    static var orange: Color { orangeCache }
     /// INFORMATION / EVENTS / SYSTEM DATA. Used sparingly.
-    static let blue   = Color.dynamic(lightColor: Light.blue, darkColor: Dark.blue)
+    static var blue: Color { blueCache }
 
     // MARK: Semantic aliases
     //

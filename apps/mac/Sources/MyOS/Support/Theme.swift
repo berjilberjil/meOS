@@ -225,19 +225,36 @@ struct CardSkin: ViewModifier {
 
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: radius, style: .continuous) }
 
+    /// How a card is painted, per the chosen card style. `flat` is the original
+    /// near-black surface; `filled` lifts it so a card reads as an object on the
+    /// canvas rather than a region of it; `gradient` grades that fill. All three
+    /// are the same two greys — this is a change of weight, not of colour, which
+    /// is why it cannot collide with anything semantic.
+    private func fill(_ base: Color, lifted: Color) -> AnyShapeStyle {
+        switch Palette.appearance.cardStyle {
+        case .flat:
+            return AnyShapeStyle(base)
+        case .filled:
+            return AnyShapeStyle(lifted)
+        case .gradient:
+            return AnyShapeStyle(LinearGradient(colors: [lifted, base],
+                                                startPoint: .top, endPoint: .bottom))
+        }
+    }
+
     func body(content: Content) -> some View {
         switch look {
         case .plain:
             content
-                .background(Palette.surface, in: shape)
+                .background(fill(Palette.surface, lifted: Palette.surfaceElevated), in: shape)
                 .overlay(shape.strokeBorder(Palette.border, lineWidth: 1))
         case .elevated:
             content
-                .background(Palette.surfaceElevated, in: shape)
+                .background(fill(Palette.surfaceElevated, lifted: Palette.surfaceElevated), in: shape)
                 .overlay(shape.strokeBorder(Palette.border, lineWidth: 1))
         case .accent:
             content
-                .background(Palette.surface, in: shape)
+                .background(fill(Palette.surface, lifted: Palette.surfaceElevated), in: shape)
                 .overlay(shape.strokeBorder(Palette.border, lineWidth: 1))
                 // A rule, not a fill. The colour marks what the card is about
                 // without turning the card into the colour.

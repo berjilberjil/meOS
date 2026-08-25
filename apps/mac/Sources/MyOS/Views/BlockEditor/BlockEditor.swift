@@ -12,6 +12,9 @@ struct BlockEditor: NSViewRepresentable {
     var findToken: Int = 0
     /// Extra scroll inset so the last lines clear the floating log bar.
     var bottomInset: CGFloat = 0
+    /// The channel the format bar talks over. Optional so an editor that wants
+    /// no chrome — a preview, a test — simply doesn't pass one.
+    var commands: EditorCommands? = nil
     var onChange: (BlockDoc) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -50,6 +53,7 @@ struct BlockEditor: NSViewRepresentable {
         tv.textStorage?.setAttributedString(BlockBridge.attributedString(from: initialDoc))
 
         context.coordinator.textView = tv
+        commands?.coordinator = context.coordinator
 
         let scroll = NSScrollView()
         scroll.documentView = tv
@@ -69,6 +73,7 @@ struct BlockEditor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         context.coordinator.parent = self
+        commands?.coordinator = context.coordinator
         if nsView.contentInsets.bottom != bottomInset {
             nsView.contentInsets.bottom = bottomInset
         }
@@ -132,7 +137,55 @@ struct BlockEditor: NSViewRepresentable {
             guard !isProgrammatic, let tv = textView else { return }
             syncTypingAttributes(tv)
             if slash.isActive { updateSlashQuery(tv) }
-            tv.needsDisplay = true
+            publishSelection(tv)
+            // Deliberately NOT `tv.needsDisplay = true`. The gutter decorations
+            // are drawn from block attributes and the trailing-block meta —
+            // nothing there depends on where the caret or the selection is. This
+            // line invalidated the entire view on every selection change, which
+            // means once per mouse-move for the whole of a drag-select, and each
+            // redraw walks every paragraph and asks the layout manager for its
+            // rects. On a long note that is what made selecting text feel like
+            // it was fighting you. AppKit already invalidates the selection's
+            // own region.
+        }
+
+        /// Publish the current selection so a SwiftUI format bar can sit over
+        /// it. Rect is in the clip view's coordinates, which are flipped and
+        /// therefore share an origin with the SwiftUI frame around us.
+        private func publishSelection(_ tv: BlockTextView) {
+            guard let commands = parent.commands else { return }
+            let next: EditorSelection? = {
+                let sel = tv.selectedRange()
+                guard sel.length > 0,
+                      let lm = tv.layoutManager, let tc = tv.textContainer,
+                      let clip = tv.enclosingScrollView?.contentView else { return nil }
+                let glyphs = lm.glyphRange(forCharacterRange: sel, actualCharacterRange: nil)
+                var rect = lm.boundingRect(forGlyphRange: glyphs, in: tc)
+                rect.origin.x += tv.textContainerOrigin.x
+                rect.origin.y += tv.textContainerOrigin.y
+                return EditorSelection(rect: tv.convert(rect, to: clip),
+                                       marks: marks(in: sel, of: tv))
+            }()
+            // The delegate callback is on the main thread but not annotated as
+            // such, which the concurrency checker cannot know.
+            MainActor.assumeIsolated {
+                if commands.selection != next { commands.selection = next }
+            }
+        }
+
+        /// Which marks the WHOLE selection carries — a partly-bold selection is
+        /// not bold, so the button reads unset and one press makes all of it bold.
+        private func marks(in range: NSRange, of tv: BlockTextView) -> Set<Mark> {
+            guard let storage = tv.textStorage else { return [] }
+            var out: Set<Mark> = []
+            for mark in [Mark.bold, .italic, .strike, .code] {
+                var all = true
+                storage.enumerateAttributes(in: range, options: []) { at, _, _ in
+                    if !hasMark(mark, at) { all = false }
+                }
+                if all { out.insert(mark) }
+            }
+            return out
         }
 
         /// Push every change up immediately. The network push is already

@@ -27,13 +27,17 @@ enum EditorMetrics {
 }
 
 enum EditorTheme {
-    static let text     = NSColor(Palette.text)
-    static let muted    = NSColor(Palette.muted)
-    static let faint    = NSColor(Palette.faint)
-    static let brand    = NSColor(Palette.action)
-    static let green    = NSColor(Palette.green)
-    static let blue     = NSColor(Palette.blue)
-    static let surface2 = NSColor(Palette.surfaceElevated)
+    // Computed, not stored. `NSColor(_ color:)` snapshots whatever `Palette`
+    // held at the moment it ran, so a `static let` here would pin the editor to
+    // the colour the app launched with — and the whole point of the appearance
+    // settings is that a new colour lands everywhere at once.
+    static var text: NSColor     { NSColor(Palette.text) }
+    static var muted: NSColor    { NSColor(Palette.muted) }
+    static var faint: NSColor    { NSColor(Palette.faint) }
+    static var brand: NSColor    { NSColor(Palette.action) }
+    static var green: NSColor    { NSColor(Palette.green) }
+    static var blue: NSColor     { NSColor(Palette.blue) }
+    static var surface2: NSColor { NSColor(Palette.surfaceElevated) }
     static let border   = NSColor(white: 1, alpha: 0.09)
 
     // Base (block-level) size/weight/color before inline marks.

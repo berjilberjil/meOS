@@ -163,6 +163,7 @@ final class AppState: ObservableObject {
         // the same key. See `ActivityDoc.merged(with:)`.
         activity  = activity.merged(with: s.activity ?? ActivityDoc())
         belongings = s.belongings ?? BelongingsState()
+        AppearanceStore.shared.apply(s.appearance ?? AppearanceSettings())
         if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
         restoreFoldIfBare()
@@ -518,9 +519,15 @@ final class AppState: ObservableObject {
     private func applyRemote(_ s: AppStatePayload) {
         if let v = s.fitness,        !hasPendingPush(StateKey.fitness),        v != fitness        { fitness = v }
         if let v = s.fitnessProfile, !hasPendingPush(StateKey.fitnessProfile), v != fitnessProfile { fitnessProfile = v }
-        if let v = s.journal,        !hasPendingPush(StateKey.journal),        v != journal        { journal = v }
+        if let v = s.journal,        !hasPendingPush(StateKey.journal),        v != journal,
+           !wroteRecently(StateKey.journal, window: 5) { journal = v }
         if let v = s.journalPresets, !hasPendingPush(StateKey.journalPresets), v != journalPresets { journalPresets = v }
-        if let v = s.notes,          !hasPendingPush(StateKey.notes),          v != notes          { notes = v }
+        // Notes and journal get a grace window on top of the in-flight check.
+        // A push is only "pending" for the 80ms debounce plus its request, and
+        // at a 1.5s poll that leaves gaps between keystrokes wide enough for a
+        // remote snapshot to land on text being typed right now.
+        if let v = s.notes,          !hasPendingPush(StateKey.notes),          v != notes,
+           !wroteRecently(StateKey.notes, window: 5) { notes = v }
         if let v = s.days,           !hasPendingPush(StateKey.days),           v != days           { days = v }
         if let v = s.profile,        !hasPendingPush(StateKey.profile),        v != profile        { profile = v }
         // Never clobber an in-flight send — a 2s pull of the previous snapshot
@@ -539,6 +546,11 @@ final class AppState: ObservableObject {
         // the Mac lands here on the phone within one poll.
         if let v = s.taskMode,       !hasPendingPush(StateKey.taskMode),       v != taskMode       { taskMode = v }
         if let v = s.weekly,         !hasPendingPush(StateKey.weekly),         v != weekly         { weekly = v }
+        // A colour chosen on the Mac is the same colour on the phone one poll
+        // later — that is most of what makes this feel like one app.
+        if let v = s.appearance,     !hasPendingPush(StateKey.appearance) {
+            AppearanceStore.shared.apply(v)
+        }
         // Activity merges rather than replaces even on a live pull: both devices
         // append to this key, so taking the remote copy wholesale would drop
         // whatever this one recorded since the last push.
@@ -558,11 +570,34 @@ final class AppState: ObservableObject {
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }
     }
 
-    /// How often to ask the server "changed?". Each tick is a conditional GET
-    /// that costs a few hundred bytes unless something actually changed, so this
-    /// is about request count, not bytes: at 2s two devices made ~86k requests a
-    /// day, which overruns a Workers free-tier daily budget on its own.
-    static let livePollInterval: UInt64 = 15_000_000_000   // 15s
+    /// How often to ask the server "changed?".
+    ///
+    /// Each tick is a conditional GET that costs a few hundred bytes unless
+    /// something actually changed, so the constraint is request *count*, not
+    /// bytes — the Workers free tier allows 100k a day and MyOS is not allowed
+    /// to cost anything. A flat 2s across two devices burns ~86k of that on
+    /// polling alone, which is why this used to sit at a flat 15s and why a
+    /// change made on the Mac could take a quarter of a minute to show up on
+    /// the phone.
+    ///
+    /// Two speeds fixes both ends. The app polls fast only while it is actually
+    /// in front of you — which is the only time a delay is something you can
+    /// see — and drops back to the cheap beat the moment it isn't. Six focused
+    /// hours a day is ~14k requests, and both devices are rarely focused at
+    /// once, so the bill stays comfortably inside the free tier.
+    static let activePollInterval: UInt64 = 1_500_000_000    // 1.5s, in front of you
+    static let idlePollInterval: UInt64 = 15_000_000_000     // 15s, everything else
+
+    /// Media keeps its own slower beat. A progress-photo sync lists an R2
+    /// bucket and a media migration uploads — both far heavier than a
+    /// conditional GET, and neither is something you are watching for.
+    static let mediaSyncInterval: TimeInterval = 15
+
+    /// Whether the app is the thing you are looking at. Set from `scenePhase`;
+    /// drives which of the two poll speeds is in use.
+    @Published var isForeground = true
+
+    private var lastMediaSync = Date.distantPast
 
     /// Move any still-inline event photos/videos into R2, sealed. Runs once per
     /// launch after unlock. Each asset is uploaded before the blob is rewritten,
@@ -590,32 +625,56 @@ final class AppState: ObservableObject {
         push(StateKey.events, events)
     }
 
+    /// True inside an `xcodebuild test` run. The unit suite launches the real
+    /// app as its host, and a host that polls the production API every 1.5
+    /// seconds for the length of a test run is both pointless and a good way to
+    /// make the suite hang on a slow network.
+    static var isRunningTests: Bool { NSClassFromString("XCTestCase") != nil }
+
     func startLiveSync() {
+        guard !Self.isRunningTests else { return }
         DietBridge.shared.start(state: self)
         liveSyncTask?.cancel()
         liveSyncTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: Self.livePollInterval)
+                let foreground = self?.isForeground ?? false
+                try? await Task.sleep(nanoseconds: foreground ? Self.activePollInterval
+                                                              : Self.idlePollInterval)
                 guard !Task.isCancelled else { return }
                 await self?.pullRemote()
-                // Progress photos live in R2, keyed by filename, and are NOT part
-                // of the state blob — so a state poll, ETag or not, can never
-                // reveal a photo added on the other device. Before this, the Mac
-                // only listed them when a photo view appeared, which is why a
-                // shot taken on the iPhone could sit invisible indefinitely.
-                // Detached so a slow upload cannot stall the tick.
-                Task { await ProgressPhotoSync.syncAll() }
-                // Cheap guard when there's nothing inline, so newly added media
-                // moves to R2 within one tick without extra wiring.
-                await self?.migrateEventMediaToR2()
-                // A media fetch that failed once (locked vault at launch, a
-                // network blip) would otherwise stay a grey placeholder until
-                // relaunch. Retrying on the tick makes it self-healing; the
-                // call returns immediately when nothing has failed.
-                await MainActor.run { EventMediaStore.shared.retryFailures() }
+                await self?.syncMediaIfDue()
             }
         }
         startFoldWatch()
+    }
+
+    /// The heavy half of a tick, rate-limited to its own interval so the fast
+    /// state poll does not drag an R2 listing along behind it.
+    private func syncMediaIfDue(force: Bool = false) async {
+        guard force || Date().timeIntervalSince(lastMediaSync) >= Self.mediaSyncInterval else { return }
+        lastMediaSync = Date()
+        // Progress photos live in R2, keyed by filename, and are NOT part of the
+        // state blob — so a state poll, ETag or not, can never reveal a photo
+        // added on the other device. Before this, the Mac only listed them when
+        // a photo view appeared, which is why a shot taken on the iPhone could
+        // sit invisible indefinitely. Detached so a slow upload cannot stall the
+        // tick.
+        Task { await ProgressPhotoSync.syncAll() }
+        // Cheap guard when there's nothing inline, so newly added media moves to
+        // R2 within one tick without extra wiring.
+        await migrateEventMediaToR2()
+        // A media fetch that failed once (locked vault at launch, a network
+        // blip) would otherwise stay a grey placeholder until relaunch.
+        // Retrying makes it self-healing; the call returns immediately when
+        // nothing has failed.
+        EventMediaStore.shared.retryFailures()
+    }
+
+    /// Coming back to the app: pull now rather than waiting out a tick, and let
+    /// media catch up in the same breath.
+    func syncNow() async {
+        await pullRemote()
+        await syncMediaIfDue(force: true)
     }
 
     func stopLiveSync() {
@@ -1347,8 +1406,21 @@ final class AppState: ObservableObject {
         push(StateKey.notes, notes)
     }
     /// Save rich block content, keeping `body` as the plain-text mirror.
+    /// Save a note's title and body — and do nothing at all if neither moved.
+    ///
+    /// The guard is the whole point. `NotesView.persistCurrent()` runs every
+    /// time you open a note, leave the editor, or switch away from the tab, and
+    /// without it every one of those *looking* at a note rewrote its
+    /// `updatedAt`. The list is sorted by `updatedAt` and grouped into Today /
+    /// Previous 7 Days sections, so merely clicking a note shot it to the top
+    /// and out of its date section — under the cursor, mid-click. That is what
+    /// "notes come and go randomly on click" was.
+    ///
+    /// It also stops a network push per click, and per keystroke for a note
+    /// whose text has not actually changed.
     func updateNoteContent(_ id: String, title: String, doc: BlockDoc) {
         guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
+        guard notes[i].wouldChange(title: title, doc: doc) else { return }
         notes[i].title = title
         notes[i].content = doc
         notes[i].body = doc.plainText
@@ -1791,6 +1863,17 @@ final class AppState: ObservableObject {
 
     /// Switch the app-wide colour theme. Persists the choice and forces a re-render —
     /// every screen observes AppState, so bumping this recolours the whole app.
+    /// How the app looks — primary colour, card style, mono. Synced, because a
+    /// personal operating system that looks different on each device is two
+    /// apps rather than one.
+    func setAppearance(_ next: AppearanceSettings) {
+        withAnimation(.knTheme) {
+            AppearanceStore.shared.apply(next)
+            themeVersion &+= 1
+        }
+        push(StateKey.appearance, next)
+    }
+
     func setTheme(_ t: AppTheme) {
         withAnimation(.knTheme) {
             ThemeStore.shared.set(t)

@@ -103,6 +103,14 @@ struct Block: Codable, Hashable, Identifiable {
     }
     var isEmpty: Bool { type != .divider && !isAttachment && plainText.isEmpty }
 
+    /// Everything about this block except its identity.
+    func sameContent(as other: Block) -> Bool {
+        type == other.type && spans == other.spans && checked == other.checked
+            && level == other.level && language == other.language && src == other.src
+            && url == other.url && linkTitle == other.linkTitle
+            && linkThumb == other.linkThumb && linkDomain == other.linkDomain
+    }
+
     static func newID() -> String { String(UUID().uuidString.prefix(8)).lowercased() }
     static func paragraph(_ text: String = "") -> Block {
         Block(type: .paragraph, spans: text.isEmpty ? [] : [TextSpan(text: text)])
@@ -133,6 +141,23 @@ struct BlockDoc: Codable, Hashable {
 
     var isEffectivelyEmpty: Bool {
         blocks.allSatisfy { $0.type == .paragraph && $0.plainText.isEmpty }
+    }
+
+    /// Equal in everything that is *content* — block ids excluded.
+    ///
+    /// `Block.newID()` mints a fresh id per block, so two documents built from
+    /// the same plain text are never `==`. For the question "did the user
+    /// actually change anything", ids are the wrong thing to compare: a legacy
+    /// note has no stored `content`, so opening it builds one from its body,
+    /// and handing that straight back would look like an edit every single
+    /// time. That rewrites `updatedAt`, which re-sorts the notes list, which is
+    /// precisely the bug the caller exists to prevent.
+    func sameContent(as other: BlockDoc) -> Bool {
+        guard blocks.count == other.blocks.count else { return false }
+        for (mine, theirs) in zip(blocks, other.blocks) where !mine.sameContent(as: theirs) {
+            return false
+        }
+        return true
     }
 
     /// Migrate a legacy plain-text body into blocks: each line becomes a

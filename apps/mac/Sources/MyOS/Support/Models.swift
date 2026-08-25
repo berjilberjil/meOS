@@ -229,6 +229,46 @@ struct Note: Codable, Identifiable, Hashable {
     /// The block document to edit — real `content` if present, otherwise migrated
     /// from the legacy plain-text body so old notes open as blocks with nothing lost.
     var effectiveDoc: BlockDoc { content ?? BlockDoc.from(plainText: body) }
+
+    /// Whether saving this title and body would actually change anything.
+    ///
+    /// Notes are saved on open, on close, on tab switch and on every keystroke,
+    /// and the list is sorted by `updatedAt` and grouped into date sections. So
+    /// a save that writes when nothing moved does not just waste a network push
+    /// — it reorders the list under the cursor for the crime of *looking* at a
+    /// note. Compare against `effectiveDoc` rather than `content` so a legacy
+    /// plain-text note that round-trips identically is also left alone.
+    func wouldChange(title: String, doc: BlockDoc) -> Bool {
+        // By content, not by identity. A legacy note stores no `content`, so
+        // `effectiveDoc` builds one from its body with fresh block ids every
+        // call — comparing with `!=` would report a change on every open and
+        // reinstate the very shuffle this guard removes.
+        title != self.title || !effectiveDoc.sameContent(as: doc)
+    }
+}
+
+/// Order notes for display, honouring a frozen order where one is supplied.
+///
+/// Pinned always wins — pinning is a deliberate act whose entire point is to
+/// move the note. Beyond that, a frozen order keeps the list still while its
+/// notes are being edited beside it; ids absent from the snapshot are new and
+/// fall to the end, joining the list rather than reshuffling it.
+func orderedNotes(_ notes: [Note], frozen: [String]?) -> [Note] {
+    guard let frozen else {
+        return notes.sorted { a, b in
+            if a.pinned != b.pinned { return a.pinned }
+            return a.updatedAt > b.updatedAt
+        }
+    }
+    var rank: [String: Int] = [:]
+    for (i, id) in frozen.enumerated() { rank[id] = i }
+    return notes.sorted { a, b in
+        if a.pinned != b.pinned { return a.pinned }
+        let ra = rank[a.id], rb = rank[b.id]
+        if (ra == nil) != (rb == nil) { return ra != nil }
+        if let ra, let rb, ra != rb { return ra < rb }
+        return a.updatedAt > b.updatedAt
+    }
 }
 
 // MARK: - Chat  (key: myos.chat)
@@ -761,6 +801,7 @@ struct AppStatePayload: Codable {
     var taskMode: TaskModeState?
     var weekly: [WeeklyReport]?
     var activity: ActivityDoc?
+    var appearance: AppearanceSettings?
 
     init() {}
 
@@ -785,6 +826,7 @@ struct AppStatePayload: Codable {
         case taskMode       = "myos.taskMode"
         case weekly         = "myos.weekly"
         case activity       = "myos.activity"
+        case appearance     = "myos.appearance"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -812,6 +854,7 @@ struct AppStatePayload: Codable {
         taskMode       = try? c.decodeIfPresent(TaskModeState.self, forKey: .taskMode)
         weekly         = try? c.decodeIfPresent([WeeklyReport].self, forKey: .weekly)
         activity       = try? c.decodeIfPresent(ActivityDoc.self, forKey: .activity)
+        appearance     = try? c.decodeIfPresent(AppearanceSettings.self, forKey: .appearance)
     }
 }
 
@@ -896,4 +939,5 @@ enum StateKey {
     static let taskMode       = "myos.taskMode"
     static let weekly         = "myos.weekly"
     static let activity       = "myos.activity"
+    static let appearance     = "myos.appearance"
 }

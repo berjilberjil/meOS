@@ -29,11 +29,23 @@ struct NotesView: View {
     @State private var findToken = 0
     /// One-shot: reopen the note that was open when the app was last closed.
     @State private var restored = false
+    /// The editor's selection, and the way to format it.
+    @StateObject private var commands = EditorCommands()
+    /// The note-list order, frozen while the editor is open.
+    ///
+    /// The list is sorted by `updatedAt`, and typing legitimately bumps it — so
+    /// without this, the note you are editing jumps to the top of the column
+    /// beside you on the first keystroke, and can hop out of its date section
+    /// while you watch. Freezing the order for as long as you are in the editor
+    /// keeps the column still; leaving it re-sorts, which is when a reorder is
+    /// actually information rather than a distraction.
+    @State private var frozenOrder: [String]? = nil
 
     private var filtered: [Note] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return state.sortedNotes }
-        return state.sortedNotes.filter {
+        let all = orderedNotes(state.notes, frozen: frozenOrder)
+        guard !q.isEmpty else { return all }
+        return all.filter {
             $0.title.lowercased().contains(q) || (!$0.locked && $0.body.lowercased().contains(q))
         }
     }
@@ -395,7 +407,8 @@ struct NotesView: View {
                 .onChange(of: titleFocused) { _, now in if now { titleEdited = true } }
                 .onChange(of: draftTitle) { saveDraft() }
 
-            BlockEditor(initialDoc: draftDoc, findToken: findToken, bottomInset: 96) { doc in
+            BlockEditor(initialDoc: draftDoc, findToken: findToken, bottomInset: 96,
+                        commands: commands) { doc in
                 draftDoc = doc
                 if !titleEdited {
                     let auto = Self.derivedTitle(from: doc)
@@ -404,6 +417,7 @@ struct NotesView: View {
                 saveDraft()
             }
             .id(id)
+            .formatBar(commands)
             .padding(.horizontal, 22)
             .padding(.top, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -463,6 +477,7 @@ struct NotesView: View {
     /// Open a note from the browse listing and drill into the detail two-pane.
     private func openFromBrowse(_ note: Note) {
         open(note)
+        freezeOrder()
         inDetail = true
     }
 
@@ -471,6 +486,8 @@ struct NotesView: View {
         persistCurrent()
         selectedID = nil
         remember(nil)
+        frozenOrder = nil
+        commands.selection = nil
         inDetail = false
     }
 
@@ -483,6 +500,7 @@ struct NotesView: View {
         draftDoc = BlockDoc()
         titleEdited = false
         pushRecent(id)
+        freezeOrder()
         inDetail = true
         titleFocused = true
     }
@@ -559,7 +577,15 @@ struct NotesView: View {
         }
         restored = true
         open(note)
+        freezeOrder()
         inDetail = true
+    }
+
+    /// Snapshot the current order. Notes created or arriving later are simply
+    /// not in it and fall to the end of their section, which is correct — they
+    /// join the list rather than reshuffling it.
+    private func freezeOrder() {
+        frozenOrder = state.sortedNotes.map(\.id)
     }
 
     private func selectFirstAfterDelete() {
