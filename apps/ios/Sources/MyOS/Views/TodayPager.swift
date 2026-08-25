@@ -56,7 +56,7 @@ struct TodayPager: View {
         // Turning the page is not arriving on a screen. Without this every card
         // on the incoming day fades up from zero as it slides in.
         .environment(\.knEntrances, false)
-        .background(Palette.bg.ignoresSafeArea())
+        .background(HueCanvas())
         .onAppear(perform: rebuildWindow)
         // The window is anchored to "today", so it has to move when midnight does.
         .onChange(of: state.todayKey) { _, _ in rebuildWindow() }

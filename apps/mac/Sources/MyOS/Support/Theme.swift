@@ -9,7 +9,7 @@ typealias PlatformColor = UIColor
 
 /// sRGB components of a Color, read via the platform color type (NSColor on
 /// macOS, UIColor on iOS) so `mixedWithBlack`/`mixedWithWhite` work everywhere.
-private func platformComponents(_ color: Color, fallback: PlatformColor) -> (r: Double, g: Double, b: Double, a: Double) {
+func platformComponents(_ color: Color, fallback: PlatformColor) -> (r: Double, g: Double, b: Double, a: Double) {
     #if os(macOS)
     let c = NSColor(color).usingColorSpace(.sRGB) ?? fallback
     return (Double(c.redComponent), Double(c.greenComponent), Double(c.blueComponent), Double(c.alphaComponent))
@@ -92,25 +92,25 @@ enum Palette {
     /// controls the way an accent colour is meant to.
     static let accent = Color(hex: 0x56BB06)
 
+    // Chrome. These were the system greys until 2026-08-25; Berjil's reading of
+    // that was "no more grey shit", so MyOS owns them again — as ink-blue
+    // neutrals, and as *dynamic* colours so Light/Dark still switches. Text
+    // colours below stay system semantic on purpose: a bold card flips the
+    // environment's colorScheme to dark, and semantic labels are what turn
+    // white for free when it does.
+    static let bg           = Color.dynamic(light: 0xF3F6FD, dark: 0x0B0F17)
+    static let sidebar      = Color.dynamic(light: 0xEAEFFA, dark: 0x080B12)
+    static let surface      = Color.dynamic(light: 0xFFFFFF, dark: 0x151B28)
+    static let surface2     = Color.dynamic(light: 0xE9EFFA, dark: 0x1E2636)
+    static let elevated     = Color.dynamic(light: 0xFFFFFF, dark: 0x1A2130)
+    static let border       = Color.dynamic(light: 0xDBE3F3, dark: 0x2A3345)
+    static let borderStrong = Color.dynamic(light: 0xC1CCE3, dark: 0x3A4459)
+
     #if os(macOS)
-    static var bg: Color           { Color(nsColor: .windowBackgroundColor) }
-    static var sidebar: Color      { Color(nsColor: .underPageBackgroundColor) }
-    static var surface: Color      { Color(nsColor: .controlBackgroundColor) }
-    static var surface2: Color     { Color(nsColor: .unemphasizedSelectedContentBackgroundColor) }
-    static var elevated: Color     { Color(nsColor: .controlBackgroundColor) }
-    static var border: Color       { Color(nsColor: .separatorColor) }
-    static var borderStrong: Color { Color(nsColor: .separatorColor) }
     static var text: Color         { Color(nsColor: .labelColor) }
     static var muted: Color        { Color(nsColor: .secondaryLabelColor) }
     static var faint: Color        { Color(nsColor: .tertiaryLabelColor) }
     #else
-    static var bg: Color           { Color(uiColor: .systemGroupedBackground) }
-    static var sidebar: Color      { Color(uiColor: .secondarySystemGroupedBackground) }
-    static var surface: Color      { Color(uiColor: .secondarySystemGroupedBackground) }
-    static var surface2: Color     { Color(uiColor: .tertiarySystemFill) }
-    static var elevated: Color     { Color(uiColor: .secondarySystemGroupedBackground) }
-    static var border: Color       { Color(uiColor: .separator) }
-    static var borderStrong: Color { Color(uiColor: .opaqueSeparator) }
     static var text: Color         { Color(uiColor: .label) }
     static var muted: Color        { Color(uiColor: .secondaryLabel) }
     static var faint: Color        { Color(uiColor: .tertiaryLabel) }
@@ -121,18 +121,19 @@ enum Palette {
     static var brandDeep: Color    { accent }
     static var green: Color        { accent }
 
-    // Feature colours — system hues, so they shift correctly between light and
-    // dark and respond to Increase Contrast.
-    static let red    = Color.red
-    static let blue   = Color.blue
-    static let amber  = Color.orange
-    static let purple = Color.purple
-    static let flame  = Color.orange
-    static let ice    = Color.cyan
-    static let rose   = Color.pink
-    static let teal   = Color.teal
-    static let gold   = Color.yellow
-    static let coral  = Color.orange
+    // Feature colours are the hue cores, so a chart, a chip and a card that all
+    // mean "workout" are the same blue rather than three neighbouring blues.
+    static var red    : Color { Hue.red.core }
+    static var blue   : Color { Hue.blue.core }
+    static var amber  : Color { Hue.amber.core }
+    static var purple : Color { Hue.purple.core }
+    static var flame  : Color { Hue.orange.core }
+    static var ice    : Color { Hue.cyan.core }
+    static var rose   : Color { Hue.pink.core }
+    static var teal   : Color { Hue.teal.core }
+    static var gold   : Color { Hue.amber.core }
+    static var coral  : Color { Hue.orange.core }
+    static var indigo : Color { Hue.indigo.core }
 }
 
 /// Vertical rhythm. Screens differed by a few points each — 14 here, 16 there,
@@ -204,18 +205,109 @@ extension View {
 
 // MARK: - Card
 
-/// The standard MyOS surface — a grouped-content cell. The 2px border, the
-/// Duolingo fill and the drop shadow are gone; on both platforms this is now the
-/// same shape the system draws behind an inset-grouped row.
+/// How a card is filled.
+enum CardLook {
+    /// Hero. Saturated gradient, white text, a coloured shadow under it. For the
+    /// one or two cards on a screen that carry the answer.
+    case bold
+    /// The default. The screen's hue, washed out, with a hairline of the hue.
+    case tinted
+    /// Plain surface. Left for places where colour would fight the content —
+    /// long-form text, photo grids, editors.
+    case plain
+}
+
+/// The standard MyOS surface.
+///
+/// Built on SwiftUI's own `GroupBox` rather than a bare `RoundedRectangle`: a
+/// group box *is* the platform's card, so the content inside is grouped for
+/// VoiceOver and the container behaves like one everywhere it is nested. The
+/// look is supplied by `MyOSCardStyle`, which replaces the system chrome
+/// wholesale — MyOS cards are coloured, and the system's are not.
+///
+/// A card with no `hue` takes the ambient `\.cardHue`, so a screen colours its
+/// whole stack with one modifier.
 struct Card<Content: View>: View {
     var padding: CGFloat = 18
     var radius: CGFloat = Radius.lg
+    /// Overrides the ambient hue for this card only.
+    var hue: Hue? = nil
+    /// nil = take the ambient `\.cardLook`.
+    var look: CardLook? = nil
     @ViewBuilder var content: Content
+
+    @Environment(\.cardHue) private var ambientHue
+    @Environment(\.cardLook) private var ambientLook
+
     var body: some View {
-        content
+        GroupBox { content }
+            .groupBoxStyle(MyOSCardStyle(hue: hue ?? ambientHue, look: look ?? ambientLook,
+                                         padding: padding, radius: radius))
+    }
+}
+
+/// The MyOS card look, as a real `GroupBoxStyle`.
+struct MyOSCardStyle: GroupBoxStyle {
+    let hue: Hue
+    let look: CardLook
+    var padding: CGFloat = 18
+    var radius: CGFloat = Radius.lg
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .modifier(CardSkin(hue: hue, look: look, radius: radius))
+    }
+}
+
+/// Paints a card. Separated from the style so `.cardSkin()` can give the same
+/// treatment to things that are card-shaped but are not `Card` — tiles, tappable
+/// rows, the meal grid.
+struct CardSkin: ViewModifier {
+    let hue: Hue
+    let look: CardLook
+    var radius: CGFloat = Radius.lg
+
+    /// A washed card *inside* a bold one cannot use its own fill — that is the
+    /// hue painted on the hue. It becomes translucent white instead, the way a
+    /// system material would.
+    @Environment(\.onBoldCard) private var onBold
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: radius, style: .continuous) }
+
+    func body(content: Content) -> some View {
+        switch look {
+        case .bold:
+            // Flipping the environment to dark is what makes every `Palette.text`
+            // and `Palette.muted` *inside* the card resolve white — the reason a
+            // hero card needed no edits to the ~40 labels it contains.
+            content
+                .environment(\.colorScheme, .dark)
+                .environment(\.onBoldCard, true)
+                .foregroundStyle(.white)
+                .background(hue.boldGradient, in: shape)
+                .overlay(shape.strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+                .shadow(color: hue.core.opacity(0.32), radius: 16, x: 0, y: 8)
+        case .tinted:
+            content
+                .background(onBold ? AnyShapeStyle(Color.white.opacity(0.15)) : AnyShapeStyle(hue.fill), in: shape)
+                .overlay(shape.strokeBorder(onBold ? AnyShapeStyle(Color.white.opacity(0.28))
+                                                   : AnyShapeStyle(hue.line), lineWidth: 1))
+        case .plain:
+            content
+                .background(onBold ? AnyShapeStyle(Color.white.opacity(0.15)) : AnyShapeStyle(Palette.surface), in: shape)
+                .overlay(shape.strokeBorder(onBold ? AnyShapeStyle(Color.white.opacity(0.28))
+                                                   : AnyShapeStyle(Palette.border), lineWidth: 1))
+        }
+    }
+}
+
+extension View {
+    /// Card treatment for something that is not a `Card` — a tile, a tappable
+    /// row, a grid cell. Same three looks, same hue inheritance rules.
+    func cardSkin(_ look: CardLook = .tinted, hue: Hue, radius: CGFloat = Radius.lg) -> some View {
+        modifier(CardSkin(hue: hue, look: look, radius: radius))
     }
 }
 
@@ -285,11 +377,11 @@ extension View {
     func knField(focused: Bool = false, radius: CGFloat = Radius.md) -> some View {
         self
             .padding(.horizontal, 13).padding(.vertical, 10)
-            .background(Palette.bg,
+            .background(.hueFillStrong,
                         in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(focused ? Palette.brand : Palette.border, lineWidth: 2)
+                    .strokeBorder(focused ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(.hueLine), lineWidth: 2)
             )
             .animation(.knFast, value: focused)
     }

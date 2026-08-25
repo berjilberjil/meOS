@@ -26,7 +26,7 @@ struct EventMediaViewer: View {
 
     var body: some View {
         ZStack {
-            Palette.bg.ignoresSafeArea()
+            HueCanvas()
 
             VStack(spacing: 0) {
                 HStack {

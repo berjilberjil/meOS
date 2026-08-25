@@ -36,21 +36,26 @@ enum NavTab: String, CaseIterable, Identifiable {
         case .settings: return "gearshape.fill"
         }
     }
-    var tint: Color {
+    /// The tab's colour. It paints the whole screen behind the tab's cards, so
+    /// moving between tabs reads as moving between rooms — which is the point of
+    /// having eleven of them.
+    var hue: Hue {
         switch self {
-        case .today:        return Palette.amber
-        case .scan:         return Palette.teal
-        case .events:       return Palette.purple
-        case .fold:         return Palette.gold
-        case .stuff:        return Palette.flame
-        case .fitness:      return Palette.rose
-        case .productivity: return Palette.blue
-        case .journal:      return Palette.purple
-        case .notes:        return Palette.ice
-        case .profile:      return Palette.teal
-        case .settings:     return Palette.muted
+        case .today:        return .amber
+        case .scan:         return .teal
+        case .events:       return .purple
+        case .fold:         return .green
+        case .stuff:        return .orange
+        case .fitness:      return .pink
+        case .productivity: return .blue
+        case .journal:      return .purple
+        case .notes:        return .cyan
+        case .profile:      return .teal
+        case .settings:     return .indigo
         }
     }
+
+    var tint: Color { hue.core }
 }
 
 extension NavTab {

@@ -28,7 +28,7 @@ struct MainView: View {
                     // Owns its own scrolling: a horizontal pager of day pages,
                     // each with its own vertical ScrollView.
                     TodayPager(go: { select($0) })
-                        .chrome(NavTab.today.title)
+                        .chrome(NavTab.today)
                 }
             }
 
@@ -37,17 +37,13 @@ struct MainView: View {
                     // Not wrapped in `screen`: it brings its own ScrollView so it
                     // can pin the "log a video" bar to the bottom.
                     ProductivityView()
-                        .chrome(NavTab.productivity.title)
+                        .chrome(NavTab.productivity)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
                                     screen { BelongingsView() }
                                         .navigationTitle(NavTab.stuff.title)
-                                        .navigationBarTitleDisplayMode(.inline)
-                                        .toolbarBackground(Palette.bg, for: .navigationBar)
-                                        .toolbarBackground(.visible, for: .navigationBar)
-                                        .toolbarBackground(Palette.bg, for: .tabBar)
-                                        .toolbarBackground(.visible, for: .tabBar)
+                                        .pushedChrome(NavTab.stuff)
                                 } label: {
                                     Label(NavTab.stuff.title, systemImage: NavTab.stuff.icon)
                                 }
@@ -59,32 +55,28 @@ struct MainView: View {
             Tab(NavTab.scan.title, systemImage: NavTab.scan.icon, value: NavTab.scan) {
                 NavigationStack {
                     screen { ScanView() }
-                        .chrome(NavTab.scan.title)
+                        .chrome(NavTab.scan)
                 }
             }
 
             Tab(NavTab.fitness.title, systemImage: NavTab.fitness.icon, value: NavTab.fitness) {
                 NavigationStack {
                     screen { FitnessView() }
-                        .chrome(NavTab.fitness.title)
+                        .chrome(NavTab.fitness)
                 }
             }
 
             Tab(NavTab.notes.title, systemImage: NavTab.notes.icon, value: NavTab.notes) {
                 NavigationStack {
                     NotesView()
-                        .chrome(NavTab.notes.title)
+                        .chrome(NavTab.notes)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
                                     // JournalView owns that title — it swaps with
                                     // the Events/Journal segment.
                                     screen { JournalView() }
-                                        .navigationBarTitleDisplayMode(.inline)
-                                        .toolbarBackground(Palette.bg, for: .navigationBar)
-                                        .toolbarBackground(.visible, for: .navigationBar)
-                                        .toolbarBackground(Palette.bg, for: .tabBar)
-                                        .toolbarBackground(.visible, for: .tabBar)
+                                        .pushedChrome(NavTab.journal)
                                 } label: {
                                     Label(NavTab.journal.title, systemImage: NavTab.journal.icon)
                                 }
@@ -158,21 +150,36 @@ private extension View {
     /// draws its material. Applied per tab — `.toolbarBackground` set on the
     /// TabView itself does not reach the bars inside each tab, which is why
     /// content was showing through the tab labels.
-    func chrome(_ title: String) -> some View {
+    func chrome(_ tab: NavTab) -> some View {
         self
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            // Palette.bg, not `.visible`: the default bar material renders a
-            // grey slab over a page whose background is black, so the top of
-            // every screen read as a different colour from the content.
-            .toolbarBackground(Palette.bg, for: .tabBar)
+            // The tab's colour, as the page behind the content and as the hue
+            // every card in it inherits.
+            .pageTint(tab.hue)
+            // The bars take the same canvas. Left to itself the default bar
+            // material renders a grey slab over a coloured page, so the top and
+            // bottom of every screen read as a different colour from the middle.
+            .toolbarBackground(tab.hue.canvas, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
-            .toolbarBackground(Palette.bg, for: .navigationBar)
+            .toolbarBackground(tab.hue.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Text(title).font(.headline)
+                    Text(tab.title).font(.headline).foregroundStyle(tab.hue.ink)
                 }
             }
+    }
+
+    /// A pushed screen. Same colour treatment, but the navigation bar draws its
+    /// own title so this must not plant a second one.
+    func pushedChrome(_ tab: NavTab) -> some View {
+        self
+            .navigationBarTitleDisplayMode(.inline)
+            .pageTint(tab.hue)
+            .toolbarBackground(tab.hue.canvas, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(tab.hue.canvas, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
     }
 }

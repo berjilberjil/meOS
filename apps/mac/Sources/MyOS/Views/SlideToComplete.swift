@@ -24,7 +24,7 @@ struct SlideToComplete: View {
         GeometryReader { geo in
             let travel = max(1, geo.size.width - knob - inset * 2)
             ZStack(alignment: .leading) {
-                Capsule().fill(Palette.surface2)
+                Capsule().fill(.hueFillStrong)
                 Capsule().fill(tint.opacity(0.18))
                     .frame(width: knob + offset + inset * 2)
 

@@ -313,7 +313,7 @@ struct ExerciseEditor: View {
             Spacer(); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint) }
         .font(.footnote.weight(.semibold))
         .padding(.horizontal, 13).padding(.vertical, 10)
-        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
     }
 }

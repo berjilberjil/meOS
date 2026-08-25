@@ -259,7 +259,7 @@ struct NotesView: View {
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
-        .background(Palette.surface2.opacity(0.6), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .background(HueFill(level: .strong).opacity(0.6), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
             .strokeBorder(searchFocused ? Palette.blue : .clear, lineWidth: 1.5))
     }

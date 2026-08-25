@@ -277,7 +277,7 @@ struct KDatePicker: View {
             })
         }
         .padding(12)
-        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
     }
 

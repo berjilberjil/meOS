@@ -389,7 +389,7 @@ private struct ModelPickerRow: View {
                         .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 2))
             }

@@ -298,7 +298,7 @@ private struct ProgramExerciseRow: View {
             if expanded { controls }
         }
         .padding(11)
-        .background(Palette.surface2.opacity(expanded ? 0.6 : 0.35),
+        .background(HueFill(level: .strong).opacity(expanded ? 0.6 : 0.35),
                     in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(expanded ? tint.opacity(0.4) : Palette.border, lineWidth: 1))
@@ -425,7 +425,7 @@ struct MuscleGroupPickerSheet: View {
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity)
-                        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                             .strokeBorder(on ? g.tint.opacity(0.5) : Palette.border, lineWidth: 1))
                         .contentShape(Rectangle())
@@ -652,10 +652,10 @@ struct SheetShell<Content: View>: View {
         .background(Palette.elevated)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg)
+        .background(.hueCanvas)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Palette.bg)
+        .presentationBackground(.hueCanvas)
         #endif
     }
 }

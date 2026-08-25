@@ -126,7 +126,7 @@ struct BelongingsView: View {
                     Button("Save", action: saveSalary).buttonStyle(.borderless)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             }
         }
     }
@@ -243,7 +243,7 @@ struct BelongingsView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(tint.opacity(0.35), lineWidth: 1.5))
     }
@@ -270,7 +270,7 @@ struct BelongingsView: View {
             .padding(14)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(tint.opacity(0.45), lineWidth: 1.5))
         .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
@@ -352,7 +352,7 @@ private struct BelongingEditor: View {
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(Palette.text)
                                     .padding(.horizontal, 12).padding(.vertical, 8)
-                                    .background(Palette.surface2, in: Capsule())
+                                    .background(.hueFillStrong, in: Capsule())
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -374,7 +374,7 @@ private struct BelongingEditor: View {
                 }
                 .padding(16)
             }
-            .background(Palette.bg.ignoresSafeArea())
+            .background(HueCanvas())
             .navigationTitle(item == nil ? "Add item" : "Edit item")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -554,7 +554,7 @@ private struct BelongingEditor: View {
             TextField("", text: text, prompt: Text(hint).foregroundColor(Palette.faint))
                 .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                 .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 1))
         }
@@ -652,7 +652,7 @@ private struct NewBelongingCategorySheet: View {
                         TextField("", text: $name, prompt: Text("Shoes, cameras, watches…").foregroundColor(Palette.faint))
                             .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                             .padding(.horizontal, 14).padding(.vertical, 12)
-                            .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                                 .strokeBorder(Palette.border, lineWidth: 1))
                     }
@@ -696,7 +696,7 @@ private struct NewBelongingCategorySheet: View {
                 }
                 .padding(16)
             }
-            .background(Palette.bg.ignoresSafeArea())
+            .background(HueCanvas())
             .navigationTitle("New category")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -181,7 +181,7 @@ private struct EventEditorSheet: View {
                         TextEditor(text: $note)
                             .frame(height: 96).scrollContentBackground(.hidden)
                             .padding(8).foregroundStyle(Palette.text)
-                            .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
                     }
 
@@ -223,7 +223,7 @@ private struct EventEditorSheet: View {
                 }
                 .padding(16)
             }
-            .background(Palette.bg.ignoresSafeArea())
+            .background(HueCanvas())
             .navigationTitle(event == nil ? "New event" : "Edit event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

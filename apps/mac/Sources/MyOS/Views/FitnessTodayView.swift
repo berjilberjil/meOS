@@ -6,6 +6,15 @@ struct DayMacroHero: View {
     var day: String? = nil
     @EnvironmentObject var state: AppState
 
+    /// Bold on Today (orange gradient), washed on the Fitness tab. On colour the
+    /// four macro tints would all fight the fill, so they collapse to white at
+    /// two weights and the *bars* carry the difference instead.
+    @Environment(\.cardLook) private var look
+    private var onColour: Bool { look == .bold }
+    private func ink(_ colour: Color, _ opacity: Double = 1) -> Color {
+        onColour ? Color.white.opacity(opacity) : colour
+    }
+
     var body: some View {
         let date = day ?? state.todayKey
         let eaten = state.consumed(date)
@@ -17,23 +26,23 @@ struct DayMacroHero: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("INTAKE")
                     .font(.caption.weight(.heavy)).tracking(0.8)
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(ink(Palette.muted, 0.8))
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(Int(eaten.calories.rounded()))")
                         .font(.largeTitle.weight(.bold))
                         .monospacedDigit()
-                        .foregroundStyle(Palette.amber)
+                        .foregroundStyle(ink(Palette.amber))
                     Text(goal > 0 ? "/ \(goal) kcal" : "kcal")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(Palette.muted)
+                        .foregroundStyle(ink(Palette.muted, 0.85))
                     Spacer()
                     if goal > 0 {
                         Text("\(remain) left")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(Palette.faint)
+                            .foregroundStyle(ink(Palette.faint, 0.75))
                     }
                 }
-                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.amber)
+                ProgressView(value: frac).progressViewStyle(.linear).tint(ink(Palette.amber))
                 HStack(spacing: 8) {
                     macro("Protein", Int(eaten.protein.rounded()), t?.proteinG, Palette.green)
                     macro("Carbs", Int(eaten.carbs.rounded()), t?.carbG, Palette.blue)
@@ -48,17 +57,18 @@ struct DayMacroHero: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
                 .font(.caption2.weight(.heavy)).tracking(0.4)
-                .foregroundStyle(tint)
+                .foregroundStyle(ink(tint, 0.85))
             if let target, target > 0 {
                 Text("\(have)")
                     .font(.body.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
-                Text("/ \(target)g").font(.caption2).foregroundStyle(Palette.faint)
-                ProgressView(value: min(1, Double(have) / Double(target))).progressViewStyle(.linear).tint(tint)
+                    .foregroundStyle(ink(Palette.text))
+                Text("/ \(target)g").font(.caption2).foregroundStyle(ink(Palette.faint, 0.7))
+                ProgressView(value: min(1, Double(have) / Double(target)))
+                    .progressViewStyle(.linear).tint(ink(tint))
             } else {
                 Text("\(have)g")
                     .font(.body.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
+                    .foregroundStyle(ink(Palette.text))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,13 +90,16 @@ struct FitnessTodayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            DayMacroHero()
+            DayMacroHero().cardHue(.orange).cardLook(.bold)
+            // Each meal keeps the colour it has on Today, so the same breakfast
+            // is amber wherever you meet it.
             ForEach(MealKey.allCases) { meal in
                 MealChecklistCard(meal: meal,
                                   edit: { editingMeal = meal },
                                   scan: { scanningMeal = meal })
+                    .cardHue(meal.hue)
             }
-            WorkoutChecklistCard()
+            WorkoutChecklistCard().cardHue(.blue)
         }
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: date, meal: meal, initialItems: seed(meal))
@@ -481,7 +494,7 @@ struct ProgramDayPickerSheet: View {
                                     .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                             }
                             .padding(13)
-                            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                                 .strokeBorder(Palette.border, lineWidth: 1))
                             .contentShape(Rectangle())
@@ -520,13 +533,13 @@ struct ProgramDaySheet: View {
         #if os(macOS)
         .frame(width: 560)
         .frame(minHeight: 620)
-        .background(Palette.bg)
+        .background(.hueCanvas)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg)
+        .background(.hueCanvas)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Palette.bg)
+        .presentationBackground(.hueCanvas)
         #endif
     }
 }
@@ -596,10 +609,10 @@ struct MealLogEditorSheet: View {
         .background(Palette.elevated)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg)
+        .background(.hueCanvas)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Palette.bg)
+        .presentationBackground(.hueCanvas)
         #endif
         .sheet(isPresented: $adding) {
             FoodPickerSheet(meal: meal, add: { f, q in draft.append(PlanItem(foodId: f.id, quantity: q)) },
@@ -678,7 +691,7 @@ struct MealLogEditorSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
     }
@@ -695,7 +708,7 @@ struct MealLogEditorSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 20)
-        .background(Palette.bg)
+        .background(.hueCanvas)
     }
 }
 
@@ -733,7 +746,7 @@ private struct DraftFoodRow: View {
                           confirmLabel: "Hold to remove") { remove() }
         }
         .padding(14)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
     }
@@ -742,7 +755,7 @@ private struct DraftFoodRow: View {
         Button(action: action) {
             Image(systemName: icon).font(.caption.weight(.bold)).foregroundStyle(Palette.text)
                 .frame(width: 34, height: 34)
-                .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
     }

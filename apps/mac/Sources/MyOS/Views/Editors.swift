@@ -67,7 +67,7 @@ struct FitnessProfileEditor: View {
                 Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
             }
             .padding(.horizontal, 13).padding(.vertical, 10)
-            .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden)
@@ -212,7 +212,7 @@ struct PersonDetailsEditor: View {
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(Palette.text)
                 .frame(width: 22, height: 22)
-                .background(Palette.surface2, in: Circle())
+                .background(.hueFillStrong, in: Circle())
                 .overlay(Circle().strokeBorder(Palette.bg, lineWidth: 2))
                 .offset(x: 2, y: 2)
         }

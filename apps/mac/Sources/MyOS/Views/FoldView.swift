@@ -71,8 +71,9 @@ struct FoldView: View {
     // MARK: - Connected: the real dashboard
 
     @ViewBuilder private func dashboard(_ f: FoldData) -> some View {
-        // Hero — net worth + sparkline + rollup, Fold-home style.
-        Card {
+        // Hero — net worth + sparkline + rollup, Fold-home style. The one
+        // number the tab exists for, so it gets the saturated fill.
+        Card(hue: .green, look: .bold) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -142,6 +143,7 @@ struct FoldView: View {
                     }
                 }
             }
+            .cardHue(.blue)
             .knRise(2)
         }
 
@@ -159,6 +161,7 @@ struct FoldView: View {
                     }
                 }
             }
+            .cardHue(.orange)
             .knRise(3)
         }
 
@@ -389,7 +392,7 @@ private struct FoldLoginSheet: View {
                         .keyboardType(.phonePad)
                         #endif
                         .padding(.horizontal, 14).padding(.vertical, 12)
-                        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                             .strokeBorder(Palette.border, lineWidth: 1))
                 }
@@ -403,7 +406,7 @@ private struct FoldLoginSheet: View {
                             .keyboardType(.numberPad)
                             #endif
                             .padding(.horizontal, 14).padding(.vertical, 12)
-                            .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                                 .strokeBorder(Palette.border, lineWidth: 1))
                     }
@@ -432,7 +435,7 @@ private struct FoldLoginSheet: View {
                 Spacer()
             }
             .padding(20)
-            .background(Palette.bg.ignoresSafeArea())
+            .background(HueCanvas())
             .navigationTitle("Connect Fold")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

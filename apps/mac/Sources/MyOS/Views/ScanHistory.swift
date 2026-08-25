@@ -124,7 +124,7 @@ struct ScanVerdictView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
     }
 }
 
@@ -312,7 +312,7 @@ struct ScanDetailSheet: View {
             }
             .padding(20)
         }
-        .background(Palette.bg)
+        .background(.hueCanvas)
         .holdToDelete(isPresented: $confirmDelete,
                       title: "Delete this scan?",
                       message: "The photo goes too. This can't be undone.") {
@@ -321,7 +321,7 @@ struct ScanDetailSheet: View {
         }
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(Palette.bg)
+        content.presentationDetents([.large]).presentationBackground(.hueCanvas)
         #else
         content.frame(width: 460, height: 620)
         #endif

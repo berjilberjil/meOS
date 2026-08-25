@@ -46,7 +46,12 @@ struct TodayView: View {
                 // Deliberately NOT on the outer stack: two `.sheet` modifiers on
                 // the same view means only one of them presents.
                     ForEach(Array(sections.enumerated()), id: \.element.id) { idx, section in
-                todaySection(section).knRise(idx + 1)
+                // Each section hands its own colour and fill down; the card
+                // types themselves stay unaware they are on Today.
+                todaySection(section)
+                    .cardHue(section.hue)
+                    .cardLook(section.look)
+                    .knRise(idx + 1)
             }
             #if os(macOS)
             settingsCard.knRise(7)
@@ -116,7 +121,7 @@ struct TodayView: View {
                     Text(meal.label).font(.footnote.weight(.semibold))
                     Spacer(minLength: 0)
                     if st == .logged {
-                        Image(systemName: "checkmark.circle.fill").font(.footnote).foregroundStyle(Palette.green)
+                        Image(systemName: "checkmark.circle.fill").font(.footnote)
                     }
                 }
                 .foregroundStyle(Palette.text)
@@ -128,8 +133,9 @@ struct TodayView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
+            // A logged meal fills with its own colour; one still open stays
+            // washed, so the grid reads at a glance without a legend.
+            .cardSkin(st == .logged ? .bold : .tinted, hue: meal.hue)
         }
         .buttonStyle(.plain)
     }
@@ -344,7 +350,7 @@ struct TodayView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.surface2.opacity(open ? 0.4 : 0.18),
+        .background(HueFill(level: .strong).opacity(open ? 0.4 : 0.18),
                     in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
     }
 
@@ -519,7 +525,7 @@ struct TodayView: View {
                     .foregroundStyle(Palette.muted)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(Palette.surface, in: Capsule())
+            .background(.hueFill, in: Capsule())
             .overlay(Capsule().strokeBorder((ice ? Palette.ice : Palette.flame).opacity(0.4), lineWidth: 1.5))
         }
         .buttonStyle(.plain)
@@ -557,7 +563,7 @@ struct TodayView: View {
         }
         #if os(iOS)
         .presentationDetents([.medium, .large])
-        .presentationBackground(Palette.bg)
+        .presentationBackground(.hueCanvas)
         #else
         .frame(width: 360, height: 420)
         #endif
@@ -600,7 +606,7 @@ struct TodayView: View {
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Palette.surface2).frame(height: 5)
+                    Capsule().fill(.hueFillStrong).frame(height: 5)
                     Capsule().fill(Palette.text).frame(width: max(4, g.size.width * value), height: 5)
                 }
             }

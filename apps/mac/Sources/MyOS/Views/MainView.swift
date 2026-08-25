@@ -62,7 +62,10 @@ struct MainView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Palette.bg.ignoresSafeArea())
+            // The content area takes the tab's colour — both as the canvas it is
+            // painted on and as the hue every card underneath inherits.
+            .pageTint(tab.hue)
+            .animation(.knTheme, value: tab)
             .overlay(alignment: .bottomTrailing) {
                 ChatWidget()
                         .padding(.trailing, ChatWidget.edgeInset)
@@ -70,8 +73,9 @@ struct MainView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg.ignoresSafeArea())
+        .background(HueCanvas())
         .animation(.knTheme, value: themeStore.theme.id)
+        .tint(Palette.accent)
         .onChange(of: tab) { _, _ in Haptics.selection() }
         // Tapped the Friday report notification.
         .onAppear { consumeWeeklySignal() }
@@ -170,7 +174,17 @@ struct MainView: View {
             .help(collapsed ? (state.username.isEmpty ? "Log out" : "@\(state.username)") : "")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Palette.sidebar.ignoresSafeArea())
+        // The rail keeps its own darker ground so it still reads as chrome, but
+        // takes a trace of the open tab's colour — otherwise a coloured page sits
+        // against a rail that belongs to a different app.
+        .background(
+            ZStack {
+                Palette.sidebar
+                tab.hue.core.opacity(0.07)
+            }
+            .ignoresSafeArea()
+        )
+        .animation(.knTheme, value: tab)
         .overlay(alignment: .trailing) {
             Rectangle().fill(Palette.border).frame(width: 2)
         }

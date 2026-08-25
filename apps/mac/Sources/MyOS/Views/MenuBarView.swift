@@ -29,7 +29,7 @@ struct MenuBarView: View {
         }
         .padding(14)
         .frame(width: 288)
-        .background(Palette.bg)
+        .background(.hueCanvas)
     }
 
     // MARK: - States

@@ -61,10 +61,11 @@ struct ActivitySheet: View {
             }
             .padding(20)
         }
-        .background(Palette.bg)
+        .background(PageCanvas(hue: .green))
+        .cardHue(.green)
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(Palette.bg)
+        content.presentationDetents([.large]).presentationBackground(Hue.green.canvas)
         #else
         content.frame(width: 460, height: 640)
         #endif
@@ -102,7 +103,7 @@ struct ActivitySheet: View {
                             .font(.caption2.weight(.heavy))
                             .foregroundStyle(on ? Palette.text : Palette.faint)
                         ZStack {
-                            Circle().stroke(Palette.surface2, lineWidth: 3.5)
+                            Circle().stroke(Hue.green.core.opacity(0.18), lineWidth: 3.5)
                             Circle().trim(from: 0, to: max(0.001, f))
                                 .stroke(tint(n), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                                 .rotationEffect(.degrees(-90))
@@ -124,7 +125,7 @@ struct ActivitySheet: View {
 
     private var ring: some View {
         ZStack {
-            Circle().stroke(Palette.surface2, lineWidth: 14)
+            Circle().stroke(Hue.green.core.opacity(0.18), lineWidth: 14)
             Circle().trim(from: 0, to: max(0.002, fraction))
                 .stroke(tint(today), style: StrokeStyle(lineWidth: 14, lineCap: .round))
                 .rotationEffect(.degrees(-90))
@@ -164,7 +165,7 @@ struct ActivitySheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .cardSkin(.tinted, hue: .green, radius: Radius.md)
     }
 
     /// The week as bars. Scaled to the bigger of the goal and the best day, so a
@@ -189,8 +190,9 @@ struct ActivitySheet: View {
             Chart {
                 ForEach(Array(week.enumerated()), id: \.element) { i, key in
                     BarMark(x: .value("Day", key), y: .value("Steps", counts[i]))
-                        .foregroundStyle(tint(counts[i]))
-                        .cornerRadius(4)
+                        .foregroundStyle(barFill(counts[i]))
+                        .cornerRadius(5)
+                        .opacity(key == selected ? 1 : 0.72)
                 }
                 if target > 0 {
                     RuleMark(y: .value("Goal", target))
@@ -214,7 +216,23 @@ struct ActivitySheet: View {
         }
     }
 
-    /// Nothing logged is grey, not red — an unworn watch is not a missed goal.
+    /// A bar is filled top-to-bottom with its own hue so the chart reads as
+    /// part of the page rather than as a plotted figure sitting on it.
+    private func barFill(_ n: Int) -> LinearGradient {
+        hue(n).boldGradient
+    }
+
+    /// Nothing logged is the hue at rest, not red — an unworn watch is not a
+    /// missed goal.
+    private func hue(_ n: Int) -> Hue {
+        guard n > 0 else { return .indigo }
+        guard target > 0 else { return .orange }
+        let f = Double(n) / Double(target)
+        if f >= 1 { return .green }
+        return f >= 0.5 ? .amber : .orange
+    }
+
+
     private func tint(_ n: Int) -> Color {
         guard n > 0 else { return Palette.border }
         guard target > 0 else { return Palette.flame }

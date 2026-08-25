@@ -14,3 +14,22 @@ extension Color {
 extension EventTag {
     var color: Color { Color(hexString: colorHex) }
 }
+
+// MARK: - Hues for model types
+//
+// The mapping lives here rather than on the models: `FitnessModels.swift` is
+// Foundation-only and stays that way, so a colour never becomes a reason the
+// data layer has to import SwiftUI.
+
+extension MealKey {
+    /// Colour of the meal, walked through the day: sunrise amber, midday orange,
+    /// evening indigo, snacks pink.
+    var hue: Hue {
+        switch self {
+        case .breakfast: return .amber
+        case .lunch: return .orange
+        case .dinner: return .indigo
+        case .snacks: return .pink
+        }
+    }
+}

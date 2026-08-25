@@ -48,7 +48,7 @@ struct MacroPulseView: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(Palette.bg)
+        .background(.hueCanvas)
         .task { await state.loadMacro(date: date) }
         .sheet(item: $detail) { m in
             MacroMetricDetail(metric: m, snapshot: snap)
@@ -376,7 +376,7 @@ struct MacroMetricCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))

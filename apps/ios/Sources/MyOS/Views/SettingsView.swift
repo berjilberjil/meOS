@@ -80,8 +80,8 @@ struct SettingsView: View {
         }
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
-        .background(Palette.bg.ignoresSafeArea())
-        .presentationBackground(Palette.bg)
+        .background(HueCanvas())
+        .presentationBackground(.hueCanvas)
         .presentationDragIndicator(.visible)
         .animation(.knTheme, value: themeStore.theme.id)
         .sheet(item: $page) { p in editorSheet(p) }
@@ -256,7 +256,7 @@ struct SettingsView: View {
                     .scrollDismissesKeyboard(.interactively)
                 }
             }
-            .background(Palette.bg.ignoresSafeArea())
+            .background(HueCanvas())
             .navigationTitle(p.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -276,7 +276,7 @@ struct SettingsView: View {
         .presentationDragIndicator(.visible)
         // Scrolling a short page should not drag the sheet taller.
         .presentationContentInteraction(.scrolls)
-        .presentationBackground(Palette.bg)
+        .presentationBackground(.hueCanvas)
     }
 
     /// Nav bar + the sheet's own top inset + the home indicator. Measured

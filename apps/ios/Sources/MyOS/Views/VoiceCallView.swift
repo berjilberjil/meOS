@@ -39,7 +39,7 @@ struct VoiceCallView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg.ignoresSafeArea())
+        .background(HueCanvas())
         .task { await begin() }
         .onDisappear { finish() }
     }

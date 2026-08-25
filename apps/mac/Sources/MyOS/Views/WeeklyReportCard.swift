@@ -218,10 +218,10 @@ private struct PastReportSheet: View {
             }
             .padding(20)
         }
-        .background(Palette.bg)
+        .background(.hueCanvas)
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(Palette.bg)
+        content.presentationDetents([.large]).presentationBackground(.hueCanvas)
         #else
         content.frame(width: 460, height: 600)
         #endif

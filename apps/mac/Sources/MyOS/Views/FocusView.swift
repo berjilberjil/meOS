@@ -258,7 +258,7 @@ struct FocusCard: View {
     private var progressBar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Palette.surface2)
+                Capsule().fill(.hueFillStrong)
                 Capsule().fill(doneCount == items.count ? Palette.green : Palette.teal)
                     .frame(width: geo.size.width * (items.isEmpty ? 0 : Double(doneCount) / Double(items.count)))
             }
@@ -402,7 +402,7 @@ struct FocusSessionView: View {
         }
         .frame(maxWidth: 460)
         .frame(maxWidth: .infinity)
-        .background(Palette.bg)
+        .background(.hueCanvas)
     }
 
     /// The only chrome in the mode: what it is, how far in, and the way out.

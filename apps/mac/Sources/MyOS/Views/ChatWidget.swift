@@ -64,7 +64,7 @@ struct ChatWidget: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Palette.bg.ignoresSafeArea())
+                .background(HueCanvas())
                 .preferredColorScheme(themeStore.theme.colorScheme)
                 .animation(.knTheme, value: themeStore.theme.id)
             }
@@ -88,7 +88,7 @@ struct ChatWidget: View {
             Task { await state.fetchSuggestions() }
         } label: {
             ZStack {
-                Circle().fill(Palette.surface2)
+                Circle().fill(.hueFillStrong)
                     .overlay(Circle().strokeBorder(Palette.border, lineWidth: 1))
                 Image(systemName: "sparkles").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.muted)
             }
@@ -121,7 +121,7 @@ struct ChatWidget: View {
                     Divider().overlay(Palette.border)
                     inputBar
                 }
-                .background(Palette.bg)
+                .background(.hueCanvas)
             }
         }
         .onAppear { Task { await state.fetchSuggestions() } }
@@ -303,7 +303,7 @@ struct ChatWidget: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
     private var emptyState: some View {
@@ -330,7 +330,7 @@ struct ChatWidget: View {
             .foregroundStyle(Palette.text)
             .padding(.horizontal, 11).padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.surface2.opacity(0.55), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+            .background(HueFill(level: .strong).opacity(0.55), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
         }
         .buttonStyle(.plain)

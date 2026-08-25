@@ -151,7 +151,7 @@ struct EventsView: View {
                                 })
                             }
                             .padding(9)
-                            .background(Palette.surface2.opacity(0.3), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(HueFill(level: .strong).opacity(0.3), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         }
                     }
                 }
@@ -358,7 +358,7 @@ private struct MediaThumb: View {
                 if let img = EventMediaIO.image(media) {
                     Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    Rectangle().fill(Palette.surface2)
+                    Rectangle().fill(.hueFillStrong)
                         .overlay(Image(systemName: media.kind == .video ? "film" : "photo").foregroundStyle(Palette.faint))
                 }
             }
@@ -411,7 +411,7 @@ private struct MediaViewer: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Palette.bg.ignoresSafeArea()
+            HueCanvas()
             content.padding(24)
             Button { dismiss() } label: {
                 Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.white.opacity(0.85))
@@ -497,7 +497,7 @@ private struct EventEditor: View {
                             Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                         }
                         .padding(.horizontal, 13).padding(.vertical, 10)
-                        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                             .strokeBorder(showCal ? Palette.brand : Palette.border, lineWidth: 2))
                     }
@@ -531,7 +531,7 @@ private struct EventEditor: View {
                         }
                         .foregroundStyle(Palette.muted)
                         .padding(.horizontal, 11).padding(.vertical, 8)
-                        .background(Palette.surface2.opacity(0.6), in: Capsule())
+                        .background(HueFill(level: .strong).opacity(0.6), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -582,7 +582,7 @@ private struct EventEditor: View {
                     }
                     .foregroundStyle(dropTargeted ? Palette.brand : Palette.muted)
                     .frame(width: 72, height: 72)
-                    .background(Palette.bg.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                    .background(HueFill(level: .canvas).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                         .foregroundStyle(dropTargeted ? Palette.brand : Palette.border))
@@ -621,7 +621,7 @@ private struct EventEditor: View {
             }
         }
         .frame(width: 72, height: 72)
-        .background(Palette.bg.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .background(HueFill(level: .canvas).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
         .animation(.knFast, value: u.progress)
         .help(u.failed ? "Tap to dismiss" : "\(Int(u.progress * 100))% uploaded")
@@ -835,7 +835,7 @@ private struct TagManagerSheet: View {
             Text(tag.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             if tag.builtIn {
                 Text("built-in").font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
-                    .padding(.horizontal, 6).padding(.vertical, 2).background(Palette.surface2, in: Capsule())
+                    .padding(.horizontal, 6).padding(.vertical, 2).background(.hueFillStrong, in: Capsule())
             }
             Spacer()
             Button { editing = tag; isAdding = false } label: { Image(systemName: "pencil").font(.caption2.weight(.bold)) }
@@ -846,7 +846,7 @@ private struct TagManagerSheet: View {
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(Palette.surface2.opacity(0.35), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(HueFill(level: .strong).opacity(0.35), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
     }
 }
 
@@ -884,7 +884,7 @@ private struct TagEditForm: View {
             }
         }
         .padding(14)
-        .background(Palette.bg.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(HueFill(level: .canvas).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
     }
 }
 

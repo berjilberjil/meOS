@@ -38,7 +38,7 @@ struct MacroMethodSheet: View {
                             .foregroundStyle(Palette.brand)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                            .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                         Text("That is the metal only. A jeweller's rate adds making charges and GST, so expect their number to be higher.")
                             .font(.caption).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
@@ -77,10 +77,10 @@ struct MacroMethodSheet: View {
             }
             .padding(20)
         }
-        .background(Palette.bg)
+        .background(.hueCanvas)
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(Palette.bg)
+        content.presentationDetents([.large]).presentationBackground(.hueCanvas)
         #else
         content.frame(width: 520, height: 660)
         #endif

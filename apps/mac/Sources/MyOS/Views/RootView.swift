@@ -8,7 +8,7 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            Palette.bg.ignoresSafeArea()
+            HueCanvas()
             Group {
                 switch state.phase {
                 case .loading:

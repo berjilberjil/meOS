@@ -13,15 +13,17 @@ struct ProfileView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
-            headerCard.knRise(0)
-            identityCard.knRise(1)
-            bodyCard.knRise(2)
-            careerCard.knRise(3)
-            aboutCard.knRise(4)
-            goalsCard.knRise(5)
-            achievementsCard.knRise(6)
-            healthCard.knRise(7)
-            linksCard.knRise(8)
+            // Nine cards, nine colours — a profile is a set of unrelated
+            // facets, and one tint for all of them made it read as a form.
+            headerCard.cardHue(.indigo).cardLook(.bold).knRise(0)
+            identityCard.cardHue(.blue).knRise(1)
+            bodyCard.cardHue(.cyan).knRise(2)
+            careerCard.cardHue(.purple).knRise(3)
+            aboutCard.cardHue(.teal).knRise(4)
+            goalsCard.cardHue(.green).knRise(5)
+            achievementsCard.cardHue(.amber).knRise(6)
+            healthCard.cardHue(.pink).knRise(7)
+            linksCard.cardHue(.orange).knRise(8)
         }
     }
 
@@ -72,7 +74,7 @@ struct ProfileView: View {
         }
         .foregroundStyle(Palette.muted)
         .padding(.horizontal, 9).padding(.vertical, 4)
-        .background(Palette.surface2.opacity(0.7), in: Capsule())
+        .background(HueFill(level: .strong).opacity(0.7), in: Capsule())
         .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
     }
 
@@ -383,7 +385,7 @@ struct ProfileView: View {
             .foregroundStyle(value.isEmpty ? Palette.faint : Palette.text)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(Palette.surface2.opacity(0.25),
+            .background(HueFill(level: .strong).opacity(0.25),
                         in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                 .strokeBorder(Palette.border.opacity(0.6), lineWidth: 1))
@@ -456,7 +458,7 @@ struct ProfileView: View {
                 Text(hint).font(.caption2).foregroundStyle(Palette.faint)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(Palette.surface2.opacity(0.35),
+            .background(HueFill(level: .strong).opacity(0.35),
                         in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                 .strokeBorder(Palette.border, lineWidth: 1))
@@ -629,7 +631,7 @@ private struct HealthEditor: View {
                 .focused($focused)
                 .frame(minHeight: 64)
                 .padding(10)
-                .background(Palette.surface2.opacity(0.6),
+                .background(HueFill(level: .strong).opacity(0.6),
                             in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(focused ? Palette.brand.opacity(0.7) : Palette.border, lineWidth: 1))

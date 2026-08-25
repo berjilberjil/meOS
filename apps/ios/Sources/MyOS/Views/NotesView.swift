@@ -39,6 +39,10 @@ struct NotesView: View {
                 ForEach(filtered) { note in
                     Button { openID = note.id } label: { noteRow(note) }
                         .buttonStyle(.plain)
+                        // Every note keeps its own colour between launches — the
+                        // hue is derived from the note's id, so the list reads as
+                        // a set of things rather than as one grey column.
+                        .listRowBackground(Hue.forKey(note.id).fill)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) { pendingDelete = note } label: {
                                 Label("Delete", systemImage: "trash")
@@ -70,6 +74,10 @@ struct NotesView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // The grouped list paints its own grey; hide it so the tab's canvas
+        // shows through behind the coloured rows.
+        .scrollContentBackground(.hidden)
+        .background(HueCanvas())
         .searchable(text: $query, prompt: "Search notes")
         // A real push now that MainView gives every tab a NavigationStack. This
         // used to be a `fullScreenCover` purely because there was no stack to
@@ -208,12 +216,12 @@ private struct NoteEditor: View {
             TextEditor(text: $text)
                 .font(.callout).foregroundStyle(Palette.text)
                 .scrollContentBackground(.hidden)
-                .background(Palette.bg)
+                .background(.hueCanvas)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onChange(of: text) { save() }
         }
         .padding(16)
-        .background(Palette.bg.ignoresSafeArea())
+        .background(HueCanvas())
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             guard !loaded else { return }

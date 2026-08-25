@@ -134,7 +134,7 @@ private struct SlashMenuView: View {
             }
         }
         .frame(width: 280)
-        .background(Palette.surface2)
+        .background(.hueFillStrong)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Palette.border, lineWidth: 1))
     }

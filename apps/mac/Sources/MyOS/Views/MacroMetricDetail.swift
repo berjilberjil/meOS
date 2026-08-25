@@ -32,10 +32,10 @@ struct MacroMetricDetail: View {
             }
             .padding(20)
         }
-        .background(Palette.bg)
+        .background(.hueCanvas)
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(Palette.bg)
+        content.presentationDetents([.large]).presentationBackground(.hueCanvas)
         #else
         content.frame(width: 520, height: 680)
         #endif
@@ -206,7 +206,7 @@ struct MacroMetricDetail: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             }
         }
     }
@@ -269,7 +269,7 @@ struct MacroMetricDetail: View {
                                 .foregroundStyle(Palette.text)
                         }
                         .padding(.horizontal, 10).padding(.vertical, 8)
-                        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                     }
                 }
             }

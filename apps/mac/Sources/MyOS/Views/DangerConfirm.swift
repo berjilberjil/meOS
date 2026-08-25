@@ -69,7 +69,7 @@ struct DangerConfirmSheet: View {
         .padding(.top, 20)
         .padding(.bottom, 20)
         .frame(maxWidth: .infinity)
-        .background(Palette.bg)
+        .background(.hueCanvas)
         .animation(.knNormal, value: step)
     }
 

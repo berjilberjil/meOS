@@ -87,7 +87,7 @@ struct ProductivityView: View {
             .knRise(0)
 
             #if os(macOS)
-            addCard.knRise(1)
+            addCard.cardLook(.bold).knRise(1)
             #endif
             if !state.watch.isEmpty { filterRow.knRise(2) }
             Group {
@@ -147,7 +147,7 @@ struct ProductivityView: View {
                     }
                     .padding(.horizontal, 13).padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(urlFocused ? Palette.brand : Palette.border, lineWidth: 2))
                     .animation(.knFast, value: urlFocused)
@@ -413,7 +413,7 @@ private struct WatchCard: View {
                 }
                 .padding(12)
             }
-            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
             .knShadow()
         }
@@ -533,7 +533,7 @@ private struct WatchDetailSheet: View {
                     .font(.footnote).foregroundStyle(Palette.text)
                     .scrollContentBackground(.hidden)
                     .frame(height: 90).padding(8)
-                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(takeawayFocused ? Palette.brand : Palette.border, lineWidth: 2))
                     .focused($takeawayFocused)

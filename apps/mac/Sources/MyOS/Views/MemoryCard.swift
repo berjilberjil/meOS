@@ -91,7 +91,7 @@ struct MemoryCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Palette.surface2.opacity(0.5),
+        .background(HueFill(level: .strong).opacity(0.5),
                     in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
@@ -169,9 +169,9 @@ struct MemoryCard: View {
     @ViewBuilder
     private func chrome<V: View>(_ view: V, width: CGFloat) -> some View {
         #if os(iOS)
-        view.presentationDetents([.large]).presentationBackground(Palette.bg)
+        view.presentationDetents([.large]).presentationBackground(.hueCanvas)
         #else
-        view.frame(width: width).background(Palette.bg)
+        view.frame(width: width).background(.hueCanvas)
         #endif
     }
 
@@ -269,7 +269,7 @@ struct MemoryCard: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 11)
-        .background(Palette.surface2, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
     private func tag(_ text: String, _ tint: Color) -> some View {

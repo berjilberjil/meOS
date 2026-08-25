@@ -255,7 +255,7 @@ private struct IOSImageDropZone: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20).padding(.horizontal, 20)
-                .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+                .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                     .strokeBorder(tint.opacity(0.35), lineWidth: 1.5))
             }

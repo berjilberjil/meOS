@@ -35,17 +35,31 @@ enum TodaySection: String, CaseIterable, Identifiable {
         }
     }
 
-    var tint: Color {
+    /// The section's colour. Today is a stack of nine different cards, so nine
+    /// different hues — the page is meant to read as a set of things, not as one
+    /// long list.
+    var hue: Hue {
         switch self {
-        case .activity: return Palette.green
-        case .intake: return Palette.flame
-        case .meals: return Palette.teal
-        case .workout: return Palette.blue
-        case .comingUp: return Palette.purple
-        case .bodyPhotos: return Palette.ice
-        case .watchLog: return Palette.amber
-        case .focus: return Palette.teal
-        case .news: return Palette.blue
+        case .activity: return .green
+        case .intake: return .orange
+        case .meals: return .teal
+        case .workout: return .blue
+        case .comingUp: return .purple
+        case .bodyPhotos: return .cyan
+        case .watchLog: return .amber
+        case .focus: return .pink
+        case .news: return .indigo
+        }
+    }
+
+    var tint: Color { hue.core }
+
+    /// The three that answer "how is today going" get the saturated treatment;
+    /// the rest are washed, or plain where colour would fight the content.
+    var look: CardLook {
+        switch self {
+        case .activity, .intake, .workout: return .bold
+        default: return .tinted
         }
     }
 

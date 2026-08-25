@@ -128,7 +128,7 @@ struct BodyPhotosCard: View {
                 VStack(spacing: 6) {
                     ThumbImage(url: p.url, key: p.id, width: 132, height: 176) {
                         RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .fill(Palette.surface2)
+                            .fill(.hueFillStrong)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     Text(Fmt.day(p.date)).font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
@@ -237,7 +237,7 @@ private struct ProgressGallery: View {
             .padding(.top, 8)
             .padding(.bottom, 20)
         }
-        .background(Palette.bg.ignoresSafeArea())
+        .background(HueCanvas())
         .sheet(isPresented: $confirmingDelete) {
             deleteSheet
                 .presentationDetents([.height(230)])

@@ -66,7 +66,7 @@ struct JournalView: View {
                     }
                     .padding(16)
                 }
-                .background(Palette.bg.ignoresSafeArea())
+                .background(HueCanvas())
                 .navigationTitle("Journal presets")
                 .navigationBarTitleDisplayMode(.inline)
             }
@@ -146,36 +146,36 @@ struct JournalView: View {
 
     @ViewBuilder private var dayContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            StreakCard().knRise(1)
+            StreakCard().cardHue(.amber).cardLook(.bold).knRise(1)
 
-            moodCard.knRise(2)
+            moodCard.cardHue(.pink).knRise(2)
             reflectionCard(title: "Morning reflection",
                            text: Binding(get: { entry.morning },
                                          set: { v in state.updateJournal(viewedDate) { $0.morning = v } }),
                            prompt: "What matters today? How do you want to show up?",
-                           presets: state.journalPresets.morning, tint: Palette.amber).knRise(3)
+                           presets: state.journalPresets.morning, tint: Palette.amber).cardHue(.amber).knRise(3)
             reflectionCard(title: "Night reflection",
                            text: Binding(get: { entry.night },
                                          set: { v in state.updateJournal(viewedDate) { $0.night = v } }),
                            prompt: "How did today actually go?",
-                           presets: state.journalPresets.night, tint: Palette.blue).knRise(4)
+                           presets: state.journalPresets.night, tint: Palette.blue).cardHue(.indigo).knRise(4)
 
             listCard(title: "Wins", color: Palette.green, items: entry.wins,
                      presets: state.journalPresets.wins,
                      add: { s in state.updateJournal(viewedDate) { $0.wins.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.wins.remove(at: i) } }).knRise(5)
+                     remove: { i in state.updateJournal(viewedDate) { $0.wins.remove(at: i) } }).cardHue(.green).knRise(5)
             listCard(title: "Mistakes", color: Palette.red, items: entry.mistakes,
                      presets: state.journalPresets.mistakes,
                      add: { s in state.updateJournal(viewedDate) { $0.mistakes.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.mistakes.remove(at: i) } }).knRise(6)
+                     remove: { i in state.updateJournal(viewedDate) { $0.mistakes.remove(at: i) } }).cardHue(.red).knRise(6)
             listCard(title: "Lessons", color: Palette.blue, items: entry.lessons,
                      presets: state.journalPresets.lessons,
                      add: { s in state.updateJournal(viewedDate) { $0.lessons.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.lessons.remove(at: i) } }).knRise(7)
+                     remove: { i in state.updateJournal(viewedDate) { $0.lessons.remove(at: i) } }).cardHue(.blue).knRise(7)
             listCard(title: "Gratitude", color: Palette.purple, items: entry.gratitude,
                      presets: state.journalPresets.gratitude,
                      add: { s in state.updateJournal(viewedDate) { $0.gratitude.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.gratitude.remove(at: i) } }).knRise(8)
+                     remove: { i in state.updateJournal(viewedDate) { $0.gratitude.remove(at: i) } }).cardHue(.purple).knRise(8)
         }
     }
 
@@ -196,7 +196,7 @@ struct JournalView: View {
                 }
                 .foregroundStyle(Palette.text)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(Palette.surface2, in: Capsule())
+                .background(.hueFillStrong, in: Capsule())
                 .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
                 .contentShape(Capsule())
             }
@@ -277,7 +277,7 @@ struct StreakFlame: View {
                 )
         case .none:
             Circle()
-                .fill(Palette.surface2)
+                .fill(.hueFillStrong)
                 .frame(width: size * 0.55, height: size * 0.55)
         }
     }
@@ -357,7 +357,7 @@ private struct StreakCard: View {
             }
         }
         .padding(.vertical, 12).padding(.horizontal, 8)
-        .background(Palette.surface2.opacity(0.45),
+        .background(HueFill(level: .strong).opacity(0.45),
                     in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
@@ -574,7 +574,7 @@ private struct MoodSlider: View {
                 let w = geo.size.width
                 let centerX = (CGFloat(value) - 0.5) / 5 * w
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Palette.surface2).frame(height: 10)
+                    Capsule().fill(.hueFillStrong).frame(height: 10)
                     Capsule().fill(moodTint(value)).frame(width: max(13, centerX), height: 10)
                     Circle().fill(.white)
                         .frame(width: 26, height: 26)
@@ -636,7 +636,7 @@ private struct ReflectionEditor: View {
                     .focused($focused)
                     .frame(minHeight: 56)
                     .padding(10)
-                    .background(Palette.surface2.opacity(0.6),
+                    .background(HueFill(level: .strong).opacity(0.6),
                                 in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(focused ? Palette.brand.opacity(0.7) : Palette.border, lineWidth: 1))

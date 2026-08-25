@@ -39,7 +39,7 @@ struct WatchLogCard: View {
                             .onSubmit { addVideo() }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 10)
-                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(urlFocused ? Palette.brand : Palette.border, lineWidth: 1.5))
                     Button("Add") { addVideo() }

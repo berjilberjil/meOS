@@ -215,7 +215,7 @@ struct FoodEditor: View {
                             Spacer(); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint) }
                         .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 13).padding(.vertical, 10)
-                        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
                     }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden)
@@ -435,7 +435,7 @@ private struct ScanFoodRow: View {
                 TextField("Serving", text: $draft.food.servingLabel)
                     .textFieldStyle(.plain).font(.caption2).foregroundStyle(Palette.muted)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
                 Stepper(value: $draft.quantity, in: 0.5...20, step: 0.5) {
                     Text("× \(Fmt.trimKg(draft.quantity)) serving\(draft.quantity == 1 ? "" : "s")")
                         .font(.caption2).foregroundStyle(Palette.muted)
@@ -451,7 +451,7 @@ private struct ScanFoodRow: View {
             }
         }
         .padding(11)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(draft.include ? Palette.border : Palette.border.opacity(0.5), lineWidth: 1))
         .opacity(draft.include ? 1 : 0.55)
@@ -468,6 +468,6 @@ private struct ScanFoodRow: View {
                 .foregroundStyle(Palette.text)
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
     }
 }

@@ -194,7 +194,7 @@ struct HoldDeleteCard: View {
         .padding(.top, 12)
         .padding(.bottom, 22)
         .frame(maxWidth: .infinity)
-        .background(Palette.bg)
+        .background(.hueCanvas)
     }
 }
 
@@ -214,7 +214,7 @@ extension View {
             }
             .presentationDetents([.height(392)])
             .presentationDragIndicator(.visible)
-            .presentationBackground(Palette.bg)
+            .presentationBackground(.hueCanvas)
         }
         #else
         popover(isPresented: isPresented, arrowEdge: .top) {
@@ -477,7 +477,7 @@ struct KLabeledMenuField: View {
                         .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                 }
                 .padding(.horizontal, 13).padding(.vertical, 10)
-                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 2))
             }
@@ -542,7 +542,7 @@ struct KLabeledDateField: View {
                     .buttonStyle(.borderless).help("Clear date of birth")
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(Palette.surface2.opacity(0.35),
+                .background(HueFill(level: .strong).opacity(0.35),
                             in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 1))

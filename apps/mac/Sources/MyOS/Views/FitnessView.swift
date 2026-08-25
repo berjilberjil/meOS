@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct FitnessView: View {
     @EnvironmentObject var state: AppState
@@ -20,6 +21,15 @@ struct FitnessView: View {
             case .meals: return "Meals"
             case .library: return "Library"
             case .body: return "Body"
+            }
+        }
+        var hue: Hue {
+            switch self {
+            case .today: return .pink
+            case .train: return .blue
+            case .meals: return .orange
+            case .library: return .teal
+            case .body: return .cyan
             }
         }
     }
@@ -55,6 +65,9 @@ struct FitnessView: View {
                 case .body:    BodyView()
                 }
             }
+            // Each sub-tab is its own colour, so the segmented control moves you
+            // somewhere rather than just swapping the contents of one card stack.
+            .cardHue(sub.hue)
             .id(sub)
         }
     }
@@ -77,7 +90,7 @@ struct FitnessView: View {
     @ViewBuilder private var todayContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             FitnessTodayView().knRise(2)
-            ActivityStepsCard().knRise(3)
+            ActivityStepsCard().cardHue(.green).cardLook(.bold).knRise(3)
             #if os(iOS)
             BodyPhotosCard().knRise(4)
             #else
@@ -151,7 +164,7 @@ struct FitnessView: View {
                             .onSubmit(saveSteps)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(stepsFocused ? Palette.brand : Palette.border, lineWidth: 2))
                     Button("Log", action: saveSteps).buttonStyle(.borderedProminent)
@@ -194,7 +207,7 @@ struct FitnessView: View {
                         Text("kg").font(.footnote).foregroundStyle(Palette.muted)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(weightFocused ? Palette.brand : Palette.border, lineWidth: 2))
                     Button("Log", action: saveWeight).buttonStyle(.borderedProminent)
@@ -231,7 +244,7 @@ struct FitnessView: View {
                                 Text(Fmt.day(d)).font(.caption2).foregroundStyle(Palette.faint)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Palette.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                            .background(HueFill(level: .strong).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                         }
                     }
                 }
@@ -487,6 +500,11 @@ struct ActivityStepsCard: View {
     @State private var month = CalMath.cal.component(.month, from: Date())
     @State private var selected: String = AppState.dateKey(Date())
 
+    /// Bold on Today, washed on the Fitness tab. Read here so the chart's ink
+    /// can flip to white without the card being told twice.
+    @Environment(\.cardLook) private var look
+    private var onColour: Bool { look == .bold }
+
     private var target: Int { state.stepsTarget }
     private func steps(_ key: String) -> Int { state.fitness[key]?.steps ?? 0 }
     private func fraction(_ n: Int) -> Double { target > 0 ? min(1, Double(n) / Double(target)) : 0 }
@@ -537,30 +555,75 @@ struct ActivityStepsCard: View {
                     Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                         .font(.footnote.weight(.bold))
                 }
-                .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.faint)
+                .buttonStyle(.borderless)
+                .tint(onColour ? Color.white : (showCalendar ? Palette.brand : Palette.faint))
                 .help(showCalendar ? "Hide the record" : "See every day")
                 .accessibilityLabel(showCalendar ? "Hide the activity calendar" : "Show the activity calendar")
             }
         }
     }
 
+    /// The week, as a chart. One progress bar only ever answered "how far
+    /// through today", which the number above it already says; seven days
+    /// answers the question the card is actually asked — is this a good week.
     private var summary: some View {
-        let n = steps(day ?? state.todayKey)
-        return HStack(spacing: 12) {
-            Image(systemName: "figure.walk").font(.callout.weight(.semibold)).foregroundStyle(Palette.muted)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Activity").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
-                Text("\(n.formatted()) / \(target.formatted()) steps")
-                    .font(.footnote).monospacedDigit().foregroundStyle(Palette.faint)
-                #if os(iOS)
-                Text("from Apple Health").font(.caption2).foregroundStyle(Palette.faint)
-                #endif
+        let key = day ?? state.todayKey
+        let n = steps(key)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "figure.walk").font(.callout.weight(.semibold))
+                Text("Activity").font(.subheadline.weight(.semibold))
+                Spacer(minLength: 4)
+                if target > 0 {
+                    Text("\(Int((fraction(n) * 100).rounded()))%")
+                        .font(.caption.weight(.heavy)).monospacedDigit().opacity(0.85)
+                }
+                Image(systemName: "chevron.right").font(.caption2.weight(.bold)).opacity(0.7)
             }
-            Spacer(minLength: 4)
-            ProgressView(value: fraction(n)).progressViewStyle(.linear).tint(Palette.flame).frame(width: 72)
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(n.formatted())
+                    .font(.largeTitle.weight(.heavy)).monospacedDigit()
+                Text("of \(target.formatted()) steps")
+                    .font(.footnote.weight(.semibold)).opacity(0.85)
+            }
+            weekChart(endingOn: key)
+            #if os(iOS)
+            Text("from Apple Health").font(.caption2).opacity(0.7)
+            #endif
         }
+        .foregroundStyle(onColour ? Color.white : Palette.text)
+    }
+
+    /// Seven `BarMark`s and a dashed goal line. On a bold card the ink is white
+    /// at two opacities — the day you are reading solid, the rest recessive.
+    private func weekChart(endingOn key: String) -> some View {
+        let days = (0..<7).reversed().map { AppState.addDays(-$0, to: key) }
+        let ink: Color = onColour ? .white : Palette.green
+        return Chart {
+            ForEach(days, id: \.self) { d in
+                BarMark(x: .value("Day", d), y: .value("Steps", steps(d)))
+                    .foregroundStyle(ink.opacity(d == key ? 1 : 0.42))
+                    .cornerRadius(3)
+            }
+            if target > 0 {
+                RuleMark(y: .value("Goal", target))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .foregroundStyle(ink.opacity(0.55))
+            }
+        }
+        .chartXAxis {
+            AxisMarks { value in
+                AxisValueLabel {
+                    if let d = value.as(String.self) {
+                        Text(Fmt.weekdayInitial(d))
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(ink.opacity(d == key ? 1 : 0.6))
+                    }
+                }
+            }
+        }
+        .chartYAxis(.hidden)
+        .frame(height: 60)
     }
 
     // MARK: The record

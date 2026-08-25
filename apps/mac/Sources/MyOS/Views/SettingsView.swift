@@ -21,21 +21,22 @@ struct SettingsView: View {
             ScreenTitle(text: "Settings")
                 .knRise(0)
 
-            accountCard.knRise(1)
+            accountCard.cardHue(.indigo).cardLook(.bold).knRise(1)
             // The single calendar. Today pages by swipe for nearby days; this is
             // where you jump somewhere far away and see the whole day at once —
             // replacing the four per-card month grids that used to clutter Today.
-            DayDetailView().knRise(1)
-            AppearanceCard().knRise(2)
-            GeneralSettingsCard().knRise(2)
-            WeeklyReportCard().knRise(3)
-            MacroEntryCard().knRise(3)
-            NotificationsCard().knRise(3)
-            AgentSettingsCard().knRise(3)
-            MemoryCard().knRise(3)
-            AIProvidersCard().knRise(3)
-            securityCard.knRise(4)
-            DataManagementCard().knRise(5)
+            DayDetailView().cardHue(.blue).knRise(1)
+            AppearanceCard().cardHue(.purple).knRise(2)
+            GeneralSettingsCard().cardHue(.teal).knRise(2)
+            WeeklyReportCard().cardHue(.green).knRise(3)
+            MacroEntryCard().cardHue(.orange).knRise(3)
+            NotificationsCard().cardHue(.amber).knRise(3)
+            AgentSettingsCard().cardHue(.cyan).knRise(3)
+            MemoryCard().cardHue(.pink).knRise(3)
+            AIProvidersCard().cardHue(.indigo).knRise(3)
+            // Both of these can lose you data. They are the only red on the page.
+            securityCard.cardHue(.red).knRise(4)
+            DataManagementCard().cardHue(.red).knRise(5)
         }
         .animation(.knTheme, value: themeStore.theme.id)
     }

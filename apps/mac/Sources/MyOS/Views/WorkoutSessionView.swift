@@ -67,13 +67,13 @@ struct WorkoutSessionView: View {
         #if os(macOS)
         .frame(width: 560)
         .frame(minHeight: 620)
-        .background(Palette.bg)
+        .background(.hueCanvas)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.bg)
+        .background(.hueCanvas)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Palette.bg)
+        .presentationBackground(.hueCanvas)
         #endif
         .onAppear { state.startSession(date: date) }
         .sheet(isPresented: $adding) {
@@ -147,7 +147,7 @@ struct WorkoutSessionView: View {
                 .font(.caption2).foregroundStyle(Palette.faint)
         }
         .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 20)
-        .background(Palette.bg)
+        .background(.hueCanvas)
     }
 }
 
@@ -303,7 +303,7 @@ private struct SetRow: View {
             Text(unit).font(.caption2).foregroundStyle(Palette.faint)
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(Palette.bg, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
             .strokeBorder(focus == field ? Palette.brand : Palette.border, lineWidth: 1.5))
     }
