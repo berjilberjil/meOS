@@ -180,15 +180,6 @@ struct ActivityAnalyticsView: View {
         }
     }
 
-    private var timelineCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: Gap.row) {
-                SectionTitle(text: "Through the day")
-                ActivityTimelineChart(timeline: daySummary.timeline, height: 140)
-            }
-        }
-    }
-
     /// Week and month get a day-by-day bar instead of an hour-by-hour one —
     /// same shape of question at a different resolution.
     private var dailyCard: some View {
