@@ -60,7 +60,8 @@ struct ActivityIntelligenceCard: View {
                     Divider().overlay(Palette.divider)
                     ScreenTimeBreakdown(summary: summary,
                                         device: device,
-                                        appLimit: 6,
+                                        appLimit: Self.appLimit,
+                                        chartHeight: Self.chartHeight,
                                         trailing: detailsButton)
                 }
 
@@ -70,6 +71,17 @@ struct ActivityIntelligenceCard: View {
             }
         }
     }
+
+    /// Today is a page of sections, not a dashboard — on the phone this card
+    /// has to answer the question and then get out of the way, so it shows four
+    /// apps and a shorter strip. The Mac has the height for six.
+    #if os(macOS)
+    private static let appLimit = 6
+    private static let chartHeight: CGFloat = 96
+    #else
+    private static let appLimit = 4
+    private static let chartHeight: CGFloat = 78
+    #endif
 
     private var detailsButton: AnyView? {
         guard let go else { return nil }
