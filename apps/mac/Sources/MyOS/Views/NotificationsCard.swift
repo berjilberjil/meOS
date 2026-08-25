@@ -29,7 +29,7 @@ struct NotificationsCard: View {
                           : "Turn on to get nudged at 6am, 8am, 12:30pm, 4pm and 7pm.") {
                 SettingsToggleRow(title: "All reminders",
                                   subtitle: "Eat, train, log weight and journal.",
-                                  icon: "bell.fill", tint: Palette.amber,
+                                  icon: "bell.fill", tint: Palette.attention,
                                   isOn: master)
             }
 
@@ -58,7 +58,7 @@ struct NotificationsCard: View {
             timePicker(r)
             Toggle("", isOn: Binding(get: { r.enabled },
                                      set: { store.setEnabled(id: r.id, $0) }))
-                .labelsHidden().tint(Palette.brand)
+                .labelsHidden().tint(Palette.action)
         }
         .padding(.horizontal, SettingsMetrics.rowPadH)
         .padding(.vertical, 11)
@@ -98,7 +98,7 @@ struct NotificationsCard: View {
                         .font(.footnote).foregroundStyle(Palette.muted)
                 }
                 Spacer()
-                Toggle("", isOn: master).labelsHidden().tint(Palette.brand)
+                Toggle("", isOn: master).labelsHidden().tint(Palette.action)
             }
 
             if store.enabled {
@@ -117,7 +117,7 @@ struct NotificationsCard: View {
                             .opacity(r.enabled ? 1 : 0.4)
                         Toggle("", isOn: Binding(get: { r.enabled },
                                                  set: { store.setEnabled(id: r.id, $0) }))
-                            .labelsHidden().tint(Palette.brand)
+                            .labelsHidden().tint(Palette.action)
                     }
                 }
             } else {

@@ -105,17 +105,17 @@ struct ProgressPhotoCalendar: View {
                     .font(.caption.weight(isSelected ? .bold : .medium)).monospacedDigit()
                     .foregroundStyle(isSelected ? .white : (isFuture ? Palette.faint : Palette.text))
                 Circle()
-                    .fill(hasPhoto ? (isSelected ? Color.white : (isPending ? Palette.amber : Palette.teal)) : .clear)
+                    .fill(hasPhoto ? (isSelected ? Color.white : (isPending ? Palette.attention : Palette.success)) : .clear)
                     .frame(width: 6, height: 6)
                     .frame(height: 8)
             }
             .frame(width: 32, height: 38)
-            .background(isSelected ? Palette.brand : .clear,
+            .background(isSelected ? Palette.action : .clear,
                         in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 if isToday && !isSelected {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Palette.brand.opacity(0.6), lineWidth: 1)
+                        .strokeBorder(Palette.action.opacity(0.6), lineWidth: 1)
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))

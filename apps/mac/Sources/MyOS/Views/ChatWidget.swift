@@ -64,7 +64,7 @@ struct ChatWidget: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(HueCanvas())
+                .background(Palette.background)
                 .preferredColorScheme(themeStore.theme.colorScheme)
                 .animation(.knTheme, value: themeStore.theme.id)
             }
@@ -88,15 +88,15 @@ struct ChatWidget: View {
             Task { await state.fetchSuggestions() }
         } label: {
             ZStack {
-                Circle().fill(.hueFillStrong)
+                Circle().fill(Palette.surfaceElevated)
                     .overlay(Circle().strokeBorder(Palette.border, lineWidth: 1))
                 Image(systemName: "sparkles").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.muted)
             }
             .frame(width: 40, height: 40)
             .overlay(alignment: .topTrailing) {
                 if state.chatBusy {
-                    Circle().fill(Palette.amber).frame(width: 12, height: 12)
-                        .overlay(Circle().strokeBorder(Palette.bg, lineWidth: 2))
+                    Circle().fill(Palette.attention).frame(width: 12, height: 12)
+                        .overlay(Circle().strokeBorder(Palette.background, lineWidth: 2))
                         .offset(x: 2, y: -2)
                 }
             }
@@ -121,7 +121,7 @@ struct ChatWidget: View {
                     Divider().overlay(Palette.border)
                     inputBar
                 }
-                .background(.hueCanvas)
+                .background(Palette.background)
             }
         }
         .onAppear { Task { await state.fetchSuggestions() } }
@@ -130,9 +130,8 @@ struct ChatWidget: View {
     private var header: some View {
         HStack(spacing: 10) {
             ZStack {
-                Circle().fill(LinearGradient(colors: [Palette.brand, Palette.brandDeep],
-                                             startPoint: .top, endPoint: .bottom))
-                Image(systemName: "sparkles").font(.footnote.weight(.bold)).foregroundStyle(Palette.bg)
+                Circle().fill(Palette.action)
+                Image(systemName: "sparkles").font(.footnote.weight(.bold)).foregroundStyle(Palette.background)
             }
             .frame(width: 30, height: 30)
             VStack(alignment: .leading, spacing: 1) {
@@ -189,10 +188,10 @@ struct ChatWidget: View {
                     if let err = state.chatError {
                         HStack(spacing: 8) {
                             Label(err, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption2).foregroundStyle(Palette.amber)
+                                .font(.caption2).foregroundStyle(Palette.attention)
                             Button("Retry") { Task { await state.retryLastChat() } }
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(Palette.brand)
+                                .foregroundStyle(Palette.action)
                                 .disabled(state.chatBusy)
                         }
                     }
@@ -249,7 +248,7 @@ struct ChatWidget: View {
                 Button { pendingHistoryDelete = th.id } label: {
                     Image(systemName: "trash").font(.caption2)
                 }
-                .buttonStyle(.borderless).tint(Palette.red)
+                .buttonStyle(.borderless).tint(Palette.warning)
                 .holdToDelete(
                     isPresented: Binding(get: { pendingHistoryDelete == th.id },
                                          set: { if !$0 { pendingHistoryDelete = nil } }),
@@ -260,10 +259,10 @@ struct ChatWidget: View {
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 9)
-            .background(active ? Palette.brand.opacity(0.14) : Palette.surface2.opacity(0.5),
+            .background(active ? Palette.action.opacity(0.14) : Palette.surfaceElevated.opacity(0.5),
                         in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                .strokeBorder(active ? Palette.brand.opacity(0.5) : .clear, lineWidth: 1))
+                .strokeBorder(active ? Palette.action.opacity(0.5) : .clear, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -295,7 +294,7 @@ struct ChatWidget: View {
             } else if state.suggestBusy {
                 Text("Reading your day…").font(.footnote).foregroundStyle(Palette.faint)
             } else if let err = state.suggestError {
-                Text(err).font(.footnote).foregroundStyle(Palette.amber)
+                Text(err).font(.footnote).foregroundStyle(Palette.attention)
             } else {
                 Text("Open this and I’ll tell you what’s going on.")
                     .font(.footnote).foregroundStyle(Palette.faint)
@@ -303,7 +302,7 @@ struct ChatWidget: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
     private var emptyState: some View {
@@ -330,7 +329,7 @@ struct ChatWidget: View {
             .foregroundStyle(Palette.text)
             .padding(.horizontal, 11).padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(HueFill(level: .strong).opacity(0.55), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+            .background(Palette.surfaceElevated.opacity(0.55), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
         }
         .buttonStyle(.plain)
@@ -342,10 +341,10 @@ struct ChatWidget: View {
         return HStack {
             if isUser { Spacer(minLength: 40) }
             Text(attributed(m.content))
-                .font(.footnote).foregroundStyle(isUser ? Palette.bg : Palette.text)
+                .font(.footnote).foregroundStyle(isUser ? Palette.background : Palette.text)
                 .textSelection(.enabled)
                 .padding(.horizontal, 12).padding(.vertical, 9)
-                .background(isUser ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(Palette.surface2),
+                .background(isUser ? AnyShapeStyle(Palette.action) : AnyShapeStyle(Palette.surfaceElevated),
                             in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .frame(maxWidth: 300, alignment: isUser ? .trailing : .leading)
                 .contextMenu {
@@ -382,8 +381,8 @@ struct ChatWidget: View {
                 .onSubmit(send)
             Button(action: send) {
                 Image(systemName: "arrow.up").font(.footnote.weight(.heavy))
-                    .foregroundStyle(Palette.bg).frame(width: 30, height: 30)
-                    .background(canSend ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(Palette.surface2), in: Circle())
+                    .foregroundStyle(Palette.background).frame(width: 30, height: 30)
+                    .background(canSend ? AnyShapeStyle(Palette.action) : AnyShapeStyle(Palette.surfaceElevated), in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(!canSend)

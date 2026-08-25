@@ -36,26 +36,10 @@ enum NavTab: String, CaseIterable, Identifiable {
         case .settings: return "gearshape.fill"
         }
     }
-    /// The tab's colour. It paints the whole screen behind the tab's cards, so
-    /// moving between tabs reads as moving between rooms — which is the point of
-    /// having eleven of them.
-    var hue: Hue {
-        switch self {
-        case .today:        return .amber
-        case .scan:         return .teal
-        case .events:       return .purple
-        case .fold:         return .green
-        case .stuff:        return .orange
-        case .fitness:      return .pink
-        case .productivity: return .blue
-        case .journal:      return .purple
-        case .notes:        return .cyan
-        case .profile:      return .teal
-        case .settings:     return .indigo
-        }
-    }
-
-    var tint: Color { hue.core }
+    /// Navigation does not change colour with the screen you are on. Active is
+    /// green everywhere, inactive is muted white — that consistency is most of
+    /// what makes eleven tabs feel like one operating system.
+    var tint: Color { Palette.action }
 }
 
 extension NavTab {

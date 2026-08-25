@@ -67,13 +67,13 @@ struct WorkoutSessionView: View {
         #if os(macOS)
         .frame(width: 560)
         .frame(minHeight: 620)
-        .background(.hueCanvas)
+        .background(Palette.background)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.hueCanvas)
+        .background(Palette.background)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.hueCanvas)
+        .presentationBackground(Palette.background)
         #endif
         .onAppear { state.startSession(date: date) }
         .sheet(isPresented: $adding) {
@@ -120,7 +120,7 @@ struct WorkoutSessionView: View {
                                 .foregroundStyle(Palette.faint)
                         }
                     }
-                    ProgressView(value: Double(doneSets) / Double(max(1, totalSets))).progressViewStyle(.linear).tint(Palette.brand)
+                    ProgressView(value: Double(doneSets) / Double(max(1, totalSets))).progressViewStyle(.linear).tint(Palette.action)
                 }
             }
         }
@@ -147,7 +147,7 @@ struct WorkoutSessionView: View {
                 .font(.caption2).foregroundStyle(Palette.faint)
         }
         .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 20)
-        .background(.hueCanvas)
+        .background(Palette.background)
     }
 }
 
@@ -278,7 +278,7 @@ private struct SetRow: View {
             .buttonStyle(.borderless)
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
-        .background(set.done ? Palette.green.opacity(0.10) : Palette.surface2.opacity(0.4),
+        .background(set.done ? Palette.green.opacity(0.10) : Palette.surfaceElevated.opacity(0.4),
                     in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         .onAppear {
             weight = set.weightKg.map { Fmt.trimKg($0) } ?? ""
@@ -303,8 +303,8 @@ private struct SetRow: View {
             Text(unit).font(.caption2).foregroundStyle(Palette.faint)
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.xs, style: .continuous)
-            .strokeBorder(focus == field ? Palette.brand : Palette.border, lineWidth: 1.5))
+            .strokeBorder(focus == field ? Palette.action : Palette.border, lineWidth: 1.5))
     }
 }

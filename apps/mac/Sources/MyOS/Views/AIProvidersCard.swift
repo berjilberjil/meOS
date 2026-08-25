@@ -303,7 +303,7 @@ private struct AIKeyRow: View {
                     .buttonStyle(.borderless)
                     .disabled(store.busy)
                 Button { showDelete = true } label: { Image(systemName: "trash") }
-                    .buttonStyle(.borderless).tint(Palette.red)
+                    .buttonStyle(.borderless).tint(Palette.warning)
                     .holdToDelete(isPresented: $showDelete,
                                   title: "Remove \(key.label)?",
                                   message: "Deletes this key from your account. Any feature using it falls back to your default.",
@@ -389,7 +389,7 @@ private struct ModelPickerRow: View {
                         .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 2))
             }

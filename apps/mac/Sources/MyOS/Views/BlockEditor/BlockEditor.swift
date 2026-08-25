@@ -518,7 +518,7 @@ struct BlockEditor: NSViewRepresentable {
                 switch mark {
                 case .bold: bold = true
                 case .italic: italic = true
-                case .code: code = true; new[.inlineCode] = true; new[.foregroundColor] = NSColor(Palette.purple)
+                case .code: code = true; new[.inlineCode] = true; new[.foregroundColor] = NSColor(Palette.information)
                 case .strike: new[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
                 case .link: break
                 }
@@ -558,7 +558,7 @@ struct BlockEditor: NSViewRepresentable {
                 case .bold: bold.toggle()
                 case .italic: italic.toggle()
                 case .code: code.toggle(); a[.inlineCode] = code ? true : nil
-                    a[.foregroundColor] = code ? NSColor(Palette.purple) : EditorTheme.baseColor(base)
+                    a[.foregroundColor] = code ? NSColor(Palette.information) : EditorTheme.baseColor(base)
                 case .strike: strike.toggle(); a[.strikethroughStyle] = strike ? NSUnderlineStyle.single.rawValue : nil
                 case .link: break
                 }
@@ -588,7 +588,7 @@ struct BlockEditor: NSViewRepresentable {
                 case .bold: bold = want
                 case .italic: italic = want
                 case .code: code = want; new[.inlineCode] = want ? true : nil
-                    new[.foregroundColor] = want ? NSColor(Palette.purple) : EditorTheme.baseColor(base)
+                    new[.foregroundColor] = want ? NSColor(Palette.information) : EditorTheme.baseColor(base)
                 case .strike: new[.strikethroughStyle] = want ? NSUnderlineStyle.single.rawValue : nil
                 case .link: break
                 }

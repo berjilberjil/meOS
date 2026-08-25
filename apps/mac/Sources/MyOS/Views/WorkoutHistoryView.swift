@@ -15,7 +15,7 @@ struct WorkoutHistoryView: View {
                 Card(padding: 20) {
                     VStack(alignment: .leading, spacing: 10) {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(.title2.weight(.semibold)).foregroundStyle(Palette.brand)
+                            .font(.title2.weight(.semibold)).foregroundStyle(Palette.action)
                         Text("No workouts logged yet")
                             .font(.body.weight(.semibold)).foregroundStyle(Palette.text)
                         Text("Start a workout from Today and every set you tick lands here.")
@@ -101,7 +101,7 @@ private struct HistoryRow: View {
     private var summaryRow: some View {
         HStack(spacing: 12) {
             Image(systemName: log.done ? "checkmark.circle.fill" : "circle.dotted")
-                .font(.callout).foregroundStyle(log.done ? Palette.green : Palette.amber)
+                .font(.callout).foregroundStyle(log.done ? Palette.green : Palette.attention)
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.title ?? "Workout")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)

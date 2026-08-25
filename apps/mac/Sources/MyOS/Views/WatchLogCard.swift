@@ -39,16 +39,16 @@ struct WatchLogCard: View {
                             .onSubmit { addVideo() }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 10)
-                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(urlFocused ? Palette.brand : Palette.border, lineWidth: 1.5))
+                        .strokeBorder(urlFocused ? Palette.action : Palette.border, lineWidth: 1.5))
                     Button("Add") { addVideo() }
                         .buttonStyle(.borderedProminent)
                         .disabled(urlInput.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
 
                 if let err = addError {
-                    Text(err).font(.footnote).foregroundStyle(Palette.amber)
+                    Text(err).font(.footnote).foregroundStyle(Palette.attention)
                 }
 
                 if todayVideos.isEmpty {
@@ -76,7 +76,7 @@ struct WatchLogCard: View {
                 AsyncImage(url: URL(string: item.thumbUrl)) { phase in
                     switch phase {
                     case .success(let img): img.resizable().scaledToFill()
-                    default: Palette.surface2
+                    default: Palette.surfaceElevated
                     }
                 }
                 .frame(width: 92, height: 56)

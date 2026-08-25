@@ -76,7 +76,7 @@ struct SettingsDivider: View {
 /// The rounded tinted square that carries a row's glyph.
 struct SettingsIcon: View {
     let symbol: String
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.action
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.opacity(0.18))
@@ -93,7 +93,7 @@ struct SettingsRow<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
     var icon: String? = nil
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.action
     var titleColor: Color = Palette.text
     var action: (() -> Void)? = nil
     @ViewBuilder var trailing: Trailing
@@ -130,7 +130,7 @@ struct SettingsRow<Trailing: View>: View {
 
 extension SettingsRow where Trailing == EmptyView {
     init(title: String, subtitle: String? = nil, icon: String? = nil,
-         tint: Color = Palette.brand, titleColor: Color = Palette.text,
+         tint: Color = Palette.action, titleColor: Color = Palette.text,
          action: (() -> Void)? = nil) {
         self.init(title: title, subtitle: subtitle, icon: icon, tint: tint,
                   titleColor: titleColor, action: action, trailing: { EmptyView() })
@@ -142,7 +142,7 @@ struct SettingsPickRow: View {
     let title: String
     var subtitle: String? = nil
     var icon: String? = nil
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.action
     let selected: Bool
     let action: () -> Void
 
@@ -163,12 +163,12 @@ struct SettingsToggleRow: View {
     let title: String
     var subtitle: String? = nil
     var icon: String? = nil
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.action
     @Binding var isOn: Bool
 
     var body: some View {
         SettingsRow(title: title, subtitle: subtitle, icon: icon, tint: tint) {
-            Toggle("", isOn: $isOn).labelsHidden().tint(Palette.brand)
+            Toggle("", isOn: $isOn).labelsHidden().tint(Palette.action)
         }
     }
 }
@@ -195,7 +195,7 @@ struct SettingsFieldRow: View {
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.trailing)
                 .font(.system(size: 16, design: monospaced ? .monospaced : .default))
-                .foregroundStyle(focused ? Palette.brand : Palette.muted)
+                .foregroundStyle(focused ? Palette.action : Palette.muted)
                 .focused($focused)
                 #if os(iOS)
                 .keyboardType(numeric ? .numberPad : .default)
@@ -254,7 +254,7 @@ struct SettingsTextArea: View {
 /// framework prose — hence the line cap.
 struct SettingsNotice: View {
     let text: String
-    var tint: Color = Palette.amber
+    var tint: Color = Palette.attention
     var icon: String = "exclamationmark.triangle.fill"
     var actionLabel: String? = nil
     var action: (() -> Void)? = nil

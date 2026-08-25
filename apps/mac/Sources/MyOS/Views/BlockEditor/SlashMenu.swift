@@ -134,7 +134,7 @@ private struct SlashMenuView: View {
             }
         }
         .frame(width: 280)
-        .background(.hueFillStrong)
+        .background(Palette.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Palette.border, lineWidth: 1))
     }
@@ -145,7 +145,7 @@ private struct SlashMenuView: View {
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(selected ? .white : Palette.muted)
                 .frame(width: 26, height: 26)
-                .background(selected ? Palette.brand : Palette.surface)
+                .background(selected ? Palette.action : Palette.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 Text(cmd.title).font(.footnote.weight(.medium)).foregroundStyle(Palette.text)
@@ -154,7 +154,7 @@ private struct SlashMenuView: View {
             Spacer()
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(selected ? Palette.brand.opacity(0.16) : .clear)
+        .background(selected ? Palette.action.opacity(0.16) : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 }

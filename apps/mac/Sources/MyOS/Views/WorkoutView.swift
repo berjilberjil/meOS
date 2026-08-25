@@ -64,12 +64,12 @@ struct WorkoutLibrarySection: View {
 
     private func libGroupChip(_ g: MuscleGroup?, _ label: String) -> some View {
         let on = libGroup == g
-        let tint = g?.tint ?? Palette.brand
+        let tint = g?.tint ?? Palette.action
         return Button { libGroup = g } label: {
             Text(label).font(.caption.weight(.heavy))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
+                .background(on ? tint : Palette.surfaceElevated.opacity(0.6), in: Capsule())
         }
         .buttonStyle(.plain)
         .onHover { h in cursor(h) }
@@ -121,14 +121,14 @@ struct ExerciseIcon: View {
     }
     var color: Color {
         switch category {
-        case .chest: return Palette.red
+        case .chest: return Palette.warning
         case .back: return Palette.blue
-        case .shoulders: return Palette.amber
-        case .arms: return Palette.purple
+        case .shoulders: return Palette.attention
+        case .arms: return Palette.information
         case .legs: return Palette.green
-        case .core: return Palette.amber
-        case .cardio: return Palette.flame
-        case .boxing: return Palette.red
+        case .core: return Palette.attention
+        case .cardio: return Palette.activity
+        case .boxing: return Palette.warning
         }
     }
 }
@@ -210,7 +210,7 @@ struct ExercisePickerSheet: View {
                                     Image(systemName: "play.circle.fill").font(.footnote).foregroundStyle(Palette.blue)
                                 }
                                 if !ex.isDefault { Text("custom").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint) }
-                                Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.brand)
+                                Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.action)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 7).contentShape(Rectangle())
                         }
@@ -233,12 +233,12 @@ struct ExercisePickerSheet: View {
 
     private func groupChip(_ g: MuscleGroup?, _ label: String) -> some View {
         let on = group2 == g
-        let tint = g?.tint ?? Palette.brand
+        let tint = g?.tint ?? Palette.action
         return Button { group2 = g } label: {
             Text(label).font(.caption.weight(.heavy))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(on ? tint : Palette.surface2.opacity(0.6), in: Capsule())
+                .background(on ? tint : Palette.surfaceElevated.opacity(0.6), in: Capsule())
         }
         .buttonStyle(.plain)
         .onHover { h in cursor(h) }
@@ -283,7 +283,7 @@ struct ExerciseEditor: View {
             HStack {
                 if let exercise, !exercise.isDefault {
                     Button("Delete") { showDelete = true }
-                        .buttonStyle(.borderless).tint(Palette.red)
+                        .buttonStyle(.borderless).tint(Palette.warning)
                         .holdToDelete(isPresented: $showDelete, title: "Delete \(exercise.name)?",
                                       message: "Removes it from your exercise library.") {
                             state.deleteExercise(exercise.id); dismiss()
@@ -313,7 +313,7 @@ struct ExerciseEditor: View {
             Spacer(); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint) }
         .font(.footnote.weight(.semibold))
         .padding(.horizontal, 13).padding(.vertical, 10)
-        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
     }
 }
@@ -363,7 +363,7 @@ struct ExerciseDetailSheet: View {
             if let url = exercise.gifURL {
                 GIFView(url: url)
             } else {
-                ZStack { Palette.surface2.opacity(0.5)
+                ZStack { Palette.surfaceElevated.opacity(0.5)
                     VStack(spacing: 8) {
                         ExerciseIcon(category: exercise.category, size: 54)
                         Text("No demo").font(.caption2).foregroundStyle(Palette.faint)
@@ -387,7 +387,7 @@ struct ExerciseDetailSheet: View {
                         Text(MuscleSlug.name(slug))
                             .font(.caption2.weight(.semibold)).foregroundStyle(Palette.text)
                             .padding(.horizontal, 9).padding(.vertical, 4)
-                            .background(Palette.brand.opacity(0.15), in: Capsule())
+                            .background(Palette.action.opacity(0.15), in: Capsule())
                     }
                 }
             }

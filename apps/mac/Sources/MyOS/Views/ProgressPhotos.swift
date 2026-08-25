@@ -49,22 +49,22 @@ struct ProgressPhotosCard: View {
                             Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                                 .font(.footnote.weight(.bold))
                         }
-                        .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.faint)
+                        .buttonStyle(.borderless).tint(showCalendar ? Palette.action : Palette.faint)
                         .help(showCalendar ? "Hide the calendar" : "Pick a day")
                     }
                     Button { chooseFile() } label: { Label("Add photo", systemImage: "camera.fill") }
-                        .buttonStyle(.borderless).tint(Palette.brand)
+                        .buttonStyle(.borderless).tint(Palette.action)
                 }
                 if photos.isEmpty {
                     Text(dropTargeted ? "Drop it here."
                                       : "Drop a photo here (or click Add) to track how your body changes over time. Syncs from iPhone too.")
-                        .font(.footnote).foregroundStyle(dropTargeted ? Palette.brand : Palette.faint)
+                        .font(.footnote).foregroundStyle(dropTargeted ? Palette.action : Palette.faint)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 14)
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                             .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                            .foregroundStyle(dropTargeted ? Palette.brand : Palette.border))
+                            .foregroundStyle(dropTargeted ? Palette.action : Palette.border))
                 } else {
                     if showCalendar {
                         ProgressPhotoCalendar(photoDates: photoDates, pendingDates: pendingDates, selected: $selectedDate)
@@ -97,9 +97,9 @@ struct ProgressPhotosCard: View {
         if ProgressPhotoSync.isSyncing {
             ProgressView().controlSize(.small)
         } else if !ProgressPhotoStore.pending().isEmpty {
-            Image(systemName: "icloud.and.arrow.up").font(.caption).foregroundStyle(Palette.amber)
+            Image(systemName: "icloud.and.arrow.up").font(.caption).foregroundStyle(Palette.attention)
         } else if !photos.isEmpty {
-            Image(systemName: "icloud.fill").font(.caption).foregroundStyle(Palette.teal)
+            Image(systemName: "icloud.fill").font(.caption).foregroundStyle(Palette.success)
         }
     }
 
@@ -182,7 +182,7 @@ struct ProgressPhotosCard: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(4)
-                        .background(Palette.amber, in: Circle())
+                        .background(Palette.attention, in: Circle())
                         .padding(4)
                 }
             }
@@ -206,7 +206,7 @@ private struct DeleteWithConfirmButton: View {
 
     var body: some View {
         Button { confirming = true } label: { Image(systemName: "trash").font(.footnote.weight(.bold)) }
-            .buttonStyle(.borderless).tint(Palette.red)
+            .buttonStyle(.borderless).tint(Palette.warning)
             .popover(isPresented: $confirming, arrowEdge: .bottom) {
                 VStack(spacing: 12) {
                     Text("Delete this photo?").font(.footnote.weight(.bold)).foregroundStyle(Palette.text)
@@ -230,7 +230,7 @@ struct DiskImage: View {
         if let img = NSImage(contentsOf: url) {
             Image(nsImage: img).resizable().aspectRatio(contentMode: contentMode)
         } else {
-            Palette.surface2.opacity(0.5)
+            Palette.surfaceElevated.opacity(0.5)
         }
     }
 }

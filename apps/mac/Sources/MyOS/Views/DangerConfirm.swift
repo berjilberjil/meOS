@@ -24,9 +24,9 @@ struct DangerConfirmSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Circle().fill(Palette.red.opacity(0.14))
+                Circle().fill(Palette.warning.opacity(0.14))
                 Image(systemName: step == 0 ? "trash.fill" : "lock.fill")
-                    .font(.title2.weight(.semibold)).foregroundStyle(Palette.red)
+                    .font(.title2.weight(.semibold)).foregroundStyle(Palette.warning)
                     .contentTransition(.symbolEffect(.replace))
             }
             .frame(width: 64, height: 64)
@@ -54,7 +54,7 @@ struct DangerConfirmSheet: View {
 
             if let error {
                 Text(error).font(.caption.weight(.semibold))
-                    .foregroundStyle(Palette.red)
+                    .foregroundStyle(Palette.warning)
                     .multilineTextAlignment(.center)
                     .padding(.top, 10)
             }
@@ -69,7 +69,7 @@ struct DangerConfirmSheet: View {
         .padding(.top, 20)
         .padding(.bottom, 20)
         .frame(maxWidth: .infinity)
-        .background(.hueCanvas)
+        .background(Palette.background)
         .animation(.knNormal, value: step)
     }
 
@@ -85,7 +85,7 @@ struct DangerConfirmSheet: View {
         HStack(spacing: 7) {
             ForEach(0..<3, id: \.self) { i in
                 Capsule()
-                    .fill(i <= step ? Palette.red : Palette.border)
+                    .fill(i <= step ? Palette.warning : Palette.border)
                     .frame(width: i == step ? 22 : 8, height: 6)
             }
         }
@@ -134,7 +134,7 @@ struct DangerConfirmSheet: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent).tint(Palette.red).controlSize(.large).frame(maxWidth: .infinity)
+            .buttonStyle(.borderedProminent).tint(Palette.warning).controlSize(.large).frame(maxWidth: .infinity)
             .disabled(passAgain.isEmpty)
             .opacity(passAgain.isEmpty ? 0.55 : 1)
         }
@@ -257,7 +257,7 @@ struct DangerResetRow: View {
     let confirmTitle: String
     let confirmMessage: String
     var actionLabel: String = "Delete forever"
-    var tint: Color = Palette.red
+    var tint: Color = Palette.warning
     var emphatic: Bool = false
     let action: () -> Void
     @State private var show = false

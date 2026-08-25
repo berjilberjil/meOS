@@ -63,7 +63,7 @@ struct FoodLibrarySection: View {
             Text(label).font(.caption.weight(on ? .semibold : .medium))
                 .foregroundStyle(on ? Palette.text : Palette.muted)
                 .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(on ? Palette.surface2 : .clear, in: Capsule())
+                .background(on ? Palette.surfaceElevated : .clear, in: Capsule())
                 .overlay(Capsule().strokeBorder(on ? Palette.borderStrong : Palette.border, lineWidth: 1))
         }
         .buttonStyle(.plain)
@@ -102,13 +102,13 @@ struct FoodIcon: View {
     }
     private var color: Color {
         switch category {
-        case .protein: return Palette.red
-        case .carb: return Palette.amber
+        case .protein: return Palette.warning
+        case .carb: return Palette.attention
         case .veg: return Palette.green
         case .dairy: return Palette.blue
-        case .fruit: return Palette.purple
+        case .fruit: return Palette.information
         case .drink: return Palette.blue
-        case .junk: return Palette.flame
+        case .junk: return Palette.activity
         case .other: return Palette.muted
         }
     }
@@ -162,7 +162,7 @@ struct FoodPickerSheet: View {
                                 if !f.isDefault {
                                     Text("custom").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
                                 }
-                                Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.brand)
+                                Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.action)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .contentShape(Rectangle())
@@ -215,7 +215,7 @@ struct FoodEditor: View {
                             Spacer(); Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint) }
                         .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 13).padding(.vertical, 10)
-                        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
                     }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden)
@@ -233,7 +233,7 @@ struct FoodEditor: View {
             HStack {
                 if let food, !food.isDefault {
                     Button("Delete") { showDelete = true }
-                        .buttonStyle(.borderless).tint(Palette.red)
+                        .buttonStyle(.borderless).tint(Palette.warning)
                         .holdToDelete(isPresented: $showDelete, title: "Delete \(food.name)?",
                                       message: "Removes it from your food library.") {
                             state.deleteFood(food.id); dismiss()
@@ -293,7 +293,7 @@ struct FoodScanSheet: View {
             ImageDropZone(
                 title: "Drop a nutrition label or product photo",
                 subtitle: "A packaged snack, a menu item, anything with visible macros. AI adds it to your food library and you confirm before it's logged.",
-                tint: Palette.brand,
+                tint: Palette.action,
                 busy: state.imageBusy
             ) { imgs, mt in
                 Task { @MainActor in
@@ -305,7 +305,7 @@ struct FoodScanSheet: View {
                 }
             }
             if let err = state.imageError {
-                Text(err).font(.caption).foregroundStyle(Palette.red)
+                Text(err).font(.caption).foregroundStyle(Palette.warning)
             }
         }
         .padding(20)
@@ -379,7 +379,7 @@ struct FoodScanReviewSheet: View {
                 if included.isEmpty {
                     Text("Select at least one.").font(.footnote).foregroundStyle(Palette.faint)
                 } else {
-                    SlideToConfirm(label: "Slide to log \(included.count)", tint: Palette.brand) {
+                    SlideToConfirm(label: "Slide to log \(included.count)", tint: Palette.action) {
                         for d in included {
                             let saved = state.addFood(d.food)
                             state.addFoodToMeal(date: logDate, meal: d.meal, foodId: saved.id, quantity: d.quantity)
@@ -435,7 +435,7 @@ private struct ScanFoodRow: View {
                 TextField("Serving", text: $draft.food.servingLabel)
                     .textFieldStyle(.plain).font(.caption2).foregroundStyle(Palette.muted)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
                 Stepper(value: $draft.quantity, in: 0.5...20, step: 0.5) {
                     Text("× \(Fmt.trimKg(draft.quantity)) serving\(draft.quantity == 1 ? "" : "s")")
                         .font(.caption2).foregroundStyle(Palette.muted)
@@ -451,7 +451,7 @@ private struct ScanFoodRow: View {
             }
         }
         .padding(11)
-        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(draft.include ? Palette.border : Palette.border.opacity(0.5), lineWidth: 1))
         .opacity(draft.include ? 1 : 0.55)
@@ -468,6 +468,6 @@ private struct ScanFoodRow: View {
                 .foregroundStyle(Palette.text)
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
-        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
+        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.xs, style: .continuous))
     }
 }

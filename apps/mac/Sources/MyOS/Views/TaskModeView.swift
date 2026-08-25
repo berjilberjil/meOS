@@ -18,7 +18,7 @@ struct TaskModeView: View {
 
     var body: some View {
         ZStack {
-            HueCanvas()
+            Palette.background
             FocusSessionView(defaultMinutes: defaultMinutes) { leave() }
         }
         .overlay(alignment: .bottom) { origin }
@@ -40,7 +40,7 @@ struct TaskModeView: View {
                 .font(.caption2.weight(.heavy))
                 .foregroundStyle(Palette.faint)
                 .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(.hueFillStrong, in: Capsule())
+                .background(Palette.surfaceElevated, in: Capsule())
                 .padding(.bottom, 14)
         }
     }

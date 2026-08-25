@@ -34,7 +34,7 @@ struct ScanThumb: View {
                let img = ScanThumbCache.image(for: key, data: bytes) {
                 img.resizable().aspectRatio(contentMode: .fill)
             } else {
-                Palette.surface2
+                Palette.surfaceElevated
                 Image(systemName: record.isFood ? "fork.knife" : "shippingbox.fill")
                     .font(.system(size: size * 0.32, weight: .semibold))
                     .foregroundStyle(Palette.faint)
@@ -124,7 +124,7 @@ struct ScanVerdictView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
     }
 }
 
@@ -147,8 +147,8 @@ enum ScanVerdict {
     static func color(_ n: ScanInsight.Needed) -> Color {
         switch n {
         case .yes: return Palette.green
-        case .no: return Palette.red
-        case .maybe: return Palette.amber
+        case .no: return Palette.warning
+        case .maybe: return Palette.attention
         }
     }
 }
@@ -186,7 +186,7 @@ struct ScanHistoryList: View {
                                           : "Show all \(state.scans.count)")
                                 .font(.caption.weight(.heavy))
                         }
-                        .buttonStyle(.borderless).tint(Palette.teal)
+                        .buttonStyle(.borderless).tint(Palette.success)
                     }
                 }
             }
@@ -264,8 +264,8 @@ private struct ScanHistoryRow: View {
         if record.isFood { return Palette.green }
         switch record.object?.needed {
         case "yes": return Palette.green
-        case "no": return Palette.red
-        default: return Palette.amber
+        case "no": return Palette.warning
+        default: return Palette.attention
         }
     }
 }
@@ -312,7 +312,7 @@ struct ScanDetailSheet: View {
             }
             .padding(20)
         }
-        .background(.hueCanvas)
+        .background(Palette.background)
         .holdToDelete(isPresented: $confirmDelete,
                       title: "Delete this scan?",
                       message: "The photo goes too. This can't be undone.") {
@@ -321,7 +321,7 @@ struct ScanDetailSheet: View {
         }
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(.hueCanvas)
+        content.presentationDetents([.large]).presentationBackground(Palette.background)
         #else
         content.frame(width: 460, height: 620)
         #endif

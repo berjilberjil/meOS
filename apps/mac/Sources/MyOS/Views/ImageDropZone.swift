@@ -16,7 +16,7 @@ import PhotosUI
 struct ImageDropZone: View {
     var title: String
     var subtitle: String
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.action
     var busy: Bool = false
     var startWithCamera: Bool = false
     /// (base64 PNGs, mediaType) — mediaType is always "image/png" here.
@@ -79,7 +79,7 @@ private struct MacImageDropZone: View {
         .padding(.vertical, 26).padding(.horizontal, 18)
         .background(
             RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-                .fill(targeted ? tint.opacity(0.10) : Palette.bg.opacity(0.5))
+                .fill(targeted ? tint.opacity(0.10) : Palette.background.opacity(0.5))
         )
         .overlay(
             RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
@@ -235,7 +235,6 @@ private struct IOSImageDropZone: View {
                         Circle()
                             .fill(tint)
                             .frame(width: 96, height: 96)
-                            .shadow(color: tint.opacity(0.35), radius: 16, y: 8)
                         if busy {
                             ProgressView().controlSize(.large).tint(.white)
                         } else {
@@ -255,7 +254,7 @@ private struct IOSImageDropZone: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20).padding(.horizontal, 20)
-                .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                     .strokeBorder(tint.opacity(0.35), lineWidth: 1.5))
             }

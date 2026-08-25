@@ -39,10 +39,10 @@ struct NotesView: View {
                 ForEach(filtered) { note in
                     Button { openID = note.id } label: { noteRow(note) }
                         .buttonStyle(.plain)
-                        // Every note keeps its own colour between launches — the
-                        // hue is derived from the note's id, so the list reads as
-                        // a set of things rather than as one grey column.
-                        .listRowBackground(Hue.forKey(note.id).fill)
+                        // Notes are not colour-coded. A note's identity is its
+                        // title, and a list of randomly tinted rows was one of
+                        // the loudest sources of visual noise in the app.
+                        .listRowBackground(Palette.surface)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) { pendingDelete = note } label: {
                                 Label("Delete", systemImage: "trash")
@@ -57,7 +57,7 @@ struct NotesView: View {
                                 Label(note.pinned ? "Unpin" : "Pin",
                                       systemImage: note.pinned ? "pin.slash" : "pin")
                             }
-                            .tint(Palette.amber)
+                            .tint(Palette.attention)
                         }
                         .contextMenu {
                             Button { state.togglePinNote(note.id) } label: {
@@ -77,7 +77,7 @@ struct NotesView: View {
         // The grouped list paints its own grey; hide it so the tab's canvas
         // shows through behind the coloured rows.
         .scrollContentBackground(.hidden)
-        .background(HueCanvas())
+        .background(Palette.background)
         .searchable(text: $query, prompt: "Search notes")
         // A real push now that MainView gives every tab a NavigationStack. This
         // used to be a `fullScreenCover` purely because there was no stack to
@@ -129,7 +129,7 @@ struct NotesView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 if note.pinned {
-                    Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
+                    Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.attention)
                 }
                 Text(note.title.isEmpty ? "Untitled" : note.title)
                     .font(.callout.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
@@ -197,13 +197,13 @@ private struct NoteEditor: View {
             HStack {
                 Button { dismiss() } label: {
                     HStack(spacing: 3) { Image(systemName: "chevron.left"); Text("Notes") }
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.brand)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.action)
                 }
                 Spacer()
                 if let n = state.note(id) {
                     Button { state.togglePinNote(id) } label: {
                         Image(systemName: n.pinned ? "pin.fill" : "pin").font(.subheadline)
-                            .foregroundStyle(n.pinned ? Palette.amber : Palette.muted)
+                            .foregroundStyle(n.pinned ? Palette.attention : Palette.muted)
                     }
                 }
             }
@@ -216,12 +216,12 @@ private struct NoteEditor: View {
             TextEditor(text: $text)
                 .font(.callout).foregroundStyle(Palette.text)
                 .scrollContentBackground(.hidden)
-                .background(.hueCanvas)
+                .background(Palette.background)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onChange(of: text) { save() }
         }
         .padding(16)
-        .background(HueCanvas())
+        .background(Palette.background)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             guard !loaded else { return }

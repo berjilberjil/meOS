@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Shared mood ramp (1 rough → 5 great), used by the slider and the calendar dots.
 func moodTint(_ m: Int) -> Color {
-    [Palette.red, Color(hex: 0xF59E0B), Palette.amber, Color(hex: 0x7DD37D), Palette.green][max(1, min(5, m)) - 1]
+    [Palette.warning, Color(hex: 0xF59E0B), Palette.attention, Color(hex: 0x7DD37D), Palette.green][max(1, min(5, m)) - 1]
 }
 
 /// Which 1...5 mood stop a horizontal position `x` (0..<width) falls on. Pure so
@@ -49,7 +49,7 @@ struct JournalView: View {
                 // "Today" lives on the same row as the Events/Journal tabs, right-aligned.
                 if jseg == .journal && !isToday {
                     Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: { Text("Today") }
-                        .buttonStyle(.bordered).tint(Palette.brand)
+                        .buttonStyle(.bordered).tint(Palette.action)
                 }
             }
             if jseg == .events { EventsView() } else { journalBody }
@@ -66,7 +66,7 @@ struct JournalView: View {
                     }
                     .padding(16)
                 }
-                .background(HueCanvas())
+                .background(Palette.background)
                 .navigationTitle("Journal presets")
                 .navigationBarTitleDisplayMode(.inline)
             }
@@ -120,7 +120,7 @@ struct JournalView: View {
                     Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
                         Text("Today")
                     }
-                    .buttonStyle(.bordered).tint(Palette.brand)
+                    .buttonStyle(.bordered).tint(Palette.action)
                     .help("Back to today")
                 }
                 dateNavigator
@@ -136,7 +136,7 @@ struct JournalView: View {
                 Button { withAnimation(.knFast) { viewedDate = state.todayKey } } label: {
                     Text("Today")
                 }
-                .buttonStyle(.bordered).tint(Palette.brand)
+                .buttonStyle(.bordered).tint(Palette.action)
                 .help("Back to today")
             }
             dateNavigator
@@ -146,36 +146,36 @@ struct JournalView: View {
 
     @ViewBuilder private var dayContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            StreakCard().cardHue(.amber).cardLook(.bold).knRise(1)
+            StreakCard().knRise(1)
 
-            moodCard.cardHue(.pink).knRise(2)
+            moodCard.knRise(2)
             reflectionCard(title: "Morning reflection",
                            text: Binding(get: { entry.morning },
                                          set: { v in state.updateJournal(viewedDate) { $0.morning = v } }),
                            prompt: "What matters today? How do you want to show up?",
-                           presets: state.journalPresets.morning, tint: Palette.amber).cardHue(.amber).knRise(3)
+                           presets: state.journalPresets.morning, tint: Palette.attention).knRise(3)
             reflectionCard(title: "Night reflection",
                            text: Binding(get: { entry.night },
                                          set: { v in state.updateJournal(viewedDate) { $0.night = v } }),
                            prompt: "How did today actually go?",
-                           presets: state.journalPresets.night, tint: Palette.blue).cardHue(.indigo).knRise(4)
+                           presets: state.journalPresets.night, tint: Palette.blue).knRise(4)
 
             listCard(title: "Wins", color: Palette.green, items: entry.wins,
                      presets: state.journalPresets.wins,
                      add: { s in state.updateJournal(viewedDate) { $0.wins.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.wins.remove(at: i) } }).cardHue(.green).knRise(5)
-            listCard(title: "Mistakes", color: Palette.red, items: entry.mistakes,
+                     remove: { i in state.updateJournal(viewedDate) { $0.wins.remove(at: i) } }).knRise(5)
+            listCard(title: "Mistakes", color: Palette.warning, items: entry.mistakes,
                      presets: state.journalPresets.mistakes,
                      add: { s in state.updateJournal(viewedDate) { $0.mistakes.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.mistakes.remove(at: i) } }).cardHue(.red).knRise(6)
+                     remove: { i in state.updateJournal(viewedDate) { $0.mistakes.remove(at: i) } }).knRise(6)
             listCard(title: "Lessons", color: Palette.blue, items: entry.lessons,
                      presets: state.journalPresets.lessons,
                      add: { s in state.updateJournal(viewedDate) { $0.lessons.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.lessons.remove(at: i) } }).cardHue(.blue).knRise(7)
-            listCard(title: "Gratitude", color: Palette.purple, items: entry.gratitude,
+                     remove: { i in state.updateJournal(viewedDate) { $0.lessons.remove(at: i) } }).knRise(7)
+            listCard(title: "Gratitude", color: Palette.information, items: entry.gratitude,
                      presets: state.journalPresets.gratitude,
                      add: { s in state.updateJournal(viewedDate) { $0.gratitude.append(s) } },
-                     remove: { i in state.updateJournal(viewedDate) { $0.gratitude.remove(at: i) } }).cardHue(.purple).knRise(8)
+                     remove: { i in state.updateJournal(viewedDate) { $0.gratitude.remove(at: i) } }).knRise(8)
         }
     }
 
@@ -196,7 +196,7 @@ struct JournalView: View {
                 }
                 .foregroundStyle(Palette.text)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(.hueFillStrong, in: Capsule())
+                .background(Palette.surfaceElevated, in: Capsule())
                 .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
                 .contentShape(Capsule())
             }
@@ -264,20 +264,14 @@ struct StreakFlame: View {
         case .done:
             Image(systemName: "flame.fill")
                 .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(
-                    LinearGradient(colors: [Palette.amber, Palette.flame],
-                                   startPoint: .top, endPoint: .bottom)
-                )
+                .foregroundStyle(Palette.complete)
         case .frozen:
             Image(systemName: "flame.fill")
                 .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(
-                    LinearGradient(colors: [Palette.ice, Palette.blue],
-                                   startPoint: .top, endPoint: .bottom)
-                )
+                .foregroundStyle(Palette.information)
         case .none:
             Circle()
-                .fill(.hueFillStrong)
+                .fill(Palette.surfaceElevated)
                 .frame(width: size * 0.55, height: size * 0.55)
         }
     }
@@ -329,17 +323,17 @@ private struct StreakCard: View {
                 VStack(spacing: 6) {
                     Text(letters[i])
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(isToday ? Palette.amber : Palette.faint)
+                        .foregroundStyle(isToday ? Palette.attention : Palette.faint)
                     Group {
                         if isFuture {
-                            Circle().fill(Palette.surface2.opacity(0.5))
+                            Circle().fill(Palette.surfaceElevated.opacity(0.5))
                                 .frame(width: 8, height: 8)
                         } else if isToday && state.journalStreakDay(key) == .none {
                             // Outline flame under today so the highlight and the
                             // fire sit on the same column (not under yesterday).
                             Image(systemName: "flame")
                                 .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Palette.amber.opacity(0.85))
+                                .foregroundStyle(Palette.attention.opacity(0.85))
                         } else {
                             StreakFlame(day: state.journalStreakDay(key), size: isToday ? 16 : 14)
                         }
@@ -350,14 +344,14 @@ private struct StreakCard: View {
                 .frame(maxWidth: .infinity)
                 .background(
                     isToday
-                    ? Palette.amber.opacity(0.12)
+                    ? Palette.attention.opacity(0.12)
                     : Color.clear,
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                 )
             }
         }
         .padding(.vertical, 12).padding(.horizontal, 8)
-        .background(HueFill(level: .strong).opacity(0.45),
+        .background(Palette.surfaceElevated.opacity(0.45),
                     in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
@@ -403,7 +397,7 @@ struct StreakCalendar: View {
         .padding(wide ? 18 : 14)
         .frame(width: wide ? nil : 268)
         .frame(maxWidth: wide ? .infinity : nil)
-        .background(wide ? Palette.bg : Palette.elevated)
+        .background(wide ? Palette.background : Palette.elevated)
     }
 
     /// What the flames mean — lit vs frozen.
@@ -419,7 +413,7 @@ struct StreakCalendar: View {
             }
             Spacer()
             HStack(spacing: 4) {
-                Image(systemName: "flame.fill").font(.caption2).foregroundStyle(Palette.flame)
+                Image(systemName: "flame.fill").font(.caption2).foregroundStyle(Palette.activity)
                 Text("\(state.journalStreak)d")
                     .font(.caption2.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
@@ -508,12 +502,12 @@ struct StreakCalendar: View {
                 .frame(height: 10)
             }
             .frame(width: 32, height: 38)
-            .background(isViewed ? Palette.brand : .clear,
+            .background(isViewed ? Palette.action : .clear,
                         in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 if isToday && !isViewed {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Palette.brand.opacity(0.6), lineWidth: 1)
+                        .strokeBorder(Palette.action.opacity(0.6), lineWidth: 1)
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -574,7 +568,7 @@ private struct MoodSlider: View {
                 let w = geo.size.width
                 let centerX = (CGFloat(value) - 0.5) / 5 * w
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.hueFillStrong).frame(height: 10)
+                    Capsule().fill(Palette.surfaceElevated).frame(height: 10)
                     Capsule().fill(moodTint(value)).frame(width: max(13, centerX), height: 10)
                     Circle().fill(.white)
                         .frame(width: 26, height: 26)
@@ -623,7 +617,7 @@ private struct ReflectionEditor: View {
     @Binding var text: String
     let prompt: String
     var presets: [String] = []
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.action
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -636,10 +630,10 @@ private struct ReflectionEditor: View {
                     .focused($focused)
                     .frame(minHeight: 56)
                     .padding(10)
-                    .background(HueFill(level: .strong).opacity(0.6),
+                    .background(Palette.surfaceElevated.opacity(0.6),
                                 in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(focused ? Palette.brand.opacity(0.7) : Palette.border, lineWidth: 1))
+                        .strokeBorder(focused ? Palette.action.opacity(0.7) : Palette.border, lineWidth: 1))
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
                             Text(prompt).font(.footnote).foregroundStyle(Palette.faint)

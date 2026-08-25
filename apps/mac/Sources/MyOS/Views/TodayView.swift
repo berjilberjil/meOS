@@ -49,8 +49,7 @@ struct TodayView: View {
                 // Each section hands its own colour and fill down; the card
                 // types themselves stay unaware they are on Today.
                 todaySection(section)
-                    .cardHue(section.hue)
-                    .cardLook(section.look)
+                    .cardAccent(section.accent)
                     .knRise(idx + 1)
             }
             #if os(macOS)
@@ -122,6 +121,7 @@ struct TodayView: View {
                     Spacer(minLength: 0)
                     if st == .logged {
                         Image(systemName: "checkmark.circle.fill").font(.footnote)
+                            .foregroundStyle(Palette.complete)
                     }
                 }
                 .foregroundStyle(Palette.text)
@@ -135,7 +135,9 @@ struct TodayView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             // A logged meal fills with its own colour; one still open stays
             // washed, so the grid reads at a glance without a legend.
-            .cardSkin(st == .logged ? .bold : .tinted, hue: meal.hue)
+            // State is carried by the tick and the type, not by a fill — a
+            // logged meal is not a different kind of thing from a planned one.
+            .cardSkin(.plain)
         }
         .buttonStyle(.plain)
     }
@@ -174,7 +176,7 @@ struct TodayView: View {
 
     private func eventLine(_ e: EventItem) -> some View {
         let tag = state.primaryTag(for: e)
-        let color = tag?.color ?? Palette.brand
+        let color = tag?.color ?? Palette.action
         let icon = tag?.symbol ?? "calendar"
         return HStack(spacing: 11) {
             Image(systemName: icon)
@@ -183,7 +185,7 @@ struct TodayView: View {
                 .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber) }
+                    if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.attention) }
                     Text(e.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 }
                 Text(eventCountdown(e)).font(.caption2.weight(.heavy)).foregroundStyle(Palette.muted)
@@ -236,7 +238,7 @@ struct TodayView: View {
                         Text("Getting today's news…").font(.footnote).foregroundStyle(Palette.muted) }
                         .padding(.vertical, 6)
                 } else if let err = state.newsError {
-                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.amber)
+                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.attention)
                 } else {
                     Button { Task { await state.fetchNews() } } label: { Label("Get today's news", systemImage: "newspaper") }
                         .buttonStyle(.bordered)
@@ -247,7 +249,7 @@ struct TodayView: View {
 
     @ViewBuilder
     private func newsColumns(_ n: NewsResult) -> some View {
-        let tech = newsColumn("Tech", tint: Palette.purple, icon: "cpu.fill",
+        let tech = newsColumn("Tech", tint: Palette.information, icon: "cpu.fill",
                               items: n.items.filter { techCats.contains($0.category) })
         let finance = newsColumn("Finance", tint: Palette.green, icon: "indianrupeesign.circle.fill",
                                  items: n.items.filter { financeCats.contains($0.category) })
@@ -338,9 +340,9 @@ struct TodayView: View {
                             Image(systemName: "sparkles").font(.caption2.weight(.bold))
                             Text("Ask AI").font(.caption2.weight(.heavy))
                         }
-                        .foregroundStyle(Palette.brand)
+                        .foregroundStyle(Palette.action)
                         .padding(.horizontal, 8).padding(.vertical, 5)
-                        .background(Palette.brand.opacity(0.14), in: Capsule())
+                        .background(Palette.action.opacity(0.14), in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .help("Chat about this with your mentor")
@@ -350,7 +352,7 @@ struct TodayView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(HueFill(level: .strong).opacity(open ? 0.4 : 0.18),
+        .background(Palette.surfaceElevated.opacity(open ? 0.4 : 0.18),
                     in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
     }
 
@@ -362,9 +364,9 @@ struct TodayView: View {
 
     private func newsColor(_ cat: String) -> Color {
         switch cat {
-        case "ai", "tech": return Palette.purple
+        case "ai", "tech": return Palette.information
         case "markets", "india": return Palette.green
-        case "crypto": return Palette.amber
+        case "crypto": return Palette.attention
         default: return Palette.blue
         }
     }
@@ -376,7 +378,7 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles").font(.footnote.weight(.bold))
-                        .foregroundStyle(Palette.brand)
+                        .foregroundStyle(Palette.action)
                     SectionTitle(text: "What to do now")
                     Spacer()
                     Button { Task { await state.fetchSuggestions() } } label: {
@@ -407,7 +409,7 @@ struct TodayView: View {
                 } else if let err = state.suggestError {
                     VStack(alignment: .leading, spacing: 8) {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundStyle(Palette.amber)
+                            .font(.caption).foregroundStyle(Palette.attention)
                         Button("Try again") { Task { await state.fetchSuggestions() } }
                             .buttonStyle(.bordered)
                     }
@@ -442,7 +444,7 @@ struct TodayView: View {
     }
 
     private func impactTag(_ impact: String) -> some View {
-        let color: Color = impact == "high" ? Palette.red : (impact == "medium" ? Palette.amber : Palette.faint)
+        let color: Color = impact == "high" ? Palette.warning : (impact == "medium" ? Palette.attention : Palette.faint)
         return Text(impact.uppercased())
             .font(.caption2.weight(.heavy)).tracking(0.5)
             .foregroundStyle(color)
@@ -464,10 +466,10 @@ struct TodayView: View {
         switch area {
         case "money": return Palette.green
         case "fitness": return Palette.blue
-        case "content": return Palette.purple
-        case "career": return Palette.amber
-        case "mind": return Palette.purple
-        default: return Palette.brand
+        case "content": return Palette.information
+        case "career": return Palette.attention
+        case "mind": return Palette.information
+        default: return Palette.action
         }
     }
 
@@ -499,7 +501,7 @@ struct TodayView: View {
                         Button("Today") { withAnimation(.knNormal) { setDate(state.todayKey) } }
                             .buttonStyle(.plain)
                             .font(.caption2.weight(.bold))
-                            .foregroundStyle(Palette.brand)
+                            .foregroundStyle(Palette.action)
                     }
                 }
             }
@@ -525,8 +527,8 @@ struct TodayView: View {
                     .foregroundStyle(Palette.muted)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(.hueFill, in: Capsule())
-            .overlay(Capsule().strokeBorder((ice ? Palette.ice : Palette.flame).opacity(0.4), lineWidth: 1.5))
+            .background(Palette.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder((ice ? Palette.information : Palette.activity).opacity(0.4), lineWidth: 1.5))
         }
         .buttonStyle(.plain)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
@@ -556,14 +558,14 @@ struct TodayView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { showStreakCal = false }
-                        .font(.body.weight(.semibold)).foregroundStyle(Palette.brand)
+                        .font(.body.weight(.semibold)).foregroundStyle(Palette.action)
                 }
             }
             #endif
         }
         #if os(iOS)
         .presentationDetents([.medium, .large])
-        .presentationBackground(.hueCanvas)
+        .presentationBackground(Palette.background)
         #else
         .frame(width: 360, height: 420)
         #endif
@@ -606,7 +608,7 @@ struct TodayView: View {
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.hueFillStrong).frame(height: 5)
+                    Capsule().fill(Palette.surfaceElevated).frame(height: 5)
                     Capsule().fill(Palette.text).frame(width: max(4, g.size.width * value), height: 5)
                 }
             }

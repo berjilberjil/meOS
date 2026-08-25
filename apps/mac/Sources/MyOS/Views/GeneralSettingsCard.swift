@@ -41,7 +41,7 @@ struct GeneralSettingsCard: View {
         let inner = VStack(alignment: .leading, spacing: 6) {
             SectionTitle(text: "General").padding(.bottom, 8)
             boxedRow(title: "Where I left off", icon: "arrow.uturn.backward",
-                     tint: Palette.teal, selected: prefs.launchTab == nil, divider: false) {
+                     tint: Palette.success, selected: prefs.launchTab == nil, divider: false) {
                 prefs.launchTab = nil
             }
             ForEach(options) { t in
@@ -58,7 +58,7 @@ struct GeneralSettingsCard: View {
                 SettingsIntro(text: "Where MyOS opens. Resuming also reopens what you had open — the note you were writing, not just the screen it was on.")
                 SettingsGroup {
                     SettingsPickRow(title: "Where I left off", icon: "arrow.uturn.backward",
-                                    tint: Palette.teal, selected: prefs.launchTab == nil) {
+                                    tint: Palette.success, selected: prefs.launchTab == nil) {
                         Haptics.selection()
                         prefs.launchTab = nil
                     }

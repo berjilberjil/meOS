@@ -48,7 +48,7 @@ struct MacroPulseView: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(.hueCanvas)
+        .background(Palette.background)
         .task { await state.loadMacro(date: date) }
         .sheet(item: $detail) { m in
             MacroMetricDetail(metric: m, snapshot: snap)
@@ -74,7 +74,7 @@ struct MacroPulseView: View {
             VStack(spacing: 1) {
                 Text("MACRO PULSE")
                     .font(.caption2.weight(.heavy)).tracking(1.2)
-                    .foregroundStyle(Palette.brand)
+                    .foregroundStyle(Palette.action)
                 if state.macroBusy {
                     Text("reading…")
                         .font(.caption2.weight(.heavy))
@@ -117,7 +117,7 @@ struct MacroPulseView: View {
                 Spacer(minLength: 0)
                 if !isToday {
                     Button("Today") { go(state.todayKey) }
-                        .buttonStyle(.bordered).tint(Palette.brand)
+                        .buttonStyle(.bordered).tint(Palette.action)
                 }
             }
             HStack(spacing: 6) {
@@ -127,7 +127,7 @@ struct MacroPulseView: View {
                             .font(.caption2.weight(.heavy))
                             .foregroundStyle(r == range ? Brandmark.ink : Palette.muted)
                             .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(r == range ? Palette.brand : Palette.surface2, in: Capsule())
+                            .background(r == range ? Palette.action : Palette.surfaceElevated, in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -195,7 +195,7 @@ struct MacroPulseView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(brief.changed, id: \.metric) { c in
                                     HStack(alignment: .top, spacing: 8) {
-                                        Circle().fill(Palette.brand).frame(width: 5, height: 5).padding(.top, 6)
+                                        Circle().fill(Palette.action).frame(width: 5, height: 5).padding(.top, 6)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(c.metric)
                                                 .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
@@ -216,9 +216,9 @@ struct MacroPulseView: View {
                                 ForEach(brief.watch, id: \.self) { w in
                                     Text(w)
                                         .font(.caption2.weight(.heavy))
-                                        .foregroundStyle(Palette.purple)
+                                        .foregroundStyle(Palette.information)
                                         .padding(.horizontal, 8).padding(.vertical, 4)
-                                        .background(Palette.purple.opacity(0.14), in: Capsule())
+                                        .background(Palette.information.opacity(0.14), in: Capsule())
                                 }
                                 Spacer(minLength: 0)
                             }
@@ -226,7 +226,7 @@ struct MacroPulseView: View {
                     }
                     if brief.speculative {
                         Text("The \"why\" here is inference from the numbers, not a reported cause.")
-                            .font(.caption2).foregroundStyle(Palette.amber)
+                            .font(.caption2).foregroundStyle(Palette.attention)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -282,7 +282,7 @@ struct MacroPulseView: View {
         Card(padding: 12) {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(Palette.amber)
+                    .font(.caption).foregroundStyle(Palette.attention)
                 Text(err).font(.caption).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -292,7 +292,7 @@ struct MacroPulseView: View {
 
     private var loading: some View {
         VStack(spacing: 10) {
-            ProgressView().controlSize(.large).tint(Palette.brand)
+            ProgressView().controlSize(.large).tint(Palette.action)
             Text("Reading the tape…")
                 .font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
         }
@@ -376,7 +376,7 @@ struct MacroMetricCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))

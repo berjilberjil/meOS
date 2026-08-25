@@ -35,33 +35,25 @@ enum TodaySection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The section's colour. Today is a stack of nine different cards, so nine
-    /// different hues — the page is meant to read as a set of things, not as one
-    /// long list.
-    var hue: Hue {
+    /// The accent this section has earned, by meaning — not by position in the
+    /// list. Nine sections do NOT get nine colours: activity and food are
+    /// orange, fitness and completion are green, events and information are
+    /// blue, and anything without a semantic claim stays uncoloured.
+    var accent: Accent {
         switch self {
-        case .activity: return .green
-        case .intake: return .orange
-        case .meals: return .teal
-        case .workout: return .blue
-        case .comingUp: return .purple
-        case .bodyPhotos: return .cyan
-        case .watchLog: return .amber
-        case .focus: return .pink
-        case .news: return .indigo
+        case .activity:   return .orange   // activity / time
+        case .intake:     return .orange   // nutrition
+        case .meals:      return .orange   // nutrition
+        case .workout:    return .green    // fitness
+        case .bodyPhotos: return .green    // fitness
+        case .focus:      return .green    // completion
+        case .comingUp:   return .blue     // events
+        case .news:       return .blue     // information
+        case .watchLog:   return .none
         }
     }
 
-    var tint: Color { hue.core }
-
-    /// The three that answer "how is today going" get the saturated treatment;
-    /// the rest are washed, or plain where colour would fight the content.
-    var look: CardLook {
-        switch self {
-        case .activity, .intake, .workout: return .bold
-        default: return .tinted
-        }
-    }
+    var tint: Color { accent.tint }
 
     var available: Bool { true }
 

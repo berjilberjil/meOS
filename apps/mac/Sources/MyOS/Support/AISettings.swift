@@ -17,7 +17,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var accent: Color {
         switch self {
         case .gemini:    return Palette.blue
-        case .anthropic: return Palette.flame
+        case .anthropic: return Palette.activity
         case .openai:    return Palette.green
         }
     }

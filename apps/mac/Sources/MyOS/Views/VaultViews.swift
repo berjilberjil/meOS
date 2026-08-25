@@ -28,7 +28,7 @@ struct VaultSetupView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let err = state.vaultError {
-                    Text(err).font(.footnote).foregroundStyle(Palette.red)
+                    Text(err).font(.footnote).foregroundStyle(Palette.warning)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -85,7 +85,7 @@ struct VaultUnlockView: View {
                 }
 
                 if let err = state.vaultError {
-                    Text(err).font(.footnote).foregroundStyle(Palette.red)
+                    Text(err).font(.footnote).foregroundStyle(Palette.warning)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -134,7 +134,7 @@ struct RecoveryCodeOverlay: View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
             VStack(spacing: 16) {
-                Image(systemName: "key.fill").font(.largeTitle).foregroundStyle(Palette.brand)
+                Image(systemName: "key.fill").font(.largeTitle).foregroundStyle(Palette.action)
                 Text("Your recovery code")
                     .font(.title3.weight(.bold)).foregroundStyle(Palette.text)
                 Text("This is the only way back in if you forget your passphrase or lose this Mac. Save it in your password manager now — we can’t show it again.")
@@ -148,8 +148,8 @@ struct RecoveryCodeOverlay: View {
                     .textSelection(.enabled)
                     .padding(.vertical, 14).padding(.horizontal, 18)
                     .frame(maxWidth: .infinity)
-                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.ring, lineWidth: 1))
+                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.action, lineWidth: 1))
 
                 Button {
                     #if os(macOS)
@@ -181,8 +181,8 @@ struct RecoveryCodeOverlay: View {
             }
             .padding(26)
             .frame(width: 400)
-            .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.ring, lineWidth: 1))
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.action, lineWidth: 1))
             .knShadow(true)
         }
     }
@@ -200,7 +200,7 @@ private struct VaultShell<Content: View>: View {
         VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 12) {
-                Image(systemName: icon).font(.largeTitle).foregroundStyle(Palette.brand)
+                Image(systemName: icon).font(.largeTitle).foregroundStyle(Palette.action)
                 VStack(spacing: 6) {
                     Text(title).font(.title.weight(.bold)).foregroundStyle(Palette.text)
                     Text(subtitle)
@@ -215,12 +215,12 @@ private struct VaultShell<Content: View>: View {
             VStack(spacing: 12) { content() }
                 .padding(24)
                 .frame(width: 360)
-                .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.ring, lineWidth: 1))
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous).strokeBorder(Palette.action, lineWidth: 1))
                 .knShadow(true)
             Spacer(); Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(HueCanvas())
+        .background(Palette.background)
     }
 }

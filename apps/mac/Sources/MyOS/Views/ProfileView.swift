@@ -15,15 +15,15 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: Gap.screen) {
             // Nine cards, nine colours — a profile is a set of unrelated
             // facets, and one tint for all of them made it read as a form.
-            headerCard.cardHue(.indigo).cardLook(.bold).knRise(0)
-            identityCard.cardHue(.blue).knRise(1)
-            bodyCard.cardHue(.cyan).knRise(2)
-            careerCard.cardHue(.purple).knRise(3)
-            aboutCard.cardHue(.teal).knRise(4)
-            goalsCard.cardHue(.green).knRise(5)
-            achievementsCard.cardHue(.amber).knRise(6)
-            healthCard.cardHue(.pink).knRise(7)
-            linksCard.cardHue(.orange).knRise(8)
+            headerCard.knRise(0)
+            identityCard.knRise(1)
+            bodyCard.knRise(2)
+            careerCard.knRise(3)
+            aboutCard.knRise(4)
+            goalsCard.knRise(5)
+            achievementsCard.knRise(6)
+            healthCard.knRise(7)
+            linksCard.knRise(8)
         }
     }
 
@@ -63,7 +63,7 @@ struct ProfileView: View {
             Button { withAnimation(.knFast) { isEditing = true } } label: {
                 Label("Edit profile", systemImage: "pencil")
             }
-            .buttonStyle(.borderless).tint(Palette.brand)
+            .buttonStyle(.borderless).tint(Palette.action)
         }
     }
 
@@ -74,7 +74,7 @@ struct ProfileView: View {
         }
         .foregroundStyle(Palette.muted)
         .padding(.horizontal, 9).padding(.vertical, 4)
-        .background(HueFill(level: .strong).opacity(0.7), in: Capsule())
+        .background(Palette.surfaceElevated.opacity(0.7), in: Capsule())
         .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
     }
 
@@ -87,7 +87,7 @@ struct ProfileView: View {
             if let img = profileImage {
                 Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
             } else {
-                LinearGradient(colors: [Palette.brand, Palette.brandDeep], startPoint: .top, endPoint: .bottom)
+                Palette.action
                 Text(initials).font(.title2.weight(.bold)).foregroundStyle(.white)
             }
         }
@@ -296,7 +296,7 @@ struct ProfileView: View {
                 GoalList(title: "Mid term", color: Palette.blue, items: state.profile.goalsMid, editing: isEditing,
                          add: { s in state.updateProfile { $0.goalsMid.append(s) } },
                          remove: { i in state.updateProfile { $0.goalsMid.remove(at: i) } })
-                GoalList(title: "Long term", color: Palette.purple, items: state.profile.goalsLong, editing: isEditing,
+                GoalList(title: "Long term", color: Palette.information, items: state.profile.goalsLong, editing: isEditing,
                          add: { s in state.updateProfile { $0.goalsLong.append(s) } },
                          remove: { i in state.updateProfile { $0.goalsLong.remove(at: i) } })
             }
@@ -385,7 +385,7 @@ struct ProfileView: View {
             .foregroundStyle(value.isEmpty ? Palette.faint : Palette.text)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(HueFill(level: .strong).opacity(0.25),
+            .background(Palette.surfaceElevated.opacity(0.25),
                         in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                 .strokeBorder(Palette.border.opacity(0.6), lineWidth: 1))
@@ -458,7 +458,7 @@ struct ProfileView: View {
                 Text(hint).font(.caption2).foregroundStyle(Palette.faint)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(HueFill(level: .strong).opacity(0.35),
+            .background(Palette.surfaceElevated.opacity(0.35),
                         in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                 .strokeBorder(Palette.border, lineWidth: 1))
@@ -560,9 +560,9 @@ private struct AchievementsEditor: View {
                 HStack(alignment: .top, spacing: 11) {
                     Text(m.year.isEmpty ? "—" : m.year)
                         .font(.caption2.weight(.bold)).monospacedDigit()
-                        .foregroundStyle(Palette.amber)
+                        .foregroundStyle(Palette.attention)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Palette.amber.opacity(0.12), in: Capsule())
+                        .background(Palette.attention.opacity(0.12), in: Capsule())
                     VStack(alignment: .leading, spacing: 2) {
                         Text(m.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         if !m.note.isEmpty {
@@ -593,7 +593,7 @@ private struct AchievementsEditor: View {
                         .focused($focused)
                         .onSubmit(commit)
                     Button(action: commit) {
-                        Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.amber)
+                        Image(systemName: "plus.circle.fill").font(.callout).foregroundStyle(Palette.attention)
                     }
                     .buttonStyle(.plain)
                     .opacity(title.isEmpty ? 0.35 : 1)
@@ -631,10 +631,10 @@ private struct HealthEditor: View {
                 .focused($focused)
                 .frame(minHeight: 64)
                 .padding(10)
-                .background(HueFill(level: .strong).opacity(0.6),
+                .background(Palette.surfaceElevated.opacity(0.6),
                             in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .strokeBorder(focused ? Palette.brand.opacity(0.7) : Palette.border, lineWidth: 1))
+                    .strokeBorder(focused ? Palette.action.opacity(0.7) : Palette.border, lineWidth: 1))
                 .animation(.knFast, value: focused)
         } else {
             Text(state.profile.healthNotes.isEmpty ? "—" : state.profile.healthNotes)

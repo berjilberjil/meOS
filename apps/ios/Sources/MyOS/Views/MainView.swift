@@ -154,19 +154,17 @@ private extension View {
         self
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            // The tab's colour, as the page behind the content and as the hue
-            // every card in it inherits.
-            .pageTint(tab.hue)
-            // The bars take the same canvas. Left to itself the default bar
-            // material renders a grey slab over a coloured page, so the top and
+            .pageBackground()
+            // The bars take the canvas too. Left to itself the default bar
+            // material renders a grey slab over a black page, so the top and
             // bottom of every screen read as a different colour from the middle.
-            .toolbarBackground(tab.hue.canvas, for: .tabBar)
+            .toolbarBackground(Palette.background, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
-            .toolbarBackground(tab.hue.canvas, for: .navigationBar)
+            .toolbarBackground(Palette.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Text(tab.title).font(.headline).foregroundStyle(tab.hue.ink)
+                    Text(tab.title).font(.headline).foregroundStyle(Palette.text)
                 }
             }
     }
@@ -176,10 +174,10 @@ private extension View {
     func pushedChrome(_ tab: NavTab) -> some View {
         self
             .navigationBarTitleDisplayMode(.inline)
-            .pageTint(tab.hue)
-            .toolbarBackground(tab.hue.canvas, for: .navigationBar)
+            .pageBackground()
+            .toolbarBackground(Palette.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(tab.hue.canvas, for: .tabBar)
+            .toolbarBackground(Palette.background, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
     }
 }

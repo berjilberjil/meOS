@@ -8,7 +8,7 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            HueCanvas()
+            Palette.background
             Group {
                 switch state.phase {
                 case .loading:

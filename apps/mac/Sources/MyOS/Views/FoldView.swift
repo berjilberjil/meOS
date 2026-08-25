@@ -47,10 +47,10 @@ struct FoldView: View {
             .knRise(0)
 
             if let err = state.foldError {
-                Text(err).font(.footnote).foregroundStyle(Palette.amber)
+                Text(err).font(.footnote).foregroundStyle(Palette.attention)
             } else if !state.foldLinked, state.fold != nil {
                 Text("This is a saved snapshot, not a live pull. Tap Connect Fold, enter the OTP Fold texts you, then refresh. The date only changes after Fold answers.")
-                    .font(.footnote).foregroundStyle(Palette.amber)
+                    .font(.footnote).foregroundStyle(Palette.attention)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let f = state.fold { dashboard(f) } else { connectState }
@@ -71,9 +71,10 @@ struct FoldView: View {
     // MARK: - Connected: the real dashboard
 
     @ViewBuilder private func dashboard(_ f: FoldData) -> some View {
-        // Hero — net worth + sparkline + rollup, Fold-home style. The one
-        // number the tab exists for, so it gets the saturated fill.
-        Card(hue: .green, look: .bold) {
+        // Hero — net worth + sparkline + rollup, Fold-home style. It is the
+        // number the tab exists for; that is carried by size and position, not
+        // by filling the card with a colour.
+        Card {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -143,7 +144,7 @@ struct FoldView: View {
                     }
                 }
             }
-            .cardHue(.blue)
+            
             .knRise(2)
         }
 
@@ -161,7 +162,7 @@ struct FoldView: View {
                     }
                 }
             }
-            .cardHue(.orange)
+            
             .knRise(3)
         }
 
@@ -181,7 +182,7 @@ struct FoldView: View {
 
     private func changeChip(_ f: FoldData) -> some View {
         let up = f.changeValue >= 0
-        let c = up ? Palette.green : Palette.red
+        let c = up ? Palette.green : Palette.warning
         return HStack(spacing: 3) {
             Image(systemName: up ? "arrow.up.right" : "arrow.down.right").font(.caption2.weight(.bold))
             Text(inr(abs(f.changeValue))).font(.caption.weight(.semibold)).monospacedDigit()
@@ -206,10 +207,10 @@ struct FoldView: View {
 
     @ViewBuilder private var connectState: some View {
         LazyVGrid(columns: cols, spacing: 12) {
-            FoldTile(label: "Net worth", accent: Palette.brand)
+            FoldTile(label: "Net worth", accent: Palette.action)
             FoldTile(label: "Bank balance", accent: Palette.green)
             FoldTile(label: "Investments", accent: Palette.blue)
-            FoldTile(label: "Spent this month", accent: Palette.red)
+            FoldTile(label: "Spent this month", accent: Palette.warning)
         }
         .knRise(1)
 
@@ -351,7 +352,7 @@ struct FoldData: Codable, Equatable {
 /// A dashboard stat placeholder — a labelled empty value used only in the connect state.
 private struct FoldTile: View {
     let label: String
-    var accent: Color = Palette.brand
+    var accent: Color = Palette.action
 
     var body: some View {
         Card {
@@ -392,7 +393,7 @@ private struct FoldLoginSheet: View {
                         .keyboardType(.phonePad)
                         #endif
                         .padding(.horizontal, 14).padding(.vertical, 12)
-                        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                             .strokeBorder(Palette.border, lineWidth: 1))
                 }
@@ -406,13 +407,13 @@ private struct FoldLoginSheet: View {
                             .keyboardType(.numberPad)
                             #endif
                             .padding(.horizontal, 14).padding(.vertical, 12)
-                            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                                 .strokeBorder(Palette.border, lineWidth: 1))
                     }
                 }
                 if let err = state.foldError {
-                    Text(err).font(.footnote).foregroundStyle(Palette.amber)
+                    Text(err).font(.footnote).foregroundStyle(Palette.attention)
                 }
                 if sent {
                     Button {
@@ -435,7 +436,7 @@ private struct FoldLoginSheet: View {
                 Spacer()
             }
             .padding(20)
-            .background(HueCanvas())
+            .background(Palette.background)
             .navigationTitle("Connect Fold")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

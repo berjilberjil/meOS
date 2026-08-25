@@ -61,7 +61,7 @@ struct PresetChip: View {
             }
             .foregroundStyle(hover ? Palette.text : tint)
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(hover ? Palette.surface2 : Palette.surface2.opacity(0.55), in: Capsule())
+            .background(hover ? Palette.surfaceElevated : Palette.surfaceElevated.opacity(0.55), in: Capsule())
             .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
         }
         .buttonStyle(.plain)
@@ -97,7 +97,7 @@ struct RemovableChip: View {
 /// is step two.
 struct HoldToConfirmButton: View {
     var label: String = "Hold to delete"
-    var tint: Color = Palette.red
+    var tint: Color = Palette.warning
     var duration: Double = 1.4
     let action: () -> Void
 
@@ -165,9 +165,9 @@ struct HoldDeleteCard: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Circle().fill(Palette.red.opacity(0.14))
+                Circle().fill(Palette.warning.opacity(0.14))
                 Image(systemName: "trash.fill")
-                    .font(.title2.weight(.semibold)).foregroundStyle(Palette.red)
+                    .font(.title2.weight(.semibold)).foregroundStyle(Palette.warning)
             }
             .frame(width: 64, height: 64)
             .padding(.bottom, 16)
@@ -194,7 +194,7 @@ struct HoldDeleteCard: View {
         .padding(.top, 12)
         .padding(.bottom, 22)
         .frame(maxWidth: .infinity)
-        .background(.hueCanvas)
+        .background(Palette.background)
     }
 }
 
@@ -214,7 +214,7 @@ extension View {
             }
             .presentationDetents([.height(392)])
             .presentationDragIndicator(.visible)
-            .presentationBackground(.hueCanvas)
+            .presentationBackground(Palette.background)
         }
         #else
         popover(isPresented: isPresented, arrowEdge: .top) {
@@ -268,7 +268,7 @@ struct SlideConfirmState {
 /// counterpart to `HoldToConfirmButton` (which is destructive hold-to-delete).
 struct SlideToConfirm: View {
     var label: String = "Slide to confirm"
-    var tint: Color = Palette.brand
+    var tint: Color = Palette.action
     let action: () -> Void
 
     @State private var state = SlideConfirmState()
@@ -292,7 +292,7 @@ struct SlideToConfirm: View {
                     .frame(width: thumb + state.progress * travel)
                 Image(systemName: state.confirmed ? "checkmark" : "chevron.right.2")
                     .font(.body.weight(.heavy))
-                    .foregroundStyle(Palette.bg)
+                    .foregroundStyle(Palette.background)
                     .frame(width: thumb, height: thumb)
                     .offset(x: state.progress * travel)
             }
@@ -369,10 +369,10 @@ struct CopyDayPickerSheet: View {
                 Toggle(dayNames[Int(d) ?? 0], isOn: Binding(
                     get: { picked.contains(d) },
                     set: { if $0 { picked.insert(d) } else { picked.remove(d) } }))
-                    .toggleStyle(.switch).tint(Palette.brand)
+                    .toggleStyle(.switch).tint(Palette.action)
                     .font(.footnote.weight(.medium)).foregroundStyle(Palette.text)
             }
-            SlideToConfirm(label: "Slide to copy", tint: Palette.brand) { copy(Array(picked)); dismiss() }
+            SlideToConfirm(label: "Slide to copy", tint: Palette.action) { copy(Array(picked)); dismiss() }
                 .opacity(picked.isEmpty ? 0.4 : 1)
                 .allowsHitTesting(!picked.isEmpty)
         }
@@ -477,7 +477,7 @@ struct KLabeledMenuField: View {
                         .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                 }
                 .padding(.horizontal, 13).padding(.vertical, 10)
-                .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 2))
             }
@@ -542,7 +542,7 @@ struct KLabeledDateField: View {
                     .buttonStyle(.borderless).help("Clear date of birth")
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(HueFill(level: .strong).opacity(0.35),
+                .background(Palette.surfaceElevated.opacity(0.35),
                             in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 1))
@@ -572,7 +572,7 @@ struct KLabeledDateField: View {
 /// at radius sm, and a third inline — for the same job. This is the only one.
 struct KStepButton: View {
     let icon: String
-    var accent: Color = Palette.brand
+    var accent: Color = Palette.action
     let action: () -> Void
     @State private var hover = false
 
@@ -581,7 +581,7 @@ struct KStepButton: View {
             Image(systemName: icon)
                 .font(.caption2.weight(.bold)).foregroundStyle(accent)
                 .frame(width: 32, height: 30)
-                .background(hover ? accent.opacity(0.14) : Palette.surface2,
+                .background(hover ? accent.opacity(0.14) : Palette.surfaceElevated,
                             in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
@@ -600,7 +600,7 @@ struct KStepButton: View {
 struct KStepper: View {
     let label: String
     let value: Int
-    var accent: Color = Palette.brand
+    var accent: Color = Palette.action
     let dec: () -> Void
     let inc: () -> Void
 
@@ -629,7 +629,7 @@ struct KStepper: View {
 /// reads the same way, so it lives here rather than existing twice.
 struct Sparkline: View {
     let values: [Double]
-    var color: Color = Palette.brand
+    var color: Color = Palette.action
 
     /// A flat series (every point equal — "0 bp" happens constantly on the macro
     /// board) collapses the y domain to a single value, and an AreaMark against a

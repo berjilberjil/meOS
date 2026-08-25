@@ -15,21 +15,13 @@ extension EventTag {
     var color: Color { Color(hexString: colorHex) }
 }
 
-// MARK: - Hues for model types
+// MARK: - Accents for model types
 //
-// The mapping lives here rather than on the models: `FitnessModels.swift` is
-// Foundation-only and stays that way, so a colour never becomes a reason the
-// data layer has to import SwiftUI.
+// Deliberately thin. Meals used to be amber / orange / indigo / pink, which is
+// exactly the "collection of unrelated widgets" problem — breakfast and dinner
+// are the same kind of thing and belong to the same visual system.
 
 extension MealKey {
-    /// Colour of the meal, walked through the day: sunrise amber, midday orange,
-    /// evening indigo, snacks pink.
-    var hue: Hue {
-        switch self {
-        case .breakfast: return .amber
-        case .lunch: return .orange
-        case .dinner: return .indigo
-        case .snacks: return .pink
-        }
-    }
+    /// Every meal is nutrition, and nutrition is orange.
+    var accent: Accent { .orange }
 }

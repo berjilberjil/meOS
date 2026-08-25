@@ -54,16 +54,16 @@ struct SettingsView: View {
         var tint: Color {
             switch self {
             case .calendar: return Palette.blue
-            case .you: return Palette.teal
-            case .appearance: return Palette.purple
+            case .you: return Palette.success
+            case .appearance: return Palette.information
             case .launch: return Palette.blue
-            case .reminders: return Palette.amber
+            case .reminders: return Palette.attention
             case .assistant: return Palette.green
-            case .memory: return Palette.teal
-            case .keys: return Palette.flame
-            case .reorder: return Palette.ice
-            case .data: return Palette.red
-            case .weekly: return Palette.rose
+            case .memory: return Palette.success
+            case .keys: return Palette.activity
+            case .reorder: return Palette.information
+            case .data: return Palette.warning
+            case .weekly: return Palette.attention
             }
         }
     }
@@ -80,8 +80,8 @@ struct SettingsView: View {
         }
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
-        .background(HueCanvas())
-        .presentationBackground(.hueCanvas)
+        .background(Palette.background)
+        .presentationBackground(Palette.background)
         .presentationDragIndicator(.visible)
         .animation(.knTheme, value: themeStore.theme.id)
         .sheet(item: $page) { p in editorSheet(p) }
@@ -135,9 +135,9 @@ struct SettingsView: View {
             Card(padding: 16) {
                 HStack(spacing: 14) {
                     ZStack {
-                        Circle().fill(Palette.teal.opacity(0.18))
+                        Circle().fill(Palette.success.opacity(0.18))
                         Image(systemName: "person.fill")
-                            .font(.title3.weight(.semibold)).foregroundStyle(Palette.teal)
+                            .font(.title3.weight(.semibold)).foregroundStyle(Palette.success)
                     }
                     .frame(width: 50, height: 50)
                     VStack(alignment: .leading, spacing: 3) {
@@ -173,7 +173,7 @@ struct SettingsView: View {
                 iconTile(p.icon, p.tint)
                 Text(p.title)
                     .font(.callout.weight(.semibold))
-                    .foregroundStyle(p == .data ? Palette.red : Palette.text)
+                    .foregroundStyle(p == .data ? Palette.warning : Palette.text)
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
@@ -186,7 +186,7 @@ struct SettingsView: View {
 
     private var lockRow: some View {
         HStack(spacing: 14) {
-            iconTile("lock.fill", Palette.ice)
+            iconTile("lock.fill", Palette.information)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Lock with \(BiometricLock.biometryName)")
                     .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
@@ -194,7 +194,7 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(Palette.muted)
             }
             Spacer(minLength: 8)
-            Toggle("", isOn: $faceIDEnabled).labelsHidden().tint(Palette.teal)
+            Toggle("", isOn: $faceIDEnabled).labelsHidden().tint(Palette.success)
         }
         .padding(.horizontal, 12).padding(.vertical, 11)
     }
@@ -256,7 +256,7 @@ struct SettingsView: View {
                     .scrollDismissesKeyboard(.interactively)
                 }
             }
-            .background(HueCanvas())
+            .background(Palette.background)
             .navigationTitle(p.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -276,7 +276,7 @@ struct SettingsView: View {
         .presentationDragIndicator(.visible)
         // Scrolling a short page should not drag the sheet taller.
         .presentationContentInteraction(.scrolls)
-        .presentationBackground(.hueCanvas)
+        .presentationBackground(Palette.background)
     }
 
     /// Nav bar + the sheet's own top inset + the home indicator. Measured

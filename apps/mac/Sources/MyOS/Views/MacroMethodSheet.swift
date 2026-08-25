@@ -35,10 +35,10 @@ struct MacroMethodSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                         Text("₹/g  =  $/oz × USD/INR ÷ 31.1035")
                             .font(.footnote.weight(.heavy).monospaced())
-                            .foregroundStyle(Palette.brand)
+                            .foregroundStyle(Palette.action)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                            .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                         Text("That is the metal only. A jeweller's rate adds making charges and GST, so expect their number to be higher.")
                             .font(.caption).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
@@ -77,10 +77,10 @@ struct MacroMethodSheet: View {
             }
             .padding(20)
         }
-        .background(.hueCanvas)
+        .background(Palette.background)
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(.hueCanvas)
+        content.presentationDetents([.large]).presentationBackground(Palette.background)
         #else
         content.frame(width: 520, height: 660)
         #endif

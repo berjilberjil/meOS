@@ -83,7 +83,7 @@ struct EventsView: View {
                         }
                         Text(e.title.isEmpty ? "Untitled" : e.title)
                             .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                        if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber) }
+                        if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.attention) }
                         Spacer()
                         Text(Fmt.day(e.date)).font(.caption2).foregroundStyle(Palette.faint)
                     }
@@ -122,7 +122,7 @@ struct EventsView: View {
                         }
                     }
             } else {
-                Palette.surface2
+                Palette.surfaceElevated
             }
         }
         .frame(width: 64, height: 64)
@@ -166,7 +166,7 @@ private struct EventEditorSheet: View {
                     VStack(alignment: .leading, spacing: 5) {
                         KFieldLabel(text: "Date")
                         DatePicker("", selection: $date, displayedComponents: .date)
-                            .labelsHidden().tint(Palette.brand)
+                            .labelsHidden().tint(Palette.action)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -181,7 +181,7 @@ private struct EventEditorSheet: View {
                         TextEditor(text: $note)
                             .frame(height: 96).scrollContentBackground(.hidden)
                             .padding(8).foregroundStyle(Palette.text)
-                            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
                     }
 
@@ -191,7 +191,7 @@ private struct EventEditorSheet: View {
                             Spacer()
                             PhotosPicker(selection: $pickerItems, maxSelectionCount: 8, matching: .images) {
                                 Label("Add", systemImage: "photo.badge.plus")
-                                    .font(.caption.weight(.semibold)).foregroundStyle(Palette.brand)
+                                    .font(.caption.weight(.semibold)).foregroundStyle(Palette.action)
                             }
                         }
                         if !media.isEmpty {
@@ -219,11 +219,11 @@ private struct EventEditorSheet: View {
                     Toggle(isOn: $special) {
                         Text("Special — highlight this one").font(.footnote).foregroundStyle(Palette.text)
                     }
-                    .tint(Palette.brand)
+                    .tint(Palette.action)
                 }
                 .padding(16)
             }
-            .background(HueCanvas())
+            .background(Palette.background)
             .navigationTitle(event == nil ? "New event" : "Edit event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -267,7 +267,7 @@ private struct EventEditorSheet: View {
                 Image(systemName: tag.symbol).font(.caption2.weight(.bold))
                 Text(tag.name).font(.caption.weight(.semibold))
             }
-            .foregroundStyle(on ? Palette.bg : tag.color)
+            .foregroundStyle(on ? Palette.background : tag.color)
             .padding(.horizontal, 11).padding(.vertical, 7)
             .background(on ? AnyShapeStyle(tag.color) : AnyShapeStyle(tag.color.opacity(0.14)), in: Capsule())
         }

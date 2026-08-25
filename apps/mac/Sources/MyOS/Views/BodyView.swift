@@ -71,7 +71,7 @@ struct BodyView: View {
                         Text(g.name).font(.caption.weight(.heavy))
                             .foregroundStyle(on ? .white : Palette.muted)
                             .padding(.horizontal, 12).padding(.vertical, 7)
-                            .background(on ? Palette.brand : Palette.surface2.opacity(0.6), in: Capsule())
+                            .background(on ? Palette.action : Palette.surfaceElevated.opacity(0.6), in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .onHover { h in cursor(h) }
@@ -105,8 +105,8 @@ struct BodyMapView: View {
                 let clickable = interactiveSlugs.contains(m.slug)
                 let shape = CGPathShape(cg: m.path, box: box)
                 shape
-                    .fill(active ? Palette.brand : (clickable ? Palette.muted.opacity(0.55) : Palette.muted.opacity(0.28)))
-                    .overlay(shape.stroke(active ? Palette.brandDeep.opacity(0.5) : Palette.borderStrong.opacity(0.7), lineWidth: active ? 1.5 : 1))
+                    .fill(active ? Palette.action : (clickable ? Palette.muted.opacity(0.55) : Palette.muted.opacity(0.28)))
+                    .overlay(shape.stroke(active ? Palette.action.opacity(0.5) : Palette.borderStrong.opacity(0.7), lineWidth: active ? 1.5 : 1))
                     .contentShape(shape)
                     .onTapGesture { if clickable { onSelect(m.slug) } }
             }
@@ -153,7 +153,7 @@ struct MuscleDetailCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Text("\(i + 1)").font(.caption2.weight(.heavy)).frame(width: 20, height: 20)
-                                .background(Palette.brand.opacity(0.15), in: Circle()).foregroundStyle(Palette.brand)
+                                .background(Palette.action.opacity(0.15), in: Circle()).foregroundStyle(Palette.action)
                             Text(m.name).font(.footnote.weight(.bold)).foregroundStyle(Palette.text)
                         }
                         Text(m.what).font(.caption).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
@@ -203,17 +203,17 @@ struct ActivationList: View {
     private func row(_ i: Int, _ ex: Exercise, _ percent: Double) -> some View {
         HStack(spacing: 10) {
             Text("\(i + 1)").font(.caption.weight(.heavy))
-                .foregroundStyle(i == 0 ? Palette.brand : Palette.faint).frame(width: 16)
+                .foregroundStyle(i == 0 ? Palette.action : Palette.faint).frame(width: 16)
             ExerciseIcon(category: ex.category, size: 34)
             VStack(alignment: .leading, spacing: 5) {
                 Text(ex.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                ProgressView(value: percent / 100).progressViewStyle(.linear).tint(Palette.brand)
+                ProgressView(value: percent / 100).progressViewStyle(.linear).tint(Palette.action)
             }
             Text("\(Int(percent))%").font(.caption.weight(.heavy))
-                .foregroundStyle(i == 0 ? Palette.brand : Palette.muted).frame(width: 36, alignment: .trailing)
+                .foregroundStyle(i == 0 ? Palette.action : Palette.muted).frame(width: 36, alignment: .trailing)
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
-        .background((i == 0 ? Palette.brand.opacity(0.1) : Palette.surface2.opacity(0.5)),
+        .background((i == 0 ? Palette.action.opacity(0.1) : Palette.surfaceElevated.opacity(0.5)),
                     in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
     }
 }

@@ -9,19 +9,19 @@ import SwiftUI
 extension MuscleGroup {
     var tint: Color {
         switch self {
-        case .chest: return Palette.red
+        case .chest: return Palette.warning
         case .back: return Palette.blue
-        case .shoulders: return Palette.amber
-        case .biceps: return Palette.purple
-        case .triceps: return Palette.coral
-        case .forearms: return Palette.gold
+        case .shoulders: return Palette.attention
+        case .biceps: return Palette.information
+        case .triceps: return Palette.attention
+        case .forearms: return Palette.attention
         case .quads: return Palette.green
-        case .hamstrings: return Palette.teal
-        case .glutes: return Palette.rose
-        case .calves: return Palette.ice
-        case .abs: return Palette.flame
-        case .cardio: return Palette.flame
-        case .fullBody: return Palette.brand
+        case .hamstrings: return Palette.success
+        case .glutes: return Palette.attention
+        case .calves: return Palette.information
+        case .abs: return Palette.activity
+        case .cardio: return Palette.activity
+        case .fullBody: return Palette.action
         }
     }
     var icon: String {
@@ -298,7 +298,7 @@ private struct ProgramExerciseRow: View {
             if expanded { controls }
         }
         .padding(11)
-        .background(HueFill(level: .strong).opacity(expanded ? 0.6 : 0.35),
+        .background(Palette.surfaceElevated.opacity(expanded ? 0.6 : 0.35),
                     in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(expanded ? tint.opacity(0.4) : Palette.border, lineWidth: 1))
@@ -425,7 +425,7 @@ struct MuscleGroupPickerSheet: View {
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity)
-                        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                             .strokeBorder(on ? g.tint.opacity(0.5) : Palette.border, lineWidth: 1))
                         .contentShape(Rectangle())
@@ -479,7 +479,7 @@ struct DaySettingsSheet: View {
                             .font(.caption2).foregroundStyle(Palette.faint)
                     }
                 }
-                .toggleStyle(.switch).tint(Palette.brand)
+                .toggleStyle(.switch).tint(Palette.action)
 
                 HStack {
                     Spacer()
@@ -505,7 +505,7 @@ struct DaySettingsSheet: View {
                 .foregroundStyle(on ? .white : Palette.muted)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity).padding(.vertical, 9)
-                .background(on ? Palette.brand : Palette.surface2.opacity(0.6),
+                .background(on ? Palette.action : Palette.surfaceElevated.opacity(0.6),
                             in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -652,10 +652,10 @@ struct SheetShell<Content: View>: View {
         .background(Palette.elevated)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.hueCanvas)
+        .background(Palette.background)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.hueCanvas)
+        .presentationBackground(Palette.background)
         #endif
     }
 }

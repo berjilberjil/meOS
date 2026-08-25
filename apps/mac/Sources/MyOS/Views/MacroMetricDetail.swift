@@ -32,10 +32,10 @@ struct MacroMetricDetail: View {
             }
             .padding(20)
         }
-        .background(.hueCanvas)
+        .background(Palette.background)
 
         #if os(iOS)
-        content.presentationDetents([.large]).presentationBackground(.hueCanvas)
+        content.presentationDetents([.large]).presentationBackground(Palette.background)
         #else
         content.frame(width: 520, height: 680)
         #endif
@@ -90,7 +90,7 @@ struct MacroMetricDetail: View {
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(r == range ? Brandmark.ink : Palette.muted)
                         .padding(.horizontal, 9).padding(.vertical, 5)
-                        .background(r == range ? Palette.brand : Palette.surface2, in: Capsule())
+                        .background(r == range ? Palette.action : Palette.surfaceElevated, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -120,14 +120,14 @@ struct MacroMetricDetail: View {
                     ForEach(plotted, id: \.point.d) { row in
                         LineMark(x: .value("Date", row.date), y: .value(metric.name, row.point.v))
                             .interpolationMethod(.monotone)
-                            .foregroundStyle(Palette.brand)
+                            .foregroundStyle(Palette.action)
                     }
                     if let h = hover, let d = MacroFormat.date(h.d) {
                         RuleMark(x: .value("Date", d))
                             .foregroundStyle(Palette.faint.opacity(0.6))
                             .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                         PointMark(x: .value("Date", d), y: .value(metric.name, h.v))
-                            .foregroundStyle(Palette.brand)
+                            .foregroundStyle(Palette.action)
                             .symbolSize(60)
                     }
                 }
@@ -206,7 +206,7 @@ struct MacroMetricDetail: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             }
         }
     }
@@ -214,7 +214,7 @@ struct MacroMetricDetail: View {
     private func noteBlock(_ note: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle.fill")
-                .font(.caption2).foregroundStyle(Palette.amber)
+                .font(.caption2).foregroundStyle(Palette.attention)
             Text(note).font(.caption).foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -229,7 +229,7 @@ struct MacroMetricDetail: View {
             if !metric.sourceUrl.isEmpty, let url = URL(string: metric.sourceUrl) {
                 Link(destination: url) {
                     Text(metric.sourceUrl)
-                        .font(.caption2).foregroundStyle(Palette.brand)
+                        .font(.caption2).foregroundStyle(Palette.action)
                         .lineLimit(1).truncationMode(.middle)
                 }
             }
@@ -269,7 +269,7 @@ struct MacroMetricDetail: View {
                                 .foregroundStyle(Palette.text)
                         }
                         .padding(.horizontal, 10).padding(.vertical, 8)
-                        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                        .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                     }
                 }
             }

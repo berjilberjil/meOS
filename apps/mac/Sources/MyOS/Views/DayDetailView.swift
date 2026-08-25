@@ -50,9 +50,9 @@ struct DayDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text(DayPaging.label(selected, today: state.todayKey).uppercased())
                     .font(.caption2.weight(.heavy)).tracking(0.6)
-                    .foregroundStyle(Palette.brand)
+                    .foregroundStyle(Palette.action)
                     .padding(.horizontal, 7).padding(.vertical, 3)
-                    .background(Palette.brand.opacity(0.14), in: Capsule())
+                    .background(Palette.action.opacity(0.14), in: Capsule())
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 4)

@@ -139,7 +139,7 @@ struct NotesView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         if note.pinned {
-                            Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
+                            Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.attention)
                         }
                         Text(note.title.isEmpty ? "Untitled" : note.title)
                             .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
@@ -259,7 +259,7 @@ struct NotesView: View {
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
-        .background(HueFill(level: .strong).opacity(0.6), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .background(Palette.surfaceElevated.opacity(0.6), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
             .strokeBorder(searchFocused ? Palette.blue : .clear, lineWidth: 1.5))
     }
@@ -271,7 +271,7 @@ struct NotesView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     if note.pinned {
-                        Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.amber)
+                        Image(systemName: "pin.fill").font(.caption2).foregroundStyle(Palette.attention)
                     }
                     Text(note.title.isEmpty ? "New Note" : note.title)
                         .font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
@@ -290,10 +290,10 @@ struct NotesView: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? Palette.amber.opacity(0.16) : .clear,
+            .background(selected ? Palette.attention.opacity(0.16) : .clear,
                         in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(selected ? Palette.amber.opacity(0.5) : .clear, lineWidth: 1))
+                .strokeBorder(selected ? Palette.attention.opacity(0.5) : .clear, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -340,12 +340,12 @@ struct NotesView: View {
 
     private func lockedScreen(_ note: Note) -> some View {
         VStack(spacing: 14) {
-            Image(systemName: "lock.fill").font(.largeTitle).foregroundStyle(Palette.amber)
+            Image(systemName: "lock.fill").font(.largeTitle).foregroundStyle(Palette.attention)
             Text(note.title.isEmpty ? "Locked Note" : note.title)
                 .font(.body.weight(.bold)).foregroundStyle(Palette.text)
             Text("This note is locked.").font(.footnote).foregroundStyle(Palette.muted)
             Button { unlocked.insert(note.id) } label: { Label("Unlock", systemImage: "lock.open.fill") }
-                .buttonStyle(.borderedProminent).tint(Palette.amber)
+                .buttonStyle(.borderedProminent).tint(Palette.attention)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -356,7 +356,7 @@ struct NotesView: View {
                 Spacer()
                 Button { state.togglePinNote(id) } label: {
                     Image(systemName: note.pinned ? "pin.fill" : "pin")
-                        .font(.footnote).foregroundStyle(note.pinned ? Palette.amber : Palette.muted)
+                        .font(.footnote).foregroundStyle(note.pinned ? Palette.attention : Palette.muted)
                 }
                 .buttonStyle(.borderless)
                 .help(note.pinned ? "Unpin" : "Pin to top")

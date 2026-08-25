@@ -91,7 +91,7 @@ struct MemoryCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(HueFill(level: .strong).opacity(0.5),
+        .background(Palette.surfaceElevated.opacity(0.5),
                     in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
@@ -102,7 +102,7 @@ struct MemoryCard: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered).tint(Palette.teal)
+            .buttonStyle(.bordered).tint(Palette.success)
 
             if state.lastTrace != nil {
                 Button { showTrace = true } label: {
@@ -149,7 +149,7 @@ struct MemoryCard: View {
                     Label("Add a memory", systemImage: "plus.circle.fill")
                         .font(.footnote.weight(.semibold))
                 }
-                .buttonStyle(.bordered).tint(Palette.teal)
+                .buttonStyle(.bordered).tint(Palette.success)
                 Spacer(minLength: 0)
                 if state.lastTrace != nil {
                     Button { showTrace = true } label: {
@@ -169,9 +169,9 @@ struct MemoryCard: View {
     @ViewBuilder
     private func chrome<V: View>(_ view: V, width: CGFloat) -> some View {
         #if os(iOS)
-        view.presentationDetents([.large]).presentationBackground(.hueCanvas)
+        view.presentationDetents([.large]).presentationBackground(Palette.background)
         #else
-        view.frame(width: width).background(.hueCanvas)
+        view.frame(width: width).background(Palette.background)
         #endif
     }
 
@@ -211,7 +211,7 @@ struct MemoryCard: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(on ? .white : Palette.muted)
                 .padding(.horizontal, 11).padding(.vertical, 6)
-                .background(on ? Palette.brand : Palette.surface2, in: Capsule())
+                .background(on ? Palette.action : Palette.surfaceElevated, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -223,7 +223,7 @@ struct MemoryCard: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: m.category.icon)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Palette.teal)
+                    .foregroundStyle(Palette.success)
                     .frame(width: 18)
                     .padding(.top, 3)
                 Text(m.content)
@@ -232,14 +232,14 @@ struct MemoryCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if m.pinned {
                     Image(systemName: "pin.fill")
-                        .font(.caption2.weight(.bold)).foregroundStyle(Palette.amber)
+                        .font(.caption2.weight(.bold)).foregroundStyle(Palette.attention)
                         .padding(.top, 4)
                 }
             }
 
             HStack(spacing: 6) {
-                tag(m.category.label, Palette.teal)
-                if m.importance >= 4 { tag("important", Palette.amber) }
+                tag(m.category.label, Palette.success)
+                if m.importance >= 4 { tag("important", Palette.attention) }
                 // Where it came from matters: something inferred from chat
                 // deserves more suspicion than something you typed.
                 if m.source == .extracted {
@@ -250,7 +250,7 @@ struct MemoryCard: View {
                 Button { togglePin(m) } label: {
                     Image(systemName: m.pinned ? "pin.slash" : "pin")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(m.pinned ? Palette.amber : Palette.faint)
+                        .foregroundStyle(m.pinned ? Palette.attention : Palette.faint)
                 }
                 .buttonStyle(.borderless)
                 .help(m.pinned ? "Stop always including it" : "Pin so it's always in context")
@@ -264,12 +264,12 @@ struct MemoryCard: View {
                 Button { pendingDelete = m.id } label: {
                     Image(systemName: "trash").font(.caption2.weight(.bold))
                 }
-                .buttonStyle(.borderless).tint(Palette.red)
+                .buttonStyle(.borderless).tint(Palette.warning)
                 .help("Forget this")
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 11)
-        .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
     private func tag(_ text: String, _ tint: Color) -> some View {
@@ -344,7 +344,7 @@ private struct MemoryEditorSheet: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(category == c ? .white : Palette.muted)
                                     .padding(.horizontal, 11).padding(.vertical, 6)
-                                    .background(category == c ? Palette.brand : Palette.surface2, in: Capsule())
+                                    .background(category == c ? Palette.action : Palette.surfaceElevated, in: Capsule())
                             }
                             .buttonStyle(.plain)
                         }
@@ -366,7 +366,7 @@ private struct MemoryEditorSheet: View {
                         .font(.caption2).foregroundStyle(Palette.faint)
                 }
             }
-            .tint(Palette.brand)
+            .tint(Palette.action)
 
             HStack(spacing: 10) {
                 Button("Cancel") { dismiss() }.buttonStyle(.bordered)

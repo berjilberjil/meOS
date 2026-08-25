@@ -67,7 +67,7 @@ struct FitnessProfileEditor: View {
                 Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
             }
             .padding(.horizontal, 13).padding(.vertical, 10)
-            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden)
@@ -194,13 +194,13 @@ struct PersonDetailsEditor: View {
 
     private var avatar: some View {
         ZStack {
-            Circle().fill(Palette.teal.opacity(0.18))
+            Circle().fill(Palette.success.opacity(0.18))
             if let photo = MediaJPEG.image(fromBase64: state.profile.photoBase64) {
                 photo.resizable().scaledToFill()
             } else {
                 Text(initials)
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(Palette.teal)
+                    .foregroundStyle(Palette.success)
             }
         }
         .frame(width: 64, height: 64)
@@ -212,8 +212,8 @@ struct PersonDetailsEditor: View {
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(Palette.text)
                 .frame(width: 22, height: 22)
-                .background(.hueFillStrong, in: Circle())
-                .overlay(Circle().strokeBorder(Palette.bg, lineWidth: 2))
+                .background(Palette.surfaceElevated, in: Circle())
+                .overlay(Circle().strokeBorder(Palette.background, lineWidth: 2))
                 .offset(x: 2, y: 2)
         }
         .accessibilityLabel(hasPhoto ? "Change profile photo" : "Add a profile photo")
@@ -290,12 +290,12 @@ struct JournalPresetsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            section("Morning reflection", Palette.amber, \.morning)
+            section("Morning reflection", Palette.attention, \.morning)
             section("Night reflection", Palette.blue, \.night)
             section("Wins", Palette.green, \.wins)
-            section("Mistakes", Palette.red, \.mistakes)
+            section("Mistakes", Palette.warning, \.mistakes)
             section("Lessons", Palette.blue, \.lessons)
-            section("Gratitude", Palette.purple, \.gratitude)
+            section("Gratitude", Palette.information, \.gratitude)
         }
     }
 

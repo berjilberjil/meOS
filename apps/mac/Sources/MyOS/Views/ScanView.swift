@@ -40,7 +40,7 @@ struct ScanView: View {
         ImageDropZone(
             title: "Take a photo",
             subtitle: "A meal, a pack, or whatever’s in front of you.",
-            tint: Palette.teal,
+            tint: Palette.success,
             busy: state.imageBusy,
             startWithCamera: true
         ) { images, media in
@@ -63,7 +63,7 @@ struct ScanView: View {
     private var readingCard: some View {
         Card(padding: 28) {
             VStack(spacing: 14) {
-                ProgressView().controlSize(.large).tint(Palette.teal)
+                ProgressView().controlSize(.large).tint(Palette.success)
                 Text("Reading…")
                     .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("Catherine is looking at the photo.")
@@ -79,7 +79,7 @@ struct ScanView: View {
             Card(padding: 24) {
                 VStack(spacing: 12) {
                     Image(systemName: "viewfinder")
-                        .font(.largeTitle.weight(.semibold)).foregroundStyle(Palette.amber)
+                        .font(.largeTitle.weight(.semibold)).foregroundStyle(Palette.attention)
                     Text("Couldn’t read that")
                         .font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
                     Text(err)
@@ -91,7 +91,7 @@ struct ScanView: View {
                 .padding(.vertical, 8)
             }
             Button("Try again") { reset() }
-                .buttonStyle(.borderedProminent).tint(Palette.teal).controlSize(.large).frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent).tint(Palette.success).controlSize(.large).frame(maxWidth: .infinity)
         }
     }
 

@@ -75,12 +75,12 @@ struct BodyPhotosCard: View {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                     .font(.callout.weight(.semibold))
             }
-            .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.muted)
+            .buttonStyle(.borderless).tint(showCalendar ? Palette.action : Palette.muted)
             .accessibilityLabel(showCalendar ? "Hide calendar" : "Show calendar")
             Button { adding = true } label: {
                 Image(systemName: "plus.circle.fill").font(.body.weight(.semibold))
             }
-            .buttonStyle(.borderless).tint(Palette.teal)
+            .buttonStyle(.borderless).tint(Palette.success)
             .accessibilityLabel("Add photo")
         }
     }
@@ -89,10 +89,10 @@ struct BodyPhotosCard: View {
         if ProgressPhotoSync.isSyncing {
             ProgressView().controlSize(.mini)
         } else if !ProgressPhotoStore.pending().isEmpty {
-            Image(systemName: "icloud.and.arrow.up").font(.caption).foregroundStyle(Palette.amber)
+            Image(systemName: "icloud.and.arrow.up").font(.caption).foregroundStyle(Palette.attention)
                 .accessibilityLabel("Some photos haven't uploaded yet")
         } else if !photos.isEmpty {
-            Image(systemName: "icloud.fill").font(.caption).foregroundStyle(Palette.teal)
+            Image(systemName: "icloud.fill").font(.caption).foregroundStyle(Palette.success)
                 .accessibilityLabel("All photos synced")
         }
     }
@@ -128,7 +128,7 @@ struct BodyPhotosCard: View {
                 VStack(spacing: 6) {
                     ThumbImage(url: p.url, key: p.id, width: 132, height: 176) {
                         RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .fill(.hueFillStrong)
+                            .fill(Palette.surfaceElevated)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     Text(Fmt.day(p.date)).font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
@@ -138,7 +138,7 @@ struct BodyPhotosCard: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(5)
-                        .background(Palette.amber, in: Circle())
+                        .background(Palette.attention, in: Circle())
                         .padding(6)
                 }
             }
@@ -193,7 +193,7 @@ private struct ProgressGallery: View {
                 Button { confirmingDelete = true } label: {
                     Image(systemName: "trash").font(.footnote.weight(.bold))
                 }
-                .buttonStyle(.borderless).tint(Palette.red)
+                .buttonStyle(.borderless).tint(Palette.warning)
                 .accessibilityLabel("Delete photo")
 
                 Spacer()
@@ -213,7 +213,7 @@ private struct ProgressGallery: View {
                         if let ui = UIImage(contentsOfFile: p.url.path) {
                             ZoomableImage(image: ui)
                         } else {
-                            Palette.surface2
+                            Palette.surfaceElevated
                         }
                     }
                     .tag(p.id)
@@ -224,7 +224,7 @@ private struct ProgressGallery: View {
 
             if !saveStatus.isEmpty {
                 Text(saveStatus).font(.caption.weight(.semibold))
-                    .foregroundStyle(saveStatus == "Saved" ? Palette.green : Palette.amber)
+                    .foregroundStyle(saveStatus == "Saved" ? Palette.green : Palette.attention)
             }
             Button { saveCurrent() } label: {
                 Label(saveStatus == "Saved" ? "Saved to Photos" : "Save to Photos",
@@ -232,12 +232,12 @@ private struct ProgressGallery: View {
                     .font(.footnote.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent).tint(Palette.teal).controlSize(.large).frame(maxWidth: .infinity)
+            .buttonStyle(.borderedProminent).tint(Palette.success).controlSize(.large).frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 20)
         }
-        .background(HueCanvas())
+        .background(Palette.background)
         .sheet(isPresented: $confirmingDelete) {
             deleteSheet
                 .presentationDetents([.height(230)])

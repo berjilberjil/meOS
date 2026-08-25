@@ -91,7 +91,7 @@ struct ProgramListView: View {
         Card(padding: 22) {
             VStack(alignment: .leading, spacing: 14) {
                 Image(systemName: "list.bullet.rectangle.portrait")
-                    .font(.title.weight(.semibold)).foregroundStyle(Palette.brand)
+                    .font(.title.weight(.semibold)).foregroundStyle(Palette.action)
                 Text("No programs yet")
                     .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
                 Text("A program holds your whole training week — the days, what each day trains, and which exercises you use for it. Build it once and Today knows what's on.")
@@ -167,7 +167,7 @@ private struct ProgramCard: View {
                         Button { state.setActiveProgram(program.id) } label: {
                             Label("Set active", systemImage: "bolt.fill").font(.footnote.weight(.semibold))
                         }
-                        .buttonStyle(.borderless).tint(Palette.brand)
+                        .buttonStyle(.borderless).tint(Palette.action)
                     }
                     Spacer(minLength: 0)
                 }
@@ -217,9 +217,9 @@ struct ActivePill: View {
     var body: some View {
         Text("ACTIVE")
             .font(.caption2.weight(.heavy)).tracking(0.6)
-            .foregroundStyle(Palette.brand)
+            .foregroundStyle(Palette.action)
             .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(Palette.brand.opacity(0.16), in: Capsule())
+            .background(Palette.action.opacity(0.16), in: Capsule())
     }
 }
 
@@ -342,9 +342,9 @@ private struct ProgramDayRow: View {
                         if isToday {
                             Text("TODAY")
                                 .font(.caption2.weight(.heavy)).tracking(0.6)
-                                .foregroundStyle(Palette.brand)
+                                .foregroundStyle(Palette.action)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Palette.brand.opacity(0.16), in: Capsule())
+                                .background(Palette.action.opacity(0.16), in: Capsule())
                         }
                     }
                     if day.isRestDay {
@@ -374,7 +374,7 @@ private struct ProgramDayRow: View {
 
     private var tag: some View {
         let label = day.weekday.map { Self.short[$0] } ?? "D\(index + 1)"
-        let tint = day.isRestDay ? Palette.blue : Palette.brand
+        let tint = day.isRestDay ? Palette.blue : Palette.action
         return Text(label)
             .font(.caption2.weight(.heavy)).tracking(0.4)
             .foregroundStyle(tint)

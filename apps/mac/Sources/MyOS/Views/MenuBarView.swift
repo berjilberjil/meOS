@@ -29,7 +29,7 @@ struct MenuBarView: View {
         }
         .padding(14)
         .frame(width: 288)
-        .background(.hueCanvas)
+        .background(Palette.background)
     }
 
     // MARK: - States
@@ -108,7 +108,7 @@ struct MenuBarView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent).tint(Palette.teal).controlSize(.large).frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent).tint(Palette.success).controlSize(.large).frame(maxWidth: .infinity)
                 upNext
             } else if items.isEmpty {
                 Text("Nothing on today's list.")
@@ -129,9 +129,9 @@ struct MenuBarView: View {
 
     private var ring: some View {
         ZStack {
-            Circle().stroke(Palette.surface2, lineWidth: 5)
+            Circle().stroke(Palette.surfaceElevated, lineWidth: 5)
             Circle().trim(from: 0, to: max(0.01, timer.progress))
-                .stroke(timer.finished ? Palette.green : Palette.teal,
+                .stroke(timer.finished ? Palette.green : Palette.success,
                         style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(timer.clock)
@@ -178,7 +178,7 @@ struct MenuBarView: View {
                     Text("Task Mode")
                 }
             }
-            .buttonStyle(.bordered).tint(state.taskMode.on ? Palette.teal : Palette.muted)
+            .buttonStyle(.bordered).tint(state.taskMode.on ? Palette.success : Palette.muted)
             .disabled(state.phase != .loggedIn)
             .help("Hide everything but today's task, on every device")
 

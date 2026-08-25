@@ -23,15 +23,6 @@ struct FitnessView: View {
             case .body: return "Body"
             }
         }
-        var hue: Hue {
-            switch self {
-            case .today: return .pink
-            case .train: return .blue
-            case .meals: return .orange
-            case .library: return .teal
-            case .body: return .cyan
-            }
-        }
     }
     @State private var sub: FitSub = .today
 
@@ -65,9 +56,6 @@ struct FitnessView: View {
                 case .body:    BodyView()
                 }
             }
-            // Each sub-tab is its own colour, so the segmented control moves you
-            // somewhere rather than just swapping the contents of one card stack.
-            .cardHue(sub.hue)
             .id(sub)
         }
     }
@@ -90,7 +78,7 @@ struct FitnessView: View {
     @ViewBuilder private var todayContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             FitnessTodayView().knRise(2)
-            ActivityStepsCard().cardHue(.green).cardLook(.bold).knRise(3)
+            ActivityStepsCard().knRise(3)
             #if os(iOS)
             BodyPhotosCard().knRise(4)
             #else
@@ -150,10 +138,10 @@ struct FitnessView: View {
                     Spacer()
                     if steps >= target && target > 0 {
                         Text("Goal hit").font(.caption2.weight(.heavy))
-                            .foregroundStyle(Palette.flame)
+                            .foregroundStyle(Palette.activity)
                     }
                 }
-                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.flame)
+                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.activity)
                 HStack(spacing: 10) {
                     HStack(spacing: 6) {
                         TextField("", text: $stepsInput,
@@ -164,14 +152,14 @@ struct FitnessView: View {
                             .onSubmit(saveSteps)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(stepsFocused ? Palette.brand : Palette.border, lineWidth: 2))
+                        .strokeBorder(stepsFocused ? Palette.action : Palette.border, lineWidth: 2))
                     Button("Log", action: saveSteps).buttonStyle(.borderedProminent)
                         .disabled(Int(stepsInput.trimmingCharacters(in: .whitespaces)) == nil)
                     ForEach([1000, 2000], id: \.self) { d in
                         Button { state.setTodaySteps(steps + d) } label: { Text("+\(d / 1000)k") }
-                            .buttonStyle(.bordered).tint(Palette.flame)
+                            .buttonStyle(.bordered).tint(Palette.activity)
                     }
                     Spacer()
                 }
@@ -207,9 +195,9 @@ struct FitnessView: View {
                         Text("kg").font(.footnote).foregroundStyle(Palette.muted)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(weightFocused ? Palette.brand : Palette.border, lineWidth: 2))
+                        .strokeBorder(weightFocused ? Palette.action : Palette.border, lineWidth: 2))
                     Button("Log", action: saveWeight).buttonStyle(.borderedProminent)
                         .disabled(Double(weightInput.trimmingCharacters(in: .whitespaces)) == nil)
                     KStepButton(icon: "minus", accent: Palette.blue) { bumpWeight(-0.5) }
@@ -244,7 +232,7 @@ struct FitnessView: View {
                                 Text(Fmt.day(d)).font(.caption2).foregroundStyle(Palette.faint)
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(HueFill(level: .strong).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                            .background(Palette.surfaceElevated.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                         }
                     }
                 }
@@ -264,15 +252,15 @@ struct FitnessView: View {
                 // same accent colours, roughly a third less visual weight —
                 // container-on-container was the noisiest thing in the app.
                 VStack(spacing: 0) {
-                    macroRow("Calories", eaten.calories, t.map { Double($0.goalCalories) }, "kcal", Palette.amber)
+                    macroRow("Calories", eaten.calories, t.map { Double($0.goalCalories) }, "kcal", Palette.attention)
                     macroDivider
                     macroRow("Protein", eaten.protein, t.map { Double($0.proteinG) }, "g", Palette.green)
                     macroDivider
                     macroRow("Carbs", eaten.carbs, t.map { Double($0.carbG) }, "g", Palette.blue)
                     macroDivider
-                    macroRow("Fiber", eaten.fiber, 30, "g", Palette.purple)
+                    macroRow("Fiber", eaten.fiber, 30, "g", Palette.information)
                     macroDivider
-                    macroRow("Fats", eaten.fats, t.map { Double($0.fatG) }, "g", Palette.red)
+                    macroRow("Fats", eaten.fats, t.map { Double($0.fatG) }, "g", Palette.warning)
                     macroDivider
                     waterRow
                 }
@@ -369,7 +357,7 @@ struct FitnessView: View {
                 if let c = state.calorieTargets() {
                     HStack(spacing: 10) {
                         calCol("Cut", c.cut, Palette.blue, on: fp.goal == .cut)
-                        calCol("Maintain", c.maintain, Palette.amber, on: fp.goal == .maintain)
+                        calCol("Maintain", c.maintain, Palette.attention, on: fp.goal == .maintain)
                         calCol("Bulk", c.bulk, Palette.green, on: fp.goal == .bulk)
                     }
                     Text("BMR \(c.bmr) · TDEE \(c.tdee) kcal · \(fp.activity.label.lowercased()) activity")
@@ -378,9 +366,9 @@ struct FitnessView: View {
                     Divider().overlay(Palette.border)
                     HStack(spacing: 10) {
                         macroPill("Protein", "\(c.proteinG)g", Palette.green)
-                        macroPill("Carbs", "\(c.carbG)g", Palette.amber)
-                        macroPill("Fat", "\(c.fatG)g", Palette.red)
-                        macroPill("Target", "\(c.goalCalories) kcal", Palette.brand)
+                        macroPill("Carbs", "\(c.carbG)g", Palette.attention)
+                        macroPill("Fat", "\(c.fatG)g", Palette.warning)
+                        macroPill("Target", "\(c.goalCalories) kcal", Palette.action)
                     }
 
                     Button {
@@ -409,7 +397,7 @@ struct FitnessView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(on ? tint.opacity(0.9) : Palette.surface2.opacity(0.5),
+        .background(on ? tint.opacity(0.9) : Palette.surfaceElevated.opacity(0.5),
                     in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(on ? tint : Palette.border, lineWidth: on ? 2 : 1))
@@ -502,8 +490,6 @@ struct ActivityStepsCard: View {
 
     /// Bold on Today, washed on the Fitness tab. Read here so the chart's ink
     /// can flip to white without the card being told twice.
-    @Environment(\.cardLook) private var look
-    private var onColour: Bool { look == .bold }
 
     private var target: Int { state.stepsTarget }
     private func steps(_ key: String) -> Int { state.fitness[key]?.steps ?? 0 }
@@ -517,8 +503,8 @@ struct ActivityStepsCard: View {
         guard target > 0 else { return Palette.green }
         let f = Double(n) / Double(target)
         if f >= 1 { return Palette.green }
-        if f >= 0.5 { return Palette.amber }
-        return Palette.red.opacity(0.8)
+        if f >= 0.5 { return Palette.attention }
+        return Palette.warning.opacity(0.8)
     }
 
     var body: some View {
@@ -556,7 +542,7 @@ struct ActivityStepsCard: View {
                         .font(.footnote.weight(.bold))
                 }
                 .buttonStyle(.borderless)
-                .tint(onColour ? Color.white : (showCalendar ? Palette.brand : Palette.faint))
+                .tint(showCalendar ? Palette.action : Palette.faint)
                 .help(showCalendar ? "Hide the record" : "See every day")
                 .accessibilityLabel(showCalendar ? "Hide the activity calendar" : "Show the activity calendar")
             }
@@ -591,14 +577,14 @@ struct ActivityStepsCard: View {
             Text("from Apple Health").font(.caption2).opacity(0.7)
             #endif
         }
-        .foregroundStyle(onColour ? Color.white : Palette.text)
+        .foregroundStyle(Palette.text)
     }
 
     /// Seven `BarMark`s and a dashed goal line. On a bold card the ink is white
     /// at two opacities — the day you are reading solid, the rest recessive.
     private func weekChart(endingOn key: String) -> some View {
         let days = (0..<7).reversed().map { AppState.addDays(-$0, to: key) }
-        let ink: Color = onColour ? .white : Palette.green
+        let ink: Color = Palette.activity
         return Chart {
             ForEach(days, id: \.self) { d in
                 BarMark(x: .value("Day", d), y: .value("Steps", steps(d)))
@@ -673,8 +659,8 @@ struct ActivityStepsCard: View {
     private var legend: some View {
         HStack(spacing: 12) {
             legendDot(Palette.green, "goal")
-            legendDot(Palette.amber, "halfway")
-            legendDot(Palette.red.opacity(0.8), "short")
+            legendDot(Palette.attention, "halfway")
+            legendDot(Palette.warning.opacity(0.8), "short")
             Spacer(minLength: 0)
         }
     }
@@ -707,15 +693,15 @@ struct ActivityStepsCard: View {
                 Text("steps").font(.caption2).foregroundStyle(Palette.muted)
                 Spacer(minLength: 0)
                 if !isFuture {
-                    KStepButton(icon: "minus", accent: Palette.flame) {
+                    KStepButton(icon: "minus", accent: Palette.activity) {
                         state.setSteps(max(0, n - 500), on: selected)
                     }
-                    KStepButton(icon: "plus", accent: Palette.flame) {
+                    KStepButton(icon: "plus", accent: Palette.activity) {
                         state.setSteps(n + 500, on: selected)
                     }
                 }
             }
-            ProgressView(value: fraction(n)).progressViewStyle(.linear).tint(Palette.flame)
+            ProgressView(value: fraction(n)).progressViewStyle(.linear).tint(Palette.activity)
             Text(isFuture ? "Hasn\u{2019}t happened yet."
                           : (n > 0 ? "500 steps a tap." : "Nothing logged that day."))
                 .font(.caption2).foregroundStyle(Palette.faint)

@@ -87,7 +87,7 @@ struct ProductivityView: View {
             .knRise(0)
 
             #if os(macOS)
-            addCard.cardLook(.bold).knRise(1)
+            addCard.knRise(1)
             #endif
             if !state.watch.isEmpty { filterRow.knRise(2) }
             Group {
@@ -128,7 +128,7 @@ struct ProductivityView: View {
             }
             if let err = addError {
                 Label(err, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2).foregroundStyle(Palette.amber)
+                    .font(.caption2).foregroundStyle(Palette.attention)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -147,9 +147,9 @@ struct ProductivityView: View {
                     }
                     .padding(.horizontal, 13).padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(urlFocused ? Palette.brand : Palette.border, lineWidth: 2))
+                        .strokeBorder(urlFocused ? Palette.action : Palette.border, lineWidth: 2))
                     .animation(.knFast, value: urlFocused)
 
                     Button("Add", action: addVideo)
@@ -159,7 +159,7 @@ struct ProductivityView: View {
                 }
                 if let err = addError {
                     Label(err, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption2).foregroundStyle(Palette.amber)
+                        .font(.caption2).foregroundStyle(Palette.attention)
                 }
             }
         }
@@ -177,10 +177,10 @@ struct ProductivityView: View {
                         Text(dayFilter == nil ? "All days" : Fmt.day(dayFilter!))
                             .font(.caption.weight(.heavy))
                     }
-                    .foregroundStyle(dayFilter == nil ? Palette.muted : Palette.brand)
+                    .foregroundStyle(dayFilter == nil ? Palette.muted : Palette.action)
                     .padding(.horizontal, 11).padding(.vertical, 7)
-                    .background(dayFilter == nil ? Palette.surface2.opacity(0.6) : Palette.brand.opacity(0.16), in: Capsule())
-                    .overlay(Capsule().strokeBorder(dayFilter == nil ? Palette.border : Palette.brand.opacity(0.5), lineWidth: 1))
+                    .background(dayFilter == nil ? Palette.surfaceElevated.opacity(0.6) : Palette.action.opacity(0.16), in: Capsule())
+                    .overlay(Capsule().strokeBorder(dayFilter == nil ? Palette.border : Palette.action.opacity(0.5), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $showCal, arrowEdge: .bottom) { calendarFilterPopover }
@@ -194,9 +194,9 @@ struct ProductivityView: View {
                 Spacer()
                 if toNoteCount > 0 {
                     Text("\(toNoteCount) need a takeaway")
-                        .font(.caption2.weight(.heavy)).foregroundStyle(Palette.flame)
+                        .font(.caption2.weight(.heavy)).foregroundStyle(Palette.activity)
                         .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Palette.flame.opacity(0.14), in: Capsule())
+                        .background(Palette.activity.opacity(0.14), in: Capsule())
                 }
             }
             ScrollView(.horizontal, showsIndicators: false) {
@@ -217,7 +217,7 @@ struct ProductivityView: View {
                          onPrev: { let (y, m) = CalMath.addMonth(year: calYear, month: calMonth, delta: -1); calYear = y; calMonth = m },
                          onNext: { let (y, m) = CalMath.addMonth(year: calYear, month: calMonth, delta: 1); calYear = y; calMonth = m })
             KMonthGrid(year: calYear, month: calMonth, selected: dayFilter,
-                       dot: { daysWithVideos.contains($0) ? Palette.purple : nil }, onTap: { key in
+                       dot: { daysWithVideos.contains($0) ? Palette.information : nil }, onTap: { key in
                 withAnimation(.knFast) { dayFilter = (dayFilter == key ? nil : key) }
                 showCal = false
             })
@@ -241,7 +241,7 @@ struct ProductivityView: View {
                                      dayFilter = CalMath.todayKey()
                                  })
                     KMonthGrid(year: calYear, month: calMonth, selected: day, big: true,
-                               dot: { groups[$0]?.first?.category.color ?? (groups[$0] == nil ? nil : Palette.purple) },
+                               dot: { groups[$0]?.first?.category.color ?? (groups[$0] == nil ? nil : Palette.information) },
                                hoverCard: { key in dayPeek(groups[key]) },
                                onTap: { key in withAnimation(.knFast) { dayFilter = key } })
                 }
@@ -413,7 +413,7 @@ private struct WatchCard: View {
                 }
                 .padding(12)
             }
-            .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
             .knShadow()
         }
@@ -442,7 +442,7 @@ private struct WatchCard: View {
             // watched / takeaway badges
             HStack(spacing: 5) {
                 if item.watched { badge(icon: "checkmark", tint: Palette.green) }
-                if needsTakeaway { badge(icon: "pencil", tint: Palette.flame) }
+                if needsTakeaway { badge(icon: "pencil", tint: Palette.activity) }
             }
             .padding(8)
         }
@@ -484,7 +484,7 @@ private struct WatchDetailSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             AsyncImage(url: URL(string: draft.thumbUrl)) { phase in
                 if case .success(let img) = phase { img.resizable().aspectRatio(contentMode: .fill) }
-                else { Palette.surface2 }
+                else { Palette.surfaceElevated }
             }
             .frame(height: 200).frame(maxWidth: .infinity).clipped()
             .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -533,15 +533,15 @@ private struct WatchDetailSheet: View {
                     .font(.footnote).foregroundStyle(Palette.text)
                     .scrollContentBackground(.hidden)
                     .frame(height: 90).padding(8)
-                    .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(takeawayFocused ? Palette.brand : Palette.border, lineWidth: 2))
+                        .strokeBorder(takeawayFocused ? Palette.action : Palette.border, lineWidth: 2))
                     .focused($takeawayFocused)
             }
 
             HStack {
                 Button { showConfirm = true } label: { Label("Delete", systemImage: "trash") }
-                    .buttonStyle(.borderless).tint(Palette.red)
+                    .buttonStyle(.borderless).tint(Palette.warning)
                     .holdToDelete(isPresented: $showConfirm, title: "Delete this video?",
                                   message: "It'll be removed from your log — this can't be undone.") {
                         state.deleteWatchItem(draft.id); dismiss()
@@ -577,12 +577,12 @@ extension WatchCategory {
     var color: Color {
         switch self {
         case .finance:   return Palette.green
-        case .business:  return Palette.amber
-        case .investing: return Palette.brand
+        case .business:  return Palette.attention
+        case .investing: return Palette.action
         case .economy:   return Palette.blue
-        case .content:   return Palette.purple
-        case .mindset:   return Palette.flame
-        case .tech:      return Palette.ice
+        case .content:   return Palette.information
+        case .mindset:   return Palette.activity
+        case .tech:      return Palette.information
         case .other:     return Palette.muted
         }
     }

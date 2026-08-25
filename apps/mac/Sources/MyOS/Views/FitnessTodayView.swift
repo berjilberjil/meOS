@@ -1,19 +1,12 @@
 import SwiftUI
 
-/// Calories + macros first — intake vs target, each macro in its own colour.
+/// Calories + macros first — intake vs target. Nutrition is orange, and the
+/// four macros are told apart by their bars and labels rather than by four
+/// unrelated colours.
 struct DayMacroHero: View {
     /// The day being shown. Today unless the Today page has been swiped.
     var day: String? = nil
     @EnvironmentObject var state: AppState
-
-    /// Bold on Today (orange gradient), washed on the Fitness tab. On colour the
-    /// four macro tints would all fight the fill, so they collapse to white at
-    /// two weights and the *bars* carry the difference instead.
-    @Environment(\.cardLook) private var look
-    private var onColour: Bool { look == .bold }
-    private func ink(_ colour: Color, _ opacity: Double = 1) -> Color {
-        onColour ? Color.white.opacity(opacity) : colour
-    }
 
     var body: some View {
         let date = day ?? state.todayKey
@@ -26,49 +19,51 @@ struct DayMacroHero: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("INTAKE")
                     .font(.caption.weight(.heavy)).tracking(0.8)
-                    .foregroundStyle(ink(Palette.muted, 0.8))
+                    .foregroundStyle(Palette.muted)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(Int(eaten.calories.rounded()))")
                         .font(.largeTitle.weight(.bold))
                         .monospacedDigit()
-                        .foregroundStyle(ink(Palette.amber))
+                        .foregroundStyle(Palette.attention)
                     Text(goal > 0 ? "/ \(goal) kcal" : "kcal")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(ink(Palette.muted, 0.85))
+                        .foregroundStyle(Palette.muted)
                     Spacer()
                     if goal > 0 {
                         Text("\(remain) left")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(ink(Palette.faint, 0.75))
+                            .foregroundStyle(Palette.faint)
                     }
                 }
-                ProgressView(value: frac).progressViewStyle(.linear).tint(ink(Palette.amber))
-                HStack(spacing: 8) {
-                    macro("Protein", Int(eaten.protein.rounded()), t?.proteinG, Palette.green)
-                    macro("Carbs", Int(eaten.carbs.rounded()), t?.carbG, Palette.blue)
-                    macro("Fibre", Int(eaten.fiber.rounded()), 30, Palette.purple)
-                    macro("Fat", Int(eaten.fats.rounded()), t?.fatG, Palette.red)
+                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.attention)
+                // Four macros, one visual system. They are told apart by their
+                // labels and their bars, not by four unrelated colours.
+                HStack(spacing: Space.sm) {
+                    macro("Protein", Int(eaten.protein.rounded()), t?.proteinG)
+                    macro("Carbs", Int(eaten.carbs.rounded()), t?.carbG)
+                    macro("Fibre", Int(eaten.fiber.rounded()), 30)
+                    macro("Fat", Int(eaten.fats.rounded()), t?.fatG)
                 }
             }
         }
     }
 
-    private func macro(_ label: String, _ have: Int, _ target: Int?, _ tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func macro(_ label: String, _ have: Int, _ target: Int?) -> some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
             Text(label.uppercased())
-                .font(.caption2.weight(.heavy)).tracking(0.4)
-                .foregroundStyle(ink(tint, 0.85))
+                .font(.myCaption).tracking(0.4)
+                .foregroundStyle(Palette.faint)
             if let target, target > 0 {
                 Text("\(have)")
                     .font(.body.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(ink(Palette.text))
-                Text("/ \(target)g").font(.caption2).foregroundStyle(ink(Palette.faint, 0.7))
+                    .foregroundStyle(Palette.text)
+                Text("/ \(target)g").font(.caption2).foregroundStyle(Palette.faint)
                 ProgressView(value: min(1, Double(have) / Double(target)))
-                    .progressViewStyle(.linear).tint(ink(tint))
+                    .progressViewStyle(.linear).tint(Palette.nutrition)
             } else {
                 Text("\(have)g")
                     .font(.body.weight(.bold)).monospacedDigit()
-                    .foregroundStyle(ink(Palette.text))
+                    .foregroundStyle(Palette.text)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -90,16 +85,13 @@ struct FitnessTodayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            DayMacroHero().cardHue(.orange).cardLook(.bold)
-            // Each meal keeps the colour it has on Today, so the same breakfast
-            // is amber wherever you meet it.
+            DayMacroHero()
             ForEach(MealKey.allCases) { meal in
                 MealChecklistCard(meal: meal,
                                   edit: { editingMeal = meal },
                                   scan: { scanningMeal = meal })
-                    .cardHue(meal.hue)
             }
-            WorkoutChecklistCard().cardHue(.blue)
+            WorkoutChecklistCard()
         }
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: date, meal: meal, initialItems: seed(meal))
@@ -392,7 +384,7 @@ struct WorkoutChecklistCard: View {
         let done = entries.reduce(0) { $0 + $1.doneSets }
         let total = entries.reduce(0) { $0 + $1.sets.count }
         return VStack(alignment: .leading, spacing: 8) {
-            ProgressView(value: Double(done) / Double(max(1, total))).progressViewStyle(.linear).tint(Palette.brand)
+            ProgressView(value: Double(done) / Double(max(1, total))).progressViewStyle(.linear).tint(Palette.action)
             Text("\(done) of \(total) sets logged")
                 .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             Button { session = true } label: {
@@ -494,7 +486,7 @@ struct ProgramDayPickerSheet: View {
                                     .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                             }
                             .padding(13)
-                            .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                                 .strokeBorder(Palette.border, lineWidth: 1))
                             .contentShape(Rectangle())
@@ -533,13 +525,13 @@ struct ProgramDaySheet: View {
         #if os(macOS)
         .frame(width: 560)
         .frame(minHeight: 620)
-        .background(.hueCanvas)
+        .background(Palette.background)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.hueCanvas)
+        .background(Palette.background)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.hueCanvas)
+        .presentationBackground(Palette.background)
         #endif
     }
 }
@@ -569,10 +561,10 @@ struct MealLogEditorSheet: View {
 
     private var mealTint: Color {
         switch meal {
-        case .breakfast: return Palette.amber
-        case .lunch:     return Palette.gold
-        case .dinner:    return Palette.purple
-        case .snacks:    return Palette.coral
+        case .breakfast: return Palette.attention
+        case .lunch:     return Palette.attention
+        case .dinner:    return Palette.information
+        case .snacks:    return Palette.attention
         }
     }
 
@@ -609,10 +601,10 @@ struct MealLogEditorSheet: View {
         .background(Palette.elevated)
         #else
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.hueCanvas)
+        .background(Palette.background)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.hueCanvas)
+        .presentationBackground(Palette.background)
         #endif
         .sheet(isPresented: $adding) {
             FoodPickerSheet(meal: meal, add: { f, q in draft.append(PlanItem(foodId: f.id, quantity: q)) },
@@ -651,8 +643,8 @@ struct MealLogEditorSheet: View {
             HStack(spacing: 8) {
                 macroChip("P", Int(mealMacros.protein.rounded()), Palette.green)
                 macroChip("C", Int(mealMacros.carbs.rounded()), Palette.blue)
-                macroChip("F", Int(mealMacros.fats.rounded()), Palette.red)
-                macroChip("Fib", Int(mealMacros.fiber.rounded()), Palette.purple)
+                macroChip("F", Int(mealMacros.fats.rounded()), Palette.warning)
+                macroChip("Fib", Int(mealMacros.fiber.rounded()), Palette.information)
             }
         }
         .padding(.horizontal, 20)
@@ -691,7 +683,7 @@ struct MealLogEditorSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
-        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
     }
@@ -708,7 +700,7 @@ struct MealLogEditorSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 20)
-        .background(.hueCanvas)
+        .background(Palette.background)
     }
 }
 
@@ -746,7 +738,7 @@ private struct DraftFoodRow: View {
                           confirmLabel: "Hold to remove") { remove() }
         }
         .padding(14)
-        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(Palette.border, lineWidth: 1))
     }
@@ -755,7 +747,7 @@ private struct DraftFoodRow: View {
         Button(action: action) {
             Image(systemName: icon).font(.caption.weight(.bold)).foregroundStyle(Palette.text)
                 .frame(width: 34, height: 34)
-                .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
     }

@@ -77,7 +77,7 @@ struct LoginView: View {
             if let err = state.authError {
                 Text(err)
                     .font(.footnote)
-                    .foregroundStyle(Palette.red)
+                    .foregroundStyle(Palette.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -92,11 +92,7 @@ struct LoginView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
                 .foregroundStyle(Brandmark.ink)
-                .background(
-                    LinearGradient(colors: [Color(hex: 0x7BE07B), Color(hex: 0x4FCB6B)],
-                                   startPoint: .leading, endPoint: .trailing),
-                    in: Capsule()
-                )
+                .background(Palette.action, in: Capsule())
             }
             .buttonStyle(.plain)
             .disabled(state.isWorking)

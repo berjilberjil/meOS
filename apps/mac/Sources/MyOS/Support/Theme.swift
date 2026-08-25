@@ -7,8 +7,12 @@ import UIKit
 typealias PlatformColor = UIColor
 #endif
 
-/// sRGB components of a Color, read via the platform color type (NSColor on
-/// macOS, UIColor on iOS) so `mixedWithBlack`/`mixedWithWhite` work everywhere.
+// Structure, motion and the card. Colour lives in `DesignSystem.swift` and
+// nowhere else — if you are about to write a hex value in this file, it belongs
+// there instead.
+
+/// sRGB components of a Color, read via the platform colour type, so the mixing
+/// helpers below work on both platforms. Used by the hand-drawn icon glyphs.
 func platformComponents(_ color: Color, fallback: PlatformColor) -> (r: Double, g: Double, b: Double, a: Double) {
     #if os(macOS)
     let c = NSColor(color).usingColorSpace(.sRGB) ?? fallback
@@ -20,12 +24,6 @@ func platformComponents(_ color: Color, fallback: PlatformColor) -> (r: Double, 
     #endif
 }
 
-// MyOS design language — the system's. Chrome, type, motion and controls all come
-// from AppKit/UIKit rather than from values typed in here, which is what makes the
-// app track Light/Dark, Increase Contrast, Dynamic Type and vibrancy for free.
-// Converted 2026-08-24 at Berjil's explicit request (see feat/native-ui): the
-// Fold black + green skin and the earlier Duolingo look are both gone. The green
-// survives only as the app tint. Do not reintroduce hardcoded hex chrome.
 extension Color {
     init(hex: UInt32, alpha: Double = 1) {
         self.init(
@@ -37,21 +35,35 @@ extension Color {
         )
     }
 
-    /// Blend toward black by `t` (0…1) — used to derive a button's darker 3D edge
-    /// from its face color, so any tint gets a matching edge for free.
+    /// Blend toward black by `t` (0…1).
     func mixedWithBlack(_ t: Double) -> Color {
         let c = platformComponents(self, fallback: .black)
         return Color(.sRGB, red: c.r * (1 - t), green: c.g * (1 - t), blue: c.b * (1 - t), opacity: c.a)
     }
-    /// Blend toward white by `t` — hover highlight.
+    /// Blend toward white by `t`.
     func mixedWithWhite(_ t: Double) -> Color {
         let c = platformComponents(self, fallback: .white)
         return Color(.sRGB, red: c.r + (1 - c.r) * t, green: c.g + (1 - c.g) * t, blue: c.b + (1 - c.b) * t, opacity: c.a)
     }
+
+    /// WCAG relative luminance — used to check that text on an accent fill is
+    /// actually legible. Neon green and orange both fail with white on top.
+    var wcagLuminance: Double {
+        let c = platformComponents(self, fallback: .black)
+        func channel(_ v: Double) -> Double {
+            v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b)
+    }
+
+    func contrast(with other: Color) -> Double {
+        let a = wcagLuminance, b = other.wcagLuminance
+        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
 }
 
-/// Appearance preference. MyOS no longer ships colour values, so a "theme" is
-/// only the question of whether we follow the OS or pin light/dark.
+/// Appearance preference. MyOS ships one palette, so a "theme" is only the
+/// question of whether we follow the OS or pin light/dark.
 struct AppTheme: Identifiable, Hashable {
     let id: String
     let name: String
@@ -67,7 +79,6 @@ struct AppTheme: Identifiable, Hashable {
     /// Unknown ids (the retired "foldDark" / "midnight") migrate to System.
     static func by(id: String) -> AppTheme { all.first { $0.id == id } ?? system }
 
-    /// Drives `.preferredColorScheme`. nil hands the decision back to the OS.
     var colorScheme: ColorScheme? { scheme }
 }
 
@@ -84,85 +95,30 @@ final class ThemeStore: ObservableObject {
     }
 }
 
-/// Every colour in MyOS. Chrome forwards to the system semantic colours; macOS
-/// and iOS spell those differently, so the platform split lives here and nowhere
-/// else in the app.
-enum Palette {
-    /// The one colour MyOS still owns. Applied as the app `.tint` so it lands on
-    /// controls the way an accent colour is meant to.
-    static let accent = Color(hex: 0x56BB06)
-
-    // Chrome. These were the system greys until 2026-08-25; Berjil's reading of
-    // that was "no more grey shit", so MyOS owns them again — as ink-blue
-    // neutrals, and as *dynamic* colours so Light/Dark still switches. Text
-    // colours below stay system semantic on purpose: a bold card flips the
-    // environment's colorScheme to dark, and semantic labels are what turn
-    // white for free when it does.
-    static let bg           = Color.dynamic(light: 0xF3F6FD, dark: 0x0B0F17)
-    static let sidebar      = Color.dynamic(light: 0xEAEFFA, dark: 0x080B12)
-    static let surface      = Color.dynamic(light: 0xFFFFFF, dark: 0x151B28)
-    static let surface2     = Color.dynamic(light: 0xE9EFFA, dark: 0x1E2636)
-    static let elevated     = Color.dynamic(light: 0xFFFFFF, dark: 0x1A2130)
-    static let border       = Color.dynamic(light: 0xDBE3F3, dark: 0x2A3345)
-    static let borderStrong = Color.dynamic(light: 0xC1CCE3, dark: 0x3A4459)
-
-    #if os(macOS)
-    static var text: Color         { Color(nsColor: .labelColor) }
-    static var muted: Color        { Color(nsColor: .secondaryLabelColor) }
-    static var faint: Color        { Color(nsColor: .tertiaryLabelColor) }
-    #else
-    static var text: Color         { Color(uiColor: .label) }
-    static var muted: Color        { Color(uiColor: .secondaryLabel) }
-    static var faint: Color        { Color(uiColor: .tertiaryLabel) }
-    #endif
-
-    static var ring: Color         { accent }
-    static var brand: Color        { accent }
-    static var brandDeep: Color    { accent }
-    static var green: Color        { accent }
-
-    // Feature colours are the hue cores, so a chart, a chip and a card that all
-    // mean "workout" are the same blue rather than three neighbouring blues.
-    static var red    : Color { Hue.red.core }
-    static var blue   : Color { Hue.blue.core }
-    static var amber  : Color { Hue.amber.core }
-    static var purple : Color { Hue.purple.core }
-    static var flame  : Color { Hue.orange.core }
-    static var ice    : Color { Hue.cyan.core }
-    static var rose   : Color { Hue.pink.core }
-    static var teal   : Color { Hue.teal.core }
-    static var gold   : Color { Hue.amber.core }
-    static var coral  : Color { Hue.orange.core }
-    static var indigo : Color { Hue.indigo.core }
-}
-
-/// Vertical rhythm. Screens differed by a few points each — 14 here, 16 there,
-/// 18, 20, 22 — which is small enough to never look like a bug and big enough
-/// that every tab switch re-spaces the page under you. One beat, everywhere.
+/// Vertical rhythm. Aliases onto the `Space` scale — one beat, everywhere.
 enum Gap {
     /// Between a screen's top-level blocks.
-    static let screen: CGFloat = 18
+    static let screen: CGFloat = Space.xl      // 20
     /// Between rows inside a card.
-    static let row: CGFloat = 12
-    static let tight: CGFloat = 8
+    static let row: CGFloat = Space.md         // 12
+    static let tight: CGFloat = Space.sm       // 8
 }
 
+/// Three radii. Small for chips and controls, medium for inputs and rows, large
+/// for cards and sheets.
 enum Radius {
-    static let xs: CGFloat = 8
-    static let sm: CGFloat = 12   // chips / small controls
-    static let md: CGFloat = 16   // inputs / small buttons / nav items
-    static let lg: CGFloat = 20   // cards
-    static let xl: CGFloat = 28   // dialogs / modals
+    static let xs: CGFloat = 12
+    static let sm: CGFloat = 12
+    static let md: CGFloat = 16
+    static let lg: CGFloat = 24
+    static let xl: CGFloat = 24
 }
 
-// Motion tokens. Springs use Apple's designer pair (WWDC 2018): response +
-// damping ratio. Default UI is critically damped (no bounce). Bounce is only
-// for momentum-driven moves (tab pop, flick).
+// Motion tokens.
 enum Motion {
-    static let fast   = 0.10   // interactions (hover / press)
-    static let normal = 0.18   // toggles / segmented
+    static let fast   = 0.10
+    static let normal = 0.18
     static let slow   = 0.28
-    /// Theme / chrome color settle — Apple "move" spring.
     static let theme  = 0.40
 
     static var reduceMotion: Bool {
@@ -175,17 +131,16 @@ enum Motion {
 }
 
 extension Animation {
-    // Stiff again, 2026-08-24. These were switched to the system spring presets
-    // earlier the same day; the app then read as "buggy and stuck", which is the
-    // same complaint that produced the stiff rule in the first place. A page
-    // that is still settling when your thumb arrives feels broken, not lively.
+    // Stiff on purpose. These were the system spring presets for half a day and
+    // the app read as "buggy and stuck" — a page still settling when your thumb
+    // arrives feels broken, not lively.
     static let knFast     = Animation.easeOut(duration: Motion.fast)
     static let knNormal   = Animation.easeInOut(duration: Motion.normal)
     /// Screens arrive by fading, not by moving. See `RiseIn`.
     static let knEntrance = Animation.easeOut(duration: 0.14)
     /// No bounce. A control that overshoots reads as loose.
     static let knPop      = Animation.spring(response: 0.26, dampingFraction: 1.0)
-    /// Dark ↔ light. Interrupted retargets from the live colour (no snap).
+    /// Dark ↔ light.
     static var knTheme: Animation {
         Motion.reduceMotion
             ? .easeInOut(duration: 0.2)
@@ -193,128 +148,115 @@ extension Animation {
     }
 }
 
-
 // MARK: - Elevation
 
 extension View {
-    /// Native surfaces carry no app-drawn shadow: grouped content sits flat on
-    /// the grouped background, and floating chrome takes its depth from a
-    /// material. Kept as a no-op so the call sites read unchanged.
+    /// MyOS draws no shadows. Depth comes from the hairline between a near-black
+    /// card and a black canvas — a glow on every card is a gaming dashboard, not
+    /// an operating system. Kept as a no-op so call sites read unchanged.
     func knShadow(_ strong: Bool = false) -> some View { self }
 }
 
 // MARK: - Card
 
-/// How a card is filled.
+/// How a card separates itself from the canvas.
 enum CardLook {
-    /// Hero. Saturated gradient, white text, a coloured shadow under it. For the
-    /// one or two cards on a screen that carry the answer.
-    case bold
-    /// The default. The screen's hue, washed out, with a hairline of the hue.
-    case tinted
-    /// Plain surface. Left for places where colour would fight the content —
-    /// long-form text, photo grids, editors.
+    /// The default, and the right answer for nearly everything: near-black
+    /// surface, hairline border, white type.
     case plain
+    /// A card *inside* a card, or a row that needs to lift off one.
+    case elevated
+    /// Carries a semantic accent as a rule down its leading edge. Rare — only
+    /// where the content genuinely belongs to one meaning (activity, nutrition,
+    /// events), never for decoration.
+    case accent
 }
 
 /// The standard MyOS surface.
 ///
-/// Built on SwiftUI's own `GroupBox` rather than a bare `RoundedRectangle`: a
-/// group box *is* the platform's card, so the content inside is grouped for
-/// VoiceOver and the container behaves like one everywhere it is nested. The
-/// look is supplied by `MyOSCardStyle`, which replaces the system chrome
-/// wholesale — MyOS cards are coloured, and the system's are not.
-///
-/// A card with no `hue` takes the ambient `\.cardHue`, so a screen colours its
-/// whole stack with one modifier.
+/// Built on SwiftUI's `GroupBox` so the content inside is grouped for VoiceOver
+/// and the container behaves like the platform's own card. `MyOSCardStyle`
+/// replaces the system chrome, because MyOS cards are black and the system's
+/// are grey.
 struct Card<Content: View>: View {
-    var padding: CGFloat = 18
+    var padding: CGFloat = Space.xl
     var radius: CGFloat = Radius.lg
-    /// Overrides the ambient hue for this card only.
-    var hue: Hue? = nil
-    /// nil = take the ambient `\.cardLook`.
-    var look: CardLook? = nil
+    /// Overrides the ambient accent for this card only.
+    var accent: Accent? = nil
+    var look: CardLook = .plain
     @ViewBuilder var content: Content
 
-    @Environment(\.cardHue) private var ambientHue
-    @Environment(\.cardLook) private var ambientLook
+    @Environment(\.cardAccent) private var ambient
 
     var body: some View {
         GroupBox { content }
-            .groupBoxStyle(MyOSCardStyle(hue: hue ?? ambientHue, look: look ?? ambientLook,
+            .groupBoxStyle(MyOSCardStyle(accent: accent ?? ambient, look: look,
                                          padding: padding, radius: radius))
     }
 }
 
 /// The MyOS card look, as a real `GroupBoxStyle`.
 struct MyOSCardStyle: GroupBoxStyle {
-    let hue: Hue
+    let accent: Accent
     let look: CardLook
-    var padding: CGFloat = 18
+    var padding: CGFloat = Space.xl
     var radius: CGFloat = Radius.lg
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .modifier(CardSkin(hue: hue, look: look, radius: radius))
+            .modifier(CardSkin(accent: accent, look: look, radius: radius))
     }
 }
 
-/// Paints a card. Separated from the style so `.cardSkin()` can give the same
+/// Paints a card. Separate from the style so `.cardSkin()` can give the same
 /// treatment to things that are card-shaped but are not `Card` — tiles, tappable
-/// rows, the meal grid.
+/// rows, grid cells.
 struct CardSkin: ViewModifier {
-    let hue: Hue
-    let look: CardLook
+    var accent: Accent = .none
+    var look: CardLook = .plain
     var radius: CGFloat = Radius.lg
-
-    /// A washed card *inside* a bold one cannot use its own fill — that is the
-    /// hue painted on the hue. It becomes translucent white instead, the way a
-    /// system material would.
-    @Environment(\.onBoldCard) private var onBold
 
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: radius, style: .continuous) }
 
     func body(content: Content) -> some View {
         switch look {
-        case .bold:
-            // Flipping the environment to dark is what makes every `Palette.text`
-            // and `Palette.muted` *inside* the card resolve white — the reason a
-            // hero card needed no edits to the ~40 labels it contains.
-            content
-                .environment(\.colorScheme, .dark)
-                .environment(\.onBoldCard, true)
-                .foregroundStyle(.white)
-                .background(hue.boldGradient, in: shape)
-                .overlay(shape.strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
-                .shadow(color: hue.core.opacity(0.32), radius: 16, x: 0, y: 8)
-        case .tinted:
-            content
-                .background(onBold ? AnyShapeStyle(Color.white.opacity(0.15)) : AnyShapeStyle(hue.fill), in: shape)
-                .overlay(shape.strokeBorder(onBold ? AnyShapeStyle(Color.white.opacity(0.28))
-                                                   : AnyShapeStyle(hue.line), lineWidth: 1))
         case .plain:
             content
-                .background(onBold ? AnyShapeStyle(Color.white.opacity(0.15)) : AnyShapeStyle(Palette.surface), in: shape)
-                .overlay(shape.strokeBorder(onBold ? AnyShapeStyle(Color.white.opacity(0.28))
-                                                   : AnyShapeStyle(Palette.border), lineWidth: 1))
+                .background(Palette.surface, in: shape)
+                .overlay(shape.strokeBorder(Palette.border, lineWidth: 1))
+        case .elevated:
+            content
+                .background(Palette.surfaceElevated, in: shape)
+                .overlay(shape.strokeBorder(Palette.border, lineWidth: 1))
+        case .accent:
+            content
+                .background(Palette.surface, in: shape)
+                .overlay(shape.strokeBorder(Palette.border, lineWidth: 1))
+                // A rule, not a fill. The colour marks what the card is about
+                // without turning the card into the colour.
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(accent.tint)
+                        .frame(width: 3)
+                        .clipShape(shape)
+                        .allowsHitTesting(false)
+                }
         }
     }
 }
 
 extension View {
-    /// Card treatment for something that is not a `Card` — a tile, a tappable
-    /// row, a grid cell. Same three looks, same hue inheritance rules.
-    func cardSkin(_ look: CardLook = .tinted, hue: Hue, radius: CGFloat = Radius.lg) -> some View {
-        modifier(CardSkin(hue: hue, look: look, radius: radius))
+    /// Card treatment for something that is not a `Card`.
+    func cardSkin(_ look: CardLook = .plain, accent: Accent = .none, radius: CGFloat = Radius.lg) -> some View {
+        modifier(CardSkin(accent: accent, look: look, radius: radius))
     }
 }
 
 // MARK: - Labels
 
-/// The name of a screen, at the system's large-title style so it tracks Dynamic
-/// Type instead of sitting at a fixed 28pt.
+/// The name of a screen.
 struct ScreenTitle: View {
     let text: String
     var body: some View {
@@ -324,14 +266,11 @@ struct ScreenTitle: View {
     }
 }
 
-/// A grouped-section header, matching the system's footnote-uppercase-secondary.
+/// A grouped-section header.
 struct SectionTitle: View {
     let text: String
-    var body: some View {
-        Text(text.uppercased())
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(Palette.muted)
-    }
+    var accent: Accent = .none
+    var body: some View { SectionLabel(text: text, accent: accent) }
 }
 
 extension View {
@@ -341,31 +280,32 @@ extension View {
     }
 }
 
-// Balanced pointing-hand cursor (uses .set(), so no push/pop imbalance on disappear).
-// No-op on iOS — there's no pointer to change.
+// Balanced pointing-hand cursor. No-op on iOS.
 func cursor(_ inside: Bool) {
     #if os(macOS)
     if inside { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
     #endif
 }
 
-/// Full-width primary action used by forms (login, etc.).
+/// Full-width primary action. Green means action, and green is far too light to
+/// carry white text — the label is black on purpose.
 struct PrimaryButton: View {
     let title: String
     var loading = false
-    var tint: Color = Palette.accent
+    var accent: Accent = .green
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                if loading { ProgressView().controlSize(.small) }
-                Text(title)
+            HStack(spacing: Space.sm) {
+                if loading { ProgressView().controlSize(.small).tint(accent.ink) }
+                Text(title).fontWeight(.semibold)
             }
+            .foregroundStyle(accent.ink)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
-        .tint(tint)
+        .tint(accent.tint)
         .disabled(loading)
     }
 }
@@ -373,15 +313,16 @@ struct PrimaryButton: View {
 // MARK: - Text field styling
 
 extension View {
-    /// The MyOS input look: filled, rounded, a 2px border that glows the accent on focus.
+    /// The MyOS input: a lifted surface, a hairline, and the accent only while
+    /// focused. An input does not need a colour to exist.
     func knField(focused: Bool = false, radius: CGFloat = Radius.md) -> some View {
         self
-            .padding(.horizontal, 13).padding(.vertical, 10)
-            .background(.hueFillStrong,
+            .padding(.horizontal, Space.md).padding(.vertical, 10)
+            .background(Palette.surfaceElevated,
                         in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(focused ? AnyShapeStyle(Palette.brand) : AnyShapeStyle(.hueLine), lineWidth: 2)
+                    .strokeBorder(focused ? Palette.action : Palette.border, lineWidth: focused ? 2 : 1)
             )
             .animation(.knFast, value: focused)
     }
@@ -389,16 +330,11 @@ extension View {
 
 // MARK: - Entrance
 
-/// Entrance for a screen's blocks: a short rise on a system spring, lightly
-/// staggered so a page reads as arriving in order.
+/// Entrance for a screen's blocks: a short fade, lightly staggered.
 ///
-/// The stagger is why this modifier was once reduced to a bare fade — inside a
-/// scroll view, a page still cascading when your thumb lands shifts content
-/// under you. The fix that matters is not stillness but the `knEntrances` guard
-/// below: `TodayPager` sets it false, so turning a page never replays entrances.
-/// Keep that guard wherever blocks are not genuinely arriving. Reduce Motion
-/// drops the movement entirely, and the stagger is capped so a long page cannot
-/// cascade for a noticeable length of time.
+/// The `knEntrances` guard is the load-bearing part: `TodayPager` sets it false,
+/// so turning a page never replays entrances. Keep that guard wherever blocks
+/// are not genuinely arriving.
 struct RiseIn: ViewModifier {
     var index: Int = 0
     @Environment(\.knEntrances) private var entrances
@@ -411,13 +347,11 @@ struct RiseIn: ViewModifier {
     }
 }
 
-
 private struct KnEntrancesKey: EnvironmentKey { static let defaultValue = true }
 
 extension EnvironmentValues {
     /// False where blocks are not *arriving*. A paged day is the case that
-    /// matters: turning the page is not an entrance, so fading nine cards up
-    /// from zero every time you swipe reads as the page failing to draw.
+    /// matters: turning the page is not an entrance.
     var knEntrances: Bool {
         get { self[KnEntrancesKey.self] }
         set { self[KnEntrancesKey.self] = newValue }
@@ -428,7 +362,7 @@ extension View {
     func knRise(_ index: Int = 0) -> some View { modifier(RiseIn(index: index)) }
 }
 
-/// Subtle hover feedback for tappable cards — a barely-there lift + brighten.
+/// Subtle hover feedback for tappable cards.
 struct HoverLift: ViewModifier {
     @State private var hover = false
     func body(content: Content) -> some View {
@@ -446,7 +380,6 @@ extension View {
 
 // MARK: - Formatting
 
-// Number formatting.
 enum Fmt {
     /// Weight with at most one decimal (e.g. 72 or 72.5).
     static func trimKg(_ v: Double) -> String {
@@ -455,16 +388,14 @@ enum Fmt {
     }
 
     /// One-letter weekday for a `yyyy-MM-dd` key. Hand-rolled rather than
-    /// localised: a strip of seven needs exactly one character each, and some
-    /// locales give two.
+    /// localised: a strip of seven needs exactly one character each.
     static func weekdayInitial(_ iso: String) -> String {
         guard let date = CalMath.date(fromKey: String(iso.prefix(10))) else { return "" }
         let i = CalMath.cal.component(.weekday, from: date)   // Sunday = 1
         return ["S", "M", "T", "W", "T", "F", "S"][max(0, min(6, i - 1))]
     }
 
-    /// Human day label from an ISO stamp ("2026-08-04" or "2026-08-04T13:22:10").
-    /// → "Today" / "Yesterday" / "Aug 4" / "Aug 4, 2025".
+    /// Human day label from an ISO stamp → "Today" / "Yesterday" / "Aug 4".
     static func day(_ iso: String) -> String {
         let datePart = String(iso.prefix(10))
         let inFmt = DateFormatter()
@@ -481,5 +412,21 @@ enum Fmt {
         out.locale = Locale(identifier: "en_US")
         out.dateFormat = cal.isDate(date, equalTo: Date(), toGranularity: .year) ? "MMM d" : "MMM d, yyyy"
         return out.string(from: date)
+    }
+
+    /// "7h 44m" / "44m" / "38s" — the app's one duration format.
+    static func duration(_ seconds: Int) -> String {
+        let s = max(0, seconds)
+        let h = s / 3600, m = (s % 3600) / 60
+        if h > 0 { return m > 0 ? "\(h)h \(m)m" : "\(h)h" }
+        if m > 0 { return "\(m)m" }
+        return "\(s)s"
+    }
+
+    /// Compact duration for tight rows: "7h 44m" → "7h44".
+    static func shortDuration(_ seconds: Int) -> String {
+        let s = max(0, seconds)
+        let h = s / 3600, m = (s % 3600) / 60
+        return h > 0 ? String(format: "%dh%02d", h, m) : "\(m)m"
     }
 }

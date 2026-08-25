@@ -70,8 +70,8 @@ struct BelongingsView: View {
         let healthTint: Color = {
             switch health {
             case .good: return Palette.green
-            case .tight: return Palette.amber
-            case .over: return Palette.red
+            case .tight: return Palette.attention
+            case .over: return Palette.warning
             }
         }()
         let burn = salary > 0 ? min(1, Double(month) / Double(salary)) : 0
@@ -105,8 +105,8 @@ struct BelongingsView: View {
                 }
                 HStack(spacing: 8) {
                     heroStat("Month", BelongingINR.format(month), Palette.blue)
-                    heroStat("Year", BelongingINR.format(year), Palette.purple)
-                    heroStat("Items", "\(live.count)", Palette.amber)
+                    heroStat("Year", BelongingINR.format(year), Palette.information)
+                    heroStat("Items", "\(live.count)", Palette.attention)
                 }
                 // Below the line: this is a setting the summary is measured
                 // against, not another number in the summary.
@@ -126,7 +126,7 @@ struct BelongingsView: View {
                     Button("Save", action: saveSalary).buttonStyle(.borderless)
                 }
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(.hueFillStrong, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .background(Palette.surfaceElevated, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             }
         }
     }
@@ -135,8 +135,8 @@ struct BelongingsView: View {
         let (t, c): (String, Color) = {
             switch h {
             case .good: return ("On track", Palette.green)
-            case .tight: return ("Tight", Palette.amber)
-            case .over: return ("Over salary", Palette.red)
+            case .tight: return ("Tight", Palette.attention)
+            case .over: return ("Over salary", Palette.warning)
             }
         }()
         return Text(t)
@@ -243,7 +243,7 @@ struct BelongingsView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(tint.opacity(0.35), lineWidth: 1.5))
     }
@@ -270,7 +270,7 @@ struct BelongingsView: View {
             .padding(14)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.hueFill, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
             .strokeBorder(tint.opacity(0.45), lineWidth: 1.5))
         .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
@@ -338,7 +338,7 @@ private struct BelongingEditor: View {
                                             Text(k.name)
                                         }
                                         .font(.footnote.weight(.semibold))
-                                        .foregroundStyle(on ? Palette.bg : k.color)
+                                        .foregroundStyle(on ? Palette.background : k.color)
                                         .padding(.horizontal, 12).padding(.vertical, 8)
                                         .background(on ? k.color : k.color.opacity(0.16), in: Capsule())
                                     }
@@ -352,7 +352,7 @@ private struct BelongingEditor: View {
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(Palette.text)
                                     .padding(.horizontal, 12).padding(.vertical, 8)
-                                    .background(.hueFillStrong, in: Capsule())
+                                    .background(Palette.surfaceElevated, in: Capsule())
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -374,7 +374,7 @@ private struct BelongingEditor: View {
                 }
                 .padding(16)
             }
-            .background(HueCanvas())
+            .background(Palette.background)
             .navigationTitle(item == nil ? "Add item" : "Edit item")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -471,7 +471,7 @@ private struct BelongingEditor: View {
                     #endif
                     if !photoBase64.isEmpty {
                         Button { showRemovePhoto = true } label: {
-                            Text("Remove photo").font(.footnote.weight(.semibold)).foregroundStyle(Palette.red)
+                            Text("Remove photo").font(.footnote.weight(.semibold)).foregroundStyle(Palette.warning)
                         }
                         .buttonStyle(.plain)
                         .holdToDelete(isPresented: $showRemovePhoto, title: "Remove this photo?",
@@ -554,7 +554,7 @@ private struct BelongingEditor: View {
             TextField("", text: text, prompt: Text(hint).foregroundColor(Palette.faint))
                 .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                 .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .strokeBorder(Palette.border, lineWidth: 1))
         }
@@ -652,7 +652,7 @@ private struct NewBelongingCategorySheet: View {
                         TextField("", text: $name, prompt: Text("Shoes, cameras, watches…").foregroundColor(Palette.faint))
                             .textFieldStyle(.plain).font(.body).foregroundStyle(Palette.text)
                             .padding(.horizontal, 14).padding(.vertical, 12)
-                            .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                                 .strokeBorder(Palette.border, lineWidth: 1))
                     }
@@ -663,7 +663,7 @@ private struct NewBelongingCategorySheet: View {
                                 Button { icon = s } label: {
                                     Image(systemName: s)
                                         .font(.callout.weight(.semibold))
-                                        .foregroundStyle(icon == s ? Palette.bg : Color(hex: tint))
+                                        .foregroundStyle(icon == s ? Palette.background : Color(hex: tint))
                                         .frame(width: 44, height: 44)
                                         .background(icon == s ? Color(hex: tint) : Color(hex: tint).opacity(0.16),
                                                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -690,13 +690,13 @@ private struct NewBelongingCategorySheet: View {
                         Text(name.isEmpty ? "Preview" : name)
                     }
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Palette.bg)
+                    .foregroundStyle(Palette.background)
                     .padding(.horizontal, 14).padding(.vertical, 8)
                     .background(Color(hex: tint), in: Capsule())
                 }
                 .padding(16)
             }
-            .background(HueCanvas())
+            .background(Palette.background)
             .navigationTitle("New category")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

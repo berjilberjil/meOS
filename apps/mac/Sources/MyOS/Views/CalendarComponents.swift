@@ -104,7 +104,7 @@ struct KMonthGrid: View {
 
     /// Header letter colour — Saturday blue, Sunday red, weekdays faint.
     private func weekdayTint(_ i: Int) -> Color {
-        if i == 6 { return Palette.red.opacity(0.85) }
+        if i == 6 { return Palette.warning.opacity(0.85) }
         if i == 5 { return Palette.blue.opacity(0.85) }
         return Palette.faint
     }
@@ -167,10 +167,10 @@ private struct DayCell: View {
         let isSel = key == selected
         let wknd = CalMath.weekend(key)
         let numberColor: Color = isSel ? .white
-            : (wknd.sun ? Palette.red : (wknd.sat ? Palette.blue : (isToday ? Palette.brand : Palette.text)))
-        let weekendBG: Color = wknd.sun ? Palette.red.opacity(0.10)
+            : (wknd.sun ? Palette.warning : (wknd.sat ? Palette.blue : (isToday ? Palette.action : Palette.text)))
+        let weekendBG: Color = wknd.sun ? Palette.warning.opacity(0.10)
             : (wknd.sat ? Palette.blue.opacity(0.06) : .clear)
-        let cellBG: Color = isSel ? Palette.brand : (holidayName != nil ? Palette.amber.opacity(0.12) : weekendBG)
+        let cellBG: Color = isSel ? Palette.action : (holidayName != nil ? Palette.attention.opacity(0.12) : weekendBG)
 
         return Button(action: onTap) {
             VStack(spacing: big ? 4 : (compact ? 1 : 3)) {
@@ -192,7 +192,7 @@ private struct DayCell: View {
                 .strokeBorder(borderColor(isToday: isToday, isSel: isSel), lineWidth: 1.5))
             .overlay(alignment: .top) {
                 if holidayName != nil {
-                    Circle().fill(isSel ? Color.white : Palette.amber)
+                    Circle().fill(isSel ? Color.white : Palette.attention)
                         .frame(width: big ? 5 : 3, height: big ? 5 : 3)
                         .padding(.top, big ? 5 : 2)
                 }
@@ -216,7 +216,7 @@ private struct DayCell: View {
     }
 
     private func borderColor(isToday: Bool, isSel: Bool) -> Color {
-        if isToday && !isSel { return Palette.brand.opacity(0.55) }
+        if isToday && !isSel { return Palette.action.opacity(0.55) }
         if hover && !isSel { return Palette.border }
         return .clear
     }
@@ -277,7 +277,7 @@ struct KDatePicker: View {
             })
         }
         .padding(12)
-        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 2))
     }
 

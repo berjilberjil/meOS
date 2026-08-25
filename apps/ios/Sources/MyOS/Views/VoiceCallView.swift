@@ -39,7 +39,7 @@ struct VoiceCallView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(HueCanvas())
+        .background(Palette.background)
         .task { await begin() }
         .onDisappear { finish() }
     }
@@ -56,12 +56,12 @@ struct VoiceCallView: View {
 
     private var orb: some View {
         Circle()
-            .fill(phase == .speaking ? Palette.brand : Palette.surface)
+            .fill(phase == .speaking ? Palette.action : Palette.surface)
             .frame(width: 132, height: 132)
             .overlay(
                 Image(systemName: icon)
                     .font(.largeTitle.weight(.semibold))
-                    .foregroundStyle(phase == .speaking ? Palette.bg : Palette.text)
+                    .foregroundStyle(phase == .speaking ? Palette.background : Palette.text)
             )
             .animation(.knPop, value: phase)
             .contentShape(Circle())

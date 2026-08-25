@@ -186,9 +186,9 @@ struct FocusCard: View {
                     Image(systemName: "flame.fill").font(.caption2.weight(.bold))
                     Text("\(streak)").font(.caption2.weight(.heavy))
                 }
-                .foregroundStyle(Palette.flame)
+                .foregroundStyle(Palette.activity)
                 .padding(.horizontal, 7).padding(.vertical, 3)
-                .background(Palette.flame.opacity(0.14), in: Capsule())
+                .background(Palette.activity.opacity(0.14), in: Capsule())
                 .help("\(streak) clean day\(streak == 1 ? "" : "s") in a row")
             }
             Spacer(minLength: 4)
@@ -201,7 +201,7 @@ struct FocusCard: View {
                 Image(systemName: showCalendar ? "calendar.badge.minus" : "calendar")
                     .font(.footnote.weight(.bold))
             }
-            .buttonStyle(.borderless).tint(showCalendar ? Palette.brand : Palette.faint)
+            .buttonStyle(.borderless).tint(showCalendar ? Palette.action : Palette.faint)
             .help(showCalendar ? "Hide the record" : "See the record")
             }
 
@@ -214,7 +214,7 @@ struct FocusCard: View {
                             .font(.caption2.weight(.heavy))
                     }
                 }
-                .buttonStyle(.bordered).tint(Palette.teal)
+                .buttonStyle(.bordered).tint(Palette.success)
                 .help("Everything else goes away until you turn it off")
             }
         }
@@ -226,9 +226,9 @@ struct FocusCard: View {
         return Button { state.setTaskMode(true) } label: {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle().stroke(Palette.teal.opacity(0.25), lineWidth: 3)
+                    Circle().stroke(Palette.success.opacity(0.25), lineWidth: 3)
                     Circle().trim(from: 0, to: max(0.02, timer.progress))
-                        .stroke(timer.finished ? Palette.green : Palette.teal,
+                        .stroke(timer.finished ? Palette.green : Palette.success,
                                 style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
@@ -244,12 +244,12 @@ struct FocusCard: View {
                 Spacer(minLength: 0)
                 Text(timer.clock)
                     .font(.body.weight(.heavy)).monospacedDigit()
-                    .foregroundStyle(timer.finished ? Palette.green : Palette.teal)
+                    .foregroundStyle(timer.finished ? Palette.green : Palette.success)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(Palette.teal.opacity(0.10), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .background(Palette.success.opacity(0.10), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                .strokeBorder(Palette.teal.opacity(0.35), lineWidth: 1))
+                .strokeBorder(Palette.success.opacity(0.35), lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -258,8 +258,8 @@ struct FocusCard: View {
     private var progressBar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(.hueFillStrong)
-                Capsule().fill(doneCount == items.count ? Palette.green : Palette.teal)
+                Capsule().fill(Palette.surfaceElevated)
+                Capsule().fill(doneCount == items.count ? Palette.green : Palette.success)
                     .frame(width: geo.size.width * (items.isEmpty ? 0 : Double(doneCount) / Double(items.count)))
             }
         }
@@ -273,7 +273,7 @@ struct FocusCard: View {
             Button { state.toggleTodo(item.id) } label: {
                 Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(item.done ? Palette.green : Palette.teal)
+                    .foregroundStyle(item.done ? Palette.green : Palette.success)
             }
             .buttonStyle(.plain)
 
@@ -295,7 +295,7 @@ struct FocusCard: View {
                 Button { start(item) } label: {
                     Image(systemName: isCurrent ? "timer" : "play.circle.fill")
                         .font(.callout.weight(.semibold))
-                        .foregroundStyle(isCurrent ? Palette.teal : Palette.muted)
+                        .foregroundStyle(isCurrent ? Palette.success : Palette.muted)
                 }
                 .buttonStyle(.plain)
                 .help(isCurrent ? "Open the running block" : "Focus on this one")
@@ -316,7 +316,7 @@ struct FocusCard: View {
                 .onSubmit(add)
             Button(action: add) {
                 Image(systemName: "plus.circle.fill").font(.body)
-                    .foregroundStyle(Palette.teal)
+                    .foregroundStyle(Palette.success)
             }
             .buttonStyle(.plain)
             .opacity(newFocus.isEmpty ? 0.35 : 1)
@@ -402,7 +402,7 @@ struct FocusSessionView: View {
         }
         .frame(maxWidth: 460)
         .frame(maxWidth: .infinity)
-        .background(.hueCanvas)
+        .background(Palette.background)
     }
 
     /// The only chrome in the mode: what it is, how far in, and the way out.
@@ -410,7 +410,7 @@ struct FocusSessionView: View {
         HStack(spacing: 8) {
             Text("TASK MODE")
                 .font(.caption2.weight(.heavy)).tracking(1.2)
-                .foregroundStyle(Palette.teal)
+                .foregroundStyle(Palette.success)
             if !items.isEmpty {
                 Text("\(TaskMode.doneCount(items))/\(items.count)")
                     .font(.caption2.weight(.semibold)).monospacedDigit()
@@ -460,7 +460,7 @@ struct FocusSessionView: View {
 
     private var stateColor: Color {
         if timer.finished { return Palette.green }
-        return timer.running ? Palette.teal : Palette.amber
+        return timer.running ? Palette.success : Palette.attention
     }
 
     /// Nothing running: either the list is empty (write one) or the day is done.
@@ -469,7 +469,7 @@ struct FocusSessionView: View {
         VStack(spacing: 11) {
             Image(systemName: empty ? "list.bullet.rectangle" : "checkmark.seal.fill")
                 .font(.largeTitle.weight(.semibold))
-                .foregroundStyle(empty ? Palette.teal : Palette.green)
+                .foregroundStyle(empty ? Palette.success : Palette.green)
             Text(empty ? "Nothing on today's list." : "Day crushed.")
                 .font(.title3.weight(.semibold)).foregroundStyle(Palette.text)
             Text(subtitle(empty: empty))
@@ -496,7 +496,7 @@ struct FocusSessionView: View {
                 .onSubmit(addTask)
             Button(action: addTask) {
                 Image(systemName: "plus.circle.fill").font(.body)
-                    .foregroundStyle(Palette.teal)
+                    .foregroundStyle(Palette.success)
             }
             .buttonStyle(.plain)
             .opacity(newTask.isEmpty ? 0.35 : 1)
@@ -530,9 +530,9 @@ struct FocusSessionView: View {
 
     private var ring: some View {
         ZStack {
-            Circle().stroke(Palette.surface2, lineWidth: 12)
+            Circle().stroke(Palette.surfaceElevated, lineWidth: 12)
             Circle().trim(from: 0, to: max(0.004, timer.progress))
-                .stroke(timer.finished ? Palette.green : Palette.teal,
+                .stroke(timer.finished ? Palette.green : Palette.success,
                         style: StrokeStyle(lineWidth: 12, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.9), value: timer.remaining)
@@ -555,15 +555,15 @@ struct FocusSessionView: View {
                     Text("\(m)m").font(.caption.weight(.heavy))
                         .foregroundStyle(timer.total == m * 60 ? .white : Palette.muted)
                         .padding(.horizontal, 13).padding(.vertical, 7)
-                        .background(timer.total == m * 60 ? Palette.teal : Palette.surface2, in: Capsule())
+                        .background(timer.total == m * 60 ? Palette.success : Palette.surfaceElevated, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
             Button { timer.add(minutes: 5) } label: {
                 Text("+5").font(.caption.weight(.heavy))
-                    .foregroundStyle(Palette.teal)
+                    .foregroundStyle(Palette.success)
                     .padding(.horizontal, 13).padding(.vertical, 7)
-                    .background(Palette.teal.opacity(0.14), in: Capsule())
+                    .background(Palette.success.opacity(0.14), in: Capsule())
             }
             .buttonStyle(.plain)
         }
@@ -616,7 +616,7 @@ struct FocusSessionView: View {
             HStack(spacing: 9) {
                 Image(systemName: item.done ? "checkmark.circle.fill" : (isCurrent ? "timer" : "circle"))
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(item.done ? Palette.green : (isCurrent ? Palette.teal : Palette.border))
+                    .foregroundStyle(item.done ? Palette.green : (isCurrent ? Palette.success : Palette.border))
                 Text(item.text)
                     .font(.footnote.weight(isCurrent ? .semibold : .regular))
                     .strikethrough(item.done, color: Palette.faint)
@@ -630,7 +630,7 @@ struct FocusSessionView: View {
                 } else if !item.done {
                     Text("\(item.mins ?? defaultMinutes)m")
                         .font(.caption2.weight(.heavy))
-                        .foregroundStyle(isCurrent ? Palette.teal : Palette.faint)
+                        .foregroundStyle(isCurrent ? Palette.success : Palette.faint)
                 }
             }
             .padding(.vertical, 3)
@@ -716,8 +716,8 @@ struct FocusCalendarPanel: View {
         switch FocusRecord.verdict(state.plan(for: key).todos) {
         case .empty:   return nil
         case .done:    return Palette.green
-        case .partial: return Palette.amber
-        case .missed:  return Palette.red.opacity(0.8)
+        case .partial: return Palette.attention
+        case .missed:  return Palette.warning.opacity(0.8)
         }
     }
 
@@ -736,8 +736,8 @@ struct FocusCalendarPanel: View {
     private var legend: some View {
         HStack(spacing: 12) {
             legendDot(Palette.green, "all done")
-            legendDot(Palette.amber, "partly")
-            legendDot(Palette.red.opacity(0.8), "missed")
+            legendDot(Palette.attention, "partly")
+            legendDot(Palette.warning.opacity(0.8), "missed")
             Spacer(minLength: 0)
         }
     }
@@ -763,7 +763,7 @@ struct FocusCalendarPanel: View {
                 let mins = FocusRecord.focusedMinutes(todos)
                 if mins > 0 {
                     Text("\(mins)m focused")
-                        .font(.caption2.weight(.heavy)).foregroundStyle(Palette.teal)
+                        .font(.caption2.weight(.heavy)).foregroundStyle(Palette.success)
                 }
             }
             if todos.isEmpty {

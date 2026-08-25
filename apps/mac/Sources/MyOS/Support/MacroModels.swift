@@ -62,7 +62,7 @@ enum MacroQuality: String, Codable {
     var tint: Color {
         switch self {
         case .verified: return Palette.green
-        case .estimated: return Palette.amber
+        case .estimated: return Palette.attention
         case .delayed: return Palette.blue
         case .unavailable: return Palette.faint
         }
@@ -80,8 +80,8 @@ struct MacroScore: Codable, Identifiable, Hashable {
     var tint: Color {
         switch state {
         case "good": return Palette.green
-        case "watch": return Palette.amber
-        case "risk": return Palette.red
+        case "watch": return Palette.attention
+        case "risk": return Palette.warning
         default: return Palette.blue
         }
     }
@@ -186,7 +186,7 @@ enum MacroFormat {
 
     static func tint(_ d: MacroDelta?) -> Color {
         guard let d, abs(d.abs) > 0.0001 else { return Palette.faint }
-        return d.abs > 0 ? Palette.green : Palette.red
+        return d.abs > 0 ? Palette.green : Palette.warning
     }
 
     /// A series clipped to a range, for the chart under a metric.

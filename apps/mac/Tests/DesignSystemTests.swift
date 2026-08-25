@@ -1,0 +1,97 @@
+import XCTest
+import SwiftUI
+@testable import MyOS
+
+/// The palette has been rewritten four times, in both directions, and each time
+/// the regression was the same: colour creeping back in as decoration. These
+/// pin the rules that survived — three accents, legible text on each, and text
+/// on the canvas that clears contrast in both appearances.
+@MainActor
+final class DesignSystemTests: XCTestCase {
+
+    /// Three accents and no more. A fourth case here means someone added a
+    /// colour; it needs a semantic reason first.
+    func testThereAreExactlyThreeAccents() {
+        let coloured = Accent.allCases.filter { $0 != .none }
+        XCTAssertEqual(coloured.count, 3)
+        XCTAssertEqual(Set(coloured.map(\.id)), ["green", "orange", "blue"])
+    }
+
+    /// The neon green and the orange are both far too light to carry white text
+    /// and the light-mode blue is too dark to carry black — which is why
+    /// `legibleInk` picks per appearance instead of hard-coding one answer. If
+    /// someone "tidies" this to always be white, half the buttons go unreadable.
+    ///
+    /// Note the raw values: resolving a dynamic colour's components re-enters
+    /// its provider and turned this test into a 100-second test once already.
+    func testAccentInkIsLegibleOnItsAccent() {
+        for accent in Accent.allCases where accent != .none {
+            for scheme in [ColorScheme.light, .dark] {
+                let tint = accent.raw(scheme)
+                let ink = Palette.legibleInk(on: tint)
+                let ratio = tint.contrast(with: ink)
+                XCTAssertGreaterThanOrEqual(ratio, 4.0,
+                    "\(accent.id) in \(scheme): ink is not legible on it (contrast \(ratio))")
+            }
+        }
+    }
+
+    /// The three accents must be told apart by *hue*, not by brightness — two
+    /// colours can share a luminance and still be obviously different, which is
+    /// why this compares channels rather than contrast.
+    func testAccentsAreDistinct() {
+        for scheme in [ColorScheme.light, .dark] {
+            let tints = Accent.allCases.filter { $0 != .none }.map { $0.raw(scheme) }
+            for (i, a) in tints.enumerated() {
+                for b in tints[(i + 1)...] {
+                    let ca = platformComponents(a, fallback: .black)
+                    let cb = platformComponents(b, fallback: .black)
+                    let distance = abs(ca.r - cb.r) + abs(ca.g - cb.g) + abs(ca.b - cb.b)
+                    XCTAssertGreaterThan(distance, 0.5,
+                        "two accents are too close to tell apart in \(scheme)")
+                }
+            }
+        }
+    }
+
+    /// Semantic aliases are the only names screens should use. This pins what
+    /// each one currently means, so a change is a deliberate one-line decision
+    /// rather than a drift.
+    func testSemanticsMapToTheRightAccent() {
+        XCTAssertEqual(Palette.success,     Palette.green)
+        XCTAssertEqual(Palette.action,      Palette.green)
+        XCTAssertEqual(Palette.fitness,     Palette.green)
+        XCTAssertEqual(Palette.productive,  Palette.green)
+        XCTAssertEqual(Palette.activity,    Palette.orange)
+        XCTAssertEqual(Palette.attention,   Palette.orange)
+        XCTAssertEqual(Palette.nutrition,   Palette.orange)
+        XCTAssertEqual(Palette.distracting, Palette.orange)
+        XCTAssertEqual(Palette.information, Palette.blue)
+        XCTAssertEqual(Palette.events,      Palette.blue)
+    }
+
+    /// Spacing and radius are scales, not free numbers.
+    func testScalesAreOnTheGrid() {
+        let grid: Set<CGFloat> = [4, 8, 12, 16, 20, 24, 32, 40, 48]
+        for v in [Space.xs, Space.sm, Space.md, Space.lg, Space.xl, Space.xxl, Space.section, Space.screen] {
+            XCTAssertTrue(grid.contains(v), "\(v) is not on the spacing scale")
+        }
+        for v in [Radius.xs, Radius.sm, Radius.md, Radius.lg, Radius.xl] {
+            XCTAssertTrue([12, 16, 24].contains(v), "\(v) is not on the radius scale")
+        }
+        // Gap is an alias onto Space — it must not drift off it.
+        XCTAssertTrue(grid.contains(Gap.screen) && grid.contains(Gap.row) && grid.contains(Gap.tight))
+    }
+
+    /// Duration is formatted in one place, because it appears in three.
+    func testDurationFormatting() {
+        XCTAssertEqual(Fmt.duration(0), "0s")
+        XCTAssertEqual(Fmt.duration(45), "45s")
+        XCTAssertEqual(Fmt.duration(60), "1m")
+        XCTAssertEqual(Fmt.duration(27 * 60), "27m")
+        XCTAssertEqual(Fmt.duration(7 * 3600 + 44 * 60), "7h 44m")
+        XCTAssertEqual(Fmt.duration(3 * 3600), "3h")
+        XCTAssertEqual(Fmt.shortDuration(7 * 3600 + 44 * 60), "7h44")
+        XCTAssertEqual(Fmt.shortDuration(5 * 60), "5m")
+    }
+}

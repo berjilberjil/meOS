@@ -118,7 +118,7 @@ struct WeeklyPlannerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let e = state.planError {
-                    Label(e, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.amber)
+                    Label(e, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -152,7 +152,7 @@ struct WeeklyPlannerView: View {
                             }
                         }
                         Button { addingMeal = meal } label: { Label("Add food", systemImage: "plus.circle.fill") }
-                            .buttonStyle(.borderless).tint(Palette.brand)
+                            .buttonStyle(.borderless).tint(Palette.action)
                     }
                 }
             }

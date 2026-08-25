@@ -62,10 +62,7 @@ struct MainView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // The content area takes the tab's colour — both as the canvas it is
-            // painted on and as the hue every card underneath inherits.
-            .pageTint(tab.hue)
-            .animation(.knTheme, value: tab)
+            .pageBackground()
             .overlay(alignment: .bottomTrailing) {
                 ChatWidget()
                         .padding(.trailing, ChatWidget.edgeInset)
@@ -73,7 +70,7 @@ struct MainView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(HueCanvas())
+        .background(Palette.background)
         .animation(.knTheme, value: themeStore.theme.id)
         .tint(Palette.accent)
         .onChange(of: tab) { _, _ in Haptics.selection() }
@@ -135,7 +132,7 @@ struct MainView: View {
                         .font(.caption2)
                     }
                 }
-                .foregroundStyle(Palette.amber)
+                .foregroundStyle(Palette.attention)
                 .padding(.horizontal, 14).padding(.bottom, 10)
             }
 
@@ -152,7 +149,7 @@ struct MainView: View {
                     }
                 }
             }
-            .buttonStyle(.borderless).tint(Palette.teal)
+            .buttonStyle(.borderless).tint(Palette.success)
             .padding(.horizontal, 8).padding(.bottom, 4)
             .help("Hide everything but today's task")
 
@@ -174,19 +171,12 @@ struct MainView: View {
             .help(collapsed ? (state.username.isEmpty ? "Log out" : "@\(state.username)") : "")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // The rail keeps its own darker ground so it still reads as chrome, but
-        // takes a trace of the open tab's colour — otherwise a coloured page sits
-        // against a rail that belongs to a different app.
-        .background(
-            ZStack {
-                Palette.sidebar
-                tab.hue.core.opacity(0.07)
-            }
-            .ignoresSafeArea()
-        )
-        .animation(.knTheme, value: tab)
+        // The rail is the same near-black as a card, separated from the canvas
+        // by a hairline. It does not change colour with the open tab — that was
+        // the loudest part of the old palette.
+        .background(Palette.sidebar.ignoresSafeArea())
         .overlay(alignment: .trailing) {
-            Rectangle().fill(Palette.border).frame(width: 2)
+            Rectangle().fill(Palette.border).frame(width: 1)
         }
     }
 
@@ -215,7 +205,7 @@ struct MainView: View {
                     logo
                     Text("MyOS")
                         .font(.title2.weight(.heavy))
-                        .foregroundStyle(Palette.brand)
+                        .foregroundStyle(Palette.action)
                     Spacer(minLength: 0)
                     toggle
                 }
@@ -236,22 +226,24 @@ private struct NavItem: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                NavGlyph(tab: tab, size: 26)
+            HStack(spacing: Space.md) {
+                NavGlyph(tab: tab, size: 22)
                 if !collapsed {
                     Text(tab.title.uppercased())
-                        .font(.footnote.weight(.heavy))
+                        .font(.footnote.weight(.semibold))
                         .tracking(0.6)
-                        .foregroundStyle(active ? tab.tint : (hover ? Palette.text : Palette.muted))
                     Spacer(minLength: 0)
                 }
             }
+            // One colour decision for the whole row: green when this is where
+            // you are, muted white when it is not.
+            .foregroundStyle(active ? Palette.action : (hover ? Palette.text : Palette.muted))
             .frame(maxWidth: collapsed ? .infinity : nil)
             .padding(.horizontal, collapsed ? 8 : 12).padding(.vertical, 9)
             .background(background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .strokeBorder(active ? tab.tint : .clear, lineWidth: 2)
+                    .strokeBorder(active ? Palette.action.opacity(0.55) : .clear, lineWidth: 1)
             )
             .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         }
@@ -263,8 +255,8 @@ private struct NavItem: View {
     }
 
     private var background: Color {
-        if active { return tab.tint.opacity(0.16) }
-        if hover { return Palette.surface2.opacity(0.5) }
+        if active { return Palette.action.opacity(0.12) }
+        if hover { return Palette.surfaceElevated }
         return .clear
     }
 }

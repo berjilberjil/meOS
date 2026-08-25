@@ -30,10 +30,10 @@ enum EditorTheme {
     static let text     = NSColor(Palette.text)
     static let muted    = NSColor(Palette.muted)
     static let faint    = NSColor(Palette.faint)
-    static let brand    = NSColor(Palette.brand)
+    static let brand    = NSColor(Palette.action)
     static let green    = NSColor(Palette.green)
     static let blue     = NSColor(Palette.blue)
-    static let surface2 = NSColor(Palette.surface2)
+    static let surface2 = NSColor(Palette.surfaceElevated)
     static let border   = NSColor(white: 1, alpha: 0.09)
 
     // Base (block-level) size/weight/color before inline marks.
@@ -129,7 +129,7 @@ enum EditorTheme {
         a[.font] = font(size: baseSize(b), weight: baseWeight(b), bold: bold, italic: italic, mono: code)
         if code && b.type != .code {
             a[.inlineCode] = true
-            a[.foregroundColor] = NSColor(Palette.purple)
+            a[.foregroundColor] = NSColor(Palette.information)
         }
         if strike { a[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
         if let href = link {

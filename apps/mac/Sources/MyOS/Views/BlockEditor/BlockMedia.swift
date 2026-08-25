@@ -48,7 +48,7 @@ enum LinkCardRenderer {
 
         let card = NSRect(x: 0.5, y: 0.5, width: width - 1, height: height - 1)
         let outline = NSBezierPath(roundedRect: card, xRadius: 10, yRadius: 10)
-        NSColor(Palette.surface2).setFill(); outline.fill()
+        NSColor(Palette.surfaceElevated).setFill(); outline.fill()
         NSColor(white: 1, alpha: 0.10).setStroke(); outline.lineWidth = 1; outline.stroke()
 
         // Thumbnail (left), clipped to the card's left rounded corners.

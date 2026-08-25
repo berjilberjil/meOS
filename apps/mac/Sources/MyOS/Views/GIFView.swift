@@ -17,7 +17,7 @@ struct GIFView: View {
 
     var body: some View {
         ZStack {
-            Palette.surface2.opacity(0.5)
+            Palette.surfaceElevated.opacity(0.5)
             if let data {
                 AnimatedGIF(data: data)
             } else if failed {

@@ -26,7 +26,7 @@ struct EventMediaViewer: View {
 
     var body: some View {
         ZStack {
-            HueCanvas()
+            Palette.background
 
             VStack(spacing: 0) {
                 HStack {
@@ -49,7 +49,7 @@ struct EventMediaViewer: View {
                             } else if let img = eventImage(m) {
                                 ZoomableImage(image: img)
                             } else {
-                                Palette.surface2
+                                Palette.surfaceElevated
                             }
                         }
                         .tag(m.id)
@@ -88,11 +88,11 @@ private struct VideoPage: View {
             } else if failed {
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.largeTitle).foregroundStyle(Palette.amber)
+                        .font(.largeTitle).foregroundStyle(Palette.attention)
                     Text("Couldn't load video").font(.footnote).foregroundStyle(Palette.faint)
                 }
             } else {
-                ProgressView().tint(Palette.brand)
+                ProgressView().tint(Palette.action)
             }
         }
         .onAppear { start() }

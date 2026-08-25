@@ -29,9 +29,9 @@ struct EventsView: View {
     private var dayColors: [String: Color] {
         var m: [String: Color] = [:]
         for (day, evs) in eventsByDay {
-            if evs.contains(where: { $0.special }) { m[day] = Palette.amber }
+            if evs.contains(where: { $0.special }) { m[day] = Palette.attention }
             else if let first = evs.first, let t = state.primaryTag(for: first) { m[day] = t.color }
-            else { m[day] = Palette.brand }
+            else { m[day] = Palette.action }
         }
         return m
     }
@@ -47,7 +47,7 @@ struct EventsView: View {
                 Button { editTarget = EventEditTarget(event: nil) } label: {
                     Label("Add event", systemImage: "plus")
                 }
-                .buttonStyle(.borderless).tint(Palette.brand)
+                .buttonStyle(.borderless).tint(Palette.action)
             }
             .knRise(0)
 
@@ -151,7 +151,7 @@ struct EventsView: View {
                                 })
                             }
                             .padding(9)
-                            .background(HueFill(level: .strong).opacity(0.3), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                            .background(Palette.surfaceElevated.opacity(0.3), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         }
                     }
                 }
@@ -214,7 +214,7 @@ struct EventsView: View {
                 ForEach(evs) { e in
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
-                            if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber) }
+                            if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.attention) }
                             if let t = state.primaryTag(for: e) {
                                 Image(systemName: t.symbol).font(.caption2.weight(.bold)).foregroundStyle(t.color)
                             }
@@ -261,7 +261,7 @@ private struct EventRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
                     if event.special {
-                        Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.amber)
+                        Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.attention)
                     }
                     Text(event.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
@@ -276,7 +276,7 @@ private struct EventRow: View {
             Button(action: edit) { Image(systemName: "pencil").font(.caption2.weight(.bold)) }
                 .buttonStyle(.borderless).opacity(hover ? 1 : 0.001).help("Edit")
             Button { showConfirm = true } label: { Image(systemName: "trash").font(.caption2.weight(.bold)) }
-                .buttonStyle(.borderless).tint(Palette.red).opacity(hover ? 1 : 0.001).help("Delete")
+                .buttonStyle(.borderless).tint(Palette.warning).opacity(hover ? 1 : 0.001).help("Delete")
                 .holdToDelete(isPresented: $showConfirm, title: "Delete this memory?",
                               message: "\(event.title) — this can't be undone.") { delete() }
         }
@@ -289,11 +289,11 @@ private struct EventRow: View {
     }
 
     private var rowBackground: Color {
-        if event.special { return Palette.amber.opacity(hover ? 0.12 : 0.07) }
-        return hover ? Palette.surface2.opacity(0.5) : .clear
+        if event.special { return Palette.attention.opacity(hover ? 0.12 : 0.07) }
+        return hover ? Palette.surfaceElevated.opacity(0.5) : .clear
     }
 
-    private var accent: Color { tags.first?.color ?? Palette.brand }
+    private var accent: Color { tags.first?.color ?? Palette.action }
 
     private var dateBadge: some View {
         VStack(spacing: 0) {
@@ -358,7 +358,7 @@ private struct MediaThumb: View {
                 if let img = EventMediaIO.image(media) {
                     Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    Rectangle().fill(.hueFillStrong)
+                    Rectangle().fill(Palette.surfaceElevated)
                         .overlay(Image(systemName: media.kind == .video ? "film" : "photo").foregroundStyle(Palette.faint))
                 }
             }
@@ -375,7 +375,7 @@ private struct MediaThumb: View {
 
             if let onRemove, hover {
                 Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill").font(.subheadline).foregroundStyle(.white, Palette.red)
+                    Image(systemName: "xmark.circle.fill").font(.subheadline).foregroundStyle(.white, Palette.warning)
                 }
                 .buttonStyle(.plain).padding(3)
             }
@@ -411,7 +411,7 @@ private struct MediaViewer: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            HueCanvas()
+            Palette.background
             content.padding(24)
             Button { dismiss() } label: {
                 Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.white.opacity(0.85))
@@ -426,7 +426,7 @@ private struct MediaViewer: View {
     @ViewBuilder private var content: some View {
         if media.kind == .video {
             if let player { VideoPlayer(player: player) }
-            else { ProgressView().tint(Palette.brand) }
+            else { ProgressView().tint(Palette.action) }
         } else if let img = EventMediaIO.image(media) {
             Image(nsImage: img).resizable().scaledToFit()
         } else {
@@ -492,14 +492,14 @@ private struct EventEditor: View {
                     KFieldLabel(text: "Date")
                     Button { showCal.toggle() } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "calendar").font(.caption.weight(.bold)).foregroundStyle(Palette.brand)
+                            Image(systemName: "calendar").font(.caption.weight(.bold)).foregroundStyle(Palette.action)
                             Text(prettyDate).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                             Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
                         }
                         .padding(.horizontal, 13).padding(.vertical, 10)
-                        .background(.hueCanvas, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                            .strokeBorder(showCal ? Palette.brand : Palette.border, lineWidth: 2))
+                            .strokeBorder(showCal ? Palette.action : Palette.border, lineWidth: 2))
                     }
                     .buttonStyle(.plain)
                     .popover(isPresented: $showCal, arrowEdge: .bottom) {
@@ -512,9 +512,9 @@ private struct EventEditor: View {
                         Image(systemName: special ? "star.fill" : "star").font(.caption)
                         Text("Special").font(.caption.weight(.heavy))
                     }
-                    .foregroundStyle(special ? .white : Palette.amber)
+                    .foregroundStyle(special ? .white : Palette.attention)
                     .padding(.horizontal, 12).padding(.vertical, 9)
-                    .background(special ? Palette.amber : Palette.amber.opacity(0.14), in: Capsule())
+                    .background(special ? Palette.attention : Palette.attention.opacity(0.14), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .help("Mark the big, once-in-a-lifetime ones")
@@ -531,7 +531,7 @@ private struct EventEditor: View {
                         }
                         .foregroundStyle(Palette.muted)
                         .padding(.horizontal, 11).padding(.vertical, 8)
-                        .background(HueFill(level: .strong).opacity(0.6), in: Capsule())
+                        .background(Palette.surfaceElevated.opacity(0.6), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -568,7 +568,7 @@ private struct EventEditor: View {
                 KFieldLabel(text: "Photos & videos")
                 Text(dropTargeted ? "drop to add" : "drag them in, or click Add")
                     .font(.caption2.weight(.heavy))
-                    .foregroundStyle(dropTargeted ? Palette.brand : Palette.faint)
+                    .foregroundStyle(dropTargeted ? Palette.action : Palette.faint)
             }
             FlowLayout(spacing: 8, runSpacing: 8) {
                 ForEach(media) { m in
@@ -580,25 +580,25 @@ private struct EventEditor: View {
                         Image(systemName: "plus").font(.callout.weight(.bold))
                         Text("Add").font(.caption2.weight(.heavy))
                     }
-                    .foregroundStyle(dropTargeted ? Palette.brand : Palette.muted)
+                    .foregroundStyle(dropTargeted ? Palette.action : Palette.muted)
                     .frame(width: 72, height: 72)
-                    .background(HueFill(level: .canvas).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                    .background(Palette.background.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                        .foregroundStyle(dropTargeted ? Palette.brand : Palette.border))
+                        .foregroundStyle(dropTargeted ? Palette.action : Palette.border))
                 }
                 .buttonStyle(.plain)
                 .help("Choose photos or videos")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(6)
-            .background(dropTargeted ? Palette.brand.opacity(0.08) : .clear,
+            .background(dropTargeted ? Palette.action.opacity(0.08) : .clear,
                         in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             .onDrop(of: Self.dropTypes, isTargeted: $dropTargeted) { handleDrop($0) }
             .animation(.knFast, value: dropTargeted)
             if let mediaError {
-                Text(mediaError).font(.caption2).foregroundStyle(Palette.red)
+                Text(mediaError).font(.caption2).foregroundStyle(Palette.warning)
             }
         }
     }
@@ -606,13 +606,13 @@ private struct EventEditor: View {
     private func uploadTile(_ u: MediaUpload) -> some View {
         VStack(spacing: 5) {
             if u.failed {
-                Image(systemName: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(Palette.red)
-                Text("Failed").font(.caption2.weight(.heavy)).foregroundStyle(Palette.red)
+                Image(systemName: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(Palette.warning)
+                Text("Failed").font(.caption2.weight(.heavy)).foregroundStyle(Palette.warning)
             } else {
                 ZStack {
-                    Circle().stroke(Palette.surface2, lineWidth: 3)
+                    Circle().stroke(Palette.surfaceElevated, lineWidth: 3)
                     Circle().trim(from: 0, to: max(0.02, u.progress))
-                        .stroke(Palette.brand, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .stroke(Palette.action, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Text("\(Int(u.progress * 100))").font(.caption2.weight(.heavy)).foregroundStyle(Palette.text)
                 }
@@ -621,7 +621,7 @@ private struct EventEditor: View {
             }
         }
         .frame(width: 72, height: 72)
-        .background(HueFill(level: .canvas).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+        .background(Palette.background.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
         .animation(.knFast, value: u.progress)
         .help(u.failed ? "Tap to dismiss" : "\(Int(u.progress * 100))% uploaded")
@@ -798,7 +798,7 @@ private struct TagManagerSheet: View {
                 Spacer()
                 Button { isAdding = true; editing = EventTag(name: "", symbol: "star.fill", colorHex: "1CB0F6") } label: {
                     Label("New tag", systemImage: "plus")
-                }.buttonStyle(.borderless).tint(Palette.brand)
+                }.buttonStyle(.borderless).tint(Palette.action)
             }
 
             if let editing {
@@ -835,18 +835,18 @@ private struct TagManagerSheet: View {
             Text(tag.name).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
             if tag.builtIn {
                 Text("built-in").font(.caption2.weight(.heavy)).foregroundStyle(Palette.faint)
-                    .padding(.horizontal, 6).padding(.vertical, 2).background(.hueFillStrong, in: Capsule())
+                    .padding(.horizontal, 6).padding(.vertical, 2).background(Palette.surfaceElevated, in: Capsule())
             }
             Spacer()
             Button { editing = tag; isAdding = false } label: { Image(systemName: "pencil").font(.caption2.weight(.bold)) }
                 .buttonStyle(.borderless).help("Edit")
             if !tag.builtIn {
                 Button { state.deleteTag(tag.id) } label: { Image(systemName: "trash").font(.caption2.weight(.bold)) }
-                    .buttonStyle(.borderless).tint(Palette.red).help("Delete tag")
+                    .buttonStyle(.borderless).tint(Palette.warning).help("Delete tag")
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(HueFill(level: .strong).opacity(0.35), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(Palette.surfaceElevated.opacity(0.35), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
     }
 }
 
@@ -884,7 +884,7 @@ private struct TagEditForm: View {
             }
         }
         .padding(14)
-        .background(HueFill(level: .canvas).opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .background(Palette.background.opacity(0.5), in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
     }
 }
 
