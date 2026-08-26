@@ -1504,7 +1504,12 @@ final class AppState: ObservableObject {
     /// The streak's "has content" test — any reflection, win, or mood.
     func journalHasContent(_ date: String) -> Bool {
         guard let e = journal[date] else { return false }
-        return !(e.morning.isEmpty && e.night.isEmpty && e.wins.isEmpty && e.mood == nil)
+        // All six fields, not three. A day where you only wrote gratitude — or
+        // only lessons, or only mistakes — drew no dot in the month grid, so it
+        // read as never journalled and there was no way to find it again.
+        return !(e.morning.isEmpty && e.night.isEmpty && e.wins.isEmpty
+                 && e.mistakes.isEmpty && e.lessons.isEmpty && e.gratitude.isEmpty
+                 && e.mood == nil)
     }
     func journalMood(_ date: String) -> Int? { journal[date]?.mood }
 
@@ -1654,10 +1659,17 @@ final class AppState: ObservableObject {
         saveDay(d, on: key)
     }
 
-    func addTodo(_ text: String) {
+    /// Add a to-do to `date` — the day being looked at, which is not always today.
+    ///
+    /// It was hardcoded to `todayKey` while the card listing the items read the
+    /// day it was showing, so typing a to-do under any other date put it on
+    /// today's list: the field cleared, no row appeared, and the item was
+    /// somewhere the user wasn't looking. Planning tomorrow — the obvious use of
+    /// the forward swipe — did not work at all.
+    func addTodo(_ text: String, on date: String? = nil) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
-        let key = todayKey
+        let key = date ?? todayKey
         var d = days[key] ?? DayPlan()
         d.todos.append(FocusItem(text: t))
         saveDay(d, on: key)
@@ -2198,9 +2210,16 @@ final class AppState: ObservableObject {
     }
 
     @discardableResult
-    func addWatchItem(_ item: WatchItem) -> WatchItem {
+    /// `on` is the day the card is showing. The stamp used to always be now, so
+    /// a video added while looking at any other day was filed under today — the
+    /// counter did not move, no row appeared, and it was on a list the user was
+    /// not looking at.
+    func addWatchItem(_ item: WatchItem, on date: String? = nil) -> WatchItem {
         var it = item
-        if it.addedAt.isEmpty { it.addedAt = Self.nowStamp() }
+        if it.addedAt.isEmpty {
+            let now = Self.nowStamp()
+            it.addedAt = (date == nil || date == todayKey) ? now : (date! + String(now.dropFirst(10)))
+        }
         watch.insert(it, at: 0)
         push(StateKey.watch, watch)
         return it

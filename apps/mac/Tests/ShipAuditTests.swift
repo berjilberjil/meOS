@@ -376,4 +376,41 @@ final class ShipAuditTests: XCTestCase {
     func testATrulyBlankNoteIsStillEmpty() {
         XCTAssertTrue(BlockDoc(blocks: [Block(type: .paragraph, spans: [])]).isEffectivelyEmpty)
     }
+
+    // MARK: - Fold's month total
+
+    // The card shows the top six categories; the headline is the whole month.
+    // Summing the truncated list dropped every category past the sixth.
+    private func debit(_ category: String, _ amount: Double, _ stamp: String) -> [String: Any] {
+        ["type": "DEBIT", "amount": amount, "category": category, "txn_timestamp": stamp]
+    }
+
+    func testSpentThisMonthCountsEveryCategoryNotJustTheShownSix() {
+        // Mid-month, so the UTC-vs-local offset can't push it into a neighbour.
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM"
+        let stamp = f.string(from: Date()) + "-15T10:00:00Z"
+        let cats = ["Transport", "Food", "Bills", "Shopping", "Health", "Rent", "Books", "Gifts"]
+        let txns = cats.enumerated().map { debit($0.element, Double(800 - $0.offset * 50), stamp) }
+        let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.topSpends.count, 6, "the card still shows six")
+        let everything = (0..<8).reduce(0.0) { $0 + Double(800 - $1 * 50) }
+        XCTAssertEqual(out.data.spentThisMonth, everything, accuracy: 0.001,
+                       "but the headline is the whole month")
+    }
+
+    // An unreadable date is not evidence that a transaction is from this month.
+    func testUndatedDebitsAreNotCountedAsThisMonth() {
+        let txns: [[String: Any]] = [["type": "DEBIT", "amount": 5000.0, "category": "Rent"]]
+        let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.spentThisMonth, 0)
+        XCTAssertTrue(out.data.topSpends.isEmpty)
+    }
+
+    func testLastMonthsDebitsStayOutOfThisMonth() {
+        let txns = [debit("Rent", 25_000, "2020-01-05T10:00:00Z")]
+        let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.spentThisMonth, 0)
+    }
 }

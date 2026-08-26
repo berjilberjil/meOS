@@ -333,7 +333,7 @@ struct FocusCard: View {
     private func add() {
         let t = newFocus.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty else { return }
-        state.addTodo(t)
+        state.addTodo(t, on: day ?? state.todayKey)
         newFocus = ""
     }
 

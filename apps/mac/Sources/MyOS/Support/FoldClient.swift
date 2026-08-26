@@ -533,10 +533,13 @@ enum FoldSnapshotBuilder {
             }
         }
 
-        let spends = spendsThisMonth(transactions)
-        if !spends.isEmpty {
-            next.topSpends = spends
-            next.spentThisMonth = spends.reduce(0) { $0 + $1.amount }
+        // The card shows the top six categories but the headline is the whole
+        // month. Summing the truncated list silently dropped every category past
+        // the sixth from "Spent this month".
+        let allSpends = spendsThisMonth(transactions)
+        if !allSpends.isEmpty {
+            next.topSpends = Array(allSpends.prefix(6))
+            next.spentThisMonth = allSpends.reduce(0) { $0 + $1.amount }
         }
 
         if next.netWorth == 0 { next.netWorth = next.liquid + next.investments - next.debt }
@@ -552,7 +555,7 @@ enum FoldSnapshotBuilder {
             next.changeLabel = "since first point"
         }
 
-        let extracted = !nums.isEmpty || !banks.isEmpty || !spends.isEmpty
+        let extracted = !nums.isEmpty || !banks.isEmpty || !allSpends.isEmpty
         if !extracted, let prev = previous, !isBare(prev) { return Outcome(data: prev, extracted: false) }
         if isBare(next), let prev = previous, !isBare(prev) { return Outcome(data: prev, extracted: false) }
 
@@ -721,11 +724,16 @@ enum FoldSnapshotBuilder {
         for t in txns {
             let kind = (string(t["type"]) ?? string(t["kind"]) ?? "").uppercased()
             guard kind.contains("DEBIT") || kind == "DEBIT" || kind.contains("OUT") else { continue }
-            if let ts = date(t["txn_timestamp"]) ?? date(t["txn_date"]) {
-                let c = cal.dateComponents([.year, .month], from: ts)
-                let n = cal.dateComponents([.year, .month], from: now)
-                guard c.year == n.year, c.month == n.month else { continue }
-            }
+            // A date we cannot read is not evidence that it is this month. The
+            // check used to be skipped entirely when parsing failed, so a feed
+            // sending date-only `txn_date` — which the ISO8601 parser rejects —
+            // dropped every page of history it had fetched straight into "this
+            // month", and the same nil defeats the paging stop condition, so it
+            // fetched all eight pages first.
+            guard let ts = date(t["txn_timestamp"]) ?? date(t["txn_date"]) else { continue }
+            let c = cal.dateComponents([.year, .month], from: ts)
+            let n = cal.dateComponents([.year, .month], from: now)
+            guard c.year == n.year, c.month == n.month else { continue }
             let amt = abs(number(t["amount"]) ?? 0)
             guard amt > 0 else { continue }
             let cat: String
@@ -735,10 +743,10 @@ enum FoldSnapshotBuilder {
             if FoldSpend.isNonSpend(cat) { continue }
             byCat[cat, default: 0] += amt
         }
+        // Every category, sorted. The caller takes the top six for the card and
+        // sums the whole list for the headline.
         return byCat.map { FoldData.Spend(category: $0.key, amount: $0.value) }
-            .sorted { $0.amount > $1.amount }
-            .prefix(6)
-            .map { $0 }
+            .sorted { $0.amount == $1.amount ? $0.category < $1.category : $0.amount > $1.amount }
     }
 }
 

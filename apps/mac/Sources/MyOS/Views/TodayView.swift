@@ -62,6 +62,10 @@ struct TodayView: View {
         .modifier(ScrollAnchors(enabled: sectionAnchors))
         .dayPager(date: $ownDate, today: state.todayKey, enabled: externalDate == nil)
         .onAppear { if ownDate.isEmpty { ownDate = state.todayKey } }
+        // Seeded once and never re-synced, so a Mac left open overnight kept
+        // showing — and writing to — yesterday: tapping Breakfast logged the meal
+        // against the old key, ticking the workout marked the old day done.
+        .onChange(of: state.todayKey) { old, new in if ownDate == old { ownDate = new } }
         .task {
             if state.news == nil { await state.fetchNews() }
         }

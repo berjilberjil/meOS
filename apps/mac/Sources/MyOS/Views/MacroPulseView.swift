@@ -361,7 +361,11 @@ struct MacroMetricCard: View {
 
             HStack(spacing: 5) {
                 if metric.available, delta != nil {
-                    Image(systemName: metric.direction >= 0 ? "arrow.up.right" : "arrow.down.right")
+                    // From the same delta the label and its tint use. `direction`
+                    // is hardcoded to the 1-day change, so on a 1Y chip a stock up
+                    // 0.4% today and down 3.1% on the year drew a green up-arrow
+                    // beside a red "-3.10%".
+                    Image(systemName: (delta?.abs ?? 0) >= 0 ? "arrow.up.right" : "arrow.down.right")
                         .font(.caption2.weight(.black))
                         .foregroundStyle(MacroFormat.tint(delta))
                 }

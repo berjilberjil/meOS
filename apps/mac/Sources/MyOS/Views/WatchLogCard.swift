@@ -107,7 +107,8 @@ struct WatchLogCard: View {
             return
         }
         addError = nil
-        let saved = state.addWatchItem(WatchItem(url: raw, videoId: id, thumbUrl: YouTube.thumbURL(id)))
+        let saved = state.addWatchItem(WatchItem(url: raw, videoId: id, thumbUrl: YouTube.thumbURL(id)),
+                                       on: day ?? state.todayKey)
         urlInput = ""
         Task { @MainActor in
             let meta = await YouTube.fetchMeta(id: id)

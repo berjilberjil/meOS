@@ -260,7 +260,13 @@ extension AppState {
     func setRestOverride(date: String, _ rest: Bool) {
         mutateDayLog(date) {
             $0.restOverride = rest
-            if rest { $0.dayId = nil; $0.skipped = false; $0.done = false }
+            // Only clears the day when there is nothing logged on it. The menu
+            // offers "make today a rest day" whatever the state, so calling it
+            // after finishing a session un-did the session: `done` went false,
+            // the card fell back to "planned", History read it as in progress
+            // and the 28-day count lost the day. "Undo rest day" never brought
+            // it back, because only `restOverride` was restored.
+            if rest, !$0.done, !$0.hasSession { $0.dayId = nil; $0.skipped = false }
         }
     }
 
@@ -274,9 +280,15 @@ extension AppState {
     // MARK: - Logging a workout (history only)
 
     /// The heaviest weight logged for an exercise, most recent day first.
-    /// Used to prefill a session so you don't retype the same load weekly.
-    func lastWeight(exerciseId: String) -> Double? {
+    ///
+    /// `before` bounds the search to days that actually precede the session
+    /// being built. Today pages a week forward as well as back, so without it
+    /// starting a workout on an earlier date prefilled from — and captioned
+    /// with — a *later* one, and anything logged on a forward-paged day poisoned
+    /// every real "last time" hint after it.
+    func lastWeight(exerciseId: String, before: String? = nil) -> Double? {
         for date in training.dayLog.keys.sorted(by: >) {
+            if let before, date >= before { continue }
             guard let entries = training.dayLog[date]?.entries else { continue }
             if let hit = entries.first(where: { $0.exerciseId == exerciseId }), let w = hit.topWeight {
                 return w
@@ -288,10 +300,15 @@ extension AppState {
     /// Build today's session from the template (once). Idempotent — reopening
     /// a session in progress returns what's already there.
     func startSession(date: String) {
-        guard workoutDayLog(date).entries == nil else { return }
+        // Empty counts as not started. `removeSessionExercise` writes back a
+        // non-nil array, so dropping every exercise off a session left
+        // `entries == []` — the card offered "Start workout" again, this guard
+        // returned immediately, and the sheet said the day had no exercises.
+        // Only "Start over" could recover it.
+        guard workoutDayLog(date).entries?.isEmpty ?? true else { return }
         guard let (p, day) = programDay(for: date), !day.isRestDay else { return }
         let entries = WorkoutSessionBuilder.session(from: day) { [weak self] id in
-            self?.lastWeight(exerciseId: id)
+            self?.lastWeight(exerciseId: id, before: date)
         }
         mutateDayLog(date) {
             $0.entries = entries

@@ -42,7 +42,11 @@ struct WorkoutHistoryView: View {
     /// The last 28 days at a glance — this is the number that tells you whether
     /// a program is being run or just admired.
     private var summary: some View {
-        let recent = dates.filter { ($0 >= AppState.addDays(-27, to: state.todayKey)) }
+        // Bounded at both ends. With only a lower bound, a workout ticked on a
+        // forward-paged day counted toward the 28-day totals and sat at the top
+        // of "recent workouts" — a day that has not happened yet.
+        let recent = dates.filter { $0 >= AppState.addDays(-27, to: state.todayKey)
+                                    && $0 <= state.todayKey }
         let done = recent.filter { state.workoutDayLog($0).done }.count
         let sets = recent.reduce(0) { acc, d in
             acc + (state.workoutDayLog(d).entries?.reduce(0) { $0 + $1.doneSets } ?? 0)
