@@ -166,9 +166,15 @@ enum WeeklyBrief {
         var photos: Int
     }
 
+    /// `intake` is the day's real totals — the meal log merged with the AI
+    /// quick-log — keyed by date. Without it the brief read `FitnessDay.calories`
+    /// alone, which only the natural-language quick-log ever writes: log every
+    /// meal through the Fitness checklist all week and the model was told
+    /// "calories: not logged", then gave diet advice against a phantom intake.
     static func text(name: String, goal: FitnessGoal, targetWeightKg: Double?,
                      calorieTarget: Double?, proteinTarget: Double?,
                      fitness: [String: FitnessDay], training: TrainingState,
+                     intake: [String: Macros] = [:],
                      lastWeek: Week, thisWeek: Week) -> String {
         var lines = ["Name: \(name.isEmpty ? "unknown" : name)"]
         var goalLine = "Goal: \(goal.label.lowercased())"
@@ -182,13 +188,14 @@ enum WeeklyBrief {
 
         for week in [lastWeek, thisWeek] {
             lines.append("")
-            lines.append(contentsOf: block(week, fitness: fitness, training: training))
+            lines.append(contentsOf: block(week, fitness: fitness, training: training, intake: intake))
         }
         return lines.joined(separator: "\n")
     }
 
     private static func block(_ w: Week, fitness: [String: FitnessDay],
-                              training: TrainingState) -> [String] {
+                              training: TrainingState,
+                              intake: [String: Macros] = [:]) -> [String] {
         var out = ["\(w.label) (\(w.range.lowerBound) to \(w.range.upperBound)) — "
                    + "\(w.photos) photo\(w.photos == 1 ? "" : "s") attached"]
         let days = fitness.filter { w.range.contains($0.key) }
@@ -203,8 +210,15 @@ enum WeeklyBrief {
             out.append("  weight: not logged")
         }
 
-        out.append(average(days.compactMapValues(\.calories), label: "calories", unit: "kcal"))
-        out.append(average(days.compactMapValues(\.proteinG), label: "protein", unit: "g"))
+        // Prefer the real totals; fall back to the quick-log fields for a week
+        // recorded before this was wired up.
+        let eaten = intake.filter { w.range.contains($0.key) && $0.value.calories > 0 }
+        out.append(eaten.isEmpty
+                   ? average(days.compactMapValues(\.calories), label: "calories", unit: "kcal")
+                   : average(eaten.mapValues(\.calories), label: "calories", unit: "kcal"))
+        out.append(eaten.isEmpty
+                   ? average(days.compactMapValues(\.proteinG), label: "protein", unit: "g")
+                   : average(eaten.mapValues(\.protein), label: "protein", unit: "g"))
         out.append(average(days.compactMapValues { $0.steps.map(Double.init) }, label: "steps", unit: ""))
 
         let logs = training.dayLog.filter { w.range.contains($0.key) }

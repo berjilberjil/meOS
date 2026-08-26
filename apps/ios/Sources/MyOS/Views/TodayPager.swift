@@ -89,7 +89,14 @@ struct TodayPager: View {
         let today = state.todayKey
         let window = (-Self.backDays...DayPaging.maxForwardDays).map { AppState.addDays($0, to: today) }
         guard window != days else { return }
+        // What "today" was before this rebuild — the page the user is on if they
+        // have not navigated. Moving only when the current day falls *out* of
+        // the window left the pager parked on yesterday at every rollover, since
+        // yesterday is still comfortably inside today−30…today+7: open the app
+        // at 08:00 after using it at 23:55 and every meal, step and workout tap
+        // wrote to the previous day.
+        let wasToday = days.count > Self.backDays ? days[Self.backDays] : nil
         days = window
-        if day == nil || !window.contains(day!) { day = today }
+        if day == nil || !window.contains(day!) || day == wasToday { day = today }
     }
 }

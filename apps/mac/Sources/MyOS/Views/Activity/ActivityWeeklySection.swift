@@ -18,10 +18,17 @@ struct ActivityWeeklySection: View {
 
     private var days: [String] { Self.days(from: weekStart, to: weekEnd) }
 
+    /// The same window, one week earlier.
+    ///
+    /// It used to count back `days.count - 1` from the day *before* this week
+    /// started, which is not the same week shifted — a Mon–Fri report was
+    /// measured against last Wed–Sun, five weekdays against three weekdays and a
+    /// weekend. Systematically flattering, and the whole week verdict leads with
+    /// that number.
     private var previousDays: [String] {
         guard let first = days.first else { return [] }
-        let priorEnd = AppState.addDays(-1, to: first)
-        return Self.days(from: AppState.addDays(-(days.count - 1), to: priorEnd), to: priorEnd)
+        return Self.days(from: AppState.addDays(-7, to: first),
+                         to: AppState.addDays(-7, to: weekEnd))
     }
 
     /// Inclusive day keys, capped so a malformed window cannot loop forever.

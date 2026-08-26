@@ -497,4 +497,36 @@ final class ShipAuditTests: XCTestCase {
         let b = doc(["2026-08-21T10:00:00"])
         XCTAssertEqual(a.merged(with: b).events.count, 2)
     }
+
+    // MARK: - What the weekly report is told
+
+    // The brief read FitnessDay.calories, which only the natural-language
+    // quick-log ever writes. Log every meal through the Fitness checklist all
+    // week and the model was handed "calories: not logged", then asked for diet
+    // advice against a phantom intake.
+    func testTheBriefReportsWhatWasActuallyEaten() {
+        let week = "2026-08-17"..."2026-08-23"
+        let intake = ["2026-08-18": Macros(calories: 2100, protein: 160),
+                      "2026-08-19": Macros(calories: 1900, protein: 150)]
+        let text = WeeklyBrief.text(
+            name: "Berjil", goal: .cut, targetWeightKg: 70,
+            calorieTarget: 2000, proteinTarget: 180,
+            fitness: [:], training: TrainingState(), intake: intake,
+            lastWeek: .init(label: "LAST WEEK", range: week, photos: 1),
+            thisWeek: .init(label: "THIS WEEK", range: week, photos: 1))
+        XCTAssertTrue(text.contains("calories: avg 2000"), text)
+        XCTAssertTrue(text.contains("protein: avg 155"), text)
+        XCTAssertFalse(text.contains("calories: not logged"))
+    }
+
+    func testTheBriefStillSaysNotLoggedWhenNothingWasEaten() {
+        let week = "2026-08-17"..."2026-08-23"
+        let text = WeeklyBrief.text(
+            name: "Berjil", goal: .cut, targetWeightKg: 70,
+            calorieTarget: nil, proteinTarget: nil,
+            fitness: [:], training: TrainingState(), intake: [:],
+            lastWeek: .init(label: "LAST WEEK", range: week, photos: 0),
+            thisWeek: .init(label: "THIS WEEK", range: week, photos: 0))
+        XCTAssertTrue(text.contains("calories: not logged"), text)
+    }
 }

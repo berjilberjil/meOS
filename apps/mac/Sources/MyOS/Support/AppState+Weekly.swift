@@ -5,6 +5,26 @@ import Foundation
 // vault open, and only then does the notification go out.
 
 extension AppState {
+
+    /// Inclusive day keys across a range, capped so a malformed window can't loop.
+    static func dayKeys(_ range: ClosedRange<String>, limit: Int = 31) -> [String] {
+        guard range.lowerBound <= range.upperBound else { return [] }
+        var out: [String] = []
+        var cursor = range.lowerBound
+        while cursor <= range.upperBound && out.count < limit {
+            out.append(cursor)
+            cursor = addDays(1, to: cursor)
+        }
+        return out
+    }
+
+    /// What was actually eaten on every day of the given windows.
+    func intakeByDay(across ranges: [ClosedRange<String>]) -> [String: Macros] {
+        var out: [String: Macros] = [:]
+        for key in ranges.flatMap({ Self.dayKeys($0) }) { out[key] = consumed(key) }
+        return out
+    }
+
     /// Run it if Friday 6pm has passed and this week has no report yet. Called on
     /// launch and on every return to the foreground; cheap when nothing is due.
     func generateWeeklyReportIfDue() async {
@@ -45,6 +65,10 @@ extension AppState {
             proteinTarget: fitnessProfile.proteinTargetG ?? calorieTargets().map { Double($0.proteinG) },
             fitness: fitness,
             training: training,
+            // The real totals — the meal log merged with the AI quick-log — so
+            // a week logged entirely through the Fitness checklist is not
+            // reported to the model as "calories: not logged".
+            intake: intakeByDay(across: [lastRange, thisRange]),
             lastWeek: .init(label: "LAST WEEK", range: lastRange, photos: lastPhotos.count),
             thisWeek: .init(label: "THIS WEEK", range: thisRange, photos: thisPhotos.count))
 
