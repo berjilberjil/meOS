@@ -109,4 +109,27 @@ final class ActivityJournalTests: XCTestCase {
         let kept = ActivityJournal.prune([stale, fresh], now: now)
         XCTAssertEqual(kept.map(\.id), ["a"])
     }
+
+    // MARK: Where it is written
+
+    /// The regression that made this whole file a no-op on the Mac.
+    ///
+    /// `containerURL(forSecurityApplicationGroupIdentifier:)` returns a path
+    /// even when the app has no App Group entitlement — a path to a directory
+    /// that does not exist. Treating that as "there is a container" sent every
+    /// write into a `try?` that threw, so the write-ahead log stored nothing on
+    /// the only device that records anything.
+    func testGroupContainerAnswersExistenceNotNilness() {
+        let fm = FileManager.default
+        let raw = fm.containerURL(forSecurityApplicationGroupIdentifier: ShareInbox.appGroup)
+        let resolved = ShareInbox.groupContainer()
+
+        if let raw, !fm.fileExists(atPath: raw.path) {
+            XCTAssertNil(resolved, "a path to a directory that does not exist is not a container")
+        }
+        if let resolved {
+            XCTAssertTrue(fm.fileExists(atPath: resolved.path),
+                          "a container that is handed out must be somewhere a write can land")
+        }
+    }
 }

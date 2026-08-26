@@ -31,11 +31,21 @@ enum ActivityJournal {
     /// older than a couple of days has either made it or never will.
     static let retentionDays = 3
 
-    /// The App Group container where there is one, else Application Support —
-    /// the Mac is unsandboxed and has no group container at all.
+    /// The App Group container where there really is one, else Application
+    /// Support — the Mac is unsandboxed and has no group container at all.
+    ///
+    /// "Where there really is one" is load-bearing. This used to ask
+    /// `containerURL(forSecurityApplicationGroupIdentifier:)` for a URL and take
+    /// any answer, and on the Mac that answer is a path to a directory that does
+    /// not exist — so the Application Support fallback never ran, every write
+    /// threw into `try?`, and the write-ahead log silently stored **nothing**.
+    /// The one bug it exists to prevent — a quit or a crash losing every session
+    /// since the last push — was live the whole time on the only device that
+    /// records anything. `ShareInbox.groupContainer()` now checks the directory
+    /// is actually there.
     private static var fileURL: URL? {
         let fm = FileManager.default
-        if let group = fm.containerURL(forSecurityApplicationGroupIdentifier: ShareInbox.appGroup) {
+        if let group = ShareInbox.groupContainer() {
             return group.appendingPathComponent("activity-journal.json")
         }
         guard let support = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask,

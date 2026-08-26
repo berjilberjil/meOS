@@ -22,13 +22,27 @@ enum ShareInbox {
         var sharedAt: String
     }
 
+    /// The shared container, or nil when this build has no App Group.
+    ///
+    /// `containerURL(forSecurityApplicationGroupIdentifier:)` is not the test it
+    /// looks like. On the ad-hoc-signed Mac build — which carries no
+    /// `application-groups` entitlement — it does **not** return nil: it hands
+    /// back `~/Library/Group Containers/group.com.berjil.myos`, a directory that
+    /// does not exist and is never created. Every write into it then throws and
+    /// is swallowed by `try?`, so the caller sees a path, writes to it happily,
+    /// and nothing is ever stored. Existence is the test, not nil-ness.
+    static func groupContainer() -> URL? {
+        let fm = FileManager.default
+        guard let url = fm.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
+              fm.fileExists(atPath: url.path) else { return nil }
+        return url
+    }
+
     /// nil when the App Group isn't provisioned — the Mac build, or a device
     /// where the entitlement didn't make it. Every call then quietly no-ops
     /// rather than trapping.
     private static var fileURL: URL? {
-        FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
-            .appendingPathComponent("share-inbox.json")
+        groupContainer()?.appendingPathComponent("share-inbox.json")
     }
 
     /// Two processes touch this file. The lock only orders writers within one
