@@ -249,6 +249,18 @@ struct Note: Codable, Identifiable, Hashable {
     /// — it reorders the list under the cursor for the crime of *looking* at a
     /// note. Compare against `effectiveDoc` rather than `content` so a legacy
     /// plain-text note that round-trips identically is also left alone.
+    /// Whether a plain-text save would actually alter this note.
+    ///
+    /// The iOS notes screen edits the plain-text mirror and saves from
+    /// `onDisappear`, unconditionally — so without this, merely *opening* a note
+    /// on the phone and going back rewrote `updatedAt`, which the list is sorted
+    /// by, and rebuilt `content` from the flat body. A note written on the Mac
+    /// with headings, checkboxes and images lost every one of them to being
+    /// looked at.
+    func wouldChange(title: String, body: String) -> Bool {
+        title != self.title || body != self.body
+    }
+
     func wouldChange(title: String, doc: BlockDoc) -> Bool {
         // By content, not by identity. A legacy note stores no `content`, so
         // `effectiveDoc` builds one from its body with fresh block ids every

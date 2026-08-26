@@ -211,4 +211,68 @@ final class ShipAuditTests: XCTestCase {
         ProgressPhotoStore.use(account: "berjil")
         XCTAssertEqual(ProgressPhotoStore.dir, a, "case must not split one person in two")
     }
+
+    // MARK: - The balance on the Fold tab
+
+    // When Fold hands over no balances blob, banks are reconstructed from the
+    // `current_balance` riding on each transaction. That walk assigned
+    // unconditionally, so the last row won — and the feed arrives newest-first,
+    // so the dictionary named `latest` held each account's *oldest* balance.
+    // `liquid`, and then net worth, are derived from it.
+    private func txn(_ id: String, _ balance: Double, _ stamp: String) -> [String: Any] {
+        ["account_id": id, "current_balance": balance, "txn_timestamp": stamp,
+         "financial_information_provider": ["name": "HDFC Bank"]]
+    }
+
+    func testBankBalanceIsTheNewestReadingNotTheOldest() {
+        // Newest first, exactly how the feed pages.
+        let txns = [txn("u1", 19_539.13, "2026-08-25T10:00:00Z"),
+                    txn("u1", 4_000.00,  "2026-08-02T10:00:00Z"),
+                    txn("u1", 1_200.00,  "2026-07-11T10:00:00Z")]
+        let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.banks.count, 1)
+        XCTAssertEqual(out.data.banks.first?.balance, 19_539.13,
+                       "a balance from July is not what the account holds today")
+        XCTAssertEqual(out.data.liquid, 19_539.13, accuracy: 0.001)
+    }
+
+    func testTheNewestReadingWinsWhateverOrderItArrivesIn() {
+        let txns = [txn("u1", 1_200.00,  "2026-07-11T10:00:00Z"),
+                    txn("u1", 19_539.13, "2026-08-25T10:00:00Z"),
+                    txn("u1", 4_000.00,  "2026-08-02T10:00:00Z")]
+        let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.banks.first?.balance, 19_539.13)
+    }
+
+    // With no timestamps there is nothing to sort on, so the first row seen wins
+    // — which is the newest, given how the feed is paged.
+    func testUndatedRowsFallBackToFeedOrder() {
+        let txns: [[String: Any]] = [
+            ["account_id": "u1", "current_balance": 900.0],
+            ["account_id": "u1", "current_balance": 100.0]
+        ]
+        let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.banks.first?.balance, 900)
+    }
+
+    // MARK: - Looking at a note is not editing it
+
+    // iOS saves from `onDisappear`, unconditionally, through the plain-text
+    // entry point — which had no change guard. Opening a note and going back
+    // rewrote `updatedAt` (the field the list is sorted and grouped by) and
+    // rebuilt `content` from the flat body, so a note written on the Mac with
+    // headings, checkboxes and images lost all of it to being looked at.
+    func testReopeningANoteUnchangedIsNotAnEdit() {
+        let n = Note(id: "n1", createdAt: "2026-08-01T10:00:00", updatedAt: "2026-08-01T10:00:00",
+                     title: "Groceries", body: "milk\neggs")
+        XCTAssertFalse(n.wouldChange(title: "Groceries", body: "milk\neggs"),
+                       "opening and closing must not count as a change")
+    }
+
+    func testARealPlainTextEditIsStillAnEdit() {
+        let n = Note(id: "n1", createdAt: "2026-08-01T10:00:00", updatedAt: "2026-08-01T10:00:00",
+                     title: "Groceries", body: "milk\neggs")
+        XCTAssertTrue(n.wouldChange(title: "Groceries", body: "milk\neggs\nbread"))
+        XCTAssertTrue(n.wouldChange(title: "Shopping", body: "milk\neggs"))
+    }
 }

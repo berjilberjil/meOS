@@ -1473,6 +1473,10 @@ final class AppState: ObservableObject {
     }
     func updateNote(_ id: String, title: String, body: String) {
         guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
+        // The same guard `updateNoteContent` carries, and for a sharper reason:
+        // this is the entry point iOS saves through, from `onDisappear`. See
+        // `Note.wouldChange(title:body:)`.
+        guard notes[i].wouldChange(title: title, body: body) else { return }
         notes[i].title = title
         notes[i].body = body
         notes[i].content = BlockDoc.from(plainText: body)

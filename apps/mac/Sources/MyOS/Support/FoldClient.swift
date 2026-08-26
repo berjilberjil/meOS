@@ -662,17 +662,45 @@ enum FoldSnapshotBuilder {
         return nil
     }
 
+    /// The most recent `current_balance` each account carried on a transaction.
+    ///
+    /// The fallback for when Fold gives us no balances blob at all. It used to
+    /// assign unconditionally as it walked the feed, so the last write won — and
+    /// the feed arrives newest-first (`fetchTransactions` stops paging once
+    /// `page.last` predates the month, which only works because it is the oldest
+    /// row). The dictionary named `latest` therefore ended up holding each
+    /// account's *oldest* known balance, and since `liquid` and then net worth
+    /// are derived from these when nothing else supplies them, the headline
+    /// number on the Fold tab was a figure from weeks ago.
     private static func banksFromTransactions(_ txns: [[String: Any]]) -> [FoldData.Bank] {
-        var latest: [String: (name: String, last4: String, bal: Double)] = [:]
+        var latest: [String: (name: String, last4: String, bal: Double, at: Date?)] = [:]
         for t in txns {
             let fip = t["financial_information_provider"] as? [String: Any]
             let name = string(fip?["name"]) ?? string(t["account"]) ?? "Bank"
             let id = string(t["account_id"]) ?? name
-            if let bal = number(t["current_balance"]) {
-                latest[id] = (name, String(id.suffix(4)), bal)
-            }
+            guard let bal = number(t["current_balance"]) else { continue }
+            let at = date(t["txn_timestamp"]) ?? date(t["txn_date"])
+            if let held = latest[id], !isNewer(at, than: held.at) { continue }
+            latest[id] = (name, String(id.suffix(4)), bal, at)
         }
-        return latest.values.map { FoldData.Bank(name: $0.name, last4: $0.last4, balance: $0.bal) }
+        // Sorted, because `latest.values` is a Dictionary and has no order:
+        // the Fold tab's bank rows shuffled between launches. `collectBanks`
+        // keeps an explicit `order` array for exactly this reason; this path
+        // has no natural order to preserve, so biggest balance leads.
+        return latest.values
+            .sorted { $0.bal == $1.bal ? $0.name < $1.name : $0.bal > $1.bal }
+            .map { FoldData.Bank(name: $0.name, last4: $0.last4, balance: $0.bal) }
+    }
+
+    /// Whether a candidate reading should displace the one already held. A dated
+    /// reading beats an undated one; with nothing to compare, the first seen
+    /// wins, because the feed arrives newest-first.
+    private static func isNewer(_ candidate: Date?, than held: Date?) -> Bool {
+        switch (candidate, held) {
+        case let (.some(new), .some(old)): return new > old
+        case (.some, .none):               return true
+        case (.none, _):                   return false
+        }
     }
 
     private static func spendsThisMonth(_ txns: [[String: Any]]) -> [FoldData.Spend] {
