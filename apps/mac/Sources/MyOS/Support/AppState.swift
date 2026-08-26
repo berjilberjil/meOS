@@ -273,7 +273,20 @@ final class AppState: ObservableObject {
         } catch {
             isHydrated = false      // keep push gated so we never wipe server data
             if hadCache { lastHydrateError = "Offline — showing saved data." }
-            else { lastHydrateError = (error as? APIError)?.message ?? "Couldn't load your data." }
+            else {
+                let why = (error as? APIError)?.message ?? "Couldn't load your data."
+                lastHydrateError = why
+                // Say so on the screen the user is actually looking at. When a
+                // register or login succeeded but this first fetch failed, the
+                // catch touched neither `phase` nor `authError`, so the login
+                // form just sat there unchanged — no spinner, no error, no
+                // navigation. People concluded it had not worked, tapped CREATE
+                // ACCOUNT again, were told the username was taken, and signed up
+                // under a second name, orphaning the account they already had.
+                if phase == .loggedOut || phase == .loading {
+                    authError = "Signed in, but couldn't reach your data: \(why)"
+                }
+            }
         }
     }
 
@@ -2365,6 +2378,20 @@ final class AppState: ObservableObject {
         belongings = BelongingsState(); push(StateKey.belongings, belongings)
         clearScans()
         weekly = [];                   push(StateKey.weekly, weekly)
+        // These were all surviving a button that says "All data". Chat and
+        // memory are the two with no other bulk-clear anywhere in the app, so
+        // there was no way to remove them at all; activity is the Mac's whole
+        // time-tracking history; and the body photos are files on disk that the
+        // state blob never touches. Meanwhile events, watch, belongings, scans
+        // and weekly were being destroyed without ever being mentioned. The
+        // confirmation copy now names the lot — see DangerConfirm.
+        chat = ChatState();            push(StateKey.chat, chat)
+        memory = MemoryState();        push(StateKey.memory, memory)
+        eraseActivity()
+        for photo in ProgressPhotoStore.list() {
+            ProgressPhotoStore.delete(photo)
+            Task { await ProgressPhotoSync.delete(id: photo.id) }
+        }
     }
 }
 

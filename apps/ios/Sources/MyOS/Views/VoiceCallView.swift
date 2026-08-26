@@ -13,6 +13,7 @@ struct VoiceCallView: View {
     let onEnd: () -> Void
 
     @EnvironmentObject private var state: AppState
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var listener = SpeechListener()
     @ObservedObject private var agent = AgentConfig.shared
 
@@ -42,6 +43,12 @@ struct VoiceCallView: View {
         .background(Palette.background)
         .task { await begin() }
         .onDisappear { finish() }
+        // Backgrounding does not dismiss a full-screen cover, so `onDisappear`
+        // never ran — and with UIBackgroundModes: audio declared, the process
+        // stayed alive with AVAudioEngine still recording and the .playAndRecord
+        // session still active. Swipe home mid-call and the mic indicator stayed
+        // lit while she went on answering out loud from the background.
+        .onChange(of: scenePhase) { _, phase in if phase != .active { finish() } }
     }
 
     // MARK: - Pieces

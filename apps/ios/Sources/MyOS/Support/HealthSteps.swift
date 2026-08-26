@@ -8,6 +8,10 @@ import CoreMotion
 enum HealthSteps {
     private static let pedometer = CMPedometer()
 
+    /// True once a read was refused because Motion & Fitness is off for MyOS.
+    /// The Steps card reads this so a refusal never renders as a zero.
+    @MainActor private(set) static var accessDenied = false
+
     @MainActor
     static func syncToday(into state: AppState) async {
         guard CMPedometer.isStepCountingAvailable() else { return }
@@ -31,6 +35,14 @@ enum HealthSteps {
     @MainActor
     static func syncRecent(into state: AppState, days: Int = 7) async {
         guard CMPedometer.isStepCountingAvailable() else { return }
+        // A refusal is not a zero. Only availability was ever checked, so
+        // declining the Motion & Fitness prompt — or switching it off later —
+        // was indistinguishable from a week of not walking: every screen showed
+        // 0 steps, the streak sat at 0 forever, and nothing anywhere said the
+        // app had been told it may not look.
+        let status = CMPedometer.authorizationStatus()
+        accessDenied = status == .denied || status == .restricted
+        guard !accessDenied else { return }
         let cal = Calendar.current
         let startOfToday = cal.startOfDay(for: Date())
         var found: [String: Int] = [:]

@@ -172,7 +172,14 @@ struct ProgressPhotosCard: View {
         for url in urls {
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
-            if ProgressPhotoStore.save(from: url, date: selectedDate) { saved = true }
+            // Today unless the calendar is actually open. `selectedDate` is
+            // @State seeded once at construction and left wherever it was last
+            // pointed, so folding the calendar after looking at an old shot —
+            // or simply leaving the card alive past midnight — silently filed
+            // today's photo under that other date, where the comparison then
+            // read it as that day's body.
+            let target = showCalendar ? selectedDate : AppState.dateKey(Date())
+            if ProgressPhotoStore.save(from: url, date: target) { saved = true }
         }
         guard saved else { return }
         photos = ProgressPhotoStore.list()

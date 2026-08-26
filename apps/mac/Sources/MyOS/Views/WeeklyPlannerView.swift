@@ -147,7 +147,7 @@ struct WeeklyPlannerView: View {
                             Text("No foods planned.").font(.caption).foregroundStyle(Palette.faint)
                         }
                         ForEach(items) { item in
-                            PlanMealRow(food: state.food(item.foodId)) {
+                            PlanMealRow(food: state.food(item.foodId), quantity: item.quantity) {
                                 state.removePlanItem(weekday: weekday, meal: meal, itemId: item.id)
                             }
                         }
@@ -164,6 +164,10 @@ struct WeeklyPlannerView: View {
 
 private struct PlanMealRow: View {
     let food: Food?
+    /// How many servings this row is for. Every other surface scales by it;
+    /// this one showed the one-serving figure, so a lunch of Chapati x3 read
+    /// "104 kcal" in the planner and logged 312 when it was ticked.
+    var quantity: Double = 1
     let remove: () -> Void
     @State private var showDelete = false
 
@@ -172,7 +176,8 @@ private struct PlanMealRow: View {
             FoodIcon(category: food?.category ?? .other, name: food?.name ?? "", size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(food?.name ?? "Unknown").font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                Text("\(food?.servingLabel ?? "") · \(Int(food?.perServing.calories ?? 0)) kcal")
+                Text("\(quantity == 1 ? "" : "\(Fmt.trimKg(quantity))x ")\(food?.servingLabel ?? "") · "
+                     + "\(Int((food?.perServing.calories ?? 0) * quantity)) kcal")
                     .font(.caption2).foregroundStyle(Palette.faint).lineLimit(1)
             }
             Spacer()

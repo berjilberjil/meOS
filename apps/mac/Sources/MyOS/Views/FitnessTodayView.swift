@@ -478,8 +478,14 @@ struct ProgramDayPickerSheet: View {
                 if let p = state.activeProgram {
                     ForEach(p.days.filter { !$0.isRestDay }) { d in
                         Button {
+                            // Only rebuild when the day actually changes. This
+                            // reset was unconditional, so opening the picker to
+                            // see what else was in the program and tapping the
+                            // day you were already on threw away every set
+                            // logged that day — no confirmation, no undo.
+                            let current = state.programDay(for: date)?.day.id
                             state.setWorkoutOverride(date: date, dayId: d.id)
-                            state.resetSession(date: date)
+                            if current != d.id { state.resetSession(date: date) }
                             dismiss()
                             thenStart()
                         } label: {

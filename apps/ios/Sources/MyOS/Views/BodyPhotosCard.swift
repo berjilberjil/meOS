@@ -146,6 +146,13 @@ struct BodyPhotosCard: View {
         .buttonStyle(.plain)
     }
 
+    /// `@MainActor` because everything after the first `await` in a nonisolated
+    /// async method runs off the main actor — and this writes `@State` three
+    /// times, which SwiftUI answers with "Publishing changes from background
+    /// threads is not allowed" and intermittently dropped strip updates. The
+    /// sibling `EventsView.loadPicked` wraps the same writes in `MainActor.run`;
+    /// this one simply diverged.
+    @MainActor
     private func addPicked(_ item: PhotosPickerItem?) async {
         guard let item else { return }
         pickerItem = nil
@@ -153,7 +160,14 @@ struct BodyPhotosCard: View {
               let ui = UIImage(data: data),
               let jpeg = ui.jpegData(compressionQuality: 0.85)
         else { return }
-        if ProgressPhotoStore.save(jpeg: jpeg, date: selectedDate) {
+        // Today unless the calendar is open. `selectedDate` is seeded once and
+        // left wherever it was last pointed, and once the calendar is folded
+        // nothing on screen says which day that is — so a shot taken today was
+        // filed under whatever old date you had been looking at, and the
+        // comparison then read it as that day's body. Same after midnight, with
+        // the calendar never opened at all.
+        let target = showCalendar ? selectedDate : state.todayKey
+        if ProgressPhotoStore.save(jpeg: jpeg, date: target) {
             photos = ProgressPhotoStore.list()
             await ProgressPhotoSync.syncAll()
             photos = ProgressPhotoStore.list()
@@ -209,14 +223,15 @@ private struct ProgressGallery: View {
 
             TabView(selection: $page) {
                 ForEach(live) { p in
-                    Group {
-                        if let ui = UIImage(contentsOfFile: p.url.path) {
-                            ZoomableImage(image: ui)
-                        } else {
-                            Palette.surfaceElevated
-                        }
-                    }
-                    .tag(p.id)
+                    // Decoded per page, downsampled, off the main thread.
+                    // `TabView` builds every page eagerly, so the old
+                    // `UIImage(contentsOfFile:)` full-resolution-decoded the
+                    // whole library the instant the viewer opened — and the
+                    // Favorites importer brings in every hearted camera-roll
+                    // shot, so that is hundreds of JPEGs at once. The UI froze
+                    // for seconds and a real device jetsammed the app. The strip
+                    // has used ThumbCache for exactly this reason all along.
+                    GalleryPage(photo: p).tag(p.id)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .automatic))
@@ -288,14 +303,43 @@ private struct ProgressGallery: View {
 
     private func deleteCurrent() {
         let deletingId = page
+        // Where the deleted photo sat, so the viewer lands on its neighbour.
+        // Jumping to `live.first` meant deleting an old photo threw you to
+        // today's shot, so clearing out a run of old ones meant scrolling back
+        // from the top of the library every single time.
+        let index = live.firstIndex { $0.id == deletingId } ?? 0
         ProgressPhotoStore.delete(deletingId)
         live = ProgressPhotoStore.list()
-        if let next = live.first {
-            page = next.id
-        } else {
+        if live.isEmpty {
             onClose()
+        } else {
+            page = live[min(index, live.count - 1)].id
         }
         Task { await ProgressPhotoSync.delete(id: deletingId) }
+    }
+}
+
+/// One page of the full-screen gallery.
+///
+/// Loads its own image lazily and downsampled, so opening the viewer costs one
+/// decode rather than one per photo in the library.
+private struct GalleryPage: View {
+    let photo: ProgressPhoto
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                ZoomableImage(image: image)
+            } else {
+                Palette.surfaceElevated
+            }
+        }
+        .task(id: photo.id) {
+            guard image == nil else { return }
+            // Screen-sized, not sensor-sized: plenty for pinch-zoom on a phone.
+            image = await ThumbCache.load(photo.url, key: "full-\(photo.id)", maxPixel: 2048)
+        }
     }
 }
 

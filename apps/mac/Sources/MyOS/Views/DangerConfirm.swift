@@ -241,7 +241,13 @@ struct DataManagementCard: View {
             DangerResetRow(title: "Reset everything",
                            subtitle: "All data — keeps your profile & chips",
                            confirmTitle: "Reset ALL data?",
-                           confirmMessage: "Wipes journal, notes, fitness and your day plans. Your profile identity and journal chips are kept.",
+                           confirmMessage: """
+                           Wipes journal, notes, day plans, fitness and food, \
+                           events, watch list, Stuff, scans, weekly reports, \
+                           chat history, what Catherine remembers, your activity \
+                           history and every progress photo. \
+                           Your profile identity and journal chips are kept.
+                           """,
                            actionLabel: "Wipe everything",
                            emphatic: true) {
                 state.resetEverything()

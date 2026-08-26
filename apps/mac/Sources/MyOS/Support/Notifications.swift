@@ -164,17 +164,32 @@ final class ReminderStore: ObservableObject {
     }
 
     /// Ask for notification permission; on grant, enable + schedule.
+    /// True after a request that was refused because permission was already
+    /// denied at the system level — the prompt does not appear a second time, so
+    /// the toggle just springs back with nothing to explain it.
+    @Published var permissionRefused = false
+
     func requestAuthorization() async {
         let granted = (try? await UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound, .badge])) ?? false
         authorized = granted
+        permissionRefused = !granted
         enabled = granted   // didSet reschedules (or clears if denied)
     }
 
     func refreshAuthorization() async {
         let s = await UNUserNotificationCenter.current().notificationSettings()
         authorized = s.authorizationStatus == .authorized || s.authorizationStatus == .provisional
+        if authorized { permissionRefused = false }
     }
+
+    /// Reminders are switched on in MyOS but the system will not deliver them.
+    ///
+    /// `enabled` lives in UserDefaults and survives permission being revoked in
+    /// System Settings, so the card went on showing the master switch on and all
+    /// five rows with their times while `syncOnLaunch` quietly skipped
+    /// scheduling. Nothing ever fired and nothing said why.
+    var isSilentlyOff: Bool { (enabled && !authorized) || permissionRefused }
 
     /// Re-sync stored settings after launch (system triggers persist, but this
     /// recovers them after a reinstall or a settings change on this device).
@@ -274,7 +289,17 @@ enum StepNotify {
     static let route = "steps"
 
     static func goalHit(_ c: StepCelebration) {
+        // No frontmost guard on iOS. The pedometer is only ever read from
+        // `MainView.refreshFeeds`, which runs from `.task` and on scenePhase
+        // `.active` — so the app is by definition frontmost at the instant a
+        // goal is detected, and this returned every single time. The banner that
+        // the whole feature was designed around ("what reaches you when the app
+        // is not open — which is most of the time, since the steps happen while
+        // walking") was unreachable code on the only platform with a pedometer.
+        // Duplication is already prevented by `hailed`, not by this.
+        #if os(macOS)
         guard !AppFocus.isFrontmost else { return }
+        #endif
         let n = UNMutableNotificationContent()
         n.title = title(c)
         n.body = body(c)

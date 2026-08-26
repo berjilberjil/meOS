@@ -13,7 +13,6 @@ struct EventMediaViewer: View {
     let onClose: () -> Void
 
     @State private var page: String
-    @State private var player: AVPlayer?
 
     init(media: [EventMedia], start: EventMedia, onClose: @escaping () -> Void) {
         self.media = media
@@ -45,7 +44,7 @@ struct EventMediaViewer: View {
                     ForEach(media) { m in
                         Group {
                             if m.kind == .video {
-                                VideoPage(media: m)
+                                VideoPage(media: m, isActive: page == m.id)
                             } else if let img = eventImage(m) {
                                 ZoomableImage(image: img)
                             } else {
@@ -56,10 +55,8 @@ struct EventMediaViewer: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .onChange(of: page) { _, _ in player?.pause(); player = nil }
             }
         }
-        .onDisappear { player?.pause() }
     }
 
     private var currentIndex: Int {
@@ -74,7 +71,14 @@ private struct VideoPage: View {
     /// is exactly why thumbnails stayed grey placeholders on iPhone.
     @ObservedObject private var mediaStore = EventMediaStore.shared
     let media: EventMedia
+    /// Whether this page is the one on screen. Each page owns its own player,
+    /// and the viewer's `onChange` was pausing a property that was declared and
+    /// never assigned — so swiping off a playing video left the audio going over
+    /// the next still image, and swiping back and forth started another player
+    /// each time, plus a temp .mp4 per start that nothing ever deleted.
+    let isActive: Bool
     @State private var player: AVPlayer?
+    @State private var file: URL?
     @State private var failed = false
 
     var body: some View {
@@ -103,7 +107,15 @@ private struct VideoPage: View {
         // forever, while the download it had just triggered landed unnoticed.
         // Closing and reopening played it, which is how this hid.
         .onChange(of: mediaStore.version) { _, _ in if player == nil { start() } }
-        .onDisappear { player?.pause() }
+        .onChange(of: isActive) { _, on in if !on { teardown() } }
+        .onDisappear { teardown() }
+    }
+
+    private func teardown() {
+        player?.pause()
+        player = nil
+        if let file { try? FileManager.default.removeItem(at: file) }
+        file = nil
     }
 
     private func start() {

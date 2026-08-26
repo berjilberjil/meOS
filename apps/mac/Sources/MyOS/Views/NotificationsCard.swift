@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// Settings card for the daily reminders (food / workout / weight+journal).
 /// Master toggle requests notification permission; each row has its own time and
@@ -111,6 +116,19 @@ struct NotificationsCard: View {
             .animation(.knFast, value: r.enabled)
     }
 
+    /// Straight to this app's notification settings on both platforms.
+    private func openNotificationSettings() {
+        #if os(macOS)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
+        }
+        #else
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+        #endif
+    }
+
     private var master: Binding<Bool> {
         Binding(
             get: { store.enabled },
@@ -135,6 +153,18 @@ struct NotificationsCard: View {
                 }
                 Spacer()
                 Toggle("", isOn: master).labelsHidden().tint(Palette.action)
+            }
+
+            // The card used to read only `enabled`, which lives in UserDefaults
+            // and survives permission being revoked in System Settings — so it
+            // went on showing the master switch on and five rows with their
+            // times while nothing was ever delivered. The mirror case: if
+            // permission was denied once, tapping the toggle gets no prompt at
+            // all and the switch silently springs back.
+            if store.isSilentlyOff {
+                SettingsNotice(text: "Notifications are turned off for MyOS, so these reminders "
+                               + "will not arrive. Turn them on in System Settings.",
+                               actionLabel: "Open Settings") { openNotificationSettings() }
             }
 
             if store.enabled {
