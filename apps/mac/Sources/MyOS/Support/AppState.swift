@@ -2226,18 +2226,25 @@ final class AppState: ObservableObject {
     /// the category. The item is saved before any of that so a dead network
     /// still leaves the video in the log.
     func drainShareInbox() async {
+        // Only clear an item once it is actually in the list. See `ShareInbox.drain`.
+        var taken: [String] = []
+        defer { ShareInbox.confirm(taken) }
         for shared in ShareInbox.drain() {
-            guard !watch.contains(where: { $0.videoId == shared.videoId }) else { continue }
-            var item = addWatchItem(WatchItem(url: shared.url, videoId: shared.videoId,
+            guard !watch.contains(where: { $0.videoId == shared.videoId }) else {
+                taken.append(shared.videoId)
+                continue
+            }
+            taken.append(shared.videoId)
+            let item = addWatchItem(WatchItem(url: shared.url, videoId: shared.videoId,
                                               thumbUrl: YouTube.thumbURL(shared.videoId)))
+            // Merged into the live row, like the other two enrichment paths —
+            // writing back a snapshot taken before these awaits reverted
+            // anything the user did to the card while the lookup ran.
             let meta = await YouTube.fetchMeta(id: shared.videoId)
-            item.title = meta.title
-            item.channel = meta.channel
-            if !meta.thumbUrl.isEmpty { item.thumbUrl = meta.thumbUrl }
-            updateWatchItem(item)
+            enrichWatchItem(id: item.id, title: meta.title, channel: meta.channel,
+                            thumbUrl: meta.thumbUrl.isEmpty ? nil : meta.thumbUrl)
             if let cat = await categorizeVideo(title: meta.title, channel: meta.channel) {
-                item.category = cat
-                updateWatchItem(item)
+                enrichWatchItem(id: item.id, category: cat)
             }
         }
     }

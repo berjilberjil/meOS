@@ -68,14 +68,26 @@ enum ShareInbox {
         return true
     }
 
-    /// Hand everything over and empty the file — the app owns them from here.
+    /// Hand everything over, leaving the file intact until `confirm` says the
+    /// items are safely in the watch list.
+    ///
+    /// This used to empty the file first. The on-disk state cache is only ever
+    /// written from a server fetch, so an item whose push had not landed had no
+    /// local copy anywhere — share a video offline, open MyOS for two seconds,
+    /// swipe it away, and it was gone from the inbox *and* from the watch log,
+    /// with nothing to say so.
     static func drain() -> [Item] {
-        guard let file = fileURL else { return [] }
         lock.lock(); defer { lock.unlock() }
-        let items = pending()
-        guard !items.isEmpty else { return [] }
-        try? Data("[]".utf8).write(to: file, options: .atomic)
-        return items
+        return pending()
+    }
+
+    /// Drop the items the app has taken responsibility for.
+    static func confirm(_ videoIds: [String]) {
+        guard let file = fileURL, !videoIds.isEmpty else { return }
+        lock.lock(); defer { lock.unlock() }
+        let taken = Set(videoIds)
+        let left = pending().filter { !taken.contains($0.videoId) }
+        try? (try? JSONEncoder().encode(left))?.write(to: file, options: .atomic)
     }
 
     private static func stamp() -> String {

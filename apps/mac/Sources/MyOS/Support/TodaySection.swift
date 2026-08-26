@@ -86,6 +86,13 @@ enum TodaySection: String, CaseIterable, Identifiable {
     /// per pass is work happening exactly while a finger is moving.
     private static var cachedOrder: [TodaySection]?
 
+    /// Bumped whenever the order changes, so views can observe it.
+    @MainActor
+    final class OrderSignal: ObservableObject {
+        static let shared = OrderSignal()
+        @Published var version = 0
+    }
+
     static func ordered() -> [TodaySection] {
         if let cachedOrder { return cachedOrder }
         let result = decodeOrder()
@@ -111,5 +118,11 @@ enum TodaySection: String, CaseIterable, Identifiable {
         if let data = try? JSONEncoder().encode(ids) {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
+        // Tell the view. `ordered()` is a plain function call that SwiftUI has
+        // no dependency on, so saving a new order changed nothing on screen
+        // until some unrelated publish happened to re-run the body — a sync
+        // tick, or a relaunch. Dragging Meals above Steps simply read as
+        // "didn't work".
+        Task { @MainActor in OrderSignal.shared.version &+= 1 }
     }
 }
