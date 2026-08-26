@@ -529,4 +529,75 @@ final class ShipAuditTests: XCTestCase {
             thisWeek: .init(label: "THIS WEEK", range: week, photos: 0))
         XCTAssertTrue(text.contains("calories: not logged"), text)
     }
+
+    // MARK: - Age
+
+    // `dob` had the real date picker and looked authoritative, but nothing read
+    // it — `age` was a separate hand-typed Int. Fill in the birth date and leave
+    // Age blank and calorieTargets() returned nil at its `age > 0` guard: every
+    // calorie and macro target silently unavailable, with nothing pointing at
+    // the empty box.
+    private func at(_ key: String) -> Date {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "yyyy-MM-dd"
+        return f.date(from: key)!
+    }
+
+    func testAgeComesFromTheDateOfBirth() {
+        XCTAssertEqual(Profile.age(fromDOB: "1998-03-14", on: at("2026-08-26")), 28)
+    }
+
+    func testAgeAdvancesOnTheBirthday() {
+        XCTAssertEqual(Profile.age(fromDOB: "1998-08-26", on: at("2026-08-25")), 27, "day before")
+        XCTAssertEqual(Profile.age(fromDOB: "1998-08-26", on: at("2026-08-26")), 28, "on the day")
+    }
+
+    func testNonsenseDatesOfBirthAreRefused() {
+        XCTAssertNil(Profile.age(fromDOB: ""))
+        XCTAssertNil(Profile.age(fromDOB: "not-a-date"))
+        XCTAssertNil(Profile.age(fromDOB: "2030-01-01", on: at("2026-08-26")), "not born yet")
+        XCTAssertNil(Profile.age(fromDOB: "1800-01-01", on: at("2026-08-26")), "beyond 120")
+    }
+
+    func testTypedAgeIsUsedWhenThereIsNoDateOfBirth() {
+        var p = Profile()
+        p.age = 31
+        XCTAssertEqual(p.resolvedAge, 31)
+        p.dob = "1998-03-14"
+        XCTAssertEqual(p.resolvedAge, Profile.age(fromDOB: "1998-03-14"),
+                       "the date of birth wins once it is set")
+    }
+
+    // MARK: - Typing a decimal point
+
+    // Any binding that re-renders a number back into its own text field on each
+    // keystroke eats the dot: the formatter has nothing to render for a trailing
+    // ".", so it vanished under the cursor and the next digit joined the integer
+    // part. 72.5 kg became 725, 172.5 cm became 1725, 12.5 g of fat became 125.
+    func testATrailingDotSurvivesBeingTyped() {
+        XCTAssertEqual(KLabeledNumberField.clean("72.", decimals: 1), "72.")
+        XCTAssertEqual(KLabeledNumberField.clean("72.5", decimals: 1), "72.5")
+    }
+
+    func testOnlyOneDotIsAllowed() {
+        XCTAssertEqual(KLabeledNumberField.clean("72.5.3", decimals: 2), "72.53")
+    }
+
+    func testAWholeNumberFieldRefusesADot() {
+        XCTAssertEqual(KLabeledNumberField.clean("8000.5", decimals: 0), "80005")
+        XCTAssertEqual(KLabeledNumberField.clean("8000", decimals: 0), "8000")
+    }
+
+    func testLettersNeverReachTheValue() {
+        XCTAssertEqual(KLabeledNumberField.clean("17a2.5kg", decimals: 1), "172.5")
+        XCTAssertEqual(KLabeledNumberField.clean("inf", decimals: 2), "")
+        XCTAssertNil(KLabeledNumberField.parse(""))
+    }
+
+    func testTheParsedValueMatchesWhatWasTyped() {
+        XCTAssertEqual(KLabeledNumberField.parse(KLabeledNumberField.clean("72.5", decimals: 1)), 72.5)
+        XCTAssertEqual(KLabeledNumberField.parse(KLabeledNumberField.clean("12.5", decimals: 2)), 12.5)
+    }
 }

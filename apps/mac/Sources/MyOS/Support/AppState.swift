@@ -1064,7 +1064,7 @@ final class AppState: ObservableObject {
     /// their own body called for. No weight logged is a thing we do not know,
     /// so it returns nil and the UI asks for one (or uses the manual override).
     func calorieTargets() -> CalorieTargets? {
-        guard let h = profile.heightCm, h > 0, let age = profile.age, age > 0 else { return nil }
+        guard let h = profile.heightCm, h > 0, let age = profile.resolvedAge, age > 0 else { return nil }
         guard let w = latestWeightKg, w > 0 else { return nil }
         return Nutrition.targets(sex: fitnessProfile.sex, weightKg: w, heightCm: h, age: age,
                                  activity: fitnessProfile.activity, goal: fitnessProfile.goal)

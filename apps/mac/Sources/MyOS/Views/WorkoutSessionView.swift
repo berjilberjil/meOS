@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Reps as typed: empty is zero, and bounded so `Int(_:)` can never trap.
+extension SetRow {
+    static func wholeReps(_ s: String) -> Int {
+        let t = s.trimmingCharacters(in: .whitespaces).filter(\.isNumber)
+        guard !t.isEmpty, let n = Int(t) else { return 0 }
+        return min(max(n, 0), 10_000)
+    }
+}
+
 // Logging a workout. Reads the program day, writes only history — nothing in
 // here can reach back into the template, which is why you can drop a set or
 // swap in an extra exercise on a bad day without breaking Monday forever.
@@ -249,7 +258,12 @@ private struct SetRow: View {
             Text("×").font(.caption.weight(.bold)).foregroundStyle(Palette.faint)
             numberField(text: $reps, field: .reps, unit: "reps", width: 52) {
                 state.updateSet(date: date, entryId: entryId, setId: set.id) {
-                    $0.reps = Int(reps.trimmingCharacters(in: .whitespaces)) ?? $0.reps
+                    // Empty means zero, not "keep what was there". `?? $0.reps`
+                    // left the previous number in the record while the box showed
+                    // the "—" prompt, and the next render put that number back
+                    // into the box — so a set you had cleared was logged at its
+                    // old count. The weight field beside it already clears to nil.
+                    $0.reps = Self.wholeReps(reps)
                 }
             }
 
@@ -261,7 +275,7 @@ private struct SetRow: View {
                     // Ticking commits whatever is typed, so a set is never
                     // marked done with a stale number behind it.
                     if weighted { s.weightKg = Double(weight.trimmingCharacters(in: .whitespaces)) }
-                    s.reps = Int(reps.trimmingCharacters(in: .whitespaces)) ?? s.reps
+                    s.reps = Self.wholeReps(reps)
                     s.done.toggle()
                 }
             } label: {

@@ -40,7 +40,7 @@ struct ProfileView: View {
                     Text(state.profile.role)
                         .font(.footnote).foregroundStyle(Palette.muted)
                     HStack(spacing: 8) {
-                        if let age = state.profile.age { factChip("number", "\(age) yrs") }
+                        if let age = state.profile.resolvedAge { factChip("number", "\(age) yrs") }
                         if !state.profile.bloodGroup.isEmpty { factChip("drop.fill", state.profile.bloodGroup) }
                         if !state.profile.city.isEmpty { factChip("mappin.and.ellipse", state.profile.city) }
                         if !state.profile.relationship.isEmpty { factChip("heart.fill", state.profile.relationship) }
@@ -170,8 +170,15 @@ struct ProfileView: View {
                 LazyVGrid(columns: fieldCols, spacing: 12) {
                     field("Full name", \.name, "Your name")
                     dateField("Date of birth", \.dob)
-                    intField("Age", get: { state.profile.age },
-                             set: { v in state.updateProfile { $0.age = v } }, placeholder: "Age")
+                    // Read-only once a date of birth is set — it is derived
+                    // from it and stays right after every birthday.
+                    if let derived = Profile.age(fromDOB: state.profile.dob) {
+                        labelledEditable("Age", value: "\(derived) yrs") { EmptyView() }
+                    } else {
+                        intField("Age", get: { state.profile.age },
+                                 set: { v in state.updateProfile { $0.age = v.map { max(1, min(120, $0)) } } },
+                                 placeholder: "Age")
+                    }
                     menuField("Blood group", Profile.bloodGroupOptions, \.bloodGroup)
                     menuField("Relationship", Profile.relationshipOptions, \.relationship)
                     phoneField("Phone", \.phone)
@@ -447,12 +454,13 @@ struct ProfileView: View {
     private func doubleField(_ label: String, get: @escaping () -> Double?,
                              set: @escaping (Double?) -> Void, placeholder: String) -> some View {
         labelledEditable(label, value: get().map { Fmt.trimKg($0) } ?? "") {
-            TextField("", text: Binding(get: { get().map { Fmt.trimKg($0) } ?? "" },
-                                        // Filtered, not bare `Double(_:)` — that
-                                        // accepts "inf", and an infinite height
-                                        // crashed `Fmt.trimKg` on the next render.
-                                        set: { set(Self.parseDecimal($0)) }),
-                      prompt: Text(placeholder).foregroundColor(Palette.faint))
+            // A draft the field owns, for the same reason KLabeledNumberField
+            // has one: round-tripping through `Fmt.trimKg` on every keystroke
+            // deleted the decimal point as it was typed, so 172.5 cm became
+            // 1725 and BMI was then computed from a 17-metre body.
+            DecimalDraftField(text: get().map { Fmt.trimKg($0) } ?? "",
+                              placeholder: placeholder,
+                              commit: { set(Self.parseDecimal($0)) })
                 .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .knField()
         }

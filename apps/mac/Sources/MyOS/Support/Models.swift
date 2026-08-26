@@ -500,6 +500,35 @@ struct Profile: Codable, Hashable {
     var hometown: String = ""
     var education: String = ""
 
+    /// Age from `dob` when there is one, else whatever was typed in.
+    ///
+    /// `dob` had a real date picker and looked like the authoritative field, but
+    /// nothing ever read it — `age` was a separate hand-typed Int. Fill in the
+    /// date of birth and leave Age blank, which is the obvious thing to do, and
+    /// `calorieTargets()` returned nil at its `age > 0` guard: every calorie and
+    /// macro target in the app silently unavailable, with nothing pointing at
+    /// the empty box. Type an age instead and it was wrong from your next
+    /// birthday onward, forever.
+    var resolvedAge: Int? {
+        if let fromDOB = Profile.age(fromDOB: dob) { return fromDOB }
+        return age
+    }
+
+    /// Whole years between a `yyyy-MM-dd` birth date and `on`. Pure, so the
+    /// birthday boundary is pinned by a test.
+    static func age(fromDOB dob: String, on today: Date = Date()) -> Int? {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = cal
+        f.dateFormat = "yyyy-MM-dd"
+        guard dob.count >= 10, let born = f.date(from: String(dob.prefix(10))) else { return nil }
+        guard let years = cal.dateComponents([.year], from: born, to: today).year,
+              (0...120).contains(years) else { return nil }
+        return years
+    }
+
     // Body
     var heightCm: Double? = nil
 

@@ -201,16 +201,20 @@ struct ActivitySettingsCard: View {
             Text("\(sessionCount) session\(sessionCount == 1 ? "" : "s") held in full, across \(trackedDays) day\(trackedDays == 1 ? "" : "s"). Sessions older than \(ActivityDoc.retentionDays) days are kept as daily totals only.")
                 .font(.myCaption).foregroundStyle(Palette.faint)
                 .fixedSize(horizontal: false, vertical: true)
-            Button(confirmingWipe ? "Tap again to erase everything" : "Erase activity history") {
-                if confirmingWipe {
-                    state.eraseActivity()
-                    confirmingWipe = false
-                } else {
-                    confirmingWipe = true
-                }
-            }
-            .buttonStyle(.borderless)
-            .tint(Palette.warning)
+            // Hold to confirm, like every other irreversible action in the app.
+            // The old two-tap latch had no timeout and no reset when the view
+            // went away, so arming it, changing your mind and scrolling on left
+            // it armed for as long as Settings stayed open — and a click on that
+            // same button minutes later erased every session, rollup and device
+            // record and pushed it to the other device.
+            Button("Erase activity history") { confirmingWipe = true }
+                .buttonStyle(.borderless)
+                .tint(Palette.warning)
+                .holdToDelete(isPresented: $confirmingWipe,
+                              title: "Erase activity history?",
+                              message: "Removes every recorded session and daily total, on this device and the other one. This cannot be undone.",
+                              confirmLabel: "Hold to erase") { state.eraseActivity() }
+                .onDisappear { confirmingWipe = false }
         }
     }
 }

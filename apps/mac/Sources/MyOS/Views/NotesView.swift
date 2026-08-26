@@ -46,6 +46,14 @@ struct NotesView: View {
     /// keeps the column still; leaving it re-sorts, which is when a reorder is
     /// actually information rather than a distraction.
     @State private var frozenOrder: [String]? = nil
+    /// `updatedAt` as it stood when the order was frozen.
+    ///
+    /// Freezing the row order alone was only half the fix: `sections` still
+    /// re-derives each note's date bucket from the live `updatedAt`, so typing
+    /// one character into a note last edited four days ago moved it out of
+    /// "Previous 7 Days" and into "Today" under the cursor — the exact jump the
+    /// freeze exists to prevent, just via the group header instead of the row.
+    @State private var frozenStamps: [String: String] = [:]
 
     private var filtered: [Note] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
@@ -590,6 +598,7 @@ struct NotesView: View {
         selectedID = nil
         remember(nil)
         frozenOrder = nil
+        frozenStamps = [:]
         commands.selection = nil
         inDetail = false
     }
@@ -689,6 +698,7 @@ struct NotesView: View {
     /// join the list rather than reshuffling it.
     private func freezeOrder() {
         frozenOrder = state.sortedNotes.map(\.id)
+        frozenStamps = Dictionary(uniqueKeysWithValues: state.notes.map { ($0.id, $0.updatedAt) })
     }
 
     private func selectFirstAfterDelete() {
@@ -734,7 +744,7 @@ private extension NotesView {
         var order: [String] = []
         var groups: [String: [Note]] = [:]
         for n in rest {
-            let label = Self.dateBucket(n.updatedAt)
+            let label = Self.dateBucket(frozenStamps[n.id] ?? n.updatedAt)
             if groups[label] == nil { order.append(label); groups[label] = [] }
             groups[label]?.append(n)
         }

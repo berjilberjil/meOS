@@ -536,14 +536,20 @@ private struct BelongingEditor: View {
                 photoHint = "Couldn’t name that. Type the name — photo still saved."
                 return
             }
-            if name.trimmingCharacters(in: .whitespaces).isEmpty || !BelongingGuess.isProductTitle(name) {
+            if item == nil,
+               name.trimmingCharacters(in: .whitespaces).isEmpty || !BelongingGuess.isProductTitle(name) {
                 name = g.name
             }
-            if categories.contains(where: { $0.id == g.categoryID }) {
+            if item == nil, categories.contains(where: { $0.id == g.categoryID }) {
                 categoryID = g.categoryID
                 if item == nil { lifeMonths = max(1, g.lifeMonths) }
             }
-            if g.priceInr > 0 { price = String(g.priceInr) }
+            // Only for a NEW item. `BelongingGuess.priceInr` always falls back
+            // to an inferred figure, so this fired every time: change the photo
+            // on something you paid ₹2,400 for and the price flipped to a
+            // model's guess, taking every ₹/day, category total and monthly-burn
+            // number on the tab with it.
+            if item == nil, g.priceInr > 0 { price = String(g.priceInr) }
             photoHint = g.summary
         }
     }

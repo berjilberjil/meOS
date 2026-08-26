@@ -310,7 +310,12 @@ struct WorkoutChecklistCard: View {
             }
             if dayLog.state == .skipped {
                 Button("Undo skip") { state.unskipWorkout(date: date) }
-            } else if !isRest {
+            } else if !isRest, dayLog.state != .done, !dayLog.hasSession {
+                // Not offered once anything is logged. `skip()` nils `items` and
+                // `entries` while `unskip()` only clears the flag, so skipping a
+                // workout you had just finished — and then undoing it — left the
+                // day unconfirmed with zero sets and dropped out of the 28-day
+                // totals. Every other destructive action here holds to confirm.
                 Button("Skip today", role: .destructive) { state.skipWorkout(date: date) }
             }
             if dayLog.entries != nil {
@@ -471,6 +476,15 @@ struct ProgramDayPickerSheet: View {
     let date: String
     var thenStart: () -> Void = {}
 
+    /// Whether this date is running something other than what the program
+    /// scheduled. `dayId` alone does not answer that — `startSession` stamps it
+    /// on every day it builds — so testing it offered "back to the scheduled
+    /// day" on days nothing had been overridden.
+    private var isOverridden: Bool {
+        guard let picked = state.workoutDayLog(date).dayId else { return false }
+        return picked != state.scheduledDay(for: date)?.day.id
+    }
+
     var body: some View {
         SheetShell(title: "Choose today\u{2019}s workout",
                    subtitle: "Runs it for \(Fmt.day(date)) only — your program keeps its schedule.") {
@@ -513,10 +527,17 @@ struct ProgramDayPickerSheet: View {
                         .buttonStyle(.plain)
                         .onHover { h in cursor(h) }
                     }
-                    if state.workoutDayLog(date).dayId != nil {
+                    // Only when the day really is overridden. `startSession`
+                    // sets `dayId` for every day it builds, so this offered
+                    // itself on days nothing had been overridden on — and reset
+                    // unconditionally, throwing away every logged set with no
+                    // confirmation and no undo.
+                    if isOverridden {
                         Button {
+                            let wasScheduled = state.scheduledDay(for: date)?.day.id
+                            let current = state.programDay(for: date)?.day.id
                             state.setWorkoutOverride(date: date, dayId: nil)
-                            state.resetSession(date: date)
+                            if wasScheduled != current { state.resetSession(date: date) }
                             dismiss()
                         } label: { Label("Back to the scheduled day", systemImage: "arrow.uturn.backward") }
                             .buttonStyle(.borderless)

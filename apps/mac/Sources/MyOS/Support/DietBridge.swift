@@ -329,7 +329,7 @@ extension AppState {
             "weekday": todayWeekday,
             "profile": [
                 "height_cm": profile.heightCm as Any,
-                "age": profile.age as Any,
+                "age": profile.resolvedAge as Any,
                 "sex": fitnessProfile.sex.rawValue,
                 "goal": fitnessProfile.goal.rawValue
             ],

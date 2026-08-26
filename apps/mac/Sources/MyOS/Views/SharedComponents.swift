@@ -412,6 +412,37 @@ struct KLabeledField: View {
     }
 }
 
+/// A bare decimal text field that owns what is in the box while you type.
+///
+/// Any binding that re-renders a number back into its own text field on every
+/// keystroke eats the decimal point — the formatter has nothing to render for a
+/// trailing dot, so it disappears under the cursor and the next digit joins the
+/// integer part. This keeps a draft and only reports the parsed value outward.
+struct DecimalDraftField: View {
+    /// The value as it stands outside; re-seeded from here whenever unfocused.
+    let text: String
+    var placeholder: String = ""
+    let commit: (String) -> Void
+    @FocusState private var focused: Bool
+    @State private var draft: String = ""
+
+    var body: some View {
+        TextField("", text: $draft,
+                  prompt: Text(placeholder).foregroundColor(Palette.faint))
+            .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
+            .focused($focused)
+            .knField()
+            .onAppear { draft = text }
+            .onChange(of: draft) { _, typed in
+                let cleaned = KLabeledNumberField.clean(typed, decimals: 2)
+                if cleaned != typed { draft = cleaned; return }
+                commit(cleaned)
+            }
+            .onChange(of: text) { _, incoming in if !focused { draft = incoming } }
+            .onChange(of: focused) { _, on in if !on { draft = text } }
+    }
+}
+
 /// Labelled numeric input over an optional Double — empty string clears to nil.
 struct KLabeledNumberField: View {
     let label: String
@@ -419,18 +450,54 @@ struct KLabeledNumberField: View {
     var decimals: Int = 0
     @Binding var value: Double?
     @FocusState private var focused: Bool
+    /// What is literally in the box while it is being typed into.
+    ///
+    /// The binding used to re-derive its own text as `format(parse(text))` on
+    /// every keystroke, and `format` renders a whole number without a trailing
+    /// dot — so typing "72." was rewritten to "72" under the cursor and the next
+    /// digit landed in the integer part: 72.5 became 725. Every fractional value
+    /// in the app was unreachable through this control — target weight, the
+    /// water target in litres, and every macro box in the food editor, where
+    /// 12.5 g of fat saved as 125 g. A draft the field owns is the fix: it is
+    /// only re-seeded from `value` when the field is not being typed into.
+    @State private var draft: String = ""
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             KFieldLabel(text: label)
-            TextField("", text: Binding(
-                get: { Self.format(value, decimals: decimals) },
-                set: { value = Self.parse($0) }),
-                prompt: Text(placeholder).foregroundColor(Palette.faint))
+            TextField("", text: $draft,
+                      prompt: Text(placeholder).foregroundColor(Palette.faint))
                 .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .monospacedDigit()
                 .focused($focused)
                 .knField(focused: focused)
+                .onAppear { draft = Self.format(value, decimals: decimals) }
+                .onChange(of: draft) { _, typed in
+                    let cleaned = Self.clean(typed, decimals: decimals)
+                    if cleaned != typed { draft = cleaned; return }   // one more pass
+                    value = Self.parse(cleaned)
+                }
+                .onChange(of: focused) { _, isFocused in
+                    // Tidy "72." into "72" once the cursor has left, never while
+                    // it is still there.
+                    if !isFocused { draft = Self.format(value, decimals: decimals) }
+                }
+                .onChange(of: value) { _, incoming in
+                    if !focused { draft = Self.format(incoming, decimals: decimals) }
+                }
         }
+    }
+
+    /// Digits, plus one dot when decimals are allowed. Filtering as it is typed
+    /// means the box can never hold something `parse` would refuse.
+    static func clean(_ s: String, decimals: Int) -> String {
+        var out = ""
+        var seenDot = false
+        for ch in s {
+            if ch.isNumber { out.append(ch) }
+            else if ch == ".", decimals > 0, !seenDot { seenDot = true; out.append(ch) }
+        }
+        return out
     }
     /// Clamped for the same reason as `Fmt.trimKg`: `Int(_: Double)` traps
     /// outside Int64. This one runs on every keystroke in Height, Calorie
