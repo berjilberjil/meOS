@@ -31,6 +31,12 @@ struct NotesView: View {
     @State private var restored = false
     /// The editor's selection, and the way to format it.
     @StateObject private var commands = EditorCommands()
+    /// List or gallery. Apple Notes has both because they answer different
+    /// questions — a list is for finding a note you can name, a grid is for
+    /// finding one you can only picture. Per device, not synced: it is about
+    /// the screen you are looking at.
+    @AppStorage("myos.notes.layout") private var browseLayout = NotesLayout.grid.rawValue
+
     /// The note-list order, frozen while the editor is open.
     ///
     /// The list is sorted by `updatedAt`, and typing legitimately bumps it — so
@@ -76,6 +82,8 @@ struct NotesView: View {
 
     // MARK: - Browse listing (home)
 
+    private var layout: NotesLayout { NotesLayout(rawValue: browseLayout) ?? .grid }
+
     private var browseView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -87,11 +95,28 @@ struct NotesView: View {
                         Text(state.notes.isEmpty
                              ? "No notes yet. Capture your first idea."
                              : "No notes match “\(query)”.")
-                            .font(.footnote).foregroundStyle(Palette.faint)
+                            .font(.myBody).foregroundStyle(Palette.faint)
                     }
                 } else {
-                    ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, note in
-                        noteCard(note).knRise(min(idx, 8))
+                    // Both layouts are grouped by date. Pinned first, then
+                    // Today / Yesterday / Previous 7 Days — the same buckets the
+                    // two-pane column uses, so the two never disagree about
+                    // where a note lives.
+                    ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
+                        VStack(alignment: .leading, spacing: 10) {
+                            SectionLabel(text: section.title)
+                                .padding(.top, index == 0 ? 0 : 10)
+                            if layout == .grid {
+                                LazyVGrid(columns: tileColumns, alignment: .leading, spacing: 18) {
+                                    ForEach(section.notes) { noteTile($0) }
+                                }
+                            } else {
+                                VStack(spacing: 10) {
+                                    ForEach(section.notes) { noteCard($0) }
+                                }
+                            }
+                        }
+                        .knRise(min(index, 8))
                     }
                 }
             }
@@ -99,6 +124,68 @@ struct NotesView: View {
             .frame(maxWidth: 1120)
             .frame(maxWidth: .infinity)
         }
+    }
+
+    private var tileColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 190), spacing: 18)]
+    }
+
+    /// A note as Apple Notes draws it in gallery view: the page itself,
+    /// shrunk — because what you recognise a note by is its shape, not its
+    /// title. Title and date sit underneath where they do not eat the preview.
+    private func noteTile(_ note: Note) -> some View {
+        let hidden = note.locked && !unlocked.contains(note.id)
+        return Button { openFromBrowse(note) } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .fill(Palette.surfaceElevated)
+                    if hidden {
+                        VStack(spacing: 6) {
+                            Image(systemName: "lock.fill").font(.title3)
+                            Text("Locked").font(.myCaption)
+                        }
+                        .foregroundStyle(Palette.faint)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if note.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Empty note")
+                            .font(.myCaption).foregroundStyle(Palette.faint)
+                            .padding(12)
+                    } else {
+                        Text(note.body)
+                            .font(.system(size: 9))
+                            .foregroundStyle(Palette.muted)
+                            .lineSpacing(1.5)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .padding(12)
+                            .clipped()
+                    }
+                }
+                .frame(height: 168)
+                .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    .strokeBorder(note.id == selectedID ? Palette.accent : Palette.border,
+                                  lineWidth: note.id == selectedID ? 2 : 1))
+
+                HStack(spacing: 5) {
+                    if note.pinned {
+                        Image(systemName: "pin.fill").font(.myCaption).foregroundStyle(Palette.accent)
+                    }
+                    Text(note.title.isEmpty ? "Untitled" : note.title)
+                        .font(.myBody.weight(.semibold)).foregroundStyle(Palette.text)
+                        .lineLimit(1)
+                    if note.locked {
+                        Image(systemName: "lock.fill").font(.myCaption).foregroundStyle(Palette.faint)
+                    }
+                }
+                Text(Fmt.day(note.updatedAt))
+                    .font(.myCaption).foregroundStyle(Palette.faint)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .knHoverLift()
+        .contextMenu { noteMenu(note) }
     }
 
     private var browseHeader: some View {
@@ -111,6 +198,15 @@ struct NotesView: View {
                     .font(.footnote.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.faint)
             }
             Spacer()
+            Picker("", selection: $browseLayout) {
+                ForEach(NotesLayout.allCases) { option in
+                    Image(systemName: option.icon).tag(option.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 88)
+            .help("List or gallery")
             // A real, visible affordance. This used to be an invisible zero-sized
             // button that existed only to register ⌘N, which left the screen with
             // no way to create a note unless you already knew the shortcut or that
@@ -366,21 +462,27 @@ struct NotesView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
                 Spacer()
+                // One size and one weight for all four. They were `.footnote`
+                // glyphs of three different weights hanging in the corner, which
+                // is what made them read as debris rather than as a toolbar.
                 Button { state.togglePinNote(id) } label: {
                     Image(systemName: note.pinned ? "pin.fill" : "pin")
-                        .font(.footnote).foregroundStyle(note.pinned ? Palette.attention : Palette.muted)
+                        .font(.body).foregroundStyle(note.pinned ? Palette.accent : Palette.muted)
+                        .frame(width: 30, height: 26)
                 }
                 .buttonStyle(.borderless)
                 .help(note.pinned ? "Unpin" : "Pin to top")
 
                 Button { findToken += 1 } label: {
-                    Image(systemName: "magnifyingglass").font(.footnote)
+                    Image(systemName: "magnifyingglass").font(.body)
+                        .foregroundStyle(Palette.muted).frame(width: 30, height: 26)
                 }
                 .buttonStyle(.borderless)
                 .help("Find in Note")
 
                 ShareLink(item: shareText(note)) {
-                    Image(systemName: "square.and.arrow.up").font(.footnote)
+                    Image(systemName: "square.and.arrow.up").font(.body)
+                        .foregroundStyle(Palette.muted).frame(width: 30, height: 26)
                 }
                 .buttonStyle(.borderless)
                 .help("Share")
@@ -388,12 +490,13 @@ struct NotesView: View {
                 Menu {
                     noteMenu(note)
                 } label: {
-                    Image(systemName: "ellipsis").font(.footnote.weight(.bold))
+                    Image(systemName: "ellipsis").font(.body)
+                        .foregroundStyle(Palette.muted).frame(width: 30, height: 26)
                 }
                 .menuStyle(.button)
                 .buttonStyle(.borderless)
                 .menuIndicator(.hidden)
-                .frame(width: 30)
+                .fixedSize()
                 .help("More")
             }
             .padding(.horizontal, 18).padding(.top, 20).padding(.bottom, 6)
@@ -601,6 +704,13 @@ struct NotesView: View {
             inDetail = false
         }
     }
+}
+
+/// How the browse screen draws its notes.
+enum NotesLayout: String, CaseIterable, Identifiable, Hashable {
+    case grid, list
+    var id: String { rawValue }
+    var icon: String { self == .grid ? "square.grid.2x2" : "list.bullet" }
 }
 
 /// A titled run of notes in the list (Pinned, Today, Previous 7 Days, …).

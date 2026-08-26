@@ -163,7 +163,11 @@ final class AppState: ObservableObject {
         // the same key. See `ActivityDoc.merged(with:)`.
         activity  = activity.merged(with: s.activity ?? ActivityDoc())
         belongings = s.belongings ?? BelongingsState()
-        AppearanceStore.shared.apply(s.appearance ?? AppearanceSettings())
+        // Only when the payload actually carries one. Falling back to the
+        // default here would reset the theme on every launch of any device
+        // whose last push had not landed yet — the local cache is a better
+        // answer than a default in that window.
+        if let appearance = s.appearance { AppearanceStore.shared.apply(appearance) }
         if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
         restoreFoldIfBare()

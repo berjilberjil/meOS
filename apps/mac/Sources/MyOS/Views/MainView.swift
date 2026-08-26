@@ -6,7 +6,19 @@ struct MainView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var themeStore = ThemeStore.shared
     @ObservedObject private var signals = UISignals.shared
-    @State private var tab: NavTab = PrefsStore.shared.resolveOpeningTab()
+    @State private var tab: NavTab = MainView.openingTab()
+
+    /// Which tab a freshly-built `MainView` should show.
+    ///
+    /// On the first build of the process that is the launch-tab preference. On
+    /// any later one it is wherever you actually are — the view is rebuilt when
+    /// the appearance changes, and being thrown back to the launch tab because
+    /// you picked a colour would be absurd.
+    nonisolated(unsafe) private static var hasLaunched = false
+    private static func openingTab() -> NavTab {
+        defer { hasLaunched = true }
+        return hasLaunched ? PrefsStore.shared.lastTab : PrefsStore.shared.resolveOpeningTab()
+    }
     private static let kCollapsed = "myos.sidebar.collapsed"
     @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
 

@@ -2,11 +2,13 @@ import SwiftUI
 
 /// Calories + macros first — intake vs target.
 ///
-/// This is the one **filled** card in MyOS: a solid block of orange with black
-/// ink, by the owner's explicit decision. Today is otherwise black, white and
-/// green, and that is exactly what makes this card the thing your eye lands on
-/// when the page opens. Everything inside inherits its ink from `CardLook`, so
-/// nothing here names a colour for text.
+/// This is the one **filled** card in MyOS: a solid block of the app's own
+/// colour, whatever Berjil has set it to. It was orange for exactly one build
+/// and looked like a warning sitting in the middle of Today, which is the one
+/// thing orange is for. The card earns its weight from being the only filled
+/// one on the page, not from being a different hue to everything else.
+/// Everything inside inherits its ink from `CardLook`, so nothing here names a
+/// colour for text.
 ///
 /// The four macros are still told apart by their bars and labels rather than by
 /// four unrelated colours.
@@ -22,7 +24,7 @@ struct DayMacroHero: View {
         let goal = t?.goalCalories ?? Int(state.fitnessProfile.calorieTargetKcal ?? 0)
         let remain = goal > 0 ? max(0, goal - Int(eaten.calories.rounded())) : 0
         let frac = goal > 0 ? min(1, eaten.calories / Double(goal)) : 0
-        return Card(padding: 18, accent: .orange, look: .filled) {
+        return Card(padding: 18, accent: .nutrition, look: .filled) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("INTAKE")
                     .font(.caption.weight(.heavy)).tracking(0.8)
@@ -45,7 +47,7 @@ struct DayMacroHero: View {
                 // card showing through, the fill is the same ink as the type.
                 ProgressView(value: frac)
                     .progressViewStyle(.linear)
-                    .tint(Accent.orange.ink)
+                    .tint(Accent.nutrition.ink)
                 // Four macros, one visual system. They are told apart by their
                 // labels and their bars, not by four unrelated colours.
                 HStack(spacing: Space.sm) {
@@ -71,7 +73,7 @@ struct DayMacroHero: View {
                 Text("/ \(target)g").font(.caption2).opacity(0.65)
                 ProgressView(value: min(1, Double(have) / Double(target)))
                     .progressViewStyle(.linear)
-                    .tint(Accent.orange.ink)
+                    .tint(Accent.nutrition.ink)
             } else {
                 Text("\(have)g")
                     .font(.body.weight(.bold)).monospacedDigit()

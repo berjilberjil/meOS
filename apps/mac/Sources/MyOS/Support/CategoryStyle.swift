@@ -1,10 +1,15 @@
 import SwiftUI
 
 extension Color {
-    /// Parse an "RRGGBB" (or "#RRGGBB") string into a Color via the existing hex init.
+    /// Parse an "RRGGBB" (or "#RRGGBB") string into a Color.
+    ///
+    /// Everything that reaches this initialiser is a colour out of Berjil's own
+    /// data — event tags, belonging tints — so it goes through
+    /// `Palette.dataTint`, which is what makes the mono theme actually mono. The
+    /// stored hex is never touched; only what is drawn changes.
     init(hexString: String) {
         let s = hexString.hasPrefix("#") ? String(hexString.dropFirst()) : hexString
-        self.init(hex: UInt32(s, radix: 16) ?? 0x9A9A9A)
+        self = Palette.dataTint(UInt32(s, radix: 16) ?? 0x9A9A9A)
     }
 }
 

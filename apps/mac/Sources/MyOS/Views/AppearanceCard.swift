@@ -23,6 +23,15 @@ struct AppearanceCard: View {
                 set: { state.setTheme(AppTheme.by(id: $0)) })
     }
 
+    private var textSize: Binding<AppearanceSettings.TextSize> {
+        Binding(get: { appearance.settings.textSize },
+                set: { next in
+                    var s = appearance.settings
+                    s.textSize = next
+                    state.setAppearance(s)
+                })
+    }
+
     private var cardStyle: Binding<AppearanceSettings.CardStyle> {
         Binding(get: { appearance.settings.cardStyle },
                 set: { next in
@@ -83,6 +92,18 @@ struct AppearanceCard: View {
                     Spacer(minLength: 0)
                 }
                 Text("Your colour takes over everything the app calls green — actions, activity, food, fitness, the active tab. Warnings stay orange and information stays blue on purpose: a warning that matches the rest of the app is a warning you stop seeing.")
+                    .font(.myCaption).foregroundStyle(Palette.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: Gap.row) {
+                SectionTitle(text: "Size")
+                Picker("Size", selection: textSize) {
+                    ForEach(AppearanceSettings.TextSize.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text("Moves the text and the icons together. The Mac's default is a step larger than the phone's, because a 27-inch display is not held at arm's length.")
                     .font(.myCaption).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }

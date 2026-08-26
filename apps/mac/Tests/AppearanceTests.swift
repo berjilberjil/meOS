@@ -72,6 +72,66 @@ final class AppearanceTests: XCTestCase {
         XCTAssertEqual(s.presetID, "teal")
     }
 
+    // MARK: Data colours
+
+    /// Event tags and belonging tints are colours out of Berjil's own data, not
+    /// out of the palette. An Events tab full of green, blue, amber and purple
+    /// chips is not a monochrome app however black the canvas behind it is —
+    /// this is the mapping that fixes that, and it must not touch the stored
+    /// hex, only what gets drawn.
+    func testMonoMapsDataColoursToInk() {
+        Palette.apply(AppearanceSettings())
+        XCTAssertEqual(Palette.dataTint(0x58CC02), Color(hex: 0x58CC02),
+                       "outside mono a data colour is itself")
+
+        Palette.apply(AppearanceSettings().applying(.mono))
+        XCTAssertNotEqual(Palette.dataTint(0x58CC02), Color(hex: 0x58CC02))
+    }
+
+    /// A set of distinct hues has to stay a set of distinct greys, or every tag
+    /// in Events becomes the same chip.
+    func testMonoKeepsDistinctHuesDistinct() {
+        Palette.apply(AppearanceSettings().applying(.mono))
+        let tags: [UInt32] = [0x58CC02, 0x1CB0F6, 0xFF9600, 0xFFC800, 0xCE82FF]
+        let mapped = tags.map { Palette.dataTint($0) }
+        XCTAssertEqual(Set(mapped).count, tags.count,
+                       "two tags collapsed onto the same grey")
+    }
+
+    /// Even the darkest tag has to stay visible against the canvas.
+    func testMonoNeverMapsToInvisible() {
+        Palette.apply(AppearanceSettings().applying(.mono))
+        XCTAssertNotEqual(Palette.dataTint(0x000000), Color.clear)
+        XCTAssertNotEqual(Palette.dataTint(0x000000), Palette.dataTint(0xFFFFFF))
+    }
+
+    // MARK: Text size
+
+    /// The Mac's "default" is deliberately a step above the phone's — that is
+    /// the whole fix for "the macOS app feels tiny".
+    func testDefaultTextSizeIsLargerOnTheMac() {
+        let standard = AppearanceSettings.TextSize.standard.dynamicTypeSize
+        #if os(macOS)
+        XCTAssertEqual(standard, .xLarge)
+        #else
+        XCTAssertEqual(standard, .large)
+        #endif
+    }
+
+    func testTextSizeStepsAreMonotonic() {
+        let sizes = AppearanceSettings.TextSize.allCases.map(\.dynamicTypeSize)
+        for (smaller, bigger) in zip(sizes, sizes.dropFirst()) {
+            XCTAssertLessThan(smaller, bigger, "the size steps are out of order")
+        }
+    }
+
+    func testTextSizeSurvivesARoundTrip() throws {
+        var s = AppearanceSettings()
+        s.textSize = .huge
+        let back = try JSONDecoder().decode(AppearanceSettings.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(back.textSize, .huge)
+    }
+
     // MARK: Persistence
 
     /// A field added later must not stop an older synced payload decoding —

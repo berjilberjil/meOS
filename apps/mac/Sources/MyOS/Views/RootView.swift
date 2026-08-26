@@ -32,6 +32,16 @@ struct RootView: View {
                 }
             }
             .transition(.opacity)
+            // A palette swap has to reach every view, and SwiftUI has no way to
+            // know that a global changed underneath it: `Palette.green` is not
+            // an input to anything, so a view whose inputs did not change keeps
+            // the colour it last drew. Bumping `themeVersion` re-renders
+            // everything that observes `AppState`, which is most screens but not
+            // all of them — which is exactly why the theme used to be "mostly"
+            // applied until the app was relaunched. Re-keying the tree is the
+            // only thing that reaches the rest. It is a rare, deliberate action,
+            // so a rebuild is a fair price for it landing everywhere at once.
+            .id(appearance.revision)
 
             // One-time recovery code — shown above any phase, after setup or a
             // regeneration from Settings.
@@ -44,6 +54,10 @@ struct RootView: View {
         // change cross-fades instead of cutting.
         .animation(.easeInOut(duration: 0.28), value: state.phase)
         .preferredColorScheme(themeStore.theme.colorScheme)
+        // One lever for the whole app's scale: it moves the type and every SF
+        // Symbol sized by a text style together, which is why the Mac's icons
+        // grew with its text rather than being left behind at the old size.
+        .dynamicTypeSize(appearance.settings.textSize.dynamicTypeSize)
         .tint(Palette.accent)
         .animation(.knTheme, value: themeStore.theme.id)
         .task {

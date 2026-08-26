@@ -1,5 +1,8 @@
 import Foundation
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// Owns the sensors and feeds `AppState.activity`.
 ///
@@ -24,6 +27,15 @@ final class ActivityCoordinator: ObservableObject {
     private weak var state: AppState?
     private var pendingPush = false
     private var pushTimer: Timer?
+    private var lastPush = Date.distantPast
+
+    /// A finished session waits no longer than this before it is sent, even if
+    /// the flush timer is not due. The Mac is the device with the real sensor
+    /// and the phone is where the numbers get read, and "the Mac's usage never
+    /// shows up on my iPhone" is what a two-minute timer feels like from the
+    /// other device — especially on macOS, where switching to another app does
+    /// not put MyOS in the background and so never triggered a flush at all.
+    private static let eagerPushAfter: TimeInterval = 20
 
     #if os(macOS)
     private let monitor = MacActivityMonitor()
@@ -86,6 +98,17 @@ final class ActivityCoordinator: ObservableObject {
         registerDevice()
         drainInbox()
         if enabled { start() }
+        #if os(macOS)
+        // macOS never goes `.background` when you switch to another app, so the
+        // scene-phase flush the phone relies on simply does not fire here. These
+        // two do.
+        for name in [NSApplication.willResignActiveNotification,
+                     NSApplication.willTerminateNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.flush() }
+            }
+        }
+        #endif
     }
 
     func setEnabled(_ on: Bool) {
@@ -138,6 +161,7 @@ final class ActivityCoordinator: ObservableObject {
         ActivityEngine.compact(&doc, today: state.todayKey)
         state.activity = doc
         pendingPush = true
+        if Date().timeIntervalSince(lastPush) >= Self.eagerPushAfter { flush() }
     }
 
     /// Fold whatever the iPhone's Shortcuts automations queued into sessions.
@@ -188,6 +212,7 @@ final class ActivityCoordinator: ObservableObject {
     func flush() {
         guard pendingPush, let state, state.isHydrated else { return }
         pendingPush = false
+        lastPush = Date()
         state.push(StateKey.activity, state.activity)
     }
 

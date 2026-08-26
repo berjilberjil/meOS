@@ -34,6 +34,47 @@ struct AppearanceSettings: Codable, Hashable {
         }
     }
 
+    /// How big everything is.
+    ///
+    /// The Mac shipped a step too small — the app was built against iOS metrics
+    /// and macOS does not scale text the way iOS does, so a `.footnote` that
+    /// reads fine on a phone held at arm's length is genuinely hard to see on a
+    /// 27-inch display. This drives `dynamicTypeSize` on the whole tree, so it
+    /// moves the type AND every SF Symbol sized by a text style, together.
+    enum TextSize: String, Codable, CaseIterable, Identifiable, Hashable {
+        case compact, standard, large, huge
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .compact:  return "Compact"
+            case .standard: return "Default"
+            case .large:    return "Large"
+            case .huge:     return "Huge"
+            }
+        }
+
+        /// Per platform, because "default" means a different thing on each. The
+        /// Mac's default is one step above what it used to draw; the phone's is
+        /// exactly what it drew, because the phone was never the problem.
+        var dynamicTypeSize: DynamicTypeSize {
+            #if os(macOS)
+            switch self {
+            case .compact:  return .large
+            case .standard: return .xLarge
+            case .large:    return .xxLarge
+            case .huge:     return .xxxLarge
+            }
+            #else
+            switch self {
+            case .compact:  return .small
+            case .standard: return .large
+            case .large:    return .xLarge
+            case .huge:     return .xxLarge
+            }
+            #endif
+        }
+    }
+
     /// Which preset this came from, or `custom` when the colour was picked by
     /// hand. Stored so the picker can show what is selected rather than
     /// guessing from a hex match.
@@ -43,6 +84,7 @@ struct AppearanceSettings: Codable, Hashable {
     var primaryLight: UInt32 = 0x18A400
     var primaryDark: UInt32 = 0x39FF14
     var cardStyle: CardStyle = .flat
+    var textSize: TextSize = .standard
     /// Black, white, and nothing else — anywhere.
     var mono: Bool = false
 
@@ -55,10 +97,11 @@ struct AppearanceSettings: Codable, Hashable {
         primaryLight = try c.decodeIfPresent(UInt32.self, forKey: .primaryLight) ?? 0x18A400
         primaryDark  = try c.decodeIfPresent(UInt32.self, forKey: .primaryDark) ?? 0x39FF14
         cardStyle    = CardStyle(rawValue: (try? c.decode(String.self, forKey: .cardStyle)) ?? "") ?? .flat
+        textSize     = TextSize(rawValue: (try? c.decode(String.self, forKey: .textSize)) ?? "") ?? .standard
         mono         = try c.decodeIfPresent(Bool.self, forKey: .mono) ?? false
     }
 
-    enum CodingKeys: String, CodingKey { case presetID, primaryLight, primaryDark, cardStyle, mono }
+    enum CodingKeys: String, CodingKey { case presetID, primaryLight, primaryDark, cardStyle, textSize, mono }
 
     /// Apply a preset, keeping everything else.
     func applying(_ preset: ThemePreset) -> AppearanceSettings {

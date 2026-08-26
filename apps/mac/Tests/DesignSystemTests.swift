@@ -87,13 +87,13 @@ final class DesignSystemTests: XCTestCase {
     }
 
     /// Today is the screen Berjil actually looks at every day, and it is the one
-    /// that went orange. Exactly ONE section may claim orange — Intake, which is
-    /// a solid filled card by his explicit decision. If a second one ever does,
-    /// the first is no longer special and the screen is drifting back.
-    func testIntakeIsTheOnlyOrangeTodaySection() {
+    /// that went orange. Nothing on it may claim orange: orange means something
+    /// has gone wrong, and eating lunch has not gone wrong. Intake is loud
+    /// because it is the only *filled* card, not because it is a second colour.
+    func testNoTodaySectionIsOrange() {
         let orange = TodaySection.allCases.filter { $0.accent == .orange }
-        XCTAssertEqual(orange, [.intake],
-                       "Today is green, white and black apart from Intake — found \(orange.map(\.rawValue))")
+        XCTAssertTrue(orange.isEmpty,
+                      "Today is the app's colour, white and black — found \(orange.map(\.rawValue))")
     }
 
     /// Spacing and radius are scales, not free numbers.

@@ -118,6 +118,31 @@ enum Palette {
         }
     }
 
+    /// A colour that came from **data** rather than from the design system — an
+    /// event tag's hex, a belonging's tint, a mood stop.
+    ///
+    /// These are the colours the palette does not own: Berjil picked them, they
+    /// are stored in the synced blob, and rewriting them when he changes theme
+    /// would be destroying his data to satisfy a setting. So they are *mapped*
+    /// at draw time instead. Mono is the case that matters: an Events tab full
+    /// of green, blue, amber and purple chips is not a monochrome app, however
+    /// black the canvas behind it is.
+    ///
+    /// The mapping is by perceived luminance, so a set of distinct hues stays a
+    /// set of distinct greys — a light tag reads light and a dark one reads
+    /// dark, which is the most a single ink can preserve.
+    static func dataTint(_ hex: UInt32) -> Color {
+        guard appearance.mono else { return Color(hex: hex) }
+        let r = Double((hex >> 16) & 0xFF) / 255
+        let g = Double((hex >> 8) & 0xFF) / 255
+        let b = Double(hex & 0xFF) / 255
+        // Rec. 709 luma. Floored at 0.45 so the darkest tag is still legible
+        // against the canvas rather than vanishing into it.
+        let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        let strength = 0.45 + 0.55 * min(1, max(0, luma))
+        return .dynamic(lightColor: .black.opacity(strength), darkColor: .white.opacity(strength))
+    }
+
     private static func build(_ slot: AccentSlot) -> Color {
         .dynamic(lightColor: accentRaw(slot, dark: false), darkColor: accentRaw(slot, dark: true))
     }
