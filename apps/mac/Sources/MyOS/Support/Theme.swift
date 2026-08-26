@@ -412,6 +412,17 @@ extension View {
 // MARK: - Formatting
 
 enum Fmt {
+    /// Digits and one dot only, finite, and within a human range.
+    ///
+    /// Both weight fields used bare `Double(_:)`, which accepts "inf" — and an
+    /// infinite weight passes a `> 0` check, is committed, pushed and synced
+    /// before anything renders it.
+    static func parseWeightKg(_ s: String) -> Double? {
+        let t = s.trimmingCharacters(in: .whitespaces).filter { $0.isNumber || $0 == "." }
+        guard !t.isEmpty, let v = Double(t), v.isFinite, v > 0, v <= 1000 else { return nil }
+        return v
+    }
+
     /// Weight with at most one decimal (e.g. 72 or 72.5).
     ///
     /// Clamped because `Int(_: Double)` **traps** outside Int64 rather than

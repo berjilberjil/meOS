@@ -10,6 +10,11 @@ struct ScanView: View {
     @State private var savedID: String?
 
     var body: some View {
+        // `imageBusy`/`imageError` are shared with the food-label scanner, and
+        // only this view's own reset() clears them — so a failure the user
+        // walked away from came back as ScanView's, and running the food scanner
+        // made this tab claim to be reading a photo it never received.
+        // Cleared on the way in; see `.onAppear` below.
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 #if os(macOS)   // iOS: the navigation bar owns the title
@@ -34,6 +39,10 @@ struct ScanView: View {
 
             ScanHistoryList()
         }
+        // Arrive clean. Otherwise a failure from a scan the user abandoned — or
+        // one belonging to the food-label scanner, which shares these two
+        // properties — is rendered here as this tab's own.
+        .onAppear { if result == nil { state.imageError = nil } }
     }
 
     private var cameraHero: some View {

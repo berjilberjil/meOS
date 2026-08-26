@@ -240,7 +240,9 @@ struct ProfileView: View {
         let t = weightDraft.trimmingCharacters(in: .whitespaces)
         if t.isEmpty {
             if state.fitnessDay(state.todayKey).weightKg != nil { state.setTodayWeight(nil) }
-        } else if let w = Double(t), w > 0 {
+        } else if let w = Fmt.parseWeightKg(t) {
+            // Not bare `Double(_:)` — that accepts "inf", and an infinite weight
+            // is committed, pushed and synced before anything renders it.
             state.setTodayWeight(w)
         }
         weightDraft = todayWeightText

@@ -131,12 +131,21 @@ enum MacroRange: String, CaseIterable, Identifiable {
     }
 
     /// The change this range corresponds to on a metric card.
+    /// Only where the metric actually carries a change for this window.
+    ///
+    /// A metric holds 1D / 1W / 1M / YTD / 1Y and nothing else, so 3M, 5Y and
+    /// MAX had been borrowing the 30-day and 1-year numbers. The chart beside
+    /// them is clipped to the real window, so a stock down 8% across three
+    /// months but up 1% in the last one printed a green "+1.00%" against a
+    /// falling line. The card already renders no arrow and no figure when this
+    /// is nil, which is the honest answer.
     func delta(_ m: MacroMetric) -> MacroDelta? {
         switch self {
         case .d1: return m.change1D
         case .w1: return m.change7D
-        case .m1, .m3: return m.change30D
-        case .y1, .y5, .max: return m.change1Y
+        case .m1: return m.change30D
+        case .y1: return m.change1Y
+        case .m3, .y5, .max: return nil
         }
     }
 }

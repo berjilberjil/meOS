@@ -216,7 +216,7 @@ struct FitnessView: View {
     @State private var weightInput = ""
     @FocusState private var weightFocused: Bool
     private func saveWeight() {
-        guard let w = Double(weightInput.trimmingCharacters(in: .whitespaces)), w > 0 else { return }
+        guard let w = Fmt.parseWeightKg(weightInput) else { return }
         state.setTodayWeight(w); weightInput = ""; weightFocused = false
     }
     private func bumpWeight(_ d: Double) {

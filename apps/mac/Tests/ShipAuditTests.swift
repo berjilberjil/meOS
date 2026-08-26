@@ -727,4 +727,55 @@ final class ShipAuditTests: XCTestCase {
         XCTAssertEqual(log.state(.lunch), .logged)
         XCTAssertEqual(log.state(.dinner), .unconfirmed)
     }
+
+    // MARK: - The crash that would have shipped
+
+    // Nutrition.targets was the one member of the Int(Double) family still
+    // converting unbounded input. A twenty-digit height is committed, pushed and
+    // synced before anything renders it — and then Today and Fitness trap on
+    // every render, on both devices, permanently.
+    func testCalorieMathsSurvivesAbsurdBodyStats() {
+        let huge = Nutrition.targets(sex: .male, weightKg: 1e20, heightCm: 1e20, age: 30,
+                                     activity: .moderate, goal: .cut)
+        XCTAssertGreaterThan(huge.bmr, 0, "clamped, not crashed")
+        let infinite = Nutrition.targets(sex: .female, weightKg: .infinity, heightCm: .nan, age: 30,
+                                         activity: .sedentary, goal: .maintain)
+        XCTAssertGreaterThanOrEqual(infinite.goalCalories, 0)
+    }
+
+    func testCalorieMathsIsUnchangedForRealBodies() {
+        let t = Nutrition.targets(sex: .male, weightKg: 90, heightCm: 175, age: 28,
+                                  activity: .moderate, goal: .cut)
+        XCTAssertGreaterThan(t.bmr, 1500)
+        XCTAssertLessThan(t.bmr, 2500)
+    }
+
+    // "inf" is a legal Double literal, and both weight fields parsed with bare
+    // Double(_:) — so it passed their `> 0` check and was synced.
+    func testWeightParseRefusesNonsense() {
+        XCTAssertNil(Fmt.parseWeightKg("inf"))
+        XCTAssertNil(Fmt.parseWeightKg("0"))
+        XCTAssertNil(Fmt.parseWeightKg("99999"))
+        XCTAssertEqual(Fmt.parseWeightKg("72.5"), 72.5)
+    }
+
+    // A metric carries 1D/1W/1M/YTD/1Y and nothing else, so 3M, 5Y and MAX had
+    // been borrowing another window's number and printing it beside a chart
+    // clipped to the real one.
+    func testRangesWithNoRealChangeReportNone() throws {
+        // Decoded rather than constructed — every field on MacroMetric is a `let`.
+        let json = """
+        {"id":"nifty","name":"NIFTY","category":"markets","country":"IN","unit":"",
+         "kind":"index","frequency":"daily","source":"-","sourceUrl":"","priority":1,
+         "value":100,"asOf":"2026-08-26",
+         "change30D":{"abs":1.0,"pct":1.0},"change1Y":{"abs":-3.1,"pct":-3.1},
+         "history":[],"quality":"verified"}
+        """
+        let m = try XCTUnwrap(try? JSONDecoder().decode(MacroMetric.self, from: Data(json.utf8)))
+        XCTAssertNil(MacroRange.m3.delta(m), "3M has no honest number")
+        XCTAssertNil(MacroRange.y5.delta(m))
+        XCTAssertNil(MacroRange.max.delta(m))
+        XCTAssertNotNil(MacroRange.m1.delta(m))
+        XCTAssertNotNil(MacroRange.y1.delta(m))
+    }
 }

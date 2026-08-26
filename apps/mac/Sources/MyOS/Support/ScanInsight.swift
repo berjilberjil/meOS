@@ -90,10 +90,18 @@ struct ScanInsight: Equatable {
         if let s = v as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty { return s }
         return fallback
     }
+    /// Bounded at the parse boundary.
+    ///
+    /// These arrive from a model through a schema that only says `z.number()`,
+    /// and the record is written into `myos.scans` and synced before anything
+    /// formats it — so a single absurd row made `ScanRecord.badge` trap on
+    /// `Int(_:)` on every render of the scan history, on both devices, for good.
     private static func num(_ v: Any?) -> Double {
-        if let d = v as? Double { return d }
-        if let i = v as? Int { return Double(i) }
-        if let s = v as? String, let d = Double(s) { return d }
-        return 0
+        var out: Double?
+        if let d = v as? Double { out = d }
+        else if let i = v as? Int { out = Double(i) }
+        else if let s = v as? String, let d = Double(s) { out = d }
+        guard let value = out, value.isFinite else { return 0 }
+        return min(max(value, 0), 100_000)
     }
 }

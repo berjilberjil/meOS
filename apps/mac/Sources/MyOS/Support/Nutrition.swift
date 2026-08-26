@@ -49,7 +49,17 @@ enum Nutrition {
         let carbsRaw: Double = (goalCals - protein * 4 - fat * 9) / 4
         let carbs: Double = max(0, carbsRaw)
 
-        func r(_ x: Double) -> Int { Int(x.rounded()) }
+        // Clamped like `Fmt.trimKg` and `KLabeledNumberField.format` — this was
+        // the one place in that family still converting an unbounded Double.
+        // `Int(_:)` traps outside Int64, and the input is a height or weight the
+        // user typed: twenty digits gives a BMR of 6.25e20. Nothing crashes on
+        // the profile screen itself, so the value is committed, pushed and
+        // synced — and then Today and Fitness trap on every render, on both
+        // devices, for good.
+        func r(_ x: Double) -> Int {
+            guard x.isFinite else { return 0 }
+            return Int(min(max(x.rounded(), -1_000_000), 10_000_000))
+        }
         return CalorieTargets(
             bmr: r(bmrV), tdee: r(tdee),
             maintain: r(tdee), cut: r(cut), bulk: r(bulk),
