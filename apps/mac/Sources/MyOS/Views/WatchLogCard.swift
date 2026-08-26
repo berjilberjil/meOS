@@ -111,15 +111,14 @@ struct WatchLogCard: View {
                                        on: day ?? state.todayKey)
         urlInput = ""
         Task { @MainActor in
+            // Merge into the live row, never write back a snapshot taken before
+            // these awaits — the lookup takes seconds, and anything ticked or
+            // typed on the new card in that window was being reverted.
             let meta = await YouTube.fetchMeta(id: id)
-            var updated = saved
-            updated.title = meta.title
-            updated.channel = meta.channel
-            if !meta.thumbUrl.isEmpty { updated.thumbUrl = meta.thumbUrl }
-            state.updateWatchItem(updated)
+            state.enrichWatchItem(id: saved.id, title: meta.title, channel: meta.channel,
+                                  thumbUrl: meta.thumbUrl.isEmpty ? nil : meta.thumbUrl)
             if let cat = await state.categorizeVideo(title: meta.title, channel: meta.channel) {
-                updated.category = cat
-                state.updateWatchItem(updated)
+                state.enrichWatchItem(id: saved.id, category: cat)
             }
         }
     }

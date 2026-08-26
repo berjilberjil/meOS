@@ -2257,9 +2257,28 @@ final class AppState: ObservableObject {
         push(StateKey.watch, watch)
         return it
     }
+    /// Replace a watch item wholesale. Prefer `enrichWatchItem` from anything
+    /// that has been away at an `await`.
     func updateWatchItem(_ item: WatchItem) {
         guard let i = watch.firstIndex(where: { $0.id == item.id }) else { return }
         watch[i] = item
+        push(StateKey.watch, watch)
+    }
+
+    /// Fold fetched metadata into whatever the record says *now*.
+    ///
+    /// The YouTube title/channel/category lookup takes seconds, and it used to
+    /// write back a whole-record snapshot captured before those awaits — so
+    /// ticking "watched" or typing a takeaway on the new card in that window was
+    /// reverted the moment the fetch returned. Only the fetched fields are
+    /// touched here, and they are applied to the live row.
+    func enrichWatchItem(id: String, title: String? = nil, channel: String? = nil,
+                         thumbUrl: String? = nil, category: WatchCategory? = nil) {
+        guard let i = watch.firstIndex(where: { $0.id == id }) else { return }
+        if let title, !title.isEmpty { watch[i].title = title }
+        if let channel, !channel.isEmpty { watch[i].channel = channel }
+        if let thumbUrl, !thumbUrl.isEmpty { watch[i].thumbUrl = thumbUrl }
+        if let category { watch[i].category = category }
         push(StateKey.watch, watch)
     }
     func toggleWatched(_ id: String) {

@@ -461,9 +461,16 @@ private struct ScanFoodRow: View {
     private func macroField(_ label: String, _ kp: WritableKeyPath<Macros, Double>) -> some View {
         HStack(spacing: 4) {
             Text(label).font(.caption2).foregroundStyle(Palette.faint)
-            TextField("0", value: Binding(get: { draft.food.perServing[keyPath: kp] },
-                                          set: { draft.food.perServing[keyPath: kp] = $0 }),
-                      format: .number)
+            // A String binding parsed per keystroke, not `TextField(value:format:)`.
+            // The formatted variant only writes back on Return or on losing first
+            // responder, and the only way out of this sheet is SlideToConfirm — a
+            // drag gesture on a shape that never takes focus. So correcting a
+            // scanned "180" to "250" and sliding to log stored 180. FoodEditor in
+            // this same file already uses the per-keystroke form.
+            TextField("0", text: Binding(
+                get: { Fmt.trimKg(draft.food.perServing[keyPath: kp]) },
+                set: { draft.food.perServing[keyPath: kp] =
+                        KLabeledNumberField.parse(KLabeledNumberField.clean($0, decimals: 1)) ?? 0 }))
                 .textFieldStyle(.plain).monospacedDigit().font(.caption.weight(.semibold))
                 .foregroundStyle(Palette.text)
         }

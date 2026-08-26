@@ -152,6 +152,22 @@ struct ProgressPhotosCard: View {
         add(panel.urls)
     }
 
+    /// `loadFileRepresentation`'s temp file is deleted the moment the callback
+    /// returns, so copy it somewhere we own first.
+    private static func spill(_ provider: NSItemProvider, type: UTType) async -> URL? {
+        await withCheckedContinuation { cont in
+            provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in
+                guard let url else { cont.resume(returning: nil); return }
+                let ext = url.pathExtension.isEmpty
+                    ? (type.preferredFilenameExtension ?? "jpg") : url.pathExtension
+                let dest = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
+                try? FileManager.default.copyItem(at: url, to: dest)
+                cont.resume(returning: FileManager.default.fileExists(atPath: dest.path) ? dest : nil)
+            }
+        }
+    }
+
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         guard !providers.isEmpty else { return false }
         Task { @MainActor in
@@ -160,7 +176,16 @@ struct ProgressPhotosCard: View {
                 let url: URL? = await withCheckedContinuation { cont in
                     _ = p.loadObject(ofClass: URL.self) { u, _ in cont.resume(returning: u) }
                 }
-                if let url, url.isFileURL { urls.append(url) }
+                if let url, url.isFileURL { urls.append(url); continue }
+                // A drag carrying image *bytes* rather than a file URL — out of
+                // Preview, Safari or Photos — resolves no URL. The drop target
+                // advertises .image/.png/.jpeg/.heic and returned true, so it lit
+                // up "drop to add" and then silently discarded the photo with no
+                // error and no clue. EventEditor already spills bytes to a temp
+                // file for exactly this.
+                for type in [UTType.image, .png, .jpeg, .heic] where p.hasItemConformingToTypeIdentifier(type.identifier) {
+                    if let spilled = await Self.spill(p, type: type) { urls.append(spilled); break }
+                }
             }
             add(urls)
         }

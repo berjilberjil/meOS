@@ -564,6 +564,7 @@ private struct AchievementsEditor: View {
     @State private var year = ""
     @State private var title = ""
     @FocusState private var focused: Bool
+    @FocusState private var yearFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -604,6 +605,7 @@ private struct AchievementsEditor: View {
                     TextField("", text: $year, prompt: Text("Year").foregroundColor(Palette.faint))
                         .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                         .frame(width: 52)
+                        .focused($yearFocused)
                     Rectangle().fill(Palette.border).frame(width: 1, height: 16)
                     TextField("", text: $title,
                               prompt: Text("What did you achieve?").foregroundColor(Palette.faint))
@@ -617,10 +619,25 @@ private struct AchievementsEditor: View {
                     .opacity(title.isEmpty ? 0.35 : 1)
                     .disabled(title.isEmpty)
                 }
-                .knField(focused: focused)
-                .onChange(of: focused) { _, now in if !now { commit() } }
+                .knField(focused: focused || yearFocused)
+                // Commit only when the whole row has been left. `focused` tracks
+                // the title alone, so clicking into the Year box to finish the
+                // entry counted as leaving — the achievement was filed at once
+                // with a blank year, both boxes were cleared, and the year typed
+                // next was discarded against an empty title.
+                .onChange(of: focused) { _, _ in commitIfDone() }
+                .onChange(of: yearFocused) { _, _ in commitIfDone() }
                 .onDisappear { commit() }
             }
+        }
+    }
+
+    /// Commit once neither box holds the cursor. SwiftUI clears the old flag
+    /// before it sets the new one, so the check is deferred by a turn.
+    private func commitIfDone() {
+        Task { @MainActor in
+            guard !focused, !yearFocused else { return }
+            commit()
         }
     }
 

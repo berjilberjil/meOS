@@ -378,18 +378,17 @@ struct ProductivityView: View {
         let saved = state.addWatchItem(WatchItem(url: raw, videoId: id, thumbUrl: YouTube.thumbURL(id)))
         urlInput = ""
         urlFocused = true
-        // Fill title/channel/thumbnail from oEmbed, then persist the enriched item.
+        // Fill title/channel/thumbnail from oEmbed, then the category.
         Task { @MainActor in
+            // Merged into the live row, never a snapshot from before these
+            // awaits — the lookup takes seconds, and ticking "watched" or typing
+            // a takeaway on the new card in that window was being reverted.
             let meta = await YouTube.fetchMeta(id: id)
-            var updated = saved
-            updated.title = meta.title
-            updated.channel = meta.channel
-            if !meta.thumbUrl.isEmpty { updated.thumbUrl = meta.thumbUrl }
-            state.updateWatchItem(updated)
+            state.enrichWatchItem(id: saved.id, title: meta.title, channel: meta.channel,
+                                  thumbUrl: meta.thumbUrl.isEmpty ? nil : meta.thumbUrl)
             // AI picks the category automatically (free model) — best-effort.
             if let cat = await state.categorizeVideo(title: meta.title, channel: meta.channel) {
-                updated.category = cat
-                state.updateWatchItem(updated)
+                state.enrichWatchItem(id: saved.id, category: cat)
             }
         }
     }
