@@ -574,6 +574,7 @@ final class AppState: ObservableObject {
             return
         }
         lastLocalWrite[key] = Date()
+        quickenSync()          // you just did something; the echo matters now
         pushGen[key, default: 0] += 1
         let gen = pushGen[key] ?? 1
         pushTasks[key]?.cancel()
@@ -691,7 +692,11 @@ final class AppState: ObservableObject {
             }
             let payload = try api.decodePayload(fromRaw: raw)
             // Only once every offered key actually landed. See `applyRemote`.
-            if applyRemote(payload) { api.commitStateETag() }
+            let landed = applyRemote(payload)
+            if landed { api.commitStateETag() }
+            // Something really came down — stay fast while the other device is
+            // active, and try again promptly for anything held back.
+            quickenSync()
             lastHydrateError = nil
         } catch let e as APIError where e.status == 401 || e.status == 403 {
             // The session is over. `bootstrap` gives a launch-time 401 exactly
@@ -805,6 +810,27 @@ final class AppState: ObservableObject {
     static let activePollInterval: UInt64 = 1_500_000_000    // 1.5s, in front of you
     static let idlePollInterval: UInt64 = 15_000_000_000     // 15s, everything else
 
+    /// The ceiling the foreground poll drifts up to while nothing is happening.
+    ///
+    /// A flat 1.5s regardless of what you are doing is what put this on course to
+    /// exhaust the free tier: ~20k requests a day per user across two devices,
+    /// against 100k a day shared by everyone. But slowing it outright would make
+    /// the two devices feel disconnected exactly when you are using them.
+    ///
+    /// So the fast beat is kept for the moment it is worth paying for — right
+    /// after something changed, here or on the other device — and the interval
+    /// doubles toward this ceiling through a quiet stretch. Any local write, any
+    /// remote change, or coming back to the app resets it. Sitting on a screen
+    /// doing nothing costs about a fifth of what it used to; picking the phone up
+    /// mid-edit is exactly as quick as before.
+    static let backoffPollCeiling: UInt64 = 12_000_000_000    // 12s
+
+    /// Current foreground interval, between `activePollInterval` and the ceiling.
+    private var pollInterval: UInt64 = AppState.activePollInterval
+
+    /// Something happened — poll fast again.
+    func quickenSync() { pollInterval = Self.activePollInterval }
+
     /// Media keeps its own slower beat. A progress-photo sync lists an R2
     /// bucket and a media migration uploads — both far heavier than a
     /// conditional GET, and neither is something you are watching for.
@@ -882,14 +908,23 @@ final class AppState: ObservableObject {
         liveSyncTask = Task { [weak self] in
             while !Task.isCancelled {
                 let foreground = self?.isForeground ?? false
-                try? await Task.sleep(nanoseconds: foreground ? Self.activePollInterval
-                                                              : Self.idlePollInterval)
+                let wait = foreground ? (self?.pollInterval ?? Self.activePollInterval)
+                                      : Self.idlePollInterval
+                try? await Task.sleep(nanoseconds: wait)
                 guard !Task.isCancelled else { return }
                 await self?.pullRemote()
                 await self?.syncMediaIfDue()
+                await self?.easeOffPolling()
             }
         }
         startFoldWatch()
+    }
+
+    /// Drift the foreground interval up through a quiet stretch. `quickenSync`
+    /// pulls it straight back down the moment anything actually happens.
+    private func easeOffPolling() {
+        guard isForeground else { return }
+        pollInterval = min(pollInterval * 2, Self.backoffPollCeiling)
     }
 
     /// The heavy half of a tick, rate-limited to its own interval so the fast
@@ -917,6 +952,7 @@ final class AppState: ObservableObject {
     /// Coming back to the app: pull now rather than waiting out a tick, and let
     /// media catch up in the same breath.
     func syncNow() async {
+        quickenSync()          // back in the app — be responsive again
         await pullRemote()
         await syncMediaIfDue(force: true)
     }

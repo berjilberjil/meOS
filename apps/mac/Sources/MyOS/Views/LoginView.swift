@@ -118,7 +118,8 @@ struct LoginView: View {
     private func submit() async {
         let u = username.trimmingCharacters(in: .whitespaces).lowercased()
         guard u.count >= 3 else { state.authError = "Username must be at least 3 characters."; return }
-        guard password.count >= 4 else { state.authError = "Password must be at least 4 characters."; return }
+        // Matches the server, and the vault passphrase minimum two screens later.
+        guard password.count >= 8 else { state.authError = "Password must be at least 8 characters."; return }
         if isRegister { await state.register(username: u, password: password) }
         else { await state.login(username: u, password: password) }
     }
