@@ -3,6 +3,23 @@ import type { RequestHandler } from './$types';
 import { sql, nowISO } from '$lib/server/db';
 
 /**
+ * Move this user's state version on. The GET reads it instead of scanning
+ * `app_state` — see the note in ../+server.ts.
+ */
+async function bumpStateVersion(userId: number): Promise<void> {
+  const now = nowISO();
+  await sql`
+    create table if not exists state_version (
+      user_id integer primary key,
+      version integer not null default 0,
+      at      text not null
+    )`;
+  await sql`
+    insert into state_version (user_id, version, at) values (${userId}, 1, ${now})
+    on conflict (user_id) do update set version = state_version.version + 1, at = ${now}`;
+}
+
+/**
  * The keys a client is allowed to write, mirroring `StateKey` in the app plus
  * the vault's own metadata row.
  *
@@ -39,6 +56,7 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
     insert into app_state (user_id, key, value, updated_at)
     values (${locals.user.id}, ${params.key}, ${sql.json(value)}, ${nowISO()})
     on conflict (user_id, key) do update set value = excluded.value, updated_at = ${nowISO()}`;
+  await bumpStateVersion(locals.user.id);
   return json({ ok: true });
 };
 
@@ -48,5 +66,6 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
   // Deliberately NOT allowlisted: removed modules (myos.finance, myos.portfolio,
   // myos.networth) are purged by key, and those names are no longer in KEYS.
   await sql`delete from app_state where user_id = ${locals.user.id} and key = ${params.key}`;
+  await bumpStateVersion(locals.user.id);
   return json({ ok: true });
 };

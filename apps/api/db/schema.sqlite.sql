@@ -78,3 +78,13 @@ create table if not exists login_attempts (
   at    text not null           -- ISO-8601 UTC
 );
 create index if not exists login_attempts_scope_idx on login_attempts(scope, at);
+
+-- One indexed row per user, bumped by every state write. The GET reads this
+-- instead of `max(updated_at), count(*)` over app_state, which has no covering
+-- index — at a 1.5s poll that scan was ~1.5M rows read per day per foregrounded
+-- device, against a free tier of 5M/day shared by every user.
+create table if not exists state_version (
+  user_id integer primary key references users(id) on delete cascade,
+  version integer not null default 0,
+  at      text not null
+);

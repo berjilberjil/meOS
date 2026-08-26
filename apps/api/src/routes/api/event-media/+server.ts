@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { eventMediaKey, signObjects, uploadObject } from '$lib/server/storage';
+import { eventMediaKey, mediaRoomFor, signObjects, uploadObject } from '$lib/server/storage';
 
 const ID_RE = /^[A-Za-z0-9._-]{1,200}$/;
 
@@ -40,6 +40,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const bytes = Buffer.from(b64, 'base64');
   // Video is capped on-device; this is a backstop, not the real limit.
   if (bytes.length === 0 || bytes.length > 60_000_000) throw error(400, 'Bad media size');
+  // The per-object cap alone is not a limit: 168 of them is R2's whole free
+  // tier, which is account-wide, so one user could stop sync for everyone.
+  if (!(await mediaRoomFor(`event-media/${locals.user.id}/`, bytes.length))) {
+    throw error(413, 'Your media storage is full. Delete some memories to make room.');
+  }
 
   await uploadObject(eventMediaKey(locals.user.id, id), bytes, 'application/octet-stream');
   return json({ ok: true, id });

@@ -694,4 +694,37 @@ final class ShipAuditTests: XCTestCase {
         XCTAssertTrue(next.plainText.contains("hello there"))
         XCTAssertEqual(next.blocks.filter { $0.isAttachment }.count, 1)
     }
+
+    // MARK: - A logged meal stays logged
+
+    // "Logged" was inferred from the meal having items, so removing the last one
+    // made it unconfirmed again — and the tile went back to advertising the
+    // plan, as if the meal were still ahead of you.
+    func testEmptyingALoggedMealKeepsItLogged() {
+        var log = MealLog()
+        log.tick(.lunch, planned: [PlanItem(foodId: "chapati", quantity: 2)])
+        XCTAssertEqual(log.state(.lunch), .logged)
+        log.setItems(.lunch, [])
+        XCTAssertEqual(log.state(.lunch), .logged, "you logged it; it was just empty")
+    }
+
+    func testSkippingAMealUnconfirmsIt() {
+        var log = MealLog()
+        log.tick(.lunch, planned: [PlanItem(foodId: "chapati", quantity: 1)])
+        log.skip(.lunch)
+        XCTAssertEqual(log.state(.lunch), .skipped)
+    }
+
+    func testAnUntouchedMealIsStillUnconfirmed() {
+        XCTAssertEqual(MealLog().state(.dinner), .unconfirmed)
+    }
+
+    // A day written by an older build has no `confirmed` list; it must still read
+    // correctly rather than turning every logged meal back into a plan.
+    func testAnOlderDayDecodesAsLogged() throws {
+        let json = #"{"meals":{"lunch":[{"id":"a","foodId":"chapati","quantity":2}]},"skipped":[]}"#
+        let log = try JSONDecoder().decode(MealLog.self, from: Data(json.utf8))
+        XCTAssertEqual(log.state(.lunch), .logged)
+        XCTAssertEqual(log.state(.dinner), .unconfirmed)
+    }
 }

@@ -222,10 +222,46 @@ struct BlockEditor: NSViewRepresentable {
             }
         }
 
-        /// Programmatic storage mutations aren't in the text view's undo
-        /// records — clear them so undo can't replay against shifted ranges.
-        private func resetUndo() {
-            textView?.undoManager?.removeAllActions()
+        /// Make a structural edit undoable, instead of destroying the history.
+        ///
+        /// This used to be `removeAllActions()`. The reasoning went as far as it
+        /// went — a programmatic `setAttributedString` leaves the text view's own
+        /// typing records pointing at ranges that no longer exist — but the cure
+        /// meant no structural edit was ever undoable AND every one of them wiped
+        /// the typing history before it. Delete an image and ⌘Z could not bring
+        /// it back; press Return and ⌘Z could no longer reach the sentence typed
+        /// before it.
+        ///
+        /// A full-document snapshot fixes both. Each action restores the entire
+        /// storage, so after an undo the content is exactly what the older typing
+        /// records were made against and the stack stays coherent. Registering
+        /// the inverse from inside the undo gives redo.
+        private func registerUndo(restoring doc: BlockDoc, caret: Int) {
+            guard let um = textView?.undoManager else { return }
+            um.registerUndo(withTarget: self) { target in
+                target.restoreForUndo(doc, caret: caret)
+            }
+        }
+
+        private func restoreForUndo(_ doc: BlockDoc, caret: Int) {
+            guard let tv = textView, let storage = tv.textStorage else { return }
+            let inverse = currentDoc()
+            let inverseCaret = tv.selectedRange().location
+            isProgrammatic = true
+            storage.setAttributedString(BlockBridge.attributedString(from: doc))
+            tv.setSelectedRange(NSRange(location: min(caret, storage.length), length: 0))
+            isProgrammatic = false
+            rememberTrailing(doc)
+            registerUndo(restoring: inverse, caret: inverseCaret)
+            syncTypingAttributes(tv)
+            tv.needsDisplay = true
+            save()
+        }
+
+        /// The document as it stands, for the undo stack.
+        private func snapshotForUndo() -> (doc: BlockDoc, caret: Int)? {
+            guard let tv = textView else { return nil }
+            return (currentDoc(), tv.selectedRange().location)
         }
 
         // MARK: Typing attributes (carry block style forward as the caret moves)
@@ -290,6 +326,7 @@ struct BlockEditor: NSViewRepresentable {
         /// Re-render `doc` and place the caret at (blockIndex, within).
         func render(_ doc: BlockDoc, caretBlock: Int, caretWithin: Int) {
             guard let tv = textView, let storage = tv.textStorage else { return }
+            let before = snapshotForUndo()
             isProgrammatic = true
             let attr = BlockBridge.attributedString(from: doc)
             storage.setAttributedString(attr)
@@ -297,7 +334,7 @@ struct BlockEditor: NSViewRepresentable {
             tv.setSelectedRange(NSRange(location: min(caret, storage.length), length: 0))
             isProgrammatic = false
             rememberTrailing(doc)
-            resetUndo()
+            if let before { registerUndo(restoring: before.doc, caret: before.caret) }
             syncTypingAttributes(tv)
             tv.needsDisplay = true
             save()
@@ -412,12 +449,13 @@ struct BlockEditor: NSViewRepresentable {
             doc.blocks[i].checked = !(doc.blocks[i].checked ?? false)
             let caret = textView?.selectedRange() ?? NSRange(location: 0, length: 0)
             guard let tv = textView, let storage = tv.textStorage else { return }
+            let before = snapshotForUndo()
             isProgrammatic = true
             storage.setAttributedString(BlockBridge.attributedString(from: doc))
             tv.setSelectedRange(NSRange(location: min(caret.location, storage.length), length: 0))
             isProgrammatic = false
             rememberTrailing(doc)
-            resetUndo()
+            if let before { registerUndo(restoring: before.doc, caret: before.caret) }
             tv.needsDisplay = true
             save()
         }
@@ -488,13 +526,14 @@ struct BlockEditor: NSViewRepresentable {
             if let t = meta.thumbBase64 { doc.blocks[i].linkThumb = t }
             if let d = meta.domain { doc.blocks[i].linkDomain = d }
             guard let tv = textView, let storage = tv.textStorage else { return }
+            let before = snapshotForUndo()
             let caret = tv.selectedRange()
             isProgrammatic = true
             storage.setAttributedString(BlockBridge.attributedString(from: doc))
             tv.setSelectedRange(NSRange(location: min(caret.location, storage.length), length: 0))
             isProgrammatic = false
             rememberTrailing(doc)
-            resetUndo()
+            if let before { registerUndo(restoring: before.doc, caret: before.caret) }
             tv.needsDisplay = true
             save()
         }
@@ -595,7 +634,9 @@ struct BlockEditor: NSViewRepresentable {
                 let newCaret = markedRange.location + markedRange.length
                 tv.setSelectedRange(NSRange(location: newCaret, length: 0))
                 isProgrammatic = false
-                resetUndo()
+                // Nothing to invalidate: this edits the existing storage in
+                // place rather than replacing it, so the text view's own records
+                // stay valid and ⌘Z already walks back through them.
                 // reset typing so text after the marked run is unmarked
                 syncTypingAttributes(tv)
                 clearMarkForTyping(p.mark, tv)

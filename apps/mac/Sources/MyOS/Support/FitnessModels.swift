@@ -135,12 +135,24 @@ struct PlanItem: Codable, Identifiable, Hashable {
 struct MealLog: Codable, Hashable {
     var meals: [String: [PlanItem]] = [:]
     var skipped: [String] = []                       // meal raws skipped this date
+    /// Meals the user has confirmed, whatever ended up in them.
+    ///
+    /// "Logged" used to be inferred from `meals` being non-empty, so removing the
+    /// last item from a meal you had already logged made it unconfirmed again —
+    /// and the tile went back to advertising the plan, as if you were about to
+    /// eat it. Recording the confirmation separately keeps an emptied meal
+    /// logged-and-empty, which is what actually happened.
+    var confirmed: [String] = []
     init() {}
-    enum CodingKeys: String, CodingKey { case meals, skipped }
+    enum CodingKeys: String, CodingKey { case meals, skipped, confirmed }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         meals   = try c.decodeIfPresent([String: [PlanItem]].self, forKey: .meals) ?? [:]
         skipped = try c.decodeIfPresent([String].self, forKey: .skipped) ?? []
+        // Anything logged before this field existed is inferred the old way, so
+        // a day recorded by an older build still reads correctly.
+        confirmed = try c.decodeIfPresent([String].self, forKey: .confirmed)
+            ?? meals.filter { !$0.value.isEmpty }.map(\.key)
     }
     func items(_ meal: MealKey) -> [PlanItem] { meals[meal.rawValue] ?? [] }
 }
@@ -152,7 +164,7 @@ extension MealLog {
 
     /// Logged (has items) wins over skipped wins over unconfirmed.
     func state(_ meal: MealKey) -> MealState {
-        if !items(meal).isEmpty { return .logged }
+        if !items(meal).isEmpty || confirmed.contains(meal.rawValue) { return .logged }
         if skipped.contains(meal.rawValue) { return .skipped }
         return .unconfirmed
     }
@@ -162,10 +174,12 @@ extension MealLog {
         guard !planned.isEmpty else { return }
         meals[meal.rawValue] = planned.map { PlanItem(foodId: $0.foodId, quantity: $0.quantity) }
         skipped.removeAll { $0 == meal.rawValue }
+        if !confirmed.contains(meal.rawValue) { confirmed.append(meal.rawValue) }
     }
     /// Skip the meal: clear any logged items (so the state is unambiguous) and mark it.
     mutating func skip(_ meal: MealKey) {
         meals[meal.rawValue] = []
+        confirmed.removeAll { $0 == meal.rawValue }
         if !skipped.contains(meal.rawValue) { skipped.append(meal.rawValue) }
     }
     mutating func unskip(_ meal: MealKey) { skipped.removeAll { $0 == meal.rawValue } }
@@ -173,6 +187,7 @@ extension MealLog {
     mutating func setItems(_ meal: MealKey, _ items: [PlanItem]) {
         meals[meal.rawValue] = items
         skipped.removeAll { $0 == meal.rawValue }
+        if !confirmed.contains(meal.rawValue) { confirmed.append(meal.rawValue) }
     }
 }
 

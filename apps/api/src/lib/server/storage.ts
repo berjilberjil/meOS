@@ -17,7 +17,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 /// Minimal structural view of the R2 binding we use.
 export interface R2Bucket {
   list(options?: { prefix?: string; cursor?: string }): Promise<{
-    objects: { key: string; uploaded?: Date }[];
+    objects: { key: string; uploaded?: Date; size?: number }[];
     truncated: boolean;
     cursor?: string;
   }>;
@@ -68,6 +68,30 @@ function client(): S3Client {
     credentials: { accessKeyId, secretAccessKey }
   });
   return cachedClient;
+}
+
+/**
+ * How much media one account may hold. R2's free tier is 10 GB and it is
+ * account-wide, so without a per-user ceiling ~168 max-size uploads — one
+ * afternoon — puts the whole deployment into billing.
+ */
+export const USER_MEDIA_BYTES = 1_500_000_000;
+
+/** Bytes currently stored under a prefix. */
+export async function bytesUnder(prefix: string): Promise<number> {
+  let total = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await media().list({ prefix, cursor });
+    for (const o of page.objects) total += o.size ?? 0;
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return total;
+}
+
+/** Whether `incoming` more bytes still fit under this user's ceiling. */
+export async function mediaRoomFor(prefix: string, incoming: number): Promise<boolean> {
+  return (await bytesUnder(prefix)) + incoming <= USER_MEDIA_BYTES;
 }
 
 export async function uploadObject(key: string, bytes: Uint8Array, contentType: string): Promise<void> {

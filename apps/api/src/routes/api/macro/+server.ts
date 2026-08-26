@@ -87,11 +87,31 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   // Only today's snapshot is kept — a reconstructed past day is cheap to redo
   // and would otherwise pin one afternoon's view of history forever.
   if (isToday) {
+    // Stored WITHOUT each metric's history. Every metric carries up to 400
+    // points, so the full payload is ~200 KB per user per day — and
+    // `priorSnapshots` reads up to 400 of those rows and JSON-parses them all
+    // inside a 128 MB isolate, purely to pull out a handful of estimated values.
+    // It slowed from the first week and would eventually stop completing.
+    const slim = { ...payload, metrics: payload.metrics.map((m) => ({ ...m, history: [] })) };
     await sql`insert or replace into macro_day (user_id, date, payload, created_at)
-              values (${locals.user.id}, ${date}, ${JSON.stringify(payload)}, ${nowISO()})`;
+              values (${locals.user.id}, ${date}, ${JSON.stringify(slim)}, ${nowISO()})`;
+    // And keep only what priorSnapshots actually looks at.
+    await sql`delete from macro_day
+              where user_id = ${locals.user.id}
+                and date < ${trimBefore(date, MACRO_HISTORY_DAYS)}`;
   }
   return json(payload);
 };
+
+/** How far back `priorSnapshots` reads. Rows older than this are dropped. */
+const MACRO_HISTORY_DAYS = 400;
+
+/** `yyyy-MM-dd`, `days` before `date`. */
+function trimBefore(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
 
 function blank(spec: (typeof AI_METRICS)[number], note: string): Metric {
   return {

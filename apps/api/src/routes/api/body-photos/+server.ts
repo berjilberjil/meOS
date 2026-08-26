@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { listObjects, signObjects, uploadObject } from '$lib/server/storage';
+import { listObjects, mediaRoomFor, signObjects, uploadObject } from '$lib/server/storage';
 
 const ID_RE = /^[A-Za-z0-9._-]{1,200}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
@@ -45,6 +45,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   const bytes = Buffer.from(b64, 'base64');
   if (bytes.length === 0 || bytes.length > 15_000_000) throw error(400, 'Bad image size');
+  // R2's free tier is account-wide, so one user filling it stops everyone.
+  if (!(await mediaRoomFor(prefix(locals.user.id), bytes.length))) {
+    throw error(413, 'Your photo storage is full. Delete some to make room.');
+  }
 
   const path = `${prefix(locals.user.id)}${id}.jpg`;
   await uploadObject(path, bytes, 'image/jpeg');
