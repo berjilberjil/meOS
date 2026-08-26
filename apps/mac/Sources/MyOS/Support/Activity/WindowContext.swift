@@ -159,9 +159,14 @@ enum WindowProbe {
 
     /// How deep the hunt for an address bar goes, and how many nodes it may
     /// touch. A browser's accessibility tree contains the whole page; this
-    /// deliberately never reaches it.
-    private static let maxDepth = 6
-    private static let maxNodes = 220
+    /// deliberately never reaches it — `AXWebArea` is a hard stop.
+    ///
+    /// Nine, because Chrome's omnibox is measured at depth **seven**
+    /// (`window/0/1/0/0/0/3/1`, reached after ~20 nodes) and a browser that
+    /// buries it one group deeper should not silently fall back to a row called
+    /// "Google Chrome". Six looked generous and found nothing at all.
+    private static let maxDepth = 9
+    private static let maxNodes = 400
     private static let messagingTimeout: Float = 0.2
 
     private static var addressBars: [pid_t: AXUIElement] = [:]
