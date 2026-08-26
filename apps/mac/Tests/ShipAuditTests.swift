@@ -600,4 +600,39 @@ final class ShipAuditTests: XCTestCase {
         XCTAssertEqual(KLabeledNumberField.parse(KLabeledNumberField.clean("72.5", decimals: 1)), 72.5)
         XCTAssertEqual(KLabeledNumberField.parse(KLabeledNumberField.clean("12.5", decimals: 2)), 12.5)
     }
+
+    // MARK: - One account, one row
+
+    // The two bank producers derive `last4` differently — the identified path
+    // from the masked account number, the transaction walk from the account
+    // uuid's last four characters — so the `name + last4` dedupe never matched
+    // across them and the same account appeared twice. `liquid` is the sum of
+    // the rows when no total is supplied, so it was counted twice, and net worth
+    // followed.
+    func testAnAccountIsNotListedTwiceFromTwoSources() {
+        let identities: [String: Any] = ["data": ["added": [
+            ["uuid": "u1", "masked_account_number": "XXXXXX8362",
+             "fi_type": "DEPOSIT", "fip": ["name": "HDFC Bank"]]
+        ], "subscribed": []]]
+        let balances: [String: Any] = ["data": [["account_id": "u1", "current_balance": 19_539.13]]]
+        let txns: [[String: Any]] = [[
+            "account_id": "u1-a1f3", "current_balance": 19_539.13,
+            "txn_timestamp": "2026-08-25T10:00:00Z",
+            "financial_information_provider": ["name": "HDFC Bank"]
+        ]]
+        let out = FoldSnapshotBuilder.outcome(blobs: [identities, balances],
+                                              transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.banks.count, 1, "one account, one row")
+        XCTAssertEqual(out.data.liquid, 19_539.13, accuracy: 0.001, "not doubled")
+    }
+
+    func testTransactionsStillSupplyBanksWhenNothingElseDoes() {
+        let txns: [[String: Any]] = [[
+            "account_id": "u1-a1f3", "current_balance": 500.0,
+            "txn_timestamp": "2026-08-25T10:00:00Z",
+            "financial_information_provider": ["name": "HDFC Bank"]
+        ]]
+        let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
+        XCTAssertEqual(out.data.banks.first?.balance, 500)
+    }
 }

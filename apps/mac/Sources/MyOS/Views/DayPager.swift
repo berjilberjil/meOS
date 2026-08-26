@@ -69,9 +69,13 @@ private struct HorizontalScrollCatcher: NSViewRepresentable {
 
         override func scrollWheel(with event: NSEvent) {
             let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
-            // Anything more vertical than horizontal belongs to the scroll view.
-            guard abs(dx) > abs(dy) else { super.scrollWheel(with: event); return }
 
+            // Phase first, THEN the dominance test. A phase marker carries zero
+            // deltas, so `abs(0) > abs(0)` is false and .ended/.cancelled were
+            // handed to the scroll view before they could ever clear the latch.
+            // On a machine where .began also arrives with no deltas, the first
+            // swipe set `firedThisGesture` and nothing ever unset it — day
+            // paging died for the rest of the process.
             switch event.phase {
             case .began:
                 accumulated = 0
@@ -83,6 +87,9 @@ private struct HorizontalScrollCatcher: NSViewRepresentable {
             default:
                 break
             }
+
+            // Anything more vertical than horizontal belongs to the scroll view.
+            guard abs(dx) > abs(dy) else { super.scrollWheel(with: event); return }
 
             guard !firedThisGesture else { return }
             accumulated += dx

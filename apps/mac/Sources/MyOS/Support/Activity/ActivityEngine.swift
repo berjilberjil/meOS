@@ -341,6 +341,18 @@ enum ActivityEngine {
                                             productivity: c.productivity, seconds: v, site: site)
                     }
                 }
+                // A compacted day's longest block still counts. `rollup()` has
+                // always written this and nothing ever read it, so on any window
+                // reaching past the 14-day retention — Month, in particular —
+                // "longest focus" was the best of the last fortnight only, and a
+                // two-hour block on day 22 was invisible. It also feeds
+                // `verdict()`, so a month that earned .excellent could be denied
+                // it on a number that was simply missing.
+                if rollup.longestFocusSeconds > (out.longestFocus?.seconds ?? 0) {
+                    out.longestFocus = FocusBlock(startedAt: day, endedAt: day,
+                                                  seconds: rollup.longestFocusSeconds,
+                                                  appName: "")
+                }
             }
         }
 

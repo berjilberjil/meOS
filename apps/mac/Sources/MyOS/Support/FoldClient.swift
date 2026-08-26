@@ -524,7 +524,15 @@ enum FoldSnapshotBuilder {
         if let v = nums["stocks"] ?? nums["equity"] ?? nums["stocks_value"] { next.stocksValue = v }
         if let v = nums["mutual_funds"] ?? nums["mf"] ?? nums["mf_value"] { next.mfValue = v }
 
-        let banks = collectBanks(blobs) + banksFromTransactions(transactions)
+        // Transaction-derived banks are a FALLBACK, not an addition. The two
+        // producers derive `last4` differently — `collectBanks` from the masked
+        // account number, the transaction walk from the last four characters of
+        // the account uuid — so the dedupe key `name + last4` never matched
+        // across them and the same account appeared twice. When no
+        // total_balance key was found, `liquid` is the sum of the rows, so one
+        // account was counted twice and net worth followed it.
+        let identified = collectBanks(blobs)
+        let banks = identified.isEmpty ? banksFromTransactions(transactions) : identified
         if !banks.isEmpty {
             var seen = Set<String>()
             next.banks = banks.filter { seen.insert($0.name + $0.last4).inserted }

@@ -210,7 +210,12 @@ struct BlockEditor: NSViewRepresentable {
         }
 
         private func rememberTrailing(_ doc: BlockDoc) {
-            if let last = doc.blocks.last, last.type != .divider, last.plainText.isEmpty {
+            // Attachments are never the trailing "empty block": an image's
+            // plainText is empty too, so it qualified — and the rebuild then
+            // recreated it from the remembered meta *without* its `src`,
+            // leaving a blank grey box in the note where the photo had been.
+            if let last = doc.blocks.last, last.type != .divider,
+               !last.isAttachment, last.plainText.isEmpty {
                 trailingBlockMeta = last
             } else {
                 trailingBlockMeta = nil
