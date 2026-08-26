@@ -310,11 +310,21 @@ struct ActivityDoc: Codable, Hashable {
     var devices: [String: ActivityDevice] = [:]
     /// What the recording device is in front of right now, for the other one.
     var live: ActivityLive?
+    /// When someone last asked for this history to be erased, `yyyy-MM-dd'T'HH:mm:ss`.
+    ///
+    /// `merged` is a union, which is what lets two devices record at once — but
+    /// a union can never express a removal. Erasing on the iPhone pushed an
+    /// empty doc, the Mac merged it and changed nothing, then pushed its full
+    /// copy straight back, and every erased session reappeared on the phone
+    /// within a couple of minutes. A tombstone is the missing half: the erase
+    /// travels as a fact about time rather than as an absence.
+    var erasedAt: String = ""
 
     init() {}
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        erasedAt = (try? c.decodeIfPresent(String.self, forKey: .erasedAt)) ?? ""
         events   = (try? c.decode([ActivityEvent].self, forKey: .events)) ?? []
         days     = (try? c.decode([String: ActivityDayRollup].self, forKey: .days)) ?? [:]
         rules    = (try? c.decode([String: AppRule].self, forKey: .rules)) ?? [:]
@@ -322,7 +332,7 @@ struct ActivityDoc: Codable, Hashable {
         live     = try? c.decodeIfPresent(ActivityLive.self, forKey: .live)
     }
 
-    enum CodingKeys: String, CodingKey { case events, days, rules, devices, live }
+    enum CodingKeys: String, CodingKey { case events, days, rules, devices, live, erasedAt }
 
     /// Union two copies of the document.
     ///
@@ -339,6 +349,15 @@ struct ActivityDoc: Codable, Hashable {
             .sorted { $0.startedAt < $1.startedAt }
         for (day, rollup) in other.days where out.days[day] == nil || (out.days[day]?.totalSeconds ?? 0) < rollup.totalSeconds {
             out.days[day] = rollup
+        }
+        // The newer erase wins, and everything it covers goes — including
+        // anything the other copy is still holding. Without this the union
+        // simply put it all back.
+        out.erasedAt = max(erasedAt, other.erasedAt)
+        if !out.erasedAt.isEmpty {
+            out.events.removeAll { $0.startedAt < out.erasedAt }
+            let cutoffDay = String(out.erasedAt.prefix(10))
+            out.days = out.days.filter { $0.key >= cutoffDay }
         }
         // Rules and devices are edits, not measurements — the other copy is at
         // least as new as this one for anything it knows about.

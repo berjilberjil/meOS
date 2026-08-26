@@ -802,6 +802,13 @@ private struct TagManagerSheet: View {
             }
 
             if let editing {
+                // `.id` is load-bearing. TagEditForm holds the tag in @State, so
+                // re-creating it with a different `editing` inside the same
+                // branch kept the FIRST tag: pencil on Work, then pencil on
+                // Travel, recolour, Save — and Work was recoloured while Travel
+                // was untouched. Pencil on Work then "New tag" was worse, adding
+                // a duplicate "Work" under a fresh id that then showed twice in
+                // every picker.
                 TagEditForm(tag: editing, isNew: isAdding,
                             onCancel: { self.editing = nil; isAdding = false },
                             onSave: { t in
@@ -809,6 +816,7 @@ private struct TagManagerSheet: View {
                                 else { state.updateTag(t) }
                                 self.editing = nil; isAdding = false
                             })
+                    .id(editing.id)
             }
 
             ScrollView {

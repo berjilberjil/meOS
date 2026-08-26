@@ -450,4 +450,51 @@ final class ShipAuditTests: XCTestCase {
     func testAPlainReplyIsUntouched() {
         XCTAssertEqual(ChatText.unwrap("just a sentence"), "just a sentence")
     }
+
+    // MARK: - Erasing activity has to stick
+
+    // `merged` is a union, which is what lets two devices record at once — but a
+    // union cannot express a removal. Erasing on the phone pushed an empty doc,
+    // the Mac merged it and changed nothing, then pushed its full copy back, and
+    // every erased session reappeared within a couple of minutes.
+    private func doc(_ startedAt: [String], erasedAt: String = "") -> ActivityDoc {
+        var d = ActivityDoc()
+        d.erasedAt = erasedAt
+        d.events = startedAt.map {
+            ActivityEvent(id: $0, deviceId: "mac", deviceType: .mac, platform: "macOS",
+                          appId: "com.apple.dt.Xcode", appName: "Xcode",
+                          category: .development, startedAt: $0, endedAt: $0,
+                          duration: 60, productivity: .productive, source: .macFrontmost)
+        }
+        return d
+    }
+
+    func testAnErasedHistoryIsNotMergedBackIn() {
+        let mac = doc(["2026-08-20T10:00:00", "2026-08-21T10:00:00"])
+        let erasedPhone = doc([], erasedAt: "2026-08-22T09:00:00")
+        let out = mac.merged(with: erasedPhone)
+        XCTAssertTrue(out.events.isEmpty, "the erase has to survive the union")
+        XCTAssertEqual(out.erasedAt, "2026-08-22T09:00:00")
+    }
+
+    func testWorkRecordedAfterTheEraseIsKept() {
+        let erased = doc([], erasedAt: "2026-08-22T09:00:00")
+        let sinceThen = doc(["2026-08-22T11:00:00"])
+        let out = erased.merged(with: sinceThen)
+        XCTAssertEqual(out.events.count, 1, "you did that after asking to erase")
+        XCTAssertEqual(out.events.first?.startedAt, "2026-08-22T11:00:00")
+    }
+
+    func testTheNewerEraseWins() {
+        let a = doc([], erasedAt: "2026-08-20T09:00:00")
+        let b = doc([], erasedAt: "2026-08-22T09:00:00")
+        XCTAssertEqual(a.merged(with: b).erasedAt, "2026-08-22T09:00:00")
+        XCTAssertEqual(b.merged(with: a).erasedAt, "2026-08-22T09:00:00")
+    }
+
+    func testWithNoEraseTheUnionIsUnchanged() {
+        let a = doc(["2026-08-20T10:00:00"])
+        let b = doc(["2026-08-21T10:00:00"])
+        XCTAssertEqual(a.merged(with: b).events.count, 2)
+    }
 }

@@ -26,9 +26,15 @@ enum BiometricLock {
     }
 
     /// Prompt for biometric (falls back to device password). Returns success.
+    ///
+    /// Fails CLOSED. It used to return true when the policy could not be
+    /// evaluated, so a user who enabled the lock and later removed their device
+    /// passcode — which also drops Face ID enrolment — got an app that opened
+    /// with no authentication at all. The same call gates revealing hidden
+    /// notes, so those opened untouched too.
     static func authenticate(reason: String = "Unlock MyOS") async -> Bool {
         let ctx = LAContext()
-        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return true }
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else { return false }
         return await withCheckedContinuation { cont in
             ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { ok, _ in
                 cont.resume(returning: ok)

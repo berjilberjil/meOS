@@ -11,6 +11,16 @@ import PhotosUI
 /// Goal + targets. Height writes `Profile.heightCm` (identical to the Profile
 /// tab); the rest writes `fitnessProfile`. Used in the Fitness tab and Settings.
 struct FitnessProfileEditor: View {
+    /// A step count as a whole number, bounded.
+    ///
+    /// `Int(_: Double)` traps outside Int64 rather than saturating, and this
+    /// binding is written on every keystroke — nineteen digits in the field was
+    /// a hard crash, not a silly value.
+    static func wholeSteps(_ v: Double) -> Int {
+        guard v.isFinite else { return 0 }
+        return Int(min(max(v, 0), 1_000_000))
+    }
+
     @EnvironmentObject var state: AppState
     private let cols = [GridItem(.adaptive(minimum: 150), spacing: 12)]
 
@@ -53,12 +63,12 @@ struct FitnessProfileEditor: View {
                 // field would spring back under the cursor.
                 KLabeledNumberField(label: "Steps goal", placeholder: "8000", decimals: 0,
                     value: Binding(get: { Double(state.stepGoals.daily) },
-                                   set: { v in state.setStepGoals(daily: v.map { Int($0) },
+                                   set: { v in state.setStepGoals(daily: v.map(Self.wholeSteps),
                                                                   stretch: state.fitnessProfile.stepsStretch) }))
                 KLabeledNumberField(label: "Steps stretch", placeholder: "10000", decimals: 0,
                     value: Binding(get: { Double(state.stepGoals.stretch) },
                                    set: { v in state.setStepGoals(daily: state.fitnessProfile.stepsTarget,
-                                                                  stretch: v.map { Int($0) }) }))
+                                                                  stretch: v.map(Self.wholeSteps)) }))
             }
         }
     }

@@ -374,7 +374,13 @@ enum ActivityEngine {
         let stale = Set(doc.events.filter { $0.day < cutoff }.map(\.day))
         guard !stale.isEmpty else { return }
         for day in stale {
-            doc.days[day] = rollup(doc.events, day: day)
+            // Keep the larger total, the same rule `ActivityDoc.merged` applies.
+        // Recomputing unconditionally from whatever raw events happen to be
+        // present let a partial set — one the other device had merged back in
+        // after this one already compacted the day — overwrite a complete
+        // rollup, and hours went missing from every week and month total.
+        let fresh = rollup(doc.events, day: day)
+        if fresh.totalSeconds > (doc.days[day]?.totalSeconds ?? 0) { doc.days[day] = fresh }
         }
         doc.events.removeAll { $0.day < cutoff }
     }

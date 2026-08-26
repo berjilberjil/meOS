@@ -96,11 +96,20 @@ private struct VideoPage: View {
             }
         }
         .onAppear { start() }
+        // The store returns nil for "not here yet" *and* starts the fetch, so
+        // treating that as a hard failure meant the first tap on any video whose
+        // bytes were not already on this device — a clip made on the Mac, or
+        // anything after the cache is purged — showed "Couldn't load video"
+        // forever, while the download it had just triggered landed unnoticed.
+        // Closing and reopening played it, which is how this hid.
+        .onChange(of: mediaStore.version) { _, _ in if player == nil { start() } }
         .onDisappear { player?.pause() }
     }
 
     private func start() {
-        guard let d = EventMediaStore.shared.data(for: media) else { failed = true; return }
+        // nil means "still loading" — the fetch is now in flight and `version`
+        // will bump when it lands. Only a real write failure is a failure.
+        guard let d = EventMediaStore.shared.data(for: media) else { return }
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString).appendingPathExtension("mp4")
         do {

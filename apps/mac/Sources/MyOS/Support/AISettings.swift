@@ -77,6 +77,22 @@ final class AISettingsStore: ObservableObject {
 
     func loadIfNeeded() async { if !loaded { await load() } }
 
+    /// Forget everything about the account that just signed out.
+    ///
+    /// This is a process-lifetime singleton and `loadIfNeeded` short-circuits on
+    /// `loaded`, so without this the next person to sign in on the same Mac
+    /// opened Settings → AI providers and saw the previous user's key labels,
+    /// masked prefixes, model lists and feature routing — and any toggle they
+    /// flipped fired against the previous user's key ids.
+    func reset() {
+        keys = []
+        routing = APIClient.AIRouting()
+        loaded = false
+        loadError = nil
+        busy = false
+        actionError = nil
+    }
+
     func load() async {
         do {
             async let k = api.aiKeys()

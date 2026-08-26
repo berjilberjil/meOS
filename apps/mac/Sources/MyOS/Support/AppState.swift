@@ -289,6 +289,7 @@ final class AppState: ObservableObject {
         ProgressPhotoStore.use(account: "")
         EventMediaStore.shared.purgeCache()
         FoldData.deleteFromDisk()
+        AISettingsStore.shared.reset()
         await api.logout()
         markSession(active: false)
         api.clearCache()
@@ -2147,8 +2148,22 @@ final class AppState: ObservableObject {
         push(StateKey.events, events)
     }
     func deleteEvent(_ id: String) {
+        // Take the sealed objects with it. Scans have done this since they were
+        // built (`AppState+TaskScan.dropPhotos`); events never did, so deleting
+        // a memory dropped the only references to its photos and video and left
+        // them in the bucket with nothing left that could name them. On a stack
+        // required to stay inside a free tier, that grows forever.
+        let orphans = events.filter { $0.id == id }
+            .flatMap(\.media)
+            .flatMap { [$0.r2Key, $0.posterKey] }
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
         events.removeAll { $0.id == id }
         push(StateKey.events, events)
+        guard !orphans.isEmpty else { return }
+        Task { [api] in
+            for key in orphans { try? await api.deleteEventMedia(id: key) }
+        }
     }
     /// Whole days from today to a date (negative = past). Timezone-stable.
     func daysUntil(_ dateKey: String) -> Int? {

@@ -153,7 +153,12 @@ struct NotesView: View {
     /// that has since been deleted is simply dropped.
     private func restoreRoute() {
         guard !restored, openID == nil else { return }
-        guard let id = PrefsStore.shared.route(for: .notes), state.note(id) != nil else {
+        // Never restore straight into a locked note. The route is persisted on
+        // open, so leaving a hidden note on screen and swipe-killing the app put
+        // it back on relaunch with `revealed` reset to false — the list hid it
+        // while the editor showed the whole body, no authentication asked.
+        guard let id = PrefsStore.shared.route(for: .notes),
+              let n = state.note(id), !n.locked else {
             if !state.notes.isEmpty { restored = true }
             return
         }

@@ -256,7 +256,11 @@ final class ActivityCoordinator: ObservableObject {
     /// activity log is worse than none, because what survives looks complete.
     func erase() {
         guard let state else { return }
-        state.activity = ActivityDoc()
+        var cleared = ActivityDoc()
+        // Stamped, so the other device honours the removal instead of merging
+        // its own copy back over it on the next poll.
+        cleared.erasedAt = AppState.nowStamp()
+        state.activity = cleared
         state.liveActivity = nil
         ActivityJournal.clear()
         registerDevice()

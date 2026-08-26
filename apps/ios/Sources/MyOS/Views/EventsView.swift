@@ -148,6 +148,9 @@ private struct EventEditorSheet: View {
     @State private var date = Date()
     @State private var note = ""
     @State private var tagID = ""
+    /// Which tag the single-select picker was seeded with, so a deselect removes
+    /// that one rather than every tag the event has.
+    @State private var originalTagID = ""
     @State private var special = false
     @State private var media: [EventMedia] = []
     @State private var pickerItems: [PhotosPickerItem] = []
@@ -249,6 +252,7 @@ private struct EventEditorSheet: View {
                 if let e = event {
                     title = e.title; note = e.note; special = e.special; media = e.media
                     tagID = e.tagIDs.first ?? ""
+                    originalTagID = tagID
                     if let d = AppState.date(fromKey: e.date) { date = d }
                 } else {
                     tagID = state.eventTags.first?.id ?? ""
@@ -285,7 +289,12 @@ private struct EventEditorSheet: View {
 
     private func save() {
         let key = AppState.dateKey(date)
-        let tagIDs = tagID.isEmpty ? [] : [tagID]
+        // Keep the tags this editor never showed. It binds only `tagIDs.first`,
+        // so writing `[tagID]` silently dropped the rest: tag a memory Travel +
+        // Family + Milestone on the Mac, change only its title on the phone, and
+        // it came back with just Travel.
+        let untouched = (event?.tagIDs ?? []).filter { $0 != originalTagID && $0 != tagID }
+        let tagIDs = (tagID.isEmpty ? [] : [tagID]) + untouched
         let t = title.trimmingCharacters(in: .whitespaces)
         if var e = event {
             e.title = t; e.date = key; e.note = note; e.tagIDs = tagIDs; e.special = special; e.media = media
