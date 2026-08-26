@@ -38,8 +38,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const goal = String(body.goal ?? 'maintain');
   const cals = Number(body.calories ?? 0);
   const protein = Number(body.protein ?? 0);
-  const foods: string[] = Array.isArray(body.foods) ? body.foods.slice(0, 120) : [];
-  const exercises: string[] = Array.isArray(body.exercises) ? body.exercises.slice(0, 120) : [];
+  // 120 elements was capped; the length of each element was not, so one
+  // element could carry the whole prompt.
+  const names = (v: unknown): string[] =>
+    Array.isArray(v) ? v.slice(0, 120).map((x) => String(x).slice(0, 120)) : [];
+  const foods: string[] = names(body.foods);
+  const exercises: string[] = names(body.exercises);
   const daysPerWeek = Number(body.daysPerWeek ?? 5);
 
   const prompt = [

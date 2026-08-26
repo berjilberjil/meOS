@@ -47,24 +47,25 @@ export function budgetDecision(
 
 // One idempotent DDL per server process, mirroring `ensureAiTable` in ai.ts —
 // so a fresh local D1 works without a manual migration step.
-let ensured: Promise<void> | null = null;
-function ensureVoiceTable(): Promise<void> {
-  if (!ensured) {
-    ensured = (async () => {
-      await sql`
-        create table if not exists voice_budget (
-          user_id    integer not null,
-          day        text not null,
-          chars      integer not null default 0,
-          updated_at text not null,
-          primary key (user_id, day)
-        )`;
-    })().catch((e) => {
-      ensured = null; // let a later request retry
-      throw e;
-    });
-  }
-  return ensured;
+// A boolean, NOT a shared promise. Memoizing the promise meant a second
+// concurrent request could await I/O belonging to the first, which the Workers
+// runtime refuses outright ("Cannot perform I/O on behalf of a different
+// request") — and because the inner promise had not rejected, the catch never
+// reset the guard, so the failure stuck for the life of the isolate. Each
+// request now awaits its own DDL; `create table if not exists` is idempotent
+// and costs nothing once the table is there.
+let ensured = false;
+async function ensureVoiceTable(): Promise<void> {
+  if (ensured) return;
+  await sql`
+    create table if not exists voice_budget (
+      user_id    integer not null,
+      day        text not null,
+      chars      integer not null default 0,
+      updated_at text not null,
+      primary key (user_id, day)
+    )`;
+  ensured = true;
 }
 
 /**

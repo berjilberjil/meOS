@@ -59,7 +59,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
   const body = await request.json().catch(() => ({}));
-  const text = String(body.text ?? '').trim();
+  const text = String(body.text ?? '').trim().slice(0, 8000);
   if (!text) throw error(400, 'Nothing to parse');
 
   let resolved;

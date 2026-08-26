@@ -55,3 +55,16 @@ create table if not exists voice_budget (
   updated_at text not null,
   primary key (user_id, day)
 );
+
+-- Calls made against the SERVER's own AI key, per user per UTC day. Users who
+-- configure their own key spend their own quota and never appear here. Two
+-- ceilings live in src/lib/server/aiBudget.ts: a per-account share, and the
+-- account-wide stop that actually protects the key — because the provider
+-- quota belongs to the key, not to a person.
+create table if not exists ai_budget (
+  user_id    integer not null references users(id) on delete cascade,
+  day        text not null,          -- 'YYYY-MM-DD', UTC
+  calls      integer not null default 0,
+  updated_at text not null,
+  primary key (user_id, day)
+);

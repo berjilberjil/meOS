@@ -20,6 +20,11 @@ export function verifyPassword(pw: string, stored: string): boolean {
 }
 
 export async function createSession(userId: number): Promise<string> {
+  // Sweep this user's dead tokens first. Nothing else ever deleted them —
+  // hooks.server.ts filters on expires_at at read time, so they were invisible
+  // and accumulated for the life of the account in a database whose free-tier
+  // storage is shared by every user.
+  await sql`delete from sessions where user_id = ${userId} and expires_at <= ${new Date().toISOString()}`;
   const token = randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + SESSION_DAYS * DAY);
   await sql`insert into sessions (token, user_id, expires_at) values (${token}, ${userId}, ${expires})`;

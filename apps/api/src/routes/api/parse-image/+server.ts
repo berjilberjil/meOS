@@ -163,11 +163,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
   const body = await request.json().catch(() => ({}));
-  const mediaType = typeof body.mediaType === 'string' ? body.mediaType : 'image/png';
+  // An allowlist, not whatever the client says — this string is handed to the
+  // provider.
+  const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+  const asked = typeof body.mediaType === 'string' ? body.mediaType : 'image/png';
+  const mediaType = ALLOWED_TYPES.has(asked) ? asked : 'image/png';
   const images: string[] = Array.isArray(body.images)
     ? body.images.filter((s: unknown) => typeof s === 'string' && s.length > 0).slice(0, 8)
     : [];
   if (!images.length) throw error(400, 'No image to read');
+  // Eight images with no size check at all: the only bound was the Workers
+  // request-body limit, and `Buffer.from(b64)` per image blew the isolate's
+  // 128 MB before anything else could refuse it. ~24 MB of base64 is eight
+  // generously-sized photos.
+  const totalBase64 = images.reduce((n, s) => n + s.length, 0);
+  if (totalBase64 > 24_000_000) throw error(413, 'Those images are too large');
 
   const mode = typeof body.mode === 'string' ? body.mode : 'food';
   const context = typeof body.context === 'string' ? body.context : '';

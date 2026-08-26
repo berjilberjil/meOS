@@ -3,6 +3,7 @@ import type { LanguageModel } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
+import { reserveAICall } from './aiBudget';
 import { sql } from './db';
 import { decryptSecret } from './secrets';
 import type { ProviderId } from './modelCatalog';
@@ -33,31 +34,32 @@ interface Routing {
 }
 
 // One-time idempotent table guard so dev (localhost) works without a manual psql;
-// prod already has it via db/schema.sql. Memoized to one DDL per server process.
-let ensured: Promise<void> | null = null;
-export function ensureAiTable(): Promise<void> {
-  if (!ensured) {
-    ensured = (async () => {
-      await sql`
-        create table if not exists ai_credentials (
-          id         integer primary key autoincrement,
-          user_id    integer not null references users(id) on delete cascade,
-          provider   text not null,
-          label      text not null,
-          secret     text not null,
-          masked     text not null,
-          enabled    integer not null default 1,
-          models     text not null default '[]',
-          created_at text not null default (datetime('now')),
-          updated_at text not null default (datetime('now'))
-        )`;
-      await sql`create index if not exists ai_credentials_user_idx on ai_credentials(user_id)`;
-    })().catch((e) => {
-      ensured = null; // let a later request retry if this one lost the race / failed
-      throw e;
-    });
-  }
-  return ensured;
+// prod already has it via db/schema.sql.
+// A boolean, NOT a shared promise. Memoizing the promise meant a second
+// concurrent request could await I/O belonging to the first, which the Workers
+// runtime refuses outright ("Cannot perform I/O on behalf of a different
+// request") — and because the inner promise had not rejected, the catch never
+// reset the guard, so the failure stuck for the life of the isolate. Each
+// request now awaits its own DDL; `create table if not exists` is idempotent
+// and costs nothing once the table is there.
+let ensured = false;
+export async function ensureAiTable(): Promise<void> {
+  if (ensured) return;
+  await sql`
+    create table if not exists ai_credentials (
+      id         integer primary key autoincrement,
+      user_id    integer not null references users(id) on delete cascade,
+      provider   text not null,
+      label      text not null,
+      secret     text not null,
+      masked     text not null,
+      enabled    integer not null default 1,
+      models     text not null default '[]',
+      created_at text not null default (datetime('now')),
+      updated_at text not null default (datetime('now'))
+    )`;
+  await sql`create index if not exists ai_credentials_user_idx on ai_credentials(user_id)`;
+  ensured = true;
 }
 
 async function loadRouting(userId: number): Promise<Routing> {
@@ -105,6 +107,13 @@ function envFallback(feature: Feature): Resolved {
   return buildModel('gemini', key, model);
 }
 
+export class AIBudgetExhausted extends Error {
+  constructor() {
+    super("The shared AI allowance for today is used up. Add your own key in Settings → AI providers.");
+    this.name = 'AIBudgetExhausted';
+  }
+}
+
 export async function resolveModel(feature: Feature, userId: number): Promise<Resolved> {
   await ensureAiTable();
 
@@ -136,5 +145,9 @@ export async function resolveModel(feature: Feature, userId: number): Promise<Re
     }
   }
 
+  // Falling back to the SERVER's key — so this call is metered. A user running
+  // on their own key above never reaches here and is never charged against it.
+  const budget = await reserveAICall(userId);
+  if (!budget.allowed) throw new AIBudgetExhausted();
   return envFallback(feature);
 }

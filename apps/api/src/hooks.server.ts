@@ -32,7 +32,13 @@ const handleRequest: Handle = async ({ event, resolve }) => {
         limit 1`;
       if (rows.length) event.locals.user = { id: rows[0].id, username: rows[0].username };
     } catch {
-      /* db unavailable — treat as logged out */
+      // NOT "treat as logged out". Falling through unauthenticated turns a
+      // server-side outage into a 401 on every route, and the client reads a 401
+      // as "the session is gone" — it logs the user out and abandons in-flight
+      // saves, because a 401 is (correctly) not worth retrying. A database that
+      // is down is a 503: temporary, and the client keeps its session and its
+      // unsaved work.
+      return new Response('Database unavailable', { status: 503 });
     }
   }
   const response = await resolve(event);

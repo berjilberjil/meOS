@@ -31,7 +31,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
   const body = await request.json().catch(() => ({}));
-  const context = String(body.context ?? '');
+  // Capped like /api/chat does. Uncapped, the prompt billed to the provider was
+  // bounded only by the request body — a 40 MB context became a 40 MB prompt.
+  const context = String(body.context ?? '').slice(0, 8000);
 
   const prompt = [
     `Look at their data and give them 3–5 things to do NOW to fix their life — most important first.`,
