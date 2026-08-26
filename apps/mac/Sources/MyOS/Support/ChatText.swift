@@ -5,8 +5,13 @@ import Foundation
 enum ChatText {
     static func unwrap(_ raw: String) -> String {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.hasPrefix("```") {
-            s = s.replacingOccurrences(of: "^```(?:json)?\\s*", with: "", options: .regularExpression)
+        // Only a json fence. The `json` tag was optional in the pattern while
+        // the branch tested for a bare ``` — so asking for a Swift snippet got
+        // its fence stripped, the language tag left behind as a stray first
+        // line, and everything after the closing fence truncated. The system
+        // prompt explicitly allows fenced code.
+        if s.hasPrefix("```json") {
+            s = s.replacingOccurrences(of: "^```json\\s*", with: "", options: .regularExpression)
             if let r = s.range(of: "```") { s = String(s[..<r.lowerBound]) }
             s = s.trimmingCharacters(in: .whitespacesAndNewlines)
         }

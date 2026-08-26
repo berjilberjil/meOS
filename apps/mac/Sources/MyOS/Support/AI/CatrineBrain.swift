@@ -70,7 +70,12 @@ extension AppState {
     private func relevantEnoughToForget(_ item: MemoryItem, _ query: String) -> Bool {
         let q = Set(TextIndex.terms(query))
         guard !q.isEmpty else { return false }
-        return !MemoryBank.tokens(item.content).intersection(q).isEmpty
+        // Most of the query's terms, not merely one. A single shared word meant
+        // "forget what you know about the MyOS beta launch" also deleted "main
+        // project is MyOS, a personal second brain" — both contain `myos`, both
+        // were in the top five, and both went. Memory has no undo.
+        let shared = Double(MemoryBank.tokens(item.content).intersection(q).count)
+        return shared / Double(q.count) >= 0.6
     }
 
     // MARK: - Context
@@ -83,7 +88,12 @@ extension AppState {
     /// prompt — trimming them first would be exactly backwards.
     func catrineContext(for query: String,
                         toolResults: [String] = [],
-                        budget: Int = 9000) -> CatrineContext {
+                        // 8000, matching the server's own slice. At 9000 the
+                        // last thousand characters were cut mid-line by the
+                        // Worker, which defeats ContextBuilder's whole contract
+                        // of dropping a section whole rather than clipping it —
+                        // a retrieved note arrived truncated with no marker.
+                        budget: Int = 8000) -> CatrineContext {
         var sections: [ContextSection] = []
 
         sections.append(ContextSection(

@@ -195,9 +195,16 @@ extension AppState {
             guard !str("title").isEmpty, !str("date").isEmpty else {
                 return ["ok": false, "error": "title and date required"]
             }
-            applyMentorActions([MentorAction(kind: .createEvent,
-                                             fields: ["title": str("title"), "date": str("date")])])
-            return ["ok": true, "created": str("title"), "date": str("date")]
+            // Straight to `addEvent`, NOT through `applyMentorActions`. That
+            // path resolves the date against the user's whole last message, and
+            // the phrase always wins — which is right for the legacy ACTION
+            // format, where the model invents last year's calendar, but wrong
+            // here: this date came through a schema, and the model was told
+            // today's date when it chose it. "What did I eat yesterday? Also put
+            // my dentist on 15 September" filed the dentist against yesterday.
+            let when = EventDate.normalizeISO(str("date")) ?? todayKey
+            addEvent(date: when, title: str("title"))
+            return ["ok": true, "created": str("title"), "date": when]
 
         default:
             return ["ok": false, "error": "no such tool: \(name)"]

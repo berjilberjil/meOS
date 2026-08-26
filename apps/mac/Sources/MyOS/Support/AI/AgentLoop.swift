@@ -45,6 +45,12 @@ extension AppState {
             trace.steps = round
 
             let outOfTime = Date().timeIntervalSince(started) > timeout
+            // Out of time ends the turn; it used to only switch tools off, so
+            // the deadline bounded nothing. Three slow rounds with a retry each,
+            // against a 90-second request timeout, ran a "55 second" turn for
+            // minutes with the chat stuck on "Thinking…" and no way to cancel.
+            // Round one always completes — a turn has to produce an answer.
+            if outOfTime, round > 1 { break }
             let allowTools = round < max(1, maxRounds)
                 && executed < Self.catrineMaxToolCalls
                 && !outOfTime

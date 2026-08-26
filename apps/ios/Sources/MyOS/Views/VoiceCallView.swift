@@ -177,8 +177,20 @@ struct VoiceCallView: View {
                                            tone: a.tone.directive,
                                            custom: Self.voiceDirective + " " +
                                                    a.custom.trimmingCharacters(in: .whitespacesAndNewlines))
-            let turns = state.voiceTurns()
+            // Append first, THEN snapshot. Snapshotting before meant `turns`
+            // ended with the previous assistant reply (or was empty on a fresh
+            // thread), and the server rejects any request whose last message is
+            // not a user turn — so every call came back 400 "Nothing to answer",
+            // which is what she then said out loud. `sendChat` has always done
+            // it in this order.
             state.appendVoiceTurn(role: "user", content: text)
+            let turns = state.voiceTurns()
+            // A voice turn takes seconds, and only `chatBusy` stops a poll
+            // replacing `chat` wholesale mid-answer — which loses the spoken
+            // question and files the reply against whatever thread the snapshot
+            // made active.
+            state.chatBusy = true
+            defer { state.chatBusy = false }
 
             var reply: String
             do {

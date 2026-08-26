@@ -413,4 +413,41 @@ final class ShipAuditTests: XCTestCase {
         let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
         XCTAssertEqual(out.data.spentThisMonth, 0)
     }
+
+    // MARK: - What the assistant remembers and forgets
+
+    // isDuplicate normalised by the SMALLER token set, so any strict superset
+    // scored a perfect 1.0 and the more specific fact was the one discarded.
+    func testAMoreSpecificMemoryIsNotADuplicateOfALooserOne() {
+        XCTAssertFalse(MemoryBank.isDuplicate("allergic to peanuts and shellfish",
+                                              "allergic to peanuts"),
+                       "the shellfish allergy has to be storable")
+    }
+
+    func testAGenuineRestatementIsStillADuplicate() {
+        XCTAssertTrue(MemoryBank.isDuplicate("allergic to peanuts", "allergic to peanuts"))
+        XCTAssertTrue(MemoryBank.isDuplicate("Allergic to peanuts.", "allergic to peanuts"))
+    }
+
+    func testUnrelatedMemoriesAreNotDuplicates() {
+        XCTAssertFalse(MemoryBank.isDuplicate("ships on Fridays", "allergic to peanuts"))
+    }
+
+    // MARK: - Fenced code in a reply
+
+    // The branch tested for a bare ``` while the pattern's json tag was
+    // optional, so a Swift snippet lost its fence, kept "swift" as a stray
+    // first line, and everything after the closing fence was cut.
+    func testASwiftCodeFenceIsLeftAlone() {
+        let raw = "```swift\nfunc debounce() {}\n```"
+        XCTAssertEqual(ChatText.unwrap(raw), raw, "code fences are for showing code")
+    }
+
+    func testAJSONFenceIsStillUnwrapped() {
+        XCTAssertEqual(ChatText.unwrap("```json\n{\"reply\":\"hello\"}\n```"), "hello")
+    }
+
+    func testAPlainReplyIsUntouched() {
+        XCTAssertEqual(ChatText.unwrap("just a sentence"), "just a sentence")
+    }
 }

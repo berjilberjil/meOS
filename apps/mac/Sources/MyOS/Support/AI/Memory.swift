@@ -203,8 +203,14 @@ enum MemoryBank {
     static func isDuplicate(_ a: String, _ b: String) -> Bool {
         let x = tokens(a), y = tokens(b)
         guard !x.isEmpty, !y.isEmpty else { return false }
+        // Normalised by the LARGER set. Dividing by the smaller one gave any
+        // strict superset a perfect 1.0, so the more specific fact was the one
+        // thrown away: with "allergic to peanuts" already stored, "also allergic
+        // to shellfish" scored as a duplicate and the shellfish allergy was
+        // never written down. The comment above says the expensive mistake is a
+        // false positive; this is the formula that actually means it.
         let overlap = Double(x.intersection(y).count)
-        return overlap / Double(min(x.count, y.count)) >= 0.8
+        return overlap / Double(max(x.count, y.count)) >= 0.8
     }
 
     static func tokens(_ s: String) -> Set<String> {

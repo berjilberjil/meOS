@@ -1958,9 +1958,14 @@ final class AppState: ObservableObject {
             Haptics.success()
             if isHydrated { push(StateKey.chat, chat) }
 
-            // Learn from it afterwards, off the critical path — the reply is
-            // already on screen and a failure here must never surface.
-            await learnFromExchange(user: t, assistant: parsed.visible)
+            // Learn from it afterwards, genuinely off the critical path. This
+            // used to be awaited here, inside the busy window: the reply was on
+            // screen but `chatBusy` stayed true for a whole extra AI round trip
+            // — up to the 90-second request timeout — with the send button dead,
+            // a red dot on the launcher, no spinner to explain it, and
+            // `applyRemote` refusing every remote chat update the entire time.
+            let assistantText = parsed.visible
+            Task { [weak self] in await self?.learnFromExchange(user: t, assistant: assistantText) }
         } catch {
             chatError = (error as? APIError)?.message ?? error.localizedDescription
             if let j = chat.threads.firstIndex(where: { $0.id == threadID }),
