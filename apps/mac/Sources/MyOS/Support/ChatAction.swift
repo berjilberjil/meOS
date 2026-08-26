@@ -27,8 +27,13 @@ enum ChatAction {
         var actions: [MentorAction] = []
         for line in raw.components(separatedBy: .newlines) {
             let t = line.trimmingCharacters(in: .whitespaces)
-            if t.uppercased().hasPrefix("ACTION ") {
-                if let a = parseLine(String(t.dropFirst(7))) { actions.append(a) }
+            // It has to actually parse to count as one. Testing the prefix alone
+            // meant an ordinary English sentence — "Action items: book the
+            // flight" — was taken for a command, failed to parse, and was then
+            // dropped from `visible` too. The line simply vanished out of the
+            // middle of her reply.
+            if t.uppercased().hasPrefix("ACTION "), let a = parseLine(String(t.dropFirst(7))) {
+                actions.append(a)
             } else {
                 visible.append(line)
             }

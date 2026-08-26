@@ -16,13 +16,60 @@ struct ProgressPhoto: Identifiable, Hashable {
 /// Local body-progress photos under Application Support.
 /// Not synced (images would bloat the KV store).
 enum ProgressPhotoStore {
-    static let dir: URL = {
+
+    /// Whose photos this device is currently showing.
+    ///
+    /// Body photos are the most private thing MyOS holds, and they used to sit
+    /// in one flat folder with nothing tying a file to an account. Logging out
+    /// clears `state.json` and nothing else, so the images stayed on disk — and
+    /// the next person to sign in on the same Mac opened Progress and was
+    /// looking at the previous user's body.
+    ///
+    /// Scoping the folder rather than deleting it matters: a photo that has not
+    /// been uploaded yet is the owner's only copy, and logging out is not
+    /// consent to destroy it. Signing back in brings the same folder back.
+    private(set) static var account: String = defaultScope
+
+    private static let defaultScope = "_none"
+
+    /// Point the store at an account. Empty means logged out, which resolves to
+    /// a scope that is always empty.
+    static func use(account newValue: String) {
+        let next = slug(newValue)
+        guard next != account else { return }
+        account = next
+        adoptLooseFiles()
+    }
+
+    private static func slug(_ name: String) -> String {
+        let cleaned = name.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        return cleaned.isEmpty ? defaultScope : cleaned
+    }
+
+    private static var root: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let d = base.appendingPathComponent("MyOS/progress", isDirectory: true)
+        return base.appendingPathComponent("MyOS/progress", isDirectory: true)
+    }
+
+    static var dir: URL {
+        let d = root.appendingPathComponent(account, isDirectory: true)
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
-    }()
+    }
+
+    /// Photos written before the folder was scoped sit loose at the root. They
+    /// belong to whoever is signing in now — this install has only ever had the
+    /// one account — so the first real sign-in adopts them.
+    private static func adoptLooseFiles() {
+        guard account != defaultScope else { return }
+        let fm = FileManager.default
+        let loose = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        let destination = dir
+        for url in loose where parse(url.lastPathComponent) != nil {
+            try? fm.moveItem(at: url, to: destination.appendingPathComponent(url.lastPathComponent))
+        }
+    }
 
     /// `2026-08-15.jpg` (legacy one-a-day) or `2026-08-15__assetId.jpg`.
     static func parse(_ filename: String) -> (id: String, date: String)? {

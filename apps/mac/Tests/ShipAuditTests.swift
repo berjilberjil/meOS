@@ -113,4 +113,102 @@ final class ShipAuditTests: XCTestCase {
         XCTAssertEqual(Food.matchKey("   "), "")
         XCTAssertEqual(Food.matchKey(""), "")
     }
+
+    // MARK: - Focus time survives midnight
+
+    // The focus timer banked its minutes into `days[todayKey]`, with todayKey
+    // re-read from the clock when the block *ended*. A block begun at 23:50 and
+    // finished at 00:15 looked for its to-do in a day that had just rolled over,
+    // found nothing, and returned silently — and drainSpent() had already zeroed
+    // the counter, so the time was lost rather than unrecorded.
+    private func plan(_ ids: [String]) -> DayPlan {
+        var d = DayPlan()
+        d.todos = ids.map { FocusItem(id: $0, text: $0) }
+        return d
+    }
+
+    func testWorkIsBankedAgainstTheDayThatOwnsIt() {
+        let days = ["2026-08-25": plan(["late-block"]), "2026-08-26": plan(["fresh"])]
+        XCTAssertEqual(
+            FocusRecord.dayOwning(todo: "late-block", in: days, today: "2026-08-26"),
+            "2026-08-25",
+            "the block started yesterday, so yesterday is where its minutes go")
+    }
+
+    func testTodayWinsWhenTodayHoldsTheItem() {
+        let days = ["2026-08-25": plan(["a"]), "2026-08-26": plan(["b"])]
+        XCTAssertEqual(FocusRecord.dayOwning(todo: "b", in: days, today: "2026-08-26"), "2026-08-26")
+    }
+
+    func testAnUnknownTodoOwnsNoDay() {
+        let days = ["2026-08-26": plan(["a"])]
+        XCTAssertNil(FocusRecord.dayOwning(todo: "ghost", in: days, today: "2026-08-26"))
+    }
+
+    func testADuplicatedIdResolvesToTheNewestDay() {
+        let days = ["2026-08-20": plan(["dup"]), "2026-08-24": plan(["dup"])]
+        XCTAssertEqual(FocusRecord.dayOwning(todo: "dup", in: days, today: "2026-08-26"), "2026-08-24")
+    }
+
+    // MARK: - Replies that only look like commands
+
+    // `parse` treated any line starting with "ACTION " as a command. When it then
+    // failed to parse, the line was appended to neither the actions nor the
+    // visible text — so an ordinary sentence vanished out of the middle of a reply.
+    func testAnEnglishSentenceStartingWithActionSurvives() {
+        let out = ChatAction.parse("Here is the plan.\nAction items: book the flight.\nThat's it.")
+        XCTAssertTrue(out.visible.contains("Action items: book the flight."),
+                      "a sentence that isn't a command must stay in the reply")
+        XCTAssertTrue(out.actions.isEmpty)
+    }
+
+    func testARealActionLineIsStillStripped() {
+        let out = ChatAction.parse("On it.\nACTION create_note title=\"Groceries\"")
+        XCTAssertEqual(out.visible, "On it.")
+        XCTAssertEqual(out.actions.count, 1)
+        XCTAssertEqual(out.actions.first?.kind, .createNote)
+        XCTAssertEqual(out.actions.first?.fields["title"], "Groceries")
+    }
+
+    // MARK: - Two people, one Mac
+
+    // Logging out cleared state.json and nothing else, so body photos stayed in
+    // one flat folder on disk and the next account to sign in on the same Mac
+    // opened Progress and saw the previous user's body. The folder is scoped per
+    // account now — hidden on logout rather than deleted, because an un-uploaded
+    // photo is the owner's only copy.
+    func testEachAccountGetsItsOwnPhotoFolder() {
+        let original = ProgressPhotoStore.account
+        addTeardownBlock { ProgressPhotoStore.use(account: original) }
+
+        ProgressPhotoStore.use(account: "alice")
+        let alice = ProgressPhotoStore.dir
+        ProgressPhotoStore.use(account: "bob")
+        let bob = ProgressPhotoStore.dir
+
+        XCTAssertNotEqual(alice, bob, "one account must never read another's photos")
+        XCTAssertEqual(alice.lastPathComponent, "alice")
+        XCTAssertEqual(bob.lastPathComponent, "bob")
+    }
+
+    func testLoggedOutResolvesToItsOwnEmptyScope() {
+        let original = ProgressPhotoStore.account
+        addTeardownBlock { ProgressPhotoStore.use(account: original) }
+
+        ProgressPhotoStore.use(account: "alice")
+        let alice = ProgressPhotoStore.dir
+        ProgressPhotoStore.use(account: "")
+        XCTAssertNotEqual(ProgressPhotoStore.dir, alice, "logging out must stop showing them")
+        XCTAssertTrue(ProgressPhotoStore.list().isEmpty, "and show nothing at all")
+    }
+
+    func testAccountNamesAreNormalisedIntoOneFolder() {
+        let original = ProgressPhotoStore.account
+        addTeardownBlock { ProgressPhotoStore.use(account: original) }
+
+        ProgressPhotoStore.use(account: "Berjil")
+        let a = ProgressPhotoStore.dir
+        ProgressPhotoStore.use(account: "berjil")
+        XCTAssertEqual(ProgressPhotoStore.dir, a, "case must not split one person in two")
+    }
 }

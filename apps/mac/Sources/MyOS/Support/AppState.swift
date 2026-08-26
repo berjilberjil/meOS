@@ -123,6 +123,7 @@ final class AppState: ObservableObject {
     private func restoreCachedSession() {
         guard UserDefaults.standard.bool(forKey: Self.kSessionActive) else { return }
         username = UserDefaults.standard.string(forKey: Self.kSessionUser) ?? ""
+        ProgressPhotoStore.use(account: username)
         guard let raw = api.cachedRawState() else { return }
         vault.adoptMeta(api.cryptoMeta(from: raw))
         guard vault.hasMeta,
@@ -243,6 +244,7 @@ final class AppState: ObservableObject {
     /// setup (no vault yet), lock (vault exists but this device can't decrypt), or
     /// decrypt + apply and go live. Never applies encrypted data without the key.
     private func loadAndGate(hadCache: Bool) async {
+        ProgressPhotoStore.use(account: username)
         do {
             let raw = try await api.fetchStateRaw()
             pendingRaw = raw
@@ -276,6 +278,13 @@ final class AppState: ObservableObject {
         DietBridge.shared.stop()
         stopLiveSync()
         stopFoldWatch()
+        cancelPendingPushes()
+        // Local media is not part of the state blob, so clearing the cache does
+        // not touch it. Point the photo store at the logged-out scope and drop
+        // the decrypted event-media cache, or the next account to sign in on
+        // this Mac inherits both.
+        ProgressPhotoStore.use(account: "")
+        EventMediaStore.shared.purgeCache()
         await api.logout()
         markSession(active: false)
         api.clearCache()
@@ -286,8 +295,11 @@ final class AppState: ObservableObject {
         fitnessProfile = FitnessProfile(); journalPresets = JournalPresets()
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
-        events = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
+        events = []; eventTags = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
         scans = []; taskMode = TaskModeState(); weekly = []
+        // Retrieved passages and recalled memories from the last answer. Debug
+        // state, but it is still this user's private data sitting in memory.
+        lastTrace = nil; stepCelebration = nil
         activity = ActivityDoc(); liveActivity = nil
         fold = nil
         username = ""; isHydrated = false; lastSyncError = nil
@@ -540,6 +552,21 @@ final class AppState: ObservableObject {
     }
 
     private func isCurrentPush(_ key: String, gen: Int) -> Bool { pushGen[key] == gen }
+
+    /// Abandon every in-flight save.
+    ///
+    /// Pushes now retry for up to half a minute, so without this they outlive
+    /// the session that authorised them: a retry landing after somebody else
+    /// signs in on this device would PUT the previous account's data under the
+    /// new account's cookie. Cancelling also clears the pending-key bookkeeping,
+    /// which otherwise carried into the next session and made `applyRemote` skip
+    /// those keys for a user they had nothing to do with.
+    private func cancelPendingPushes() {
+        pushTasks.values.forEach { $0.cancel() }
+        pushTasks.removeAll()
+        pushGen.removeAll()
+        lastLocalWrite.removeAll()
+    }
 
     private func hasPendingPush(_ key: String) -> Bool { pushTasks[key] != nil }
     private func wroteRecently(_ key: String, window: TimeInterval = 20) -> Bool {
@@ -1501,39 +1528,62 @@ final class AppState: ObservableObject {
 
     func todayPlan() -> DayPlan { days[todayKey] ?? DayPlan() }
 
-    private func saveDay(_ d: DayPlan) {
-        days[todayKey] = d
+    private func saveDay(_ d: DayPlan, on key: String) {
+        days[key] = d
         push(StateKey.days, days)
+    }
+
+    /// The day whose plan actually holds `id`.
+    ///
+    /// Every one of these used to read `todayPlan()` and write straight back to
+    /// `days[todayKey]`, with `todayKey` re-read from the clock on each call. A
+    /// focus block begun at 23:50 and finished at 00:15 therefore looked for its
+    /// to-do in a day that had just turned over and did not contain it — so
+    /// `firstIndex` failed, the function returned silently, and because
+    /// `drainSpent()` had already zeroed the counter the twenty-five minutes
+    /// were gone. Completing that block did nothing either: the task stayed
+    /// unticked. Work is banked against the day that owns it.
+    private func dayKeyOwning(todo id: String) -> String? {
+        FocusRecord.dayOwning(todo: id, in: days, today: todayKey)
+    }
+
+    /// Edit the to-do `id` wherever it lives. No-op when nothing owns it.
+    private func mutateTodo(_ id: String, _ transform: (inout FocusItem) -> Void) {
+        guard let key = dayKeyOwning(todo: id) else { return }
+        var d = days[key] ?? DayPlan()
+        guard let i = d.todos.firstIndex(where: { $0.id == id }) else { return }
+        transform(&d.todos[i])
+        saveDay(d, on: key)
     }
 
     func addTodo(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
-        var d = todayPlan()
+        let key = todayKey
+        var d = days[key] ?? DayPlan()
         d.todos.append(FocusItem(text: t))
-        saveDay(d)
+        saveDay(d, on: key)
     }
 
     func toggleTodo(_ id: String) {
-        var d = todayPlan()
-        guard let i = d.todos.firstIndex(where: { $0.id == id }) else { return }
-        d.todos[i].done.toggle()
-        saveDay(d)
+        mutateTodo(id) { $0.done.toggle() }
     }
 
     func removeTodo(_ id: String) {
-        var d = todayPlan()
+        guard let key = dayKeyOwning(todo: id) else { return }
+        var d = days[key] ?? DayPlan()
         d.todos.removeAll { $0.id == id }
-        saveDay(d)
+        saveDay(d, on: key)
     }
 
     func setFocus(_ items: [String]) {
-        var d = todayPlan()
+        let key = todayKey
+        var d = days[key] ?? DayPlan()
         d.todos = items
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .map { FocusItem(text: $0) }
-        saveDay(d)
+        saveDay(d, on: key)
     }
     func toggleHabit(_ name: String) {
         var d = days[todayKey] ?? DayPlan()
@@ -1548,27 +1598,21 @@ final class AppState: ObservableObject {
 
     /// Mark done (not a toggle) — what the focus timer calls when a block ends.
     func completeTodo(_ id: String) {
-        var d = todayPlan()
-        guard let i = d.todos.firstIndex(where: { $0.id == id }), !d.todos[i].done else { return }
-        d.todos[i].done = true
-        saveDay(d)
+        mutateTodo(id) { if !$0.done { $0.done = true } }
     }
 
     /// Planned focus length for one to-do, in minutes.
     func setTodoMinutes(_ id: String, _ mins: Int) {
-        var d = todayPlan()
-        guard let i = d.todos.firstIndex(where: { $0.id == id }) else { return }
-        d.todos[i].mins = max(1, mins)
-        saveDay(d)
+        mutateTodo(id) { $0.mins = max(1, mins) }
     }
 
     /// Bank the seconds a focus session actually ran.
+    ///
+    /// `drainSpent()` has already zeroed the timer's counter by the time this is
+    /// called, so anything this fails to record is lost rather than retried.
     func addTodoSpent(_ id: String, seconds: Int) {
         guard seconds > 0 else { return }
-        var d = todayPlan()
-        guard let i = d.todos.firstIndex(where: { $0.id == id }) else { return }
-        d.todos[i].spent += seconds
-        saveDay(d)
+        mutateTodo(id) { $0.spent += seconds }
     }
 
     /// Consecutive clean days counting back from today (rules in `FocusRecord`).

@@ -30,13 +30,31 @@ final class EventMediaStore: ObservableObject {
         self.vault = vault
     }
 
-    private static let dir: URL = {
+    /// Computed, not a `static let`: `purgeCache()` deletes this folder, and a
+    /// one-shot that had already created it would leave every later write
+    /// failing silently into a parent that no longer exists.
+    private static var dir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let d = base.appendingPathComponent("MyOS/event-media", isDirectory: true)
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
-    }()
+    }
+
+    /// Drop every decrypted byte this device is holding.
+    ///
+    /// The disk cache stores *plaintext* — the whole point is that views can
+    /// read it without a round trip through the vault — and nothing was clearing
+    /// it when the session ended. Somebody else signing in on the same Mac
+    /// inherited a folder of the previous user's unsealed photos and videos.
+    /// R2 is authoritative, so anything dropped here simply re-downloads.
+    func purgeCache() {
+        memory.removeAll()
+        inFlight.removeAll()
+        failed.removeAll()
+        try? FileManager.default.removeItem(at: Self.dir)
+        version &+= 1
+    }
 
     private static func aad(_ id: String) -> Data { Data("event-media:\(id)".utf8) }
     private static func cacheURL(_ id: String) -> URL { dir.appendingPathComponent(id) }

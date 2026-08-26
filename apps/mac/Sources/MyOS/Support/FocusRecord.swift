@@ -40,4 +40,23 @@ enum FocusRecord {
     static func focusedMinutes(_ todos: [FocusItem]) -> Int {
         todos.reduce(0) { $0 + $1.spent } / 60
     }
+
+    /// Which day's plan holds a given to-do.
+    ///
+    /// The focus timer used to bank its minutes into `days[todayKey]` with
+    /// `todayKey` re-read from the clock at the moment it finished. A block
+    /// begun at 23:50 and ended at 00:15 therefore looked for its to-do in a day
+    /// that had just turned over and did not contain it, so the write silently
+    /// did nothing — and since the timer had already drained its counter, the
+    /// twenty-five minutes were gone rather than merely unrecorded. Completing
+    /// that block failed the same way and left the task unticked.
+    ///
+    /// Today is checked first so the common case costs one lookup, and the rest
+    /// are walked newest-first so a duplicated id can only resolve forwards.
+    static func dayOwning(todo id: String, in days: [String: DayPlan], today: String) -> String? {
+        if days[today]?.todos.contains(where: { $0.id == id }) == true { return today }
+        return days.keys.sorted(by: >).first { key in
+            days[key]?.todos.contains { $0.id == id } == true
+        }
+    }
 }
