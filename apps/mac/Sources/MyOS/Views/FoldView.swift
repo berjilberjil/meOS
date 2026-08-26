@@ -304,39 +304,15 @@ struct FoldData: Codable, Equatable {
 
     static func load() -> FoldData? { loadFromDisk() }
 
-    /// Last known real snapshot (14 Aug). Used only when this device is stuck on ₹0
-    /// after an empty live pull wiped the phone copy.
-    static func recoverySnapshot() -> FoldData {
-        var f = FoldData()
-        f.asOf = "14 Aug 2026, 9:14 pm"
-        f.currency = "INR"
-        f.netWorth = 67_217.29
-        f.liquid = 19_671.89
-        f.investments = 47_545.40
-        f.spentThisMonth = 39_232.30
-        f.stocksValue = 0
-        f.changeValue = -11_282.44
-        f.changePercent = -0.144
-        f.changeLabel = "6 months"
-        f.history = [
-            78500, 81680, 79088, 85241, 79463, 78264, 73638, 75758, 75101, 72773,
-            74480, 78911, 79542, 81289, 80808, 90653, 85074, 84479, 80126, 75766,
-            76572, 86786, 76495, 70723, 64415, 66217, 64203, 64651, 87795, 55070,
-            49073, 48659, 58447, 69130, 68374, 67686, 87981, 74310, 70898, 68404,
-            67207, 67217
-        ]
-        f.banks = [
-            Bank(name: "HDFC Bank", last4: "8362", balance: 19_539.13),
-            Bank(name: "State Bank of India", last4: "7065", balance: 111.56),
-            Bank(name: "AU Small Finance Bank", last4: "4377", balance: 21.20)
-        ]
-        f.topSpends = [
-            Spend(category: "Transport", amount: 7731.40),
-            Spend(category: "Food & Drinks", amount: 1765.97),
-            Spend(category: "Hidden Charges", amount: 1532.50),
-            Spend(category: "Shopping", amount: 1313.95)
-        ]
-        return f
+    /// Remove this device's cached snapshot.
+    ///
+    /// Not part of the state blob, so logging out does not touch it otherwise —
+    /// and the path is fixed, not per-account, so the next person to sign in on
+    /// this Mac had the previous user's balances loaded straight back off disk
+    /// and pushed into their own synced state by `healFoldSnapshot`.
+    static func deleteFromDisk() {
+        guard let url = fileURL else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     static func save(_ data: FoldData) {

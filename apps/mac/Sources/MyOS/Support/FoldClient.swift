@@ -486,10 +486,21 @@ enum FoldSnapshotBuilder {
             && f.spentThisMonth == 0 && f.banks.isEmpty && f.topSpends.isEmpty
     }
 
-    static func resolved(current: FoldData?, disk: FoldData?, recovery: FoldData) -> FoldData {
+    /// The best snapshot this device actually has: what is in memory, else what
+    /// is on disk. Nil when neither holds anything real.
+    ///
+    /// There used to be a third fallback — a hardcoded "recovery" snapshot added
+    /// to rescue a device stuck on zero. It held the owner's real bank names,
+    /// account digits, balances and a 42-point net-worth history, and nothing
+    /// scoped it to him. Any new user who opened the Fold tab without connecting
+    /// anything was shown his finances; `restoreFoldIfBare` then saved that to
+    /// disk and pushed it, so it became their synced state and reached their
+    /// other devices too. Nothing real to show is not an emergency — it is the
+    /// "Connect Fold" screen, which this returning nil is what reveals.
+    static func resolved(current: FoldData?, disk: FoldData?) -> FoldData? {
         if let c = current, !isBare(c) { return c }
         if let d = disk, !isBare(d) { return d }
-        return recovery
+        return nil
     }
 
     /// `extracted` is false when Fold was reached but nothing usable came back —

@@ -101,6 +101,9 @@ final class AppState: ObservableObject {
     private var foldFileWatch: DispatchSourceFileSystemObject?
     #endif
     private var isPulling = false
+    /// One media migration at a time. `syncNow()` and the media tick both start
+    /// one, and two interleaving overwrite each other's results.
+    private var isMigratingEventMedia = false
 
     init() {
         api.vault = vault
@@ -285,6 +288,7 @@ final class AppState: ObservableObject {
         // this Mac inherits both.
         ProgressPhotoStore.use(account: "")
         EventMediaStore.shared.purgeCache()
+        FoldData.deleteFromDisk()
         await api.logout()
         markSession(active: false)
         api.clearCache()
@@ -706,19 +710,41 @@ final class AppState: ObservableObject {
     /// so an interruption leaves un-migrated items rather than dangling keys.
     func migrateEventMediaToR2() async {
         guard isHydrated, let dek = vault.dek else { return }
+        guard !isMigratingEventMedia else { return }
         guard events.contains(where: { $0.media.contains(where: \.needsMigration) }) else { return }
+        isMigratingEventMedia = true
+        defer { isMigratingEventMedia = false }
 
+        // Collect into a map keyed by media id rather than editing a snapshot of
+        // the whole array. Uploading a 25 MB video takes long enough for a lot to
+        // happen: another memory logged here, one arriving from the phone through
+        // `applyRemote` — which this does not block, because a migration is not a
+        // push. Writing the pre-upload snapshot back afterwards deleted every one
+        // of those, on both devices, silently. `syncNow()` can start a second
+        // migration from its own task too, hence the reentrancy guard.
+        var migrated: [String: EventMedia] = [:]
+        for event in events {
+            for m in event.media where m.needsMigration {
+                do {
+                    if let out = try await EventMediaStore.migrate(m, api: api, dek: dek) {
+                        migrated[m.id] = out
+                    }
+                } catch {
+                    break   // network or vault trouble — keep what landed, retry next tick
+                }
+            }
+        }
+        guard !migrated.isEmpty else { return }
+
+        // Re-read: `events` is whatever it is *now*, not what it was before the
+        // awaits. Only the migrated media entries are replaced.
         var next = events
         var moved = 0
         for i in next.indices {
-            for j in next[i].media.indices where next[i].media[j].needsMigration {
-                do {
-                    if let m = try await EventMediaStore.migrate(next[i].media[j], api: api, dek: dek) {
-                        next[i].media[j] = m
-                        moved += 1
-                    }
-                } catch {
-                    return   // network or vault trouble — keep what we have, retry next launch
+            for j in next[i].media.indices {
+                if let out = migrated[next[i].media[j].id] {
+                    next[i].media[j] = out
+                    moved += 1
                 }
             }
         }
@@ -785,14 +811,22 @@ final class AppState: ObservableObject {
         stopFoldWatch()
     }
 
-    /// Pick up a new `fold.json` the moment it lands on disk and push so the phone
-    /// gets it on the next 2s pull. Live Fold login is the source of truth.
-    func ingestLocalFold() {
+    /// Pick up `fold.json` from disk.
+    ///
+    /// `live` marks the file-watcher path: a Fold login writes that file, so a
+    /// change landing on disk really is the newest thing anywhere and should
+    /// win. Every other caller runs during hydrate, where the snapshot that just
+    /// came down from the server is at least as new — and taking disk
+    /// unconditionally there meant a device that had been shut for a week booted
+    /// up, replaced the fresh snapshot with its stale one, and `healFoldSnapshot`
+    /// pushed last week's balances back for every other device to pull down.
+    func ingestLocalFold(live: Bool = false) {
         guard let disk = FoldData.loadFromDisk(), disk != fold else { return }
         if FoldSnapshotBuilder.isBare(disk) {
             restoreFoldIfBare()
             return
         }
+        if !live, let current = fold, !FoldSnapshotBuilder.isBare(current) { return }
         fold = disk
         if isHydrated { push(StateKey.fold, disk) }
     }
@@ -805,10 +839,8 @@ final class AppState: ObservableObject {
     }
 
     func restoreFoldIfBare() {
-        let next = FoldSnapshotBuilder.resolved(
-            current: fold, disk: FoldData.loadFromDisk(), recovery: FoldData.recoverySnapshot()
-        )
-        guard next != fold else { return }
+        guard let next = FoldSnapshotBuilder.resolved(current: fold, disk: FoldData.loadFromDisk()),
+              next != fold else { return }
         fold = next
         FoldData.save(next)
         if isHydrated { push(StateKey.fold, next) }
@@ -823,7 +855,7 @@ final class AppState: ObservableObject {
         guard fd >= 0 else { return }
         let src = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd, eventMask: [.write, .extend, .attrib, .rename, .link], queue: .main)
-        src.setEventHandler { [weak self] in self?.ingestLocalFold() }
+        src.setEventHandler { [weak self] in self?.ingestLocalFold(live: true) }
         src.setCancelHandler { close(fd) }
         src.resume()
         foldFileWatch = src

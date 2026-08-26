@@ -130,11 +130,12 @@ final class FoldClientTests: XCTestCase {
         rich.liquid = 19671
         var zeros = FoldData()
         zeros.asOf = "16 Aug 2026, 6:11 pm"
-        let rec = FoldData.recoverySnapshot()
-        XCTAssertEqual(FoldSnapshotBuilder.resolved(current: rich, disk: nil, recovery: rec).netWorth, 67217)
-        XCTAssertEqual(FoldSnapshotBuilder.resolved(current: zeros, disk: rich, recovery: rec).netWorth, 67217)
-        XCTAssertEqual(FoldSnapshotBuilder.resolved(current: zeros, disk: zeros, recovery: rec).netWorth, rec.netWorth)
-        XCTAssertFalse(FoldSnapshotBuilder.isBare(rec))
+        XCTAssertEqual(FoldSnapshotBuilder.resolved(current: rich, disk: nil)?.netWorth, 67217)
+        XCTAssertEqual(FoldSnapshotBuilder.resolved(current: zeros, disk: rich)?.netWorth, 67217)
+        // Nothing real anywhere is the "Connect Fold" screen, not a fallback to
+        // somebody else's balances.
+        XCTAssertNil(FoldSnapshotBuilder.resolved(current: zeros, disk: zeros))
+        XCTAssertNil(FoldSnapshotBuilder.resolved(current: nil, disk: nil))
     }
 
     func testBareLocalStillPullsSyncAfterFailedLive() {
