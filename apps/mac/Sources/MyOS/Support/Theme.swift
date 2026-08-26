@@ -413,8 +413,15 @@ extension View {
 
 enum Fmt {
     /// Weight with at most one decimal (e.g. 72 or 72.5).
+    ///
+    /// Clamped because `Int(_: Double)` **traps** outside Int64 rather than
+    /// saturating, and this runs on whatever is in the field right now — a
+    /// weight field that commits on every keystroke, a height parsed with bare
+    /// `Double(_:)` (which accepts "inf"), a number from sync, a number a model
+    /// guessed. Nineteen digits was a hard crash on the very next render.
     static func trimKg(_ v: Double) -> String {
-        let r = (v * 10).rounded() / 10
+        guard v.isFinite else { return "0" }
+        let r = (min(max(v, -1_000_000), 1_000_000) * 10).rounded() / 10
         return r == r.rounded() ? String(Int(r)) : String(format: "%.1f", r)
     }
 

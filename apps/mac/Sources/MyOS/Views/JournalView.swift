@@ -285,7 +285,11 @@ private struct MoodSlider: View {
     private let words = ["Rough", "Low", "Okay", "Good", "Great"]
     @State private var dragging: Int? = nil
 
-    private var value: Int { dragging ?? mood ?? 1 }
+    /// Clamped: `words[value - 1]` indexes a five-element array, and `mood` is
+    /// whatever the AI quick-log wrote or sync delivered — `applyParse` takes the
+    /// model's integer verbatim. "mood was a 7 out of 10" stored a 7, and from
+    /// then on opening the Journal tab crashed, on both devices, for good.
+    private var value: Int { max(1, min(5, dragging ?? mood ?? 1)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {

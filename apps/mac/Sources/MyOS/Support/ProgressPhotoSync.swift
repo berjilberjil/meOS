@@ -27,7 +27,9 @@ enum ProgressPhotoSync {
     /// Re-ask the server to drop every photo this device has deleted but not yet
     /// had confirmed gone.
     static func flushDeletes() async {
+        let account = ProgressPhotoStore.account
         for id in ProgressPhotoStore.deletedIds {
+            guard ProgressPhotoStore.account == account else { return }
             do {
                 try await api.deleteBodyPhoto(id: id)
                 ProgressPhotoStore.clearDeleted(id)
@@ -39,7 +41,13 @@ enum ProgressPhotoSync {
 
     /// Upload every local photo the server hasn't confirmed yet.
     static func push() async {
+        // This loop is detached and each upload can take a minute. Without the
+        // account check, a logout mid-loop meant the next iteration POSTed the
+        // previous user's file under the new user's cookie — the server writes
+        // by session, so it landed in their bucket.
+        let account = ProgressPhotoStore.account
         for photo in ProgressPhotoStore.pending() {
+            guard ProgressPhotoStore.account == account else { return }
             guard let jpeg = try? Data(contentsOf: photo.url) else { continue }
             do {
                 try await api.uploadBodyPhoto(id: photo.id, date: photo.date, jpeg: jpeg)
@@ -64,12 +72,28 @@ enum ProgressPhotoSync {
         }
     }
 
-    /// Download any photo synced from another device that isn't on this one yet.
+    /// Reconcile with the cloud: take down what is missing here, and drop what
+    /// is no longer there.
     static func pull() async {
         guard let remote = try? await api.listBodyPhotos() else { return }
+        let account = ProgressPhotoStore.account
+        let remoteIds = Set(remote.map(\.id))
+
+        // A photo deleted on the other device has to disappear from this one.
+        // `pull` only ever added, so deleting on the Mac left the iPhone showing
+        // it forever — and still feeding it into the weekly comparison. Only
+        // photos this device had confirmed uploaded are removed: anything not
+        // yet synced is the owner's single copy and is never someone else's
+        // delete to act on.
+        for local in ProgressPhotoStore.list()
+        where !remoteIds.contains(local.id) && ProgressPhotoStore.isSynced(local.id) {
+            ProgressPhotoStore.delete(local.id)
+        }
+
         let localIds = Set(ProgressPhotoStore.list().map(\.id))
         let deleted = ProgressPhotoStore.deletedIds
         for photo in remote where !localIds.contains(photo.id) && !deleted.contains(photo.id) {
+            guard ProgressPhotoStore.account == account else { return }
             guard let urlString = photo.url, let url = URL(string: urlString) else { continue }
             guard let (data, response) = try? await URLSession.shared.data(from: url),
                   let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode)

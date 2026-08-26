@@ -17,7 +17,12 @@ private extension Dictionary where Key == String, Value == Any {
     }
     func num(_ k: String) -> Int? {
         if let i = self[k] as? Int { return i }
-        if let d = self[k] as? Double { return Int(d.rounded()) }
+        // Clamped: an MCP client or a model can hand over 1e21 — legal JSON,
+        // legal Double, far outside Int64 — and `Int(_: Double)` traps there.
+        if let d = self[k] as? Double {
+            guard d.isFinite else { return nil }
+            return Int(Swift.min(Swift.max(d.rounded(), -1e15), 1e15))
+        }
         if let s = self[k] as? String { return Int(s.filter { $0.isNumber || $0 == "-" }) }
         return nil
     }

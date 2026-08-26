@@ -67,6 +67,15 @@ final class DietBridge {
     private func handle(_ req: HTTPReq) -> HTTPRes {
         guard let state else { return HTTPRes(503, #"{"error":"not ready"}"#) }
         guard req.token == Self.token() else { return HTTPRes(401, #"{"error":"bad token"}"#) }
+        // A write needs a hydrated store. The bridge starts from `AppState.init`,
+        // long before any unlock, and on the Mac the app always lands on the
+        // passphrase screen. Before hydrate, `push` refuses the write, the next
+        // `apply()` overwrites the in-memory mutation from the server — and the
+        // tool had already been told `{"ok":true}`. Meals logged at the lock
+        // screen simply never existed.
+        if req.method != "GET", !state.isHydrated {
+            return HTTPRes(503, #"{"error":"MyOS is locked or not synced yet"}"#)
+        }
         do {
             switch (req.method, req.path) {
             case ("GET", "/health"):

@@ -145,7 +145,13 @@ enum ProgressPhotoStore {
         NotificationCenter.default.post(name: .progressPhotosDidChange, object: id)
     }
 
-    private static let importedKey = "myos.progress.importedAssetIds"
+    // All three of these sets are keyed by account for the same reason the
+    // folder is. They were plain globals shared by every account on the device,
+    // so user A's un-flushed tombstone for the legacy stem "2026-08-15" was
+    // replayed under user B's cookie on the next sync and deleted B's photo for
+    // that date — and a stem in A's synced set made `pending()` skip B's
+    // identically-named photo, which then never uploaded at all.
+    private static var importedKey: String { "myos.progress.importedAssetIds.\(account)" }
 
     static var importedIds: Set<String> {
         Set(UserDefaults.standard.stringArray(forKey: importedKey) ?? [])
@@ -162,7 +168,7 @@ enum ProgressPhotoStore {
     // (either it uploaded it, or it just pulled it down). Purely local bookkeeping —
     // the source of truth for what's actually in the cloud is the server.
 
-    private static let syncedKey = "myos.progress.syncedStems"
+    private static var syncedKey: String { "myos.progress.syncedStems.\(account)" }
 
     static var syncedIds: Set<String> {
         Set(UserDefaults.standard.stringArray(forKey: syncedKey) ?? [])
@@ -200,7 +206,7 @@ enum ProgressPhotoStore {
     // A stem stays on this list until the server has confirmed it is gone. It is
     // both the retry queue and the filter `pull()` checks before downloading.
 
-    private static let deletedKey = "myos.progress.deletedStems"
+    private static var deletedKey: String { "myos.progress.deletedStems.\(account)" }
 
     static var deletedIds: Set<String> {
         Set(UserDefaults.standard.stringArray(forKey: deletedKey) ?? [])

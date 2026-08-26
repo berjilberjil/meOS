@@ -151,6 +151,8 @@ final class APIClient {
 
     /// Last `ETag` seen for `GET api/state`.
     private var stateETag: String?
+    /// The ETag of the last 200, waiting on the caller to say it was applied.
+    private var pendingStateETag: String?
 
     /// The live-sync read. Sends `If-None-Match` and returns **nil** when the
     /// server answers `304 Not Modified`, so an unchanged poll costs a few
@@ -172,9 +174,20 @@ final class APIClient {
             throw APIError(status: http.statusCode,
                            message: Self.errorText(from: data, status: http.statusCode))
         }
-        stateETag = http.value(forHTTPHeaderField: "ETag")
+        // Held, not committed. Only the caller knows whether the payload was
+        // actually applied, and storing it here meant a snapshot `applyRemote`
+        // deliberately deferred — or one `decodePayload` threw on — was answered
+        // 304 forever after and never offered again. See `AppState.applyRemote`.
+        pendingStateETag = http.value(forHTTPHeaderField: "ETag")
         Self.writeCache(data, "state.json")
         return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    /// Accept the last fetch's ETag. Call only once its payload is fully applied.
+    func commitStateETag() {
+        guard let pendingStateETag else { return }
+        stateETag = pendingStateETag
+        self.pendingStateETag = nil
     }
 
     /// Pull the plaintext crypto metadata out of a raw state map, if the account

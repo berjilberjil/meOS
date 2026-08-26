@@ -298,4 +298,44 @@ final class ShipAuditTests: XCTestCase {
         XCTAssertTrue(AppState.isWorthRetrying(APIError(status: 408, message: "Timeout")))
         XCTAssertTrue(AppState.isWorthRetrying(APIError(status: 429, message: "Slow down")))
     }
+
+    // MARK: - Numbers that used to crash the app
+
+    // `Int(_: Double)` traps outside Int64 rather than saturating. These
+    // formatters run on every keystroke of unvalidated fields, and on whatever
+    // arrives from sync or from a model's guess.
+    func testWeightFormatterSurvivesNonsense() {
+        XCTAssertEqual(Fmt.trimKg(.infinity), "0")
+        XCTAssertEqual(Fmt.trimKg(-.infinity), "0")
+        XCTAssertEqual(Fmt.trimKg(.nan), "0")
+        XCTAssertFalse(Fmt.trimKg(1e300).isEmpty, "clamped, not crashed")
+    }
+
+    func testWeightFormatterStillFormatsRealWeights() {
+        XCTAssertEqual(Fmt.trimKg(72), "72")
+        XCTAssertEqual(Fmt.trimKg(72.5), "72.5")
+        XCTAssertEqual(Fmt.trimKg(72.44), "72.4")
+    }
+
+    func testNumberFieldFormatterSurvivesNonsense() {
+        XCTAssertEqual(KLabeledNumberField.format(.infinity, decimals: 0), "")
+        XCTAssertEqual(KLabeledNumberField.format(.nan, decimals: 1), "")
+        XCTAssertEqual(KLabeledNumberField.format(nil, decimals: 0), "")
+        XCTAssertFalse(KLabeledNumberField.format(1e300, decimals: 0).isEmpty)
+    }
+
+    func testNumberFieldFormatterStillFormats() {
+        XCTAssertEqual(KLabeledNumberField.format(8000, decimals: 0), "8000")
+        XCTAssertEqual(KLabeledNumberField.format(175.5, decimals: 1), "175.5")
+    }
+
+    // The profile height field parsed with bare `Double(_:)`, which accepts
+    // "inf" — and an infinite height crashed the formatter on the next render.
+    func testProfileDecimalParseRejectsInfinity() {
+        XCTAssertNil(ProfileView.parseDecimal("inf"))
+        XCTAssertNil(ProfileView.parseDecimal("nan"))
+        XCTAssertNil(ProfileView.parseDecimal(""))
+        XCTAssertEqual(ProfileView.parseDecimal("175.5"), 175.5)
+        XCTAssertEqual(ProfileView.parseDecimal("17a5"), 175, "stray letters are dropped, not fatal")
+    }
 }

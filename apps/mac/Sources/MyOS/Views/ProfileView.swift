@@ -437,11 +437,21 @@ struct ProfileView: View {
         }
     }
 
+    /// Digits and one dot only. Mirrors `KLabeledNumberField.parse`.
+    static func parseDecimal(_ s: String) -> Double? {
+        let t = s.trimmingCharacters(in: .whitespaces).filter { $0.isNumber || $0 == "." }
+        guard !t.isEmpty, let v = Double(t), v.isFinite else { return nil }
+        return v
+    }
+
     private func doubleField(_ label: String, get: @escaping () -> Double?,
                              set: @escaping (Double?) -> Void, placeholder: String) -> some View {
         labelledEditable(label, value: get().map { Fmt.trimKg($0) } ?? "") {
             TextField("", text: Binding(get: { get().map { Fmt.trimKg($0) } ?? "" },
-                                        set: { set(Double($0.trimmingCharacters(in: .whitespaces))) }),
+                                        // Filtered, not bare `Double(_:)` — that
+                                        // accepts "inf", and an infinite height
+                                        // crashed `Fmt.trimKg` on the next render.
+                                        set: { set(Self.parseDecimal($0)) }),
                       prompt: Text(placeholder).foregroundColor(Palette.faint))
                 .textFieldStyle(.plain).font(.footnote).foregroundStyle(Palette.text)
                 .knField()

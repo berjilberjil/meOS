@@ -432,10 +432,14 @@ struct KLabeledNumberField: View {
                 .knField(focused: focused)
         }
     }
+    /// Clamped for the same reason as `Fmt.trimKg`: `Int(_: Double)` traps
+    /// outside Int64. This one runs on every keystroke in Height, Calorie
+    /// target and Steps goal, so it is the most exposed of the pair.
     static func format(_ v: Double?, decimals: Int) -> String {
-        guard let v else { return "" }
-        if decimals <= 0 { return String(Int(v.rounded())) }
-        let r = (v * pow(10, Double(decimals))).rounded() / pow(10, Double(decimals))
+        guard let v, v.isFinite else { return "" }
+        let safe = min(max(v, -1_000_000_000), 1_000_000_000)
+        if decimals <= 0 { return String(Int(safe.rounded())) }
+        let r = (safe * pow(10, Double(decimals))).rounded() / pow(10, Double(decimals))
         return r == r.rounded() ? String(Int(r)) : String(format: "%.\(decimals)f", r)
     }
     static func parse(_ s: String) -> Double? {

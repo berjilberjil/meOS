@@ -614,47 +614,81 @@ final class AppState: ObservableObject {
                 return
             }
             let payload = try api.decodePayload(fromRaw: raw)
-            applyRemote(payload)
+            // Only once every offered key actually landed. See `applyRemote`.
+            if applyRemote(payload) { api.commitStateETag() }
             lastHydrateError = nil
+        } catch let e as APIError where e.status == 401 || e.status == 403 {
+            // The session is over. `bootstrap` gives a launch-time 401 exactly
+            // this treatment, but a live-sync 401 was swallowed here — so an app
+            // left open past its 60-day session kept accepting edits for hours,
+            // pushed each one into a 401 that `isWorthRetrying` rightly refuses
+            // to retry, showed nothing, and lost the lot at the next relaunch.
+            await logout()
         } catch {
             // Stay quiet — the next tick retries. Surface only a hard hydrate miss.
         }
     }
 
     /// Apply a remote snapshot without stomping an in-flight local edit.
-    private func applyRemote(_ s: AppStatePayload) {
-        if let v = s.fitness,        !hasPendingPush(StateKey.fitness),        v != fitness        { fitness = v }
-        if let v = s.fitnessProfile, !hasPendingPush(StateKey.fitnessProfile), v != fitnessProfile { fitnessProfile = v }
-        if let v = s.journal,        !hasPendingPush(StateKey.journal),        v != journal,
-           !wroteRecently(StateKey.journal, window: 5) { journal = v }
-        if let v = s.journalPresets, !hasPendingPush(StateKey.journalPresets), v != journalPresets { journalPresets = v }
+    ///
+    /// Returns false when a key that differed had to be held back.
+    ///
+    /// That return value is the whole point. The ETag is global — one header for
+    /// all twenty-odd keys — so committing it after a partial apply tells the
+    /// server "I already have this version". Every later poll then answers 304
+    /// and the key that was skipped is never offered again. The grace windows
+    /// below are meant to expire after a few seconds; committing straight
+    /// through them turned a deliberate deferral into permanent data loss. Two
+    /// devices logging meals minutes apart was enough: the Mac declined the
+    /// phone's nutrition once, stored the ETag, never saw it again, and
+    /// overwrote it server-side on its own next write.
+    private func applyRemote(_ s: AppStatePayload) -> Bool {
+        var deferred = false
+
+        /// Whether `key` must be held back this round — and remember that it was.
+        func blocked(_ key: String, grace: TimeInterval? = nil, busy: Bool = false) -> Bool {
+            let held = hasPendingPush(key) || busy
+                || (grace.map { wroteRecently(key, window: $0) } ?? false)
+            if held { deferred = true }
+            return held
+        }
+
+        // Fitness and training carry the same risk as nutrition — a poll issued
+        // before a local write can return after the push completed, so
+        // `hasPendingPush` is already false and the remote copy silently reverts
+        // a ticked set or a typed weight. They get the grace window too.
+        if let v = s.fitness, v != fitness, !blocked(StateKey.fitness, grace: 20) { fitness = v }
+        if let v = s.fitnessProfile, v != fitnessProfile,
+           !blocked(StateKey.fitnessProfile) { fitnessProfile = v }
         // Notes and journal get a grace window on top of the in-flight check.
         // A push is only "pending" for the 80ms debounce plus its request, and
         // at a 1.5s poll that leaves gaps between keystrokes wide enough for a
         // remote snapshot to land on text being typed right now.
-        if let v = s.notes,          !hasPendingPush(StateKey.notes),          v != notes,
-           !wroteRecently(StateKey.notes, window: 5) { notes = v }
-        if let v = s.days,           !hasPendingPush(StateKey.days),           v != days           { days = v }
-        if let v = s.profile,        !hasPendingPush(StateKey.profile),        v != profile        { profile = v }
+        if let v = s.journal, v != journal, !blocked(StateKey.journal, grace: 5) { journal = v }
+        if let v = s.journalPresets, v != journalPresets,
+           !blocked(StateKey.journalPresets) { journalPresets = v }
+        if let v = s.notes, v != notes, !blocked(StateKey.notes, grace: 5) { notes = v }
+        if let v = s.days, v != days, !blocked(StateKey.days) { days = v }
+        if let v = s.profile, v != profile, !blocked(StateKey.profile) { profile = v }
         // Never clobber an in-flight send — a 2s pull of the previous snapshot
         // was landing replies on the wrong turn.
-        if let v = s.chat,           !hasPendingPush(StateKey.chat), !chatBusy, v != chat          { chat = v }
-        if let v = s.nutrition,      !hasPendingPush(StateKey.nutrition),      v != nutrition,
-           !wroteRecently(StateKey.nutrition) { nutrition = v }
-        if let v = s.training,       !hasPendingPush(StateKey.training),       v != training       { training = v }
-        if let v = s.events,         !hasPendingPush(StateKey.events),         v != events         { events = v }
-        if let v = s.eventTags,      !hasPendingPush(StateKey.eventTags),      v != eventTags      { eventTags = v }
-        if let v = s.watch,          !hasPendingPush(StateKey.watch),          v != watch          { watch = v }
-        if let v = s.memory,         !hasPendingPush(StateKey.memory),         v != memory         { memory = v }
-        if let v = s.belongings,     !hasPendingPush(StateKey.belongings),     v != belongings     { belongings = v }
-        if let v = s.scans,          !hasPendingPush(StateKey.scans),          v != scans          { scans = v }
+        if let v = s.chat, v != chat, !blocked(StateKey.chat, busy: chatBusy) { chat = v }
+        if let v = s.nutrition, v != nutrition,
+           !blocked(StateKey.nutrition, grace: 20) { nutrition = v }
+        if let v = s.training, v != training, !blocked(StateKey.training, grace: 20) { training = v }
+        if let v = s.events, v != events, !blocked(StateKey.events) { events = v }
+        if let v = s.eventTags, v != eventTags, !blocked(StateKey.eventTags) { eventTags = v }
+        if let v = s.watch, v != watch, !blocked(StateKey.watch) { watch = v }
+        if let v = s.memory, v != memory, !blocked(StateKey.memory) { memory = v }
+        if let v = s.belongings, v != belongings, !blocked(StateKey.belongings) { belongings = v }
+        if let v = s.scans, v != scans, !blocked(StateKey.scans) { scans = v }
         // The mode is the one switch meant to reach across devices — a flip on
         // the Mac lands here on the phone within one poll.
-        if let v = s.taskMode,       !hasPendingPush(StateKey.taskMode),       v != taskMode       { taskMode = v }
-        if let v = s.weekly,         !hasPendingPush(StateKey.weekly),         v != weekly         { weekly = v }
+        if let v = s.taskMode, v != taskMode, !blocked(StateKey.taskMode) { taskMode = v }
+        if let v = s.weekly, v != weekly, !blocked(StateKey.weekly) { weekly = v }
         // A colour chosen on the Mac is the same colour on the phone one poll
         // later — that is most of what makes this feel like one app.
-        if let v = s.appearance,     !hasPendingPush(StateKey.appearance) {
+        if let v = s.appearance, !blocked(StateKey.appearance) {
             AppearanceStore.shared.apply(v)
         }
         // Activity merges rather than replaces even on a live pull: both devices
@@ -664,7 +698,7 @@ final class AppState: ObservableObject {
             let merged = activity.merged(with: v)
             if merged != activity { activity = merged }
         }
-        if let v = s.fold, !hasPendingPush(StateKey.fold), v != fold {
+        if let v = s.fold, v != fold, !blocked(StateKey.fold) {
             if FoldSnapshotBuilder.isBare(v) {
                 restoreFoldIfBare()
                 if let cur = fold, !FoldSnapshotBuilder.isBare(cur) { push(StateKey.fold, cur) }
@@ -674,6 +708,7 @@ final class AppState: ObservableObject {
             }
         }
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }
+        return !deferred
     }
 
     /// How often to ask the server "changed?".
@@ -1057,7 +1092,13 @@ final class AppState: ObservableObject {
         var changed = false
         for (key, n) in byDay {
             let existing = fitness[key]?.steps
-            let write = key == authoritative ? existing != n : (existing ?? 0) == 0
+            // A past day takes the higher reading, not merely the first one. It
+            // used to be written only when nothing was there at all, which froze
+            // every day at whatever the pedometer happened to have read the last
+            // time the app was open: close it at 6pm on 7,400 steps, walk 3,000
+            // more that evening, and yesterday stayed 7,400 forever — under the
+            // goal, so the streak broke on a day that was actually walked.
+            let write = key == authoritative ? existing != n : n > (existing ?? 0)
             guard write else { continue }
             var d = fitness[key] ?? FitnessDay()
             d.steps = max(0, n)
