@@ -278,6 +278,25 @@ enum BlockBridge {
         return BlockDoc(blocks: blocks)
     }
 
+    /// The spans in `range` that are not the attachment character itself.
+    ///
+    /// Rescues text that ended up sharing a paragraph with an image or a link
+    /// card — something the block model cannot represent as a single block.
+    private static func textOutsideAttachments(in attr: NSAttributedString,
+                                               range: NSRange) -> [TextSpan] {
+        guard range.length > 0 else { return [] }
+        let ns = attr.string as NSString
+        let object = unichar(0xFFFC)
+        let kept = NSMutableAttributedString()
+        for i in 0..<range.length {
+            let at = range.location + i
+            guard at < ns.length, ns.character(at: at) != object else { continue }
+            kept.append(attr.attributedSubstring(from: NSRange(location: at, length: 1)))
+        }
+        guard kept.length > 0 else { return [] }
+        return spans(in: kept, range: NSRange(location: 0, length: kept.length))
+    }
+
     private static func spans(in attr: NSAttributedString, range: NSRange) -> [TextSpan] {
         var spans: [TextSpan] = []
         attr.enumerateAttributes(in: range, options: []) { at, r, _ in

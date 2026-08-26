@@ -10,6 +10,7 @@ struct SettingsView: View {
     @ObservedObject private var themeStore = ThemeStore.shared
 
     // Change-passphrase form
+    @State private var currentPass = ""
     @State private var newPass = ""
     @State private var newPassConfirm = ""
     @State private var passMsg: String?
@@ -125,6 +126,12 @@ struct SettingsView: View {
 
                 // Change passphrase
                 Text("Change passphrase").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                // The current one first. Rotating is as destructive as a wipe —
+                // which already re-authenticates — and without it anyone at an
+                // unlocked Mac could lock the owner out.
+                SecureField("", text: $currentPass,
+                            prompt: Text("Current passphrase").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
                 SecureField("", text: $newPass, prompt: Text("New passphrase").foregroundColor(Palette.faint))
                     .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
                 SecureField("", text: $newPassConfirm, prompt: Text("Confirm new passphrase").foregroundColor(Palette.faint))
@@ -134,6 +141,7 @@ struct SettingsView: View {
                 }
                 Button { Task { await changePass() } } label: { Text("Update passphrase") }
                     .buttonStyle(.bordered)
+                    .disabled(state.vaultBusy)
             }
         }
     }
@@ -142,9 +150,10 @@ struct SettingsView: View {
         passMsg = nil; passOK = false
         guard newPass.count >= 8 else { passMsg = "Use at least 8 characters."; return }
         guard newPass == newPassConfirm else { passMsg = "The two passphrases don’t match."; return }
-        if await state.changePassphrase(to: newPass) {
+        guard !currentPass.isEmpty else { passMsg = "Enter your current passphrase."; return }
+        if await state.changePassphrase(current: currentPass, to: newPass) {
             passOK = true; passMsg = "Passphrase updated."
-            newPass = ""; newPassConfirm = ""
+            currentPass = ""; newPass = ""; newPassConfirm = ""
         } else {
             passMsg = state.vaultError ?? "Couldn’t update the passphrase."
         }

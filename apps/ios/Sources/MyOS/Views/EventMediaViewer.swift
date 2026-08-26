@@ -107,7 +107,13 @@ private struct VideoPage: View {
         // forever, while the download it had just triggered landed unnoticed.
         // Closing and reopening played it, which is how this hid.
         .onChange(of: mediaStore.version) { _, _ in if player == nil { start() } }
-        .onChange(of: isActive) { _, on in if !on { teardown() } }
+        // Symmetric: tear down when it scrolls off, build again when it comes
+        // back. `onAppear` fires once per page and `mediaStore.version` does not
+        // move for bytes already cached, so without the second half a video you
+        // swiped past showed an endless spinner on the way back.
+        .onChange(of: isActive) { _, on in
+            if on { if player == nil { start() } } else { teardown() }
+        }
         .onDisappear { teardown() }
     }
 

@@ -20,8 +20,15 @@ import { nowISO, sql } from './db';
  */
 export const VOICE_ACCOUNT_DAILY_CHAR_CAP = 7000;
 
-/** One account's share of the day. Never above the account-wide ceiling. */
-export const VOICE_DAILY_CHAR_CAP = 4000;
+/**
+ * One account's share of the day. Never above the account-wide ceiling.
+ *
+ * Equal to it on purpose: the account ceiling is what protects the quota, and
+ * this exists only so one talkative user cannot drink the whole day before
+ * anyone else wakes up. Setting it lower than the account cap would strand the
+ * remainder on a single-user deployment, which is what ships today.
+ */
+export const VOICE_DAILY_CHAR_CAP = 7000;
 
 /** The UTC calendar day an instant falls in. Workers AI resets at 00:00 UTC. */
 export function utcDayKey(iso: string): string {
@@ -54,6 +61,28 @@ export function budgetDecision(
 // reset the guard, so the failure stuck for the life of the isolate. Each
 // request now awaits its own DDL; `create table if not exists` is idempotent
 // and costs nothing once the table is there.
+/**
+ * Refuse on whichever ceiling binds first, and report the tighter remainder so
+ * the client is told the truth about what it can still ask for.
+ *
+ * Exported so the account-wide rule is testable on its own. It used to be
+ * inlined in `reserveVoiceChars`, which needs a database — so the tests
+ * recreated the arithmetic themselves and would have passed against the version
+ * that had no account ceiling at all.
+ */
+export function combineCeilings(
+  usedByMe: number,
+  usedByEveryone: number,
+  request: number
+): { allowed: boolean; remaining: number } {
+  const mine = budgetDecision(usedByMe, request);
+  const account = budgetDecision(usedByEveryone, request, VOICE_ACCOUNT_DAILY_CHAR_CAP);
+  return {
+    allowed: mine.allowed && account.allowed,
+    remaining: Math.min(mine.remaining, account.remaining)
+  };
+}
+
 let ensured = false;
 async function ensureVoiceTable(): Promise<void> {
   if (ensured) return;
@@ -94,14 +123,7 @@ export async function reserveVoiceChars(
   const used = Number(rows[0]?.mine ?? 0);
   const usedByAll = Number(rows[0]?.everyone ?? 0);
 
-  // Refuse on whichever ceiling binds first, and report the tighter remainder
-  // so the client is told the truth about what it can still ask for.
-  const mine = budgetDecision(used, chars);
-  const account = budgetDecision(usedByAll, chars, VOICE_ACCOUNT_DAILY_CHAR_CAP);
-  const decision = {
-    allowed: mine.allowed && account.allowed,
-    remaining: Math.min(mine.remaining, account.remaining)
-  };
+  const decision = combineCeilings(used, usedByAll, chars);
   if (!decision.allowed) return decision;
 
   await sql`

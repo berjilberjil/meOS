@@ -209,11 +209,43 @@ final class APIClient {
                 guard vault.isUnlocked else { throw VaultLockedError() }
                 let ptData = try vault.openValue(v as! [String: Any], key: k)
                 plain[k] = try JSONSerialization.jsonObject(with: ptData, options: [.fragmentsAllowed])
+            } else if let vault, vault.hasMeta, vault.shouldEncrypt(k) {
+                // A key that is supposed to be sealed arriving in the clear is
+                // not data, it is a downgrade. The passthrough exists for the
+                // one-time migration off plaintext, but it was unconditional and
+                // permanent — so anything that could write to this account, or
+                // to a `myos.baseURL` override, could replace an envelope with
+                // JSON of its own and have the app trust it and re-seal it.
+                // Dropped rather than trusted; the module keeps its local value.
+                continue
             } else {
                 plain[k] = v
             }
         }
-        let rebuilt = try JSONSerialization.data(withJSONObject: plain)
+        do {
+            let rebuilt = try JSONSerialization.data(withJSONObject: plain)
+            return try decoder.decode(AppStatePayload.self, from: rebuilt)
+        } catch {
+            // One module in a shape this build cannot read must not take the
+            // whole app away. `decodeIfPresent` throws on a type mismatch, not
+            // only on absence, so a single key written by a newer build left
+            // every unlock failing here — the correct passphrase, every launch,
+            // with nothing on screen but "Log out". Drop the offenders and carry
+            // on with the rest.
+            return try decodeSkippingBadKeys(plain)
+        }
+    }
+
+    /// Decode each key on its own, discarding the ones that will not parse.
+    private func decodeSkippingBadKeys(_ plain: [String: Any]) throws -> AppStatePayload {
+        var good: [String: Any] = [:]
+        for (k, v) in plain {
+            let probe = try? JSONSerialization.data(withJSONObject: [k: v])
+            if let probe, (try? decoder.decode(AppStatePayload.self, from: probe)) != nil {
+                good[k] = v
+            }
+        }
+        let rebuilt = try JSONSerialization.data(withJSONObject: good)
         return try decoder.decode(AppStatePayload.self, from: rebuilt)
     }
 

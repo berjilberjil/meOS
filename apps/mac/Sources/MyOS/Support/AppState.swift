@@ -285,6 +285,12 @@ final class AppState: ObservableObject {
                 // under a second name, orphaning the account they already had.
                 if phase == .loggedOut || phase == .loading {
                     authError = "Signed in, but couldn't reach your data: \(why)"
+                    // And put the user somewhere with a control. `phase` stayed
+                    // `.loading`, so RootView kept showing the splash — "Getting
+                    // your day ready…" — with no error, no retry and no way to
+                    // the login form. The only escape was leaving the app and
+                    // coming back, which nothing said.
+                    phase = .loggedOut
                 }
             }
         }
@@ -303,6 +309,12 @@ final class AppState: ObservableObject {
         EventMediaStore.shared.purgeCache()
         FoldData.deleteFromDisk()
         AISettingsStore.shared.reset()
+        // The activity write-ahead log is a plain file, not account-scoped, and
+        // it holds three days of app names, site domains and window titles —
+        // written even while logged out, because tracking starts before auth. On
+        // the next sign-in the coordinator folded all of it into whoever was
+        // now signed in, and pushed it into *their* encrypted activity.
+        ActivityJournal.clear()
         await api.logout()
         markSession(active: false)
         api.clearCache()
@@ -338,6 +350,16 @@ final class AppState: ObservableObject {
     /// existing (plaintext) module in place. Surfaces the recovery code once.
     func completeVaultSetup(passphrase: String) async {
         vaultError = nil
+        // One at a time. The submit path is not disabled while this runs, and
+        // `vault.setup()` spends ~1.5s in two 600k-round PBKDF2 derivations on
+        // the main thread with nothing on screen changing — so a second Return
+        // was easy, and it minted a SECOND DEK over the first. Both then PUT
+        // their own meta while `migrateEncryptExisting` sealed twenty modules
+        // under whichever was current. If the server kept the first meta, the
+        // passphrase derived DEK1, the check token validated, the vault
+        // "unlocked" — and every data key failed to open, from the recovery code
+        // too. A brand-new account, permanently unopenable, on its first run.
+        guard !vaultBusy else { return }
         guard let raw = pendingRaw else { vaultError = "Lost the sync — reopen the app."; return }
         guard passphrase.count >= 8 else { vaultError = "Use at least 8 characters."; return }
         vaultBusy = true; defer { vaultBusy = false }
@@ -432,9 +454,21 @@ final class AppState: ObservableObject {
     // MARK: - Vault: manage (change passphrase, new recovery code, export)
 
     @discardableResult
-    func changePassphrase(to newPass: String) async -> Bool {
+    /// Rotate the passphrase. `current` is verified first — this is as
+    /// destructive as a wipe (on the Mac the passphrase is demanded at every
+    /// launch), and a wipe already re-authenticates. Without it, anyone reaching
+    /// an unlocked running MyOS could type a new passphrase, have it accepted
+    /// because the DEK is already in memory, and lock the owner out at the next
+    /// launch — recoverable only with the recovery code.
+    func changePassphrase(current: String, to newPass: String) async -> Bool {
         vaultError = nil
         guard newPass.count >= 8 else { vaultError = "Use at least 8 characters."; return false }
+        guard !vaultBusy else { return false }
+        vaultBusy = true; defer { vaultBusy = false }
+        guard await verifyPassphrase(current) else {
+            vaultError = "That isn't your current passphrase."
+            return false
+        }
         do {
             let meta = try vault.rewrap(newPassphrase: newPass)
             try await api.putCryptoMeta(meta)
@@ -449,14 +483,38 @@ final class AppState: ObservableObject {
 
     func regenerateRecoveryCode() async {
         vaultError = nil
+        guard !vaultBusy else { return }
+        vaultBusy = true; defer { vaultBusy = false }
+        let built: (meta: CryptoMeta, recoveryCode: String)
+        do { built = try vault.regenerateRecovery() } catch {
+            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return
+        }
         do {
-            let (meta, code) = try vault.regenerateRecovery()
-            try await api.putCryptoMeta(meta)
-            vault.adoptMeta(meta)          // only now that the server has it
-            recoveryCodeToShow = code
+            try await api.putCryptoMeta(built.meta)
+            vault.adoptMeta(built.meta)     // only now that the server has it
+            recoveryCodeToShow = built.recoveryCode
         } catch {
+            // The PUT may well have landed and only the response been lost — a
+            // 15-second request timeout on a single-shot write. That retires the
+            // code on paper while never showing its replacement, and the next
+            // forgotten passphrase is then unrecoverable. So ask the server what
+            // it actually holds before reporting failure.
+            if await serverHasMeta(built.meta) {
+                vault.adoptMeta(built.meta)
+                recoveryCodeToShow = built.recoveryCode
+                return
+            }
             vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    /// Whether the server's stored crypto metadata is the one we just built.
+    private func serverHasMeta(_ meta: CryptoMeta) async -> Bool {
+        guard let raw = try? await api.fetchStateRaw(),
+              let stored = api.cryptoMeta(from: raw) else { return false }
+        return stored.wrappedByRecovery == meta.wrappedByRecovery
+            && stored.recoverySalt == meta.recoverySalt
     }
 
     /// A plaintext JSON snapshot of everything — the user's own backup / escape hatch.
@@ -774,14 +832,19 @@ final class AppState: ObservableObject {
         // of those, on both devices, silently. `syncNow()` can start a second
         // migration from its own task too, hence the reentrancy guard.
         var migrated: [String: EventMedia] = [:]
-        for event in events {
+        // Labelled, so one failure ends the whole pass. A bare `break` only left
+        // the inner loop, so a relocked vault or a dropped network was retried
+        // once per remaining event — with a two-minute resource timeout on large
+        // video that is an hour of a single pass, blocking every other migration
+        // behind the reentrancy guard, and repeating on every media tick.
+        passes: for event in events {
             for m in event.media where m.needsMigration {
                 do {
                     if let out = try await EventMediaStore.migrate(m, api: api, dek: dek) {
                         migrated[m.id] = out
                     }
                 } catch {
-                    break   // network or vault trouble — keep what landed, retry next tick
+                    break passes   // keep what landed, retry next tick
                 }
             }
         }
@@ -1179,8 +1242,18 @@ final class AppState: ObservableObject {
     @discardableResult
     func upsertFood(_ food: Food) -> Food {
         let key = Food.matchKey(food.name)
-        guard !key.isEmpty,
-              let i = nutrition.customFoods.firstIndex(where: { Food.matchKey($0.name) == key })
+        guard !key.isEmpty else { return addFood(food) }
+        // An id that already matches wins over the name — a caller updating a
+        // seed food passes its id, and that must become a custom override rather
+        // than a second entry sharing the name.
+        if let i = nutrition.customFoods.firstIndex(where: { $0.id == food.id }) {
+            var f = food
+            f.isDefault = false
+            nutrition.customFoods[i] = f
+            push(StateKey.nutrition, nutrition)
+            return f
+        }
+        guard let i = nutrition.customFoods.firstIndex(where: { Food.matchKey($0.name) == key })
         else { return addFood(food) }
         var f = food
         f.id = nutrition.customFoods[i].id
@@ -2172,6 +2245,7 @@ final class AppState: ObservableObject {
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         events.removeAll { $0.id == id }
+        // (`resetEverything` does the same sweep over every event.)
         push(StateKey.events, events)
         guard !orphans.isEmpty else { return }
         Task { [api] in
@@ -2414,10 +2488,40 @@ final class AppState: ObservableObject {
         chat = ChatState();            push(StateKey.chat, chat)
         memory = MemoryState();        push(StateKey.memory, memory)
         eraseActivity()
-        for photo in ProgressPhotoStore.list() {
-            ProgressPhotoStore.delete(photo)
-            Task { await ProgressPhotoSync.delete(id: photo.id) }
+
+        // Take the sealed event media with it, exactly as `deleteEvent` does.
+        // Clearing `events` alone left every photo and video in the bucket with
+        // nothing able to name them again — the same leak, reachable from the
+        // one button that promises to remove everything.
+        let orphans = eventMediaKeys
+        if !orphans.isEmpty {
+            Task { [api] in
+                for key in orphans { try? await api.deleteEventMedia(id: key) }
+            }
         }
+
+        // Tombstone every photo FIRST, on this actor, then delete sequentially.
+        // A task per photo raced: `markDeleted` is a read-modify-write over one
+        // UserDefaults array from a nonisolated context, so with hundreds of
+        // imported favourites several tasks wrote back the same stale array and
+        // tombstones for photos whose cloud delete had failed simply vanished —
+        // nothing retried them, and the next pull downloaded them again.
+        let photoIDs = ProgressPhotoStore.list().map(\.id)
+        for id in photoIDs {
+            ProgressPhotoStore.markDeleted(id)
+            ProgressPhotoStore.delete(id)
+        }
+        if !photoIDs.isEmpty {
+            Task { await ProgressPhotoSync.flushDeletes() }
+        }
+    }
+
+    /// Every sealed R2 object the events currently reference.
+    private var eventMediaKeys: [String] {
+        events.flatMap(\.media)
+            .flatMap { [$0.r2Key, $0.posterKey] }
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
     }
 }
 

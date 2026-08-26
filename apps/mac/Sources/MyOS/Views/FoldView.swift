@@ -297,6 +297,19 @@ struct FoldData: Codable, Equatable {
             .first?.appendingPathComponent("MyOS/fold.json")
     }
 
+    /// The digits the user actually typed, with a leading country code removed.
+    /// The field starts life holding "+91", so a plain digit count reached ten
+    /// after eight keystrokes.
+    static func nationalDigits(_ phone: String) -> String {
+        // Strip on the field's own prefix, not on how many digits are present.
+        // Counting was useless here: "+91" plus eight typed digits is exactly
+        // ten, so the guard never fired at the size it existed to catch.
+        var d = phone.filter(\.isNumber)
+        if phone.hasPrefix("+91"), d.hasPrefix("91") { d.removeFirst(2) }
+        else if d.count > 10, d.hasPrefix("91") { d.removeFirst(2) }
+        return d
+    }
+
     static func loadFromDisk() -> FoldData? {
         guard let url = fileURL, let d = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(FoldData.self, from: d)
@@ -346,14 +359,6 @@ private struct FoldTile: View {
 
 /// Phone OTP against Fold's own auth. Tokens stay in the device Keychain.
 private struct FoldLoginSheet: View {
-    /// The digits the user actually typed, with a leading country code removed.
-    /// The field starts life holding "+91", so a plain digit count reached ten
-    /// after eight keystrokes.
-    static func nationalDigits(_ phone: String) -> String {
-        var d = phone.filter(\.isNumber)
-        if d.count > 10, d.hasPrefix("91") { d.removeFirst(2) }
-        return d
-    }
 
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
@@ -419,7 +424,7 @@ private struct FoldLoginSheet: View {
                     // The field is seeded with "+91", so counting every digit
                     // enabled Send after eight typed ones and fired an OTP at a
                     // half-typed number.
-                    .disabled(Self.nationalDigits(phone).count < 10 || state.foldBusy)
+                    .disabled(FoldData.nationalDigits(phone).count < 10 || state.foldBusy)
                 }
                 Spacer()
             }

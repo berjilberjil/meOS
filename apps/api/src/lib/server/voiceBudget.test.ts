@@ -3,6 +3,7 @@ import {
   VOICE_ACCOUNT_DAILY_CHAR_CAP,
   VOICE_DAILY_CHAR_CAP,
   budgetDecision,
+  combineCeilings,
   utcDayKey
 } from './voiceBudget';
 
@@ -46,29 +47,34 @@ describe('budgetDecision', () => {
 });
 
 describe('the account-wide ceiling', () => {
-  // The neuron allowance belongs to the Cloudflare account, not to a person, so
-  // a per-user cap alone stopped protecting anything the moment a second user
-  // existed: two accounts spending 7,000 characters each is 19,090 neurons
-  // against a free 10,000, and the overage bills.
+  // These call combineCeilings — the rule reserveVoiceChars actually applies.
+  // The previous versions rebuilt the arithmetic inside the test, so they would
+  // have passed unchanged against the code that had no account ceiling at all.
   it("keeps one account's share at or under the account-wide allowance", () => {
     expect(VOICE_DAILY_CHAR_CAP).toBeLessThanOrEqual(VOICE_ACCOUNT_DAILY_CHAR_CAP);
   });
 
-  it('refuses on the account ceiling even when this user has room left', () => {
-    const mine = budgetDecision(0, 500);
-    const account = budgetDecision(VOICE_ACCOUNT_DAILY_CHAR_CAP - 100, 500, VOICE_ACCOUNT_DAILY_CHAR_CAP);
-    expect(mine.allowed).toBe(true);
-    expect(account.allowed).toBe(false);
-    // reserveVoiceChars combines them: refused, and reporting the tighter figure.
-    expect(mine.allowed && account.allowed).toBe(false);
-    expect(Math.min(mine.remaining, account.remaining)).toBe(100);
+  it('refuses on the account ceiling even when this user has spent nothing', () => {
+    const d = combineCeilings(0, VOICE_ACCOUNT_DAILY_CHAR_CAP - 100, 500);
+    expect(d.allowed).toBe(false);
+    expect(d.remaining).toBe(100);
   });
 
-  it('still allows a normal request when neither ceiling binds', () => {
-    const mine = budgetDecision(0, 500);
-    const account = budgetDecision(1000, 500, VOICE_ACCOUNT_DAILY_CHAR_CAP);
-    expect(mine.allowed && account.allowed).toBe(true);
-    expect(Math.min(mine.remaining, account.remaining))
-      .toBe(Math.min(VOICE_DAILY_CHAR_CAP - 500, VOICE_ACCOUNT_DAILY_CHAR_CAP - 1500));
+  it('refuses on the per-user ceiling even when the account has room', () => {
+    const d = combineCeilings(VOICE_DAILY_CHAR_CAP, 0, 1);
+    expect(d.allowed).toBe(false);
+  });
+
+  it('allows a request when neither ceiling binds', () => {
+    const d = combineCeilings(0, 1000, 500);
+    expect(d.allowed).toBe(true);
+    expect(d.remaining).toBe(
+      Math.min(VOICE_DAILY_CHAR_CAP - 500, VOICE_ACCOUNT_DAILY_CHAR_CAP - 1500)
+    );
+  });
+
+  it('reports the tighter of the two remainders', () => {
+    const d = combineCeilings(0, VOICE_ACCOUNT_DAILY_CHAR_CAP - 600, 100);
+    expect(d.remaining).toBe(500);
   });
 });

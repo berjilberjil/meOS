@@ -27,6 +27,22 @@ final class BlockTextView: NSTextView {
         super.deleteBackward(sender)
     }
 
+    /// Same guards as backspace. Only `deleteBackward` was routed through the
+    /// coordinator, so ⌥-Delete at the start of the line under a photo — and
+    /// fn-Delete at the end of the line above one — merged text into the image's
+    /// paragraph, where the serializer reads block identity from the first
+    /// character and threw the text away. Exactly the loss the backspace guard
+    /// was added to stop, reachable by two other keys.
+    override func deleteWordBackward(_ sender: Any?) {
+        if coordinator?.handleBackspace() == true { return }
+        super.deleteWordBackward(sender)
+    }
+
+    override func deleteForward(_ sender: Any?) {
+        if coordinator?.handleForwardDelete() == true { return }
+        super.deleteForward(sender)
+    }
+
     override func keyDown(with event: NSEvent) {
         if coordinator?.slash.isActive == true {
             switch event.keyCode {

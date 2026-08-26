@@ -635,4 +635,63 @@ final class ShipAuditTests: XCTestCase {
         let out = FoldSnapshotBuilder.outcome(blobs: [], transactions: txns, previous: nil)
         XCTAssertEqual(out.data.banks.first?.balance, 500)
     }
+
+    // MARK: - Regressions in the fixes themselves
+
+    // "+91" plus eight typed digits is exactly ten, so a fix that stripped the
+    // country code only when there were MORE than ten digits never fired at the
+    // size it existed to catch — Send stayed enabled at a half-typed number.
+    func testTheOTPGateCountsOnlyTypedDigits() {
+        XCTAssertEqual(FoldData.nationalDigits("+9198765432").count, 8, "eight typed")
+        XCTAssertEqual(FoldData.nationalDigits("+919876543210").count, 10, "a whole number")
+        XCTAssertEqual(FoldData.nationalDigits("9876543210").count, 10, "no prefix typed")
+    }
+
+    // A block recovered from a compacted day knows how long it lasted but not
+    // which app it was in, and both consumers interpolate the name straight into
+    // a sentence — an empty one read "2h 14m in ."
+    func testAFocusBlockAlwaysNamesAnApp() {
+        XCTAssertFalse(FocusBlock.unknownApp.isEmpty)
+    }
+
+    // A flat 0.6 ratio meant any two-term forget query needed a perfect match,
+    // so the most ordinary phrasing there is did nothing at all.
+    func testForgettingMatchesOrdinaryPhrasing() {
+        let q = Set(TextIndex.terms("peanut allergy"))
+        let stored = MemoryBank.tokens("allergic to peanuts")
+        let shared = stored.intersection(q).count
+        XCTAssertGreaterThanOrEqual(shared, max(1, q.count - 1),
+                                    "one stem mismatch must not defeat a short query")
+    }
+
+    func testForgettingStillIgnoresAnUnrelatedMemory() {
+        let q = Set(TextIndex.terms("peanut allergy"))
+        let unrelated = MemoryBank.tokens("ships on Fridays")
+        XCTAssertLessThan(unrelated.intersection(q).count, max(1, q.count - 1))
+    }
+
+    // MARK: - Round-tripping a note between devices
+
+    // A link card mirrors its URL into plainText so search finds it, so
+    // re-parsing that text produced a paragraph holding the URL *and* the card
+    // was appended beside it — the note grew a line on every hop between
+    // devices.
+    func testMergingIsIdempotentForLinkCards() {
+        let card = Block(type: .linkCard, url: "https://example.com")
+        let old = BlockDoc(blocks: [Block(type: .paragraph, spans: [TextSpan(text: "hello")]), card])
+        let once = BlockDoc.merging(plainText: old.plainText, keepingAttachmentsOf: old)
+        let twice = BlockDoc.merging(plainText: once.plainText, keepingAttachmentsOf: once)
+        XCTAssertEqual(once.blocks.count, twice.blocks.count, "a second hop must not add a line")
+        XCTAssertEqual(once.blocks.filter { $0.isAttachment }.count, 1)
+        XCTAssertTrue(once.plainText.contains("hello"))
+    }
+
+    func testMergingStillKeepsAGenuineEdit() {
+        let card = Block(type: .linkCard, url: "https://example.com")
+        let old = BlockDoc(blocks: [Block(type: .paragraph, spans: [TextSpan(text: "hello")]), card])
+        let next = BlockDoc.merging(plainText: "hello there\nhttps://example.com",
+                                    keepingAttachmentsOf: old)
+        XCTAssertTrue(next.plainText.contains("hello there"))
+        XCTAssertEqual(next.blocks.filter { $0.isAttachment }.count, 1)
+    }
 }

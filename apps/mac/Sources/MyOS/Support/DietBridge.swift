@@ -73,7 +73,13 @@ final class DietBridge {
         // `apply()` overwrites the in-memory mutation from the server — and the
         // tool had already been told `{"ok":true}`. Meals logged at the lock
         // screen simply never existed.
-        if req.method != "GET", !state.isHydrated {
+        // Reads too, not just writes. `/health` is deliberately exempt — the
+        // client polls it to decide whether the local bridge is usable at all.
+        // Serving a read from a default-constructed store meant that with the
+        // Mac sitting at its passphrase screen, `get_context` answered "0 kcal,
+        // 0 g protein, no custom foods" — so the assistant told the user they
+        // had eaten nothing today and their food library did not exist.
+        if req.path != "/health", !state.isHydrated {
             return HTTPRes(503, #"{"error":"MyOS is locked or not synced yet"}"#)
         }
         do {
@@ -168,6 +174,10 @@ private func dietBridgeRead(_ conn: NWConnection, done: @escaping (HTTPReq) -> V
         conn.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, isComplete, err in
             if let data { buf.append(data) }
             if let req = HTTPReq.parse(buf) { done(req); return }
+            // Bounded. A peer that opens a connection and never sends a header
+            // terminator — or declares a body it does not deliver — otherwise
+            // grew this buffer for as long as it stayed connected.
+            if buf.count > HTTPReq.maxBodyBytes + 64 * 1024 { done(HTTPReq.bad); return }
             if isComplete || err != nil { done(HTTPReq.bad); return }
             more()
         }
@@ -182,6 +192,10 @@ private func dietBridgeWrite(_ conn: NWConnection, _ res: HTTPRes) {
 }
 
 struct HTTPReq {
+    /// Anything larger than this is not a diet log. Bounds both the declared
+    /// Content-Length and, with it, the buffer the reader will accumulate.
+    static let maxBodyBytes = 4 * 1024 * 1024
+
     var method = "GET"
     var path = "/"
     var query: [String: String] = [:]
@@ -223,11 +237,20 @@ struct HTTPReq {
                 req.token = String(line[r.upperBound...]).trimmingCharacters(in: .whitespaces)
             }
             if lower.hasPrefix("content-length:") {
-                contentLength = Int(line.split(separator: ":")[1].trimmingCharacters(in: .whitespaces)) ?? 0
+                // Bounded, and split with a count check. `split(":")[1]` traps on
+                // a header with no value, and a negative length made `subdata`
+                // trap on an inverted range — both before the token was even
+                // looked at, so any process on the machine could kill the app
+                // with one line of netcat.
+                let kv = line.split(separator: ":", maxSplits: 1)
+                guard kv.count == 2,
+                      let n = Int(kv[1].trimmingCharacters(in: .whitespaces)),
+                      n >= 0, n <= Self.maxBodyBytes else { return nil }
+                contentLength = n
             }
         }
         let bodyStart = range.upperBound
-        if data.count - bodyStart < contentLength { return nil }
+        guard bodyStart <= data.count, data.count - bodyStart >= contentLength else { return nil }
         req.body = data.subdata(in: bodyStart..<(bodyStart + contentLength))
         return req
     }
@@ -275,6 +298,26 @@ extension AppState {
         case "snack", "snacks": return .snacks
         default: throw NSError(domain: "DietBridge", code: 400, userInfo: [NSLocalizedDescriptionKey: "unknown meal \(raw)"])
         }
+    }
+
+    /// Like `mcpWeekday`, but refuses an unusable date instead of defaulting.
+    ///
+    /// The lenient version falls back to `weekdayKey(date)`, which itself
+    /// returns "0" for anything it cannot parse — so a bad date on a planner
+    /// write silently overwrote Sunday.
+    /// The 400 this bridge reports, matching the convention already in use here.
+    static func badRequest(_ message: String) -> Error {
+        NSError(domain: "DietBridge", code: 400,
+                userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    fileprivate func mcpWeekdayChecked(_ body: [String: Any]) throws -> String {
+        if let w = body.int("weekday") { return String(max(0, min(6, w))) }
+        if let s = body["weekday"] as? String, WEEKDAY_OK.contains(s) { return s }
+        if let date = body["date"] as? String, !date.isEmpty {
+            return Self.weekdayKey(try mcpDate(date))
+        }
+        return todayWeekday
     }
 
     fileprivate func mcpWeekday(_ body: [String: Any]) -> String {
@@ -354,7 +397,8 @@ extension AppState {
 
     func mcpAddSlot(_ b: [String: Any]) throws {
         let meal = try mcpMeal(b.string("meal"))
-        addFoodToPlan(weekday: mcpWeekday(b), meal: meal, foodId: b.string("food_id"), quantity: b.double("quantity") ?? 1)
+        addFoodToPlan(weekday: try mcpWeekdayChecked(b), meal: meal,
+                      foodId: try mcpFoodID(b.string("food_id")), quantity: b.double("quantity") ?? 1)
     }
 
     func mcpClearSlot(_ b: [String: Any]) throws {
@@ -373,28 +417,84 @@ extension AppState {
     }
 
     func mcpLogFood(_ b: [String: Any]) throws {
-        let date = (b["logged_on"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? todayKey
-        addFoodToMeal(date: date, meal: try mcpMeal(b.string("meal")), foodId: b.string("food_id"), quantity: b.double("quantity") ?? 1)
+        let date = try mcpDate(b["logged_on"])
+        let id = try mcpFoodID(b.string("food_id"))
+        addFoodToMeal(date: date, meal: try mcpMeal(b.string("meal")),
+                      foodId: id, quantity: b.double("quantity") ?? 1)
+    }
+
+    /// A `yyyy-MM-dd` key, or today. Rejects anything else.
+    ///
+    /// The schema types these as plain strings and they were used verbatim as
+    /// dictionary keys, so `"2026-2-5"` wrote a day the app never reads back —
+    /// `{"ok":true}`, and the meal was invisible forever. A malformed date on
+    /// the planner path was worse: `weekdayKey` fell back to "0" and quietly
+    /// overwrote Sunday.
+    func mcpDate(_ raw: Any?) throws -> String {
+        guard let s = (raw as? String).flatMap({ $0.isEmpty ? nil : $0 }) else { return todayKey }
+        guard let d = Self.date(fromKey: s), Self.dateKey(d) == s else {
+            throw AppState.badRequest("date must be yyyy-MM-dd, got \(s)")
+        }
+        return s
+    }
+
+    /// A food the library actually holds.
+    ///
+    /// It used to be passed straight through, so an id a model invented instead
+    /// of taking from `search_foods` stored a row that resolves to nothing: the
+    /// tool reported success, the entry rendered as "unknown", and it added zero
+    /// calories to the day.
+    func mcpFoodID(_ id: String) throws -> String {
+        guard !id.isEmpty, food(id) != nil else {
+            throw AppState.badRequest("no food with id \(id)")
+        }
+        return id
     }
 
     func mcpLogPlanned(_ b: [String: Any]) throws {
-        let date = (b["date"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? todayKey
-        tickMeal(date: date, meal: try mcpMeal(b.string("meal")))
+        let date = try mcpDate(b["date"])
+        let meal = try mcpMeal(b.string("meal"))
+        // Refuse rather than overwrite or no-op. `tick` ASSIGNS the planned
+        // items over the meal, so calling this after logging lunch by hand
+        // replaced what was actually eaten with the template — reported as
+        // success. With nothing planned it wrote nothing at all, also reported
+        // as success.
+        guard !planItems(Self.weekdayKey(date), meal).isEmpty else {
+            throw AppState.badRequest("nothing planned for \(meal.rawValue) on \(date)")
+        }
+        guard mealState(date, meal) != .logged else {
+            throw AppState.badRequest("\(meal.rawValue) on \(date) is already logged")
+        }
+        tickMeal(date: date, meal: meal)
     }
 
+    /// Create a food, or update only the fields the caller actually sent.
+    ///
+    /// It used to build a whole `Food` with `?? 0` defaults and hand that to
+    /// `upsertFood`, which replaces the matched record wholesale — so
+    /// `upsert_food({name:"Protein bar", energy_kcal:210})` on an existing food
+    /// zeroed its protein, carbs, fat and fibre, reset the serving label and
+    /// dropped its vitamins. Every meal ever logged references that food by id,
+    /// so the whole history's protein retroactively fell to zero, and the tool
+    /// answered `{id,name}` as if nothing had happened.
     func mcpUpsertFood(_ b: [String: Any]) throws -> [String: Any] {
-        let food = Food(
-            name: b.string("name"),
-            category: FoodCategory(rawValue: b.string("category")) ?? .other,
-            servingLabel: b["serving_label"] as? String ?? "1 serving",
-            perServing: Macros(
-                calories: b.double("energy_kcal") ?? 0,
-                protein: b.double("protein_g") ?? 0,
-                carbs: b.double("carb_g") ?? 0,
-                fiber: b.double("fiber_g") ?? 0,
-                fats: b.double("fat_g") ?? 0
-            )
-        )
+        let name = b.string("name")
+        guard !name.isEmpty else { throw AppState.badRequest("name required") }
+        // Match across the whole library, not only custom foods — otherwise
+        // upserting a seed food's name quietly created a second entry with the
+        // same name.
+        let existing = allFoods.first { Food.matchKey($0.name) == Food.matchKey(name) }
+        var food = existing ?? Food(name: name, category: .other,
+                                    servingLabel: "1 serving", perServing: .zero)
+        food.name = name
+        if let c = FoodCategory(rawValue: b.string("category")) { food.category = c }
+        if let label = b["serving_label"] as? String, !label.isEmpty { food.servingLabel = label }
+        if let v = b.double("energy_kcal") { food.perServing.calories = v }
+        if let v = b.double("protein_g")   { food.perServing.protein = v }
+        if let v = b.double("carb_g")      { food.perServing.carbs = v }
+        if let v = b.double("fiber_g")     { food.perServing.fiber = v }
+        if let v = b.double("fat_g")       { food.perServing.fats = v }
+        if let v = b["vitamins"] as? String, !v.isEmpty { food.vitamins = v }
         let saved = upsertFood(food)
         return ["id": saved.id, "name": saved.name]
     }

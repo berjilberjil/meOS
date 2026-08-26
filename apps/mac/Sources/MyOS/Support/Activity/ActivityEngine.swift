@@ -66,6 +66,11 @@ struct TimelineHour: Identifiable, Hashable {
 
 /// An uninterrupted run of productive work.
 struct FocusBlock: Identifiable, Hashable {
+    /// Stands in when the block came from a compacted day, which keeps the
+    /// duration but not which app it was spent in. Both consumers interpolate
+    /// `appName` straight into a sentence, so it must never be empty.
+    static let unknownApp = "one app"
+
     var id: String { startedAt }
     var startedAt: String
     var endedAt: String
@@ -349,9 +354,12 @@ enum ActivityEngine {
                 // `verdict()`, so a month that earned .excellent could be denied
                 // it on a number that was simply missing.
                 if rollup.longestFocusSeconds > (out.longestFocus?.seconds ?? 0) {
+                    // A rollup keeps the duration but not which app it was in,
+                    // and both consumers interpolate `appName` straight into a
+                    // sentence — an empty one reads "2h 14m in ."
                     out.longestFocus = FocusBlock(startedAt: day, endedAt: day,
                                                   seconds: rollup.longestFocusSeconds,
-                                                  appName: "")
+                                                  appName: FocusBlock.unknownApp)
                 }
             }
         }

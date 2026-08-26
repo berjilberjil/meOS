@@ -74,8 +74,13 @@ extension AppState {
         // "forget what you know about the MyOS beta launch" also deleted "main
         // project is MyOS, a personal second brain" — both contain `myos`, both
         // were in the top five, and both went. Memory has no undo.
-        let shared = Double(MemoryBank.tokens(item.content).intersection(q).count)
-        return shared / Double(q.count) >= 0.6
+        // All but one of the query's terms. A flat 0.6 ratio meant any two-term
+        // query needed a perfect match — "peanut allergy" against the stored
+        // "allergic to peanuts" stems to one shared term out of two, scores 0.5,
+        // and forgetting silently did nothing on the most ordinary phrasing
+        // there is.
+        let shared = MemoryBank.tokens(item.content).intersection(q).count
+        return shared >= max(1, q.count - 1)
     }
 
     // MARK: - Context

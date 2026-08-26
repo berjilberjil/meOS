@@ -44,13 +44,16 @@ extension AppState {
             try Task.checkCancellation()
             trace.steps = round
 
+            // Out of time switches tools off, and that IS the exit: with
+            // `allowTools` false the `!allowTools` branch below returns this
+            // round's answer, so the loop runs at most one more request.
+            //
+            // A previous attempt at "enforcing" the deadline broke out of the
+            // loop here instead, which falls through to the empty-reply return
+            // at the bottom — so a slow turn ended with a blank message in the
+            // chat rather than a tool-less answer. The deadline was already
+            // doing its job; the loop is bounded by `maxRounds` regardless.
             let outOfTime = Date().timeIntervalSince(started) > timeout
-            // Out of time ends the turn; it used to only switch tools off, so
-            // the deadline bounded nothing. Three slow rounds with a retry each,
-            // against a 90-second request timeout, ran a "55 second" turn for
-            // minutes with the chat stuck on "Thinking…" and no way to cancel.
-            // Round one always completes — a turn has to produce an answer.
-            if outOfTime, round > 1 { break }
             let allowTools = round < max(1, maxRounds)
                 && executed < Self.catrineMaxToolCalls
                 && !outOfTime

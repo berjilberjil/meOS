@@ -156,6 +156,15 @@ struct BlockDoc: Codable, Hashable {
         var doc = BlockDoc.from(plainText: text)
         let attachments = (old?.blocks ?? []).filter(\.isAttachment)
         guard !attachments.isEmpty else { return doc }
+        // Drop any rebuilt paragraph that is just an attachment's own mirrored
+        // text. A link card mirrors its URL into `plainText` so search finds it,
+        // so re-parsing that text produced a paragraph holding the URL *and* the
+        // card was appended beside it — and the note grew by one line on every
+        // round trip between the phone and the Mac.
+        let mirrored = Set(attachments.map(\.plainText).filter { !$0.isEmpty })
+        if !mirrored.isEmpty {
+            doc.blocks.removeAll { $0.type == .paragraph && mirrored.contains($0.plainText) }
+        }
         doc.blocks.append(contentsOf: attachments)
         return doc
     }

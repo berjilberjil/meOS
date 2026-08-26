@@ -32,6 +32,25 @@ export function callDecision(
   return { allowed: left > 0, remaining: left };
 }
 
+/**
+ * Whether one more shared-key call fits under both ceilings.
+ *
+ * Exported for the same reason as voiceBudget's: `reserveAICall` needs a
+ * database, so a test that could only reach it ended up recreating the
+ * arithmetic and proving nothing about the code that ships.
+ */
+export function combineCeilings(
+  usedByMe: number,
+  usedByEveryone: number
+): { allowed: boolean; remaining: number } {
+  const perUser = callDecision(usedByMe, AI_USER_DAILY_CALLS);
+  const account = callDecision(usedByEveryone, AI_ACCOUNT_DAILY_CALLS);
+  return {
+    allowed: perUser.allowed && account.allowed,
+    remaining: Math.min(perUser.remaining, account.remaining)
+  };
+}
+
 let ensured = false;
 async function ensureTable(): Promise<void> {
   if (ensured) return;
@@ -70,12 +89,7 @@ export async function reserveAICall(
   const mine = Number(rows[0]?.mine ?? 0);
   const everyone = Number(rows[0]?.everyone ?? 0);
 
-  const perUser = callDecision(mine, AI_USER_DAILY_CALLS);
-  const account = callDecision(everyone, AI_ACCOUNT_DAILY_CALLS);
-  const decision = {
-    allowed: perUser.allowed && account.allowed,
-    remaining: Math.min(perUser.remaining, account.remaining)
-  };
+  const decision = combineCeilings(mine, everyone);
   if (!decision.allowed) return decision;
 
   await sql`

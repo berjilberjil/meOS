@@ -249,6 +249,12 @@ struct BlockEditor: NSViewRepresentable {
                 let at = storage.attributes(at: readAt, effectiveRange: nil)
                 block = blockMeta(from: at)
             }
+            // Never type "into" an attachment. `blockMeta` reads the block from
+            // the character at the caret, so at offset 0 of an image paragraph it
+            // handed typed text `blockType == "image"` with no source — and the
+            // paragraph then serialized as an image block with a nil src,
+            // destroying both the typed word and the photo.
+            if block.isAttachment { block = Block.paragraph() }
             var attrs = EditorTheme.baseAttributes(for: block)
             // Inherit inline marks from the char just before the caret (same paragraph).
             if loc > para.location, loc - 1 < storage.length,
@@ -260,6 +266,12 @@ struct BlockEditor: NSViewRepresentable {
                 inherited[.headingLevel] = attrs[.headingLevel]
                 inherited[.todoChecked] = attrs[.todoChecked]
                 inherited[.codeLanguage] = attrs[.codeLanguage]
+                // And the media keys. Inheriting every attribute from the
+                // preceding character carried `.attachment`, `.blockImageSrc`
+                // and `.blockLinkURL` into freshly typed text.
+                inherited[.attachment] = nil
+                inherited[.blockImageSrc] = nil
+                inherited[.blockLinkURL] = nil
                 attrs = inherited
             }
             tv.typingAttributes = attrs
@@ -319,6 +331,28 @@ struct BlockEditor: NSViewRepresentable {
             blocks.insert(newBlock, at: bi + 1)
             render(BlockDoc(blocks: blocks), caretBlock: bi + 1, caretWithin: 0)
             return true
+        }
+
+        /// Forward delete, with the same refusal as backspace.
+        ///
+        /// At the end of a block, fn-Delete pulls the NEXT block up into this
+        /// one. If either side is an attachment that merge is destructive — the
+        /// serializer takes a paragraph's identity from its first character, so
+        /// a mixed `text + image` paragraph is saved as one or the other and the
+        /// rest is discarded on the same keystroke.
+        func handleForwardDelete() -> Bool {
+            guard let tv = textView else { return false }
+            guard tv.selectedRange().length == 0 else { return false }
+            let doc = currentDoc()
+            let caret = tv.selectedRange().location
+            let (bi, w) = locate(caret, in: doc)
+            guard bi < doc.blocks.count else { return false }
+            let atEnd = w == (doc.blocks[bi].plainText as NSString).length
+            guard atEnd, bi + 1 < doc.blocks.count else { return false }
+            // Deleting forward INTO or OUT OF an attachment: refuse, exactly as
+            // backspace does. The image stays removable with the caret on it.
+            if doc.blocks[bi].isAttachment || doc.blocks[bi + 1].isAttachment { return true }
+            return false
         }
 
         func handleBackspace() -> Bool {

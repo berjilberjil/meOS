@@ -3,6 +3,7 @@ import {
   AI_ACCOUNT_DAILY_CALLS,
   AI_USER_DAILY_CALLS,
   callDecision,
+  combineCeilings,
   utcDayKey
 } from './aiBudget';
 
@@ -36,11 +37,20 @@ describe('the shared AI key ceilings', () => {
     });
   });
 
-  it('refuses on the account ceiling even when this user has room', () => {
-    const mine = callDecision(0, AI_USER_DAILY_CALLS);
-    const account = callDecision(AI_ACCOUNT_DAILY_CALLS, AI_ACCOUNT_DAILY_CALLS);
-    expect(mine.allowed).toBe(true);
-    expect(mine.allowed && account.allowed).toBe(false);
+  // Through combineCeilings — the rule reserveAICall applies. Rebuilding the
+  // arithmetic inside the test proved nothing about the shipping code.
+  it('refuses on the account ceiling even when this user has spent nothing', () => {
+    expect(combineCeilings(0, AI_ACCOUNT_DAILY_CALLS).allowed).toBe(false);
+  });
+
+  it('refuses on the per-user ceiling even when the account has room', () => {
+    expect(combineCeilings(AI_USER_DAILY_CALLS, 0).allowed).toBe(false);
+  });
+
+  it('allows a call when neither ceiling binds', () => {
+    const d = combineCeilings(0, 0);
+    expect(d.allowed).toBe(true);
+    expect(d.remaining).toBe(Math.min(AI_USER_DAILY_CALLS, AI_ACCOUNT_DAILY_CALLS));
   });
 });
 

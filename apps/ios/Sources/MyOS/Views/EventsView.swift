@@ -293,8 +293,18 @@ private struct EventEditorSheet: View {
         // so writing `[tagID]` silently dropped the rest: tag a memory Travel +
         // Family + Milestone on the Mac, change only its title on the phone, and
         // it came back with just Travel.
-        let untouched = (event?.tagIDs ?? []).filter { $0 != originalTagID && $0 != tagID }
-        let tagIDs = (tagID.isEmpty ? [] : [tagID]) + untouched
+        let existing = event?.tagIDs ?? []
+        let tagIDs: [String]
+        if tagID.isEmpty {
+            tagIDs = existing.filter { $0 != originalTagID }          // deselected the primary
+        } else if existing.contains(tagID) {
+            // Already on the event — the picker moved to a tag it already had,
+            // which is a reorder, not a replacement. Dropping the old primary
+            // here lost a tag the user never touched.
+            tagIDs = [tagID] + existing.filter { $0 != tagID }
+        } else {
+            tagIDs = [tagID] + existing.filter { $0 != originalTagID && $0 != tagID }
+        }
         let t = title.trimmingCharacters(in: .whitespaces)
         if var e = event {
             e.title = t; e.date = key; e.note = note; e.tagIDs = tagIDs; e.special = special; e.media = media

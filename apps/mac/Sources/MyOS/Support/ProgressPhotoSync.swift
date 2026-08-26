@@ -75,8 +75,13 @@ enum ProgressPhotoSync {
     /// Reconcile with the cloud: take down what is missing here, and drop what
     /// is no longer there.
     static func pull() async {
-        guard let remote = try? await api.listBodyPhotos() else { return }
+        // Captured BEFORE the listing, not after. Reading it afterwards meant a
+        // logout during the await left `account` holding the *new* user, and the
+        // reconciliation below then deleted their photos for not appearing in
+        // the previous user's listing.
         let account = ProgressPhotoStore.account
+        guard let remote = try? await api.listBodyPhotos() else { return }
+        guard ProgressPhotoStore.account == account else { return }
         let remoteIds = Set(remote.map(\.id))
 
         // A photo deleted on the other device has to disappear from this one.
@@ -87,6 +92,7 @@ enum ProgressPhotoSync {
         // delete to act on.
         for local in ProgressPhotoStore.list()
         where !remoteIds.contains(local.id) && ProgressPhotoStore.isSynced(local.id) {
+            guard ProgressPhotoStore.account == account else { return }
             ProgressPhotoStore.delete(local.id)
         }
 
