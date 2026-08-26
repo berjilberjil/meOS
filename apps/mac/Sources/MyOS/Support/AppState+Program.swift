@@ -428,9 +428,14 @@ extension AppState {
 
     /// Every logged set for an exercise, newest date first — the "last time"
     /// panel inside a session.
-    func history(ofExercise id: String, limit: Int = 8) -> [(date: String, entry: ExerciseLog)] {
+    /// `before` bounds it to days that really precede the one being shown.
+    /// Today pages a week forward, so without it "Last time 80 kg · Fri" could
+    /// be quoting a session logged on a day that has not happened.
+    func history(ofExercise id: String, limit: Int = 8,
+                 before: String? = nil) -> [(date: String, entry: ExerciseLog)] {
         var out: [(String, ExerciseLog)] = []
         for date in training.dayLog.keys.sorted(by: >) {
+            if let before, date >= before { continue }
             guard let entries = training.dayLog[date]?.entries else { continue }
             for e in entries where e.exerciseId == id && e.doneSets > 0 {
                 out.append((date, e))

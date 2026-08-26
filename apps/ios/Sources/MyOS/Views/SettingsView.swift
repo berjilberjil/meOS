@@ -71,6 +71,14 @@ struct SettingsView: View {
         }
     }
 
+    @ObservedObject private var signals = UISignals.shared
+
+    private func consumeWeeklySignal() {
+        guard signals.openWeeklyReport else { return }
+        signals.openWeeklyReport = false
+        page = .weekly
+    }
+
     var body: some View {
         // This is a sheet, so it is outside MainView's scroll container — it has
         // to bring its own, and its own horizontal padding, or it is a fixed
@@ -90,12 +98,14 @@ struct SettingsView: View {
         .sheet(item: $page) { p in editorSheet(p) }
         .onChange(of: page) { _, now in if now == nil { sheetHeight = 0 } }
         // Arrived from the Friday report notification — open straight on it.
-        .onAppear {
-            if UISignals.shared.openWeeklyReport {
-                UISignals.shared.openWeeklyReport = false
-                page = .weekly
-            }
-        }
+        //
+        // Also on every later change, not just `onAppear`: if Settings was
+        // already up when the notification was tapped, `showSettings = true`
+        // changed nothing, `onAppear` never re-fired, and the flag stayed set —
+        // so nothing happened then, and the *next* time Settings was opened for
+        // something else it jumped to the weekly report unasked.
+        .onAppear { consumeWeeklySignal() }
+        .onChange(of: signals.openWeeklyReport) { _, _ in consumeWeeklySignal() }
     }
 
     private var groups: some View {

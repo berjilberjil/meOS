@@ -221,7 +221,7 @@ private struct SessionExerciseCard: View {
         }
         .onAppear {
             if previous == nil {
-                previous = state.history(ofExercise: entry.exerciseId, limit: 2).first { $0.date != date }
+                previous = state.history(ofExercise: entry.exerciseId, limit: 2, before: date).first
             }
         }
     }

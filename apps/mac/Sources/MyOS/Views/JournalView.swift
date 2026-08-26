@@ -271,7 +271,12 @@ struct JournalView: View {
 
     private func listCard(title: String, color: Color, items: [String], presets: [String],
                           add: @escaping (String) -> Void, remove: @escaping (Int) -> Void) -> some View {
+        // Keyed to the day. The card holds its draft in @State while the `add`
+        // closure resolves `viewedDate` at call time, so typing a win without
+        // pressing Enter and then paging to another day committed it to *that*
+        // day — and left the stale text sitting in the new day's box.
         JournalListCard(title: title, color: color, items: items, presets: presets, add: add, remove: remove)
+            .id(viewedDate)
     }
 }
 

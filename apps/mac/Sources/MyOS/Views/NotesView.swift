@@ -515,7 +515,11 @@ struct NotesView: View {
                 .foregroundStyle(Palette.text)
                 .padding(.horizontal, 26)
                 .focused($titleFocused)
-                .onChange(of: titleFocused) { _, now in if now { titleEdited = true } }
+                // Set on *typing*, not on focus. `startNew()` focuses the title
+                // box, so focus alone marked every new note as having a
+                // hand-written title — and the auto-derive from the first line
+                // of the body, the branch just below, never ran once.
+                .onChange(of: draftTitle) { _, _ in if titleFocused { titleEdited = true } }
                 .onChange(of: draftTitle) { saveDraft() }
 
             BlockEditor(initialDoc: draftDoc, findToken: findToken, bottomInset: 96,

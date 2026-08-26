@@ -110,6 +110,17 @@ struct SettingsView: View {
                         .buttonStyle(.bordered)
                 }
 
+                // A failed regeneration used to be indistinguishable from doing
+                // nothing: the only failure channel is `vaultError`, and this
+                // card never rendered it — no overlay appears, because the code
+                // is shown only after the upload succeeds. People tapped again,
+                // or walked away believing they had a new code.
+                if let err = state.vaultError, !err.isEmpty {
+                    Text(err)
+                        .font(.footnote).foregroundStyle(Palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Divider().overlay(Palette.action)
 
                 // Change passphrase
