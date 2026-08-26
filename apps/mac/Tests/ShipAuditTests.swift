@@ -275,4 +275,27 @@ final class ShipAuditTests: XCTestCase {
         XCTAssertTrue(n.wouldChange(title: "Groceries", body: "milk\neggs\nbread"))
         XCTAssertTrue(n.wouldChange(title: "Shopping", body: "milk\neggs"))
     }
+
+    // MARK: - What a failed save does next
+
+    // Retrying is for the network being briefly gone. A 401 means the session is
+    // over and a 400 means the server refuses this body every time — re-sending
+    // either just burns requests against a free tier that has to stay free.
+    func testAuthAndValidationFailuresAreNotRetried() {
+        XCTAssertFalse(AppState.isWorthRetrying(APIError(status: 401, message: "Not logged in")))
+        XCTAssertFalse(AppState.isWorthRetrying(APIError(status: 403, message: "Forbidden")))
+        XCTAssertFalse(AppState.isWorthRetrying(APIError(status: 400, message: "Bad body")))
+    }
+
+    func testServerAndTransportFailuresAreRetried() {
+        XCTAssertTrue(AppState.isWorthRetrying(APIError(status: 500, message: "Server error")))
+        XCTAssertTrue(AppState.isWorthRetrying(APIError(status: 503, message: "Unavailable")))
+        XCTAssertTrue(AppState.isWorthRetrying(URLError(.notConnectedToInternet)),
+                      "the whole reason retries exist")
+    }
+
+    func testTimeoutsAndRateLimitsAreWorthWaitingOut() {
+        XCTAssertTrue(AppState.isWorthRetrying(APIError(status: 408, message: "Timeout")))
+        XCTAssertTrue(AppState.isWorthRetrying(APIError(status: 429, message: "Slow down")))
+    }
 }

@@ -526,7 +526,8 @@ final class AppState: ObservableObject {
                     return
                 } catch {
                     let msg = (error as? APIError)?.message ?? error.localizedDescription
-                    guard attempt < Self.pushRetryDelays.count,
+                    guard Self.isWorthRetrying(error),
+                          attempt < Self.pushRetryDelays.count,
                           await self.isCurrentPush(key, gen: gen) else {
                         await self.finishPush(key, gen: gen, error: msg)
                         return
@@ -553,6 +554,18 @@ final class AppState: ObservableObject {
 
     private func isCurrentPush(_ key: String, gen: Int) -> Bool { pushGen[key] == gen }
 
+    /// Whether a failed PUT could plausibly succeed if we simply ask again.
+    ///
+    /// Retrying is for the network being briefly gone. A 401 means the session
+    /// is over and a 400 means the server will refuse this body every time, so
+    /// re-sending them just burns requests against a free tier that has to stay
+    /// free. Timeouts and rate limits are the two 4xx cases worth waiting out.
+    nonisolated static func isWorthRetrying(_ error: Error) -> Bool {
+        guard let api = error as? APIError else { return true }   // transport-level
+        if api.status == 408 || api.status == 429 { return true }
+        return !(400..<500).contains(api.status)
+    }
+
     /// Abandon every in-flight save.
     ///
     /// Pushes now retry for up to half a minute, so without this they outlive
@@ -564,7 +577,12 @@ final class AppState: ObservableObject {
     private func cancelPendingPushes() {
         pushTasks.values.forEach { $0.cancel() }
         pushTasks.removeAll()
-        pushGen.removeAll()
+        // `pushGen` is deliberately NOT reset. Generations have to keep rising
+        // for the lifetime of the process: zero them here and the next session's
+        // first push for a key is gen 1 again, so a cancelled task from the
+        // previous session — still unwinding — matches on generation and
+        // releases the new push's pending slot, re-opening the very window
+        // `finishPush` exists to close.
         lastLocalWrite.removeAll()
     }
 
