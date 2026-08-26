@@ -108,6 +108,8 @@ final class AppState: ObservableObject {
     init() {
         api.vault = vault
         EventMediaStore.shared.configure(api: api, vault: vault)
+        // Body photos are sealed with the same DEK; the sync needs to reach it.
+        ProgressPhotoSync.vault = vault
         // Fold's tokens are sealed with the vault DEK — read it live so a lock or
         // an unlock is picked up without anyone having to re-register the key.
         FoldSession.keyProvider = { [vault] in vault.dek }

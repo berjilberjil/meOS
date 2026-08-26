@@ -19,6 +19,61 @@ export function verifyPassword(pw: string, stored: string): boolean {
   return orig.length === test.length && timingSafeEqual(orig, test);
 }
 
+/**
+ * Failed sign-in attempts, so a password cannot simply be guessed.
+ *
+ * `verifyPassword` is one scrypt at Node defaults — roughly 50 ms — and Workers
+ * fan out, so an unthrottled login endpoint exhausts a short password in minutes
+ * from concurrent clients. The account is worth taking: it holds every synced
+ * module and `myos.crypto`, whose salts and wrapped DEKs enable an offline
+ * attack on the passphrase itself.
+ *
+ * Counted per username AND per IP, because either alone is trivially sidestepped.
+ */
+export const LOGIN_MAX_ATTEMPTS = 10;
+export const LOGIN_WINDOW_MINUTES = 15;
+
+let attemptsReady = false;
+async function ensureAttempts(): Promise<void> {
+  if (attemptsReady) return;
+  await sql`
+    create table if not exists login_attempts (
+      scope      text not null,
+      at         text not null
+    )`;
+  await sql`create index if not exists login_attempts_scope_idx on login_attempts(scope, at)`;
+  attemptsReady = true;
+}
+
+function windowStart(): string {
+  return new Date(Date.now() - LOGIN_WINDOW_MINUTES * 60_000).toISOString();
+}
+
+/** Whether this username/IP pair still has attempts left in the window. */
+export async function loginAllowed(username: string, ip: string): Promise<boolean> {
+  await ensureAttempts();
+  const since = windowStart();
+  const rows = await sql`
+    select count(*) as n from login_attempts
+    where at > ${since} and scope in (${'u:' + username}, ${'i:' + ip})`;
+  return Number(rows[0]?.n ?? 0) < LOGIN_MAX_ATTEMPTS;
+}
+
+/** Record a failure, and opportunistically drop rows that have aged out. */
+export async function recordFailedLogin(username: string, ip: string): Promise<void> {
+  await ensureAttempts();
+  const now = new Date().toISOString();
+  await sql`delete from login_attempts where at <= ${windowStart()}`;
+  await sql`insert into login_attempts (scope, at) values (${'u:' + username}, ${now})`;
+  await sql`insert into login_attempts (scope, at) values (${'i:' + ip}, ${now})`;
+}
+
+/** A clean sign-in clears the username's failures. */
+export async function clearFailedLogins(username: string): Promise<void> {
+  await ensureAttempts();
+  await sql`delete from login_attempts where scope = ${'u:' + username}`;
+}
+
 export async function createSession(userId: number): Promise<string> {
   // Sweep this user's dead tokens first. Nothing else ever deleted them —
   // hooks.server.ts filters on expires_at at read time, so they were invisible

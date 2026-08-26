@@ -46,16 +46,48 @@ enum ProgressPhotoSync {
         // previous user's file under the new user's cookie — the server writes
         // by session, so it landed in their bucket.
         let account = ProgressPhotoStore.account
+        // Sealed with the vault DEK, like event media has always been. Body
+        // photos were the one data class going to the server in the clear —
+        // written straight into R2 as image/jpeg — while the setup screen
+        // promises "even if the server and database are hacked, your data stays
+        // unreadable". Without the key there is nothing to upload.
+        guard let dek = vault?.dek else { return }
         for photo in ProgressPhotoStore.pending() {
             guard ProgressPhotoStore.account == account else { return }
-            guard let jpeg = try? Data(contentsOf: photo.url) else { continue }
+            guard let jpeg = try? Data(contentsOf: photo.url),
+                  let sealedB64 = try? MyOSCrypto.seal(jpeg, key: dek, aad: Self.aad(photo.id)),
+                  let sealed = Data(base64Encoded: sealedB64) else { continue }
             do {
-                try await api.uploadBodyPhoto(id: photo.id, date: photo.date, jpeg: jpeg)
+                try await api.uploadBodyPhoto(id: photo.id, date: photo.date, jpeg: sealed)
                 ProgressPhotoStore.markSynced(photo.id)
             } catch {
                 break // likely offline/logged out — stop, try again next cycle
             }
         }
+    }
+
+    /// The vault, for sealing. Set alongside the API client by `AppState`.
+    static weak var vault: Vault?
+
+    /// Domain-separated, per photo — the same shape event media uses.
+    private static func aad(_ id: String) -> Data { Data("body-photo:\(id)".utf8) }
+
+    /// Plaintext JPEG from what the bucket returned.
+    ///
+    /// Anything uploaded before photos were sealed is still sitting there as a
+    /// raw JPEG, so an unopenable payload that already looks like an image is
+    /// taken as legacy rather than discarded. `push()` re-uploads it sealed the
+    /// next time that photo is pending.
+    private static func opened(_ data: Data, id: String) -> Data? {
+        if let dek = vault?.dek,
+           let plain = try? MyOSCrypto.open(data.base64EncodedString(), key: dek, aad: aad(id)) {
+            return plain
+        }
+        return Self.looksLikeJPEG(data) ? data : nil
+    }
+
+    private static func looksLikeJPEG(_ d: Data) -> Bool {
+        d.count > 3 && d[d.startIndex] == 0xFF && d[d.startIndex + 1] == 0xD8
     }
 
     /// Delete the cloud copy of one photo. The local delete has already
@@ -104,7 +136,8 @@ enum ProgressPhotoSync {
             guard let (data, response) = try? await URLSession.shared.data(from: url),
                   let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode)
             else { continue }
-            ProgressPhotoStore.storeRemote(jpeg: data, stem: photo.id)
+            guard let jpeg = Self.opened(data, id: photo.id) else { continue }
+            ProgressPhotoStore.storeRemote(jpeg: jpeg, stem: photo.id)
         }
     }
 }

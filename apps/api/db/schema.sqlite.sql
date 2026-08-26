@@ -68,3 +68,13 @@ create table if not exists ai_budget (
   updated_at text not null,
   primary key (user_id, day)
 );
+
+-- Failed sign-in attempts, per username and per IP, inside a rolling window.
+-- verifyPassword is one scrypt (~50ms) and Workers fan out, so without this a
+-- short password falls in minutes — and the account holds myos.crypto, whose
+-- salts and wrapped keys enable an offline attack on the passphrase itself.
+create table if not exists login_attempts (
+  scope text not null,          -- 'u:<username>' or 'i:<ip>'
+  at    text not null           -- ISO-8601 UTC
+);
+create index if not exists login_attempts_scope_idx on login_attempts(scope, at);
