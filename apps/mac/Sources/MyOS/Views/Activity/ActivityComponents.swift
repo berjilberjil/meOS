@@ -1,5 +1,8 @@
 import SwiftUI
 import Charts
+#if os(macOS)
+import AppKit
+#endif
 
 // The pieces Today, Productivity and the Weekly Report share, so the same
 // number never gets two different treatments in two places.
@@ -46,11 +49,28 @@ struct FocusNowHeader: View {
                 Spacer(minLength: 0)
             }
 
+            if let detail = focus.detail {
+                Text(detail)
+                    .font(.myBody)
+                    .foregroundStyle(Palette.muted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
             HStack(spacing: Space.sm) {
                 Text(focus.category.label)
                     .font(.myBody)
                     .foregroundStyle(Palette.muted)
                 WorthBadge(worth: focus.productivity)
+                // Only ever set on the phone, where "now" is happening on the
+                // other machine and saying so is the difference between a live
+                // reading and a wrong one.
+                if let device = focus.device {
+                    Label(device, systemImage: "laptopcomputer")
+                        .font(.myCaption)
+                        .foregroundStyle(Palette.faint)
+                        .lineLimit(1)
+                }
             }
         }
     }
@@ -192,47 +212,6 @@ struct ActionCallout: View {
     }
 }
 
-/// Mac and iPhone side by side. They are separate sensors that add up to one
-/// model, and the split is worth showing because it is where the honesty about
-/// what iOS allows lives.
-struct DeviceSplit: View {
-    let mac: Int
-    let iphone: Int
-    var showsTotal = true
-
-    var body: some View {
-        HStack(spacing: Space.sm) {
-            tile(.mac, mac)
-            tile(.iphone, iphone)
-            if showsTotal {
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    Text("Total").font(.myCaption).foregroundStyle(Palette.faint)
-                    Text(Fmt.duration(mac + iphone))
-                        .font(.myBody.weight(.semibold)).monospacedDigit()
-                        .foregroundStyle(Palette.activity)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Space.md)
-                .cardSkin(.elevated, radius: Radius.md)
-            }
-        }
-    }
-
-    private func tile(_ device: DeviceType, _ seconds: Int) -> some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            Label(device.label, systemImage: device.icon)
-                .font(.myCaption)
-                .foregroundStyle(Palette.faint)
-            Text(seconds > 0 ? Fmt.duration(seconds) : "—")
-                .font(.myBody.weight(.semibold)).monospacedDigit()
-                .foregroundStyle(seconds > 0 ? Palette.text : Palette.faint)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Space.md)
-        .cardSkin(.elevated, radius: Radius.md)
-    }
-}
-
 /// One app's line in a breakdown.
 struct AppUsageRow: View {
     let usage: AppUsage
@@ -308,4 +287,50 @@ struct VerdictBlock: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+/// The Accessibility ask, placed under the breakdown it would fix.
+///
+/// A permission prompt in Settings is a chore; the same prompt sitting under a
+/// row that says "Chrome 2h" is an offer, because the thing it buys is on
+/// screen and obviously missing. It disappears the moment it is granted, and it
+/// never blocks anything — tracking works without it.
+struct DetailHint: View {
+    #if os(macOS)
+    @State private var trusted = AXAccess.isTrusted
+
+    var body: some View {
+        Group {
+            if !trusted {
+                VStack(alignment: .leading, spacing: Space.sm) {
+                    Text("Chrome is a room, not an activity. Give MyOS Accessibility and these rows become the sites and files you were actually in — github.com, not \"Chrome\".")
+                        .font(.myCaption)
+                        .foregroundStyle(Palette.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: Space.sm) {
+                        Button("Allow Accessibility") { AXAccess.request(); recheck() }
+                            .buttonStyle(.bordered)
+                        Button("Open Settings") { AXAccess.openSettings() }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(Palette.faint)
+                    }
+                    .font(.myCaption)
+                }
+                .padding(Space.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardSkin(.elevated, radius: Radius.md)
+            }
+        }
+        .onAppear(perform: recheck)
+        // macOS grants this in System Settings, in another window — so the
+        // answer arrives when MyOS comes back to the front, not when the button
+        // was pressed.
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification)) { _ in recheck() }
+    }
+
+    private func recheck() { trusted = AXAccess.isTrusted }
+    #else
+    var body: some View { EmptyView() }
+    #endif
 }

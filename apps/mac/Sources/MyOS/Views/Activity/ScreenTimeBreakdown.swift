@@ -7,10 +7,9 @@ import AppKit
 /// Real application icons, resolved once per bundle identifier.
 ///
 /// A list of app names is a list of strings; a list of app icons is recognisable
-/// at a glance, which is the whole reason to look at it. Only the Mac can do
-/// this — it has the app bundles on disk. An iPhone session arrives from a
-/// Shortcuts automation as a display name and nothing else, so those fall back
-/// to a monogram rather than a wrong icon.
+/// at a glance, which is the whole reason to look at it. Only the Mac has the
+/// bundles on disk, so on the phone — which reads the Mac's day rather than
+/// recording one — every row falls back to a monogram rather than a wrong icon.
 @MainActor
 enum AppIconCache {
     #if os(macOS)
@@ -67,23 +66,54 @@ struct AppIconTile: View {
 struct AppTimeRow: View {
     let usage: AppUsage
     var iconSize: CGFloat = 30
+    /// How many window titles to show under the row. Zero on Today, where the
+    /// card has to answer and get out of the way.
+    var detailLimit: Int = 0
 
     var body: some View {
-        HStack(spacing: Space.sm) {
-            AppIconTile(appId: usage.appId, appName: usage.appName,
-                        worth: usage.productivity, size: iconSize)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(usage.appName)
-                    .font(.myBody.weight(.medium))
-                    .foregroundStyle(Palette.text)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(Fmt.duration(usage.seconds))
-                    .font(.myCaption).monospacedDigit()
-                    .foregroundStyle(Palette.muted)
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(spacing: Space.sm) {
+                AppIconTile(appId: usage.iconId.isEmpty ? usage.appId : usage.iconId,
+                            appName: usage.appName,
+                            worth: usage.productivity, size: iconSize)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(usage.appName)
+                        .font(.myBody.weight(.medium))
+                        .foregroundStyle(Palette.text)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Text(Fmt.duration(usage.seconds))
+                        .font(.myCaption).monospacedDigit()
+                        .foregroundStyle(Palette.muted)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            if detailLimit > 0, !usage.details.isEmpty {
+                details
+            }
         }
+    }
+
+    /// What the window said, under what the app was. This is the level
+    /// Accessibility buys: not "Xcode 2h" but which files those two hours went
+    /// into.
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(usage.details.prefix(detailLimit)) { detail in
+                HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
+                    Text(detail.title)
+                        .font(.myCaption)
+                        .foregroundStyle(Palette.muted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: Space.sm)
+                    Text(Fmt.duration(detail.seconds))
+                        .font(.myCaption).monospacedDigit()
+                        .foregroundStyle(Palette.faint)
+                }
+            }
+        }
+        .padding(.leading, iconSize + Space.sm)
     }
 }
 
@@ -112,18 +142,21 @@ struct CategoryLegend: View {
     }
 }
 
-/// Where the time actually went: which device, which apps, which hours.
+/// Where the time actually went: which places, which hours.
 ///
 /// This is the same question Apple's Screen Time answers, asked in MyOS's terms
-/// — the hours are stacked by *worth* rather than by Apple's categories, and the
-/// device is a control rather than a separate screen, because the Mac and the
-/// phone are two sensors feeding one model and the interesting number is usually
-/// the pair of them.
+/// — the hours are stacked by *worth* rather than by Apple's categories, and a
+/// row is a place rather than an app, so a browser breaks into the domains that
+/// were actually open in it.
+///
+/// There is no device switch. The Mac is the only thing that can see a day, and
+/// the phone shows the same day rather than a second, emptier one.
 struct ScreenTimeBreakdown: View {
     let summary: ActivitySummary
-    @Binding var device: ActivityDeviceFilter
-    /// How many apps the grid shows before it stops.
+    /// How many rows to show before stopping.
     var appLimit: Int = 6
+    /// Window titles under each row — the deep view has the height for them.
+    var detailLimit: Int = 0
     var chartHeight: CGFloat = 96
     /// The deep view has room to also name the *kinds* of time; Today does not,
     /// and there the worth split under the chart is already the legend.
@@ -139,8 +172,6 @@ struct ScreenTimeBreakdown: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
-            devicePicker
-
             HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
                 Text(Fmt.duration(summary.totalSeconds))
                     .font(.myDisplay).monospacedDigit()
@@ -171,48 +202,42 @@ struct ScreenTimeBreakdown: View {
         }
     }
 
-    private var devicePicker: some View {
-        Picker("Device", selection: $device) {
-            ForEach(ActivityDeviceFilter.allCases) { filter in
-                Text(filter.label).tag(filter)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-    }
-
-    /// Two columns, biggest first — the shape the phone's own Screen Time card
-    /// uses, and the one that fits the most apps in the least height.
+    /// Two columns where the rows are one line each — the shape the phone's own
+    /// Screen Time card uses, and the one that fits the most in the least
+    /// height. One column once titles are shown, because a row is then three
+    /// lines tall and two of those side by side is a wall.
     private var apps: some View {
         let shown = Array(summary.apps.prefix(appLimit))
         return VStack(alignment: .leading, spacing: Space.md) {
-            LazyVGrid(columns: columns, alignment: .leading, spacing: Space.md) {
-                ForEach(shown) { usage in
-                    if let onApp {
-                        Button { onApp(usage) } label: {
-                            AppTimeRow(usage: usage).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        AppTimeRow(usage: usage)
-                    }
+            if detailLimit > 0 {
+                VStack(alignment: .leading, spacing: Space.md) {
+                    ForEach(shown) { row($0) }
+                }
+            } else {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: Space.md) {
+                    ForEach(shown) { row($0) }
                 }
             }
             if summary.apps.count > shown.count {
-                Text("+ \(summary.apps.count - shown.count) more app\(summary.apps.count - shown.count == 1 ? "" : "s")")
+                Text("+ \(summary.apps.count - shown.count) more")
                     .font(.myCaption)
                     .foregroundStyle(Palette.faint)
             }
         }
     }
 
-    /// An empty day and an unwatched device are not the same nothing, and the
-    /// line says which one this is.
-    private var emptyLine: String {
-        switch device {
-        case .mac:    return "Nothing recorded on the Mac."
-        case .iphone: return "Nothing from the iPhone. Each app needs its own Shortcuts automation — Settings → Activity has the steps."
-        case .all:    return "Nothing recorded yet."
+    @ViewBuilder
+    private func row(_ usage: AppUsage) -> some View {
+        let content = AppTimeRow(usage: usage, detailLimit: detailLimit)
+        if let onApp {
+            Button { onApp(usage) } label: { content.contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+        } else {
+            content
         }
     }
+
+    /// The empty line, which must not read as "nothing happened" when the truth
+    /// is "nothing was watching".
+    var emptyLine: String = "Nothing recorded yet."
 }

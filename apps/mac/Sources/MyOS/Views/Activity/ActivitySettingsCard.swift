@@ -1,5 +1,6 @@
 import SwiftUI
 #if os(macOS)
+import AppKit
 import ServiceManagement
 #endif
 
@@ -35,13 +36,20 @@ final class LoginItemStore: ObservableObject {
 }
 #endif
 
-/// Settings → Activity. What is recorded, on which devices, and how to make the
-/// iPhone report anything at all.
+/// Settings → Activity. What is recorded, how much detail, and how to erase it.
+///
+/// The Mac is the only sensor. iOS gives an app no way to read another app's
+/// usage — Screen Time is walled behind an entitlement a free account cannot
+/// have, and even with it the numbers render in a sandbox that cannot hand them
+/// back — so the phone shows this document rather than writing to it, and there
+/// is no phone section to configure.
 struct ActivitySettingsCard: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var coordinator = ActivityCoordinator.shared
-    @State private var showingSetup = false
     @State private var confirmingWipe = false
+    #if os(macOS)
+    @State private var trusted = AXAccess.isTrusted
+    #endif
 
     private var sessionCount: Int { state.activity.events.count }
     private var trackedDays: Int { Set(state.activity.events.map(\.day)).count + state.activity.days.count }
@@ -51,50 +59,47 @@ struct ActivitySettingsCard: View {
             VStack(alignment: .leading, spacing: Gap.row) {
                 SectionTitle(text: "Activity")
 
+                #if os(macOS)
                 Toggle(isOn: Binding(get: { coordinator.enabled },
                                      set: { coordinator.setEnabled($0) })) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(toggleTitle).font(.myBody.weight(.medium)).foregroundStyle(Palette.text)
-                        Text(toggleDetail).font(.myCaption).foregroundStyle(Palette.faint)
+                        Text("Track activity on this Mac")
+                            .font(.myBody.weight(.medium)).foregroundStyle(Palette.text)
+                        Text("Records which app is in front and for how long. Stops while the screen is locked or you are away from the keyboard.")
+                            .font(.myCaption).foregroundStyle(Palette.faint)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .tint(Palette.action)
 
-                #if os(macOS)
                 launchAtLogin
+
+                Divider().overlay(Palette.divider)
+                detail
+                #else
+                phoneNote
                 #endif
 
                 Divider().overlay(Palette.divider)
                 devices
 
                 Divider().overlay(Palette.divider)
-                iphoneSetup
-
-                Divider().overlay(Palette.divider)
                 storage
             }
         }
-        .sheet(isPresented: $showingSetup) { IPhoneActivitySetupSheet() }
     }
 
-    private var toggleTitle: String {
-        #if os(macOS)
-        return "Track activity on this Mac"
-        #else
-        return "Track MyOS use on this iPhone"
-        #endif
+    #if !os(macOS)
+    /// The honest sentence, in place of a switch that would control nothing.
+    private var phoneNote: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            SectionLabel(text: "Recorded by your Mac", accent: .activity)
+            Text("iOS gives an app no way to read another app's usage — Screen Time is walled off behind an entitlement a free developer account cannot get, and even with it the numbers can only be drawn, never handed back. So MyOS does not pretend to track this iPhone. Everything you see here was recorded on your Mac and synced.")
+                .font(.myCaption).foregroundStyle(Palette.faint)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
-
-    /// Says exactly what is and is not recorded. A tracker you cannot describe
-    /// in one sentence is a tracker you should not run.
-    private var toggleDetail: String {
-        #if os(macOS)
-        return "Records which app is in front and for how long — the app's name, never what is inside it. Stops while the screen is locked or you are away from the keyboard."
-        #else
-        return "iOS only lets an app time itself. This records MyOS's own foreground time; other apps need the automations below."
-        #endif
-    }
+    #endif
 
     #if os(macOS)
     @ObservedObject private var loginItem = LoginItemStore.shared
@@ -119,15 +124,6 @@ struct ActivitySettingsCard: View {
     }
     #endif
 
-    /// Which iPhone apps have actually reported. The automations are set up one
-    /// at a time on the phone and it is genuinely hard to remember which ones
-    /// are done — so this is the answer, taken from what has arrived.
-    private var reportingApps: [String] {
-        var names = Set(state.activity.events.filter { $0.deviceType == .iphone }.map(\.appName))
-        names.remove("MyOS")
-        return names.sorted()
-    }
-
     private var devices: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
             SectionLabel(text: "Devices reporting")
@@ -148,25 +144,56 @@ struct ActivitySettingsCard: View {
         }
     }
 
-    private var iphoneSetup: some View {
+    #if os(macOS)
+    /// The Accessibility permission and what it buys, said plainly.
+    ///
+    /// Without it a browser is one undifferentiated block called "Chrome",
+    /// which is the single biggest hole in the numbers — it is where the work
+    /// happens *and* where the day leaks, and the app name cannot tell those
+    /// apart. Granting it is what turns that block into github.com and
+    /// youtube.com.
+    private var detail: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
-            SectionLabel(text: "iPhone apps", accent: .activity)
-            Text("iOS gives no app permission to read another app's usage — Apple's Screen Time data is walled off behind an entitlement that needs a paid developer account, and even then it can only be drawn, not read. A Shortcuts automation is the way round it.")
+            SectionLabel(text: "Detail", accent: .activity)
+            Text(trusted
+                 ? "Accessibility is on. MyOS reads the frontmost window's title, and a browser's domain, so the breakdown names places rather than apps."
+                 : "MyOS can see which app is in front, but not what is in it — so every browser hour reads as \"Chrome\". Accessibility fixes that. It reads the title bar and the domain; never the page, never the path, never a keystroke.")
+                .font(.myCaption).foregroundStyle(trusted ? Palette.success : Palette.faint)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !trusted {
+                HStack(spacing: Space.sm) {
+                    Button("Allow Accessibility") { AXAccess.request(); recheck() }
+                        .buttonStyle(.bordered)
+                    Button("Open System Settings") { AXAccess.openSettings() }
+                        .buttonStyle(.borderless)
+                        .tint(Palette.action)
+                }
+            }
+
+            Toggle(isOn: Binding(get: { coordinator.recordsTitles },
+                                 set: { coordinator.setRecordsTitles($0) })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Record window titles").font(.myBody.weight(.medium)).foregroundStyle(Palette.text)
+                    Text("The second line under each row — which file, which video, which document. Turn it off and MyOS keeps domains only.")
+                        .font(.myCaption).foregroundStyle(Palette.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(Palette.action)
+            .disabled(!trusted)
+
+            Text("This app is ad-hoc signed, so macOS may drop the permission after MyOS is reinstalled. If the rows go back to app names, come back here.")
                 .font(.myCaption).foregroundStyle(Palette.faint)
                 .fixedSize(horizontal: false, vertical: true)
-            if reportingApps.isEmpty {
-                Text("No iPhone app has reported yet.")
-                    .font(.myCaption).foregroundStyle(Palette.faint)
-            } else {
-                Text("Reporting: \(reportingApps.joined(separator: ", "))")
-                    .font(.myCaption).foregroundStyle(Palette.success)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Button("How to set it up") { showingSetup = true }
-                .buttonStyle(.borderless)
-                .tint(Palette.action)
         }
+        .onAppear(perform: recheck)
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification)) { _ in recheck() }
     }
+
+    private func recheck() { trusted = AXAccess.isTrusted }
+    #endif
 
     private var storage: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
@@ -185,75 +212,5 @@ struct ActivitySettingsCard: View {
             .buttonStyle(.borderless)
             .tint(Palette.warning)
         }
-    }
-}
-
-/// The setup walkthrough. Written as the steps in the iPhone's own words, so it
-/// can be followed with the phone in hand.
-struct IPhoneActivitySetupSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    private let steps: [(String, String)] = [
-        ("Open Shortcuts on your iPhone",
-         "Go to the Automation tab and tap +."),
-        ("Choose App",
-         "Pick the app you want tracked — WhatsApp, Instagram, YouTube, whatever actually eats your day."),
-        ("Select “Is Opened”, then Run Immediately",
-         "Turn off “Notify When Run”, or you will get a banner every time you open it."),
-        ("Add the action “Track App Activity”",
-         "It is under MyOS. Set App to the app's name and State to opened."),
-        ("Repeat with “Is Closed”",
-         "Same automation app, State set to closed. Without this MyOS caps the session at 30 minutes rather than guessing."),
-        ("Open MyOS once a day",
-         "The automations queue up in the background; MyOS folds them into sessions the next time you open it."),
-    ]
-
-    var body: some View {
-        let content = ScrollView {
-            VStack(alignment: .leading, spacing: Gap.screen) {
-                VStack(alignment: .leading, spacing: Space.sm) {
-                    Text("Track iPhone apps").font(.myDisplay).foregroundStyle(Palette.text)
-                    Text("One automation per app, set up once. MyOS never sees what you did in the app — only that it was in front, and for how long.")
-                        .font(.myBody).foregroundStyle(Palette.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                    HStack(alignment: .top, spacing: Space.md) {
-                        Text("\(index + 1)")
-                            .font(.myCaption.weight(.bold))
-                            .foregroundStyle(Accent.activity.ink)
-                            .frame(width: 22, height: 22)
-                            .background(Palette.activity, in: Circle())
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(step.0).font(.myBody.weight(.semibold)).foregroundStyle(Palette.text)
-                            Text(step.1).font(.myCaption).foregroundStyle(Palette.faint)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-
-                Text("Why not Screen Time: Apple's DeviceActivity framework needs the family-controls entitlement, which a free developer account cannot provision — and its report extension is sandboxed so the per-app numbers can be shown but never handed back to MyOS. This is the only route that works without paying for a developer account.")
-                    .font(.myCaption).foregroundStyle(Palette.faint)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(Space.md)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .cardSkin(.elevated, radius: Radius.md)
-
-                Button("Done") { dismiss() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Palette.action)
-                    .foregroundStyle(Accent.green.ink)
-                    .frame(maxWidth: .infinity)
-            }
-            .padding(Space.xl)
-        }
-        .background(Palette.background)
-
-        #if os(iOS)
-        content.presentationDetents([.large])
-        #else
-        content.frame(width: 460, height: 620)
-        #endif
     }
 }

@@ -15,14 +15,35 @@ struct CategoryUsage: Identifiable, Hashable {
     var id: String { category.rawValue }
 }
 
-/// One app's share of a period.
+/// One place's share of a period — an app, or a site inside a browser.
+///
+/// A browser is a room rather than an activity, so where Accessibility could
+/// read the address bar the row *is* the domain and the browser is reduced to
+/// the icon beside it. Everything above this layer reads a row the same way
+/// whether it came from an app or a site.
 struct AppUsage: Identifiable, Hashable {
+    /// `com.apple.dt.Xcode`, or `web.github.com`.
     var appId: String
     var appName: String
     var category: ActivityCategory
     var productivity: ProductivityType
     var seconds: Int
+    /// The bundle id whose icon marks this row — for a site, the browser it was
+    /// open in.
+    var iconId: String = ""
+    /// Set when this row is a site.
+    var site: String?
+    /// What the window titles said, biggest first. The second level of the
+    /// breakdown: which repository, which video, which file.
+    var details: [DetailUsage] = []
     var id: String { appId }
+}
+
+/// One window title's share of a row.
+struct DetailUsage: Identifiable, Hashable {
+    var title: String
+    var seconds: Int
+    var id: String { title }
 }
 
 /// One hour of the day, split by worth. The timeline strip is a stacked bar over
@@ -57,7 +78,6 @@ struct FocusBlock: Identifiable, Hashable {
 struct ActivitySummary: Hashable {
     var day: String
     var totalSeconds: Int = 0
-    var byDevice: [DeviceType: Int] = [:]
     var byProductivity: [ProductivityType: Int] = [:]
     var apps: [AppUsage] = []
     var categories: [CategoryUsage] = []
@@ -69,7 +89,6 @@ struct ActivitySummary: Hashable {
 
     var isEmpty: Bool { totalSeconds == 0 }
     func seconds(_ p: ProductivityType) -> Int { byProductivity[p] ?? 0 }
-    func seconds(_ d: DeviceType) -> Int { byDevice[d] ?? 0 }
     var longestFocus: FocusBlock? { focusBlocks.max { $0.seconds < $1.seconds } }
 
     /// Share of *tracked* time, not of the day. A number out of 24 hours would
@@ -84,7 +103,6 @@ struct ActivitySummary: Hashable {
 struct ActivityWeekSummary: Hashable {
     var days: [String] = []
     var totalSeconds: Int = 0
-    var byDevice: [DeviceType: Int] = [:]
     var byProductivity: [ProductivityType: Int] = [:]
     var apps: [AppUsage] = []
     var categories: [CategoryUsage] = []
@@ -98,7 +116,6 @@ struct ActivityWeekSummary: Hashable {
 
     var isEmpty: Bool { totalSeconds == 0 }
     func seconds(_ p: ProductivityType) -> Int { byProductivity[p] ?? 0 }
-    func seconds(_ d: DeviceType) -> Int { byDevice[d] ?? 0 }
     func share(_ p: ProductivityType) -> Double {
         totalSeconds > 0 ? Double(seconds(p)) / Double(totalSeconds) : 0
     }
@@ -124,39 +141,47 @@ enum ActivityEngine {
 
     // MARK: - Day
 
-    static func sessions(_ events: [ActivityEvent], on day: String,
-                         device: ActivityDeviceFilter = .all) -> [ActivityEvent] {
-        events.filter { $0.day == day && device.matches($0) }.sorted { $0.startedAt < $1.startedAt }
+    static func sessions(_ events: [ActivityEvent], on day: String) -> [ActivityEvent] {
+        events.filter { $0.day == day }.sorted { $0.startedAt < $1.startedAt }
     }
 
-    static func summary(_ events: [ActivityEvent], day: String,
-                        device: ActivityDeviceFilter = .all) -> ActivitySummary {
-        let sessions = sessions(events, on: day, device: device)
+    static func summary(_ events: [ActivityEvent], day: String) -> ActivitySummary {
+        let sessions = sessions(events, on: day)
         var out = ActivitySummary(day: day)
         out.sessionCount = sessions.count
         guard !sessions.isEmpty else { return out }
 
         var apps: [String: AppUsage] = [:]
+        var details: [String: [String: Int]] = [:]
         var hours = (0..<24).map { TimelineHour(hour: $0) }
 
         for s in sessions {
             out.totalSeconds += s.duration
-            out.byDevice[s.deviceType, default: 0] += s.duration
             out.byProductivity[s.productivity, default: 0] += s.duration
 
-            if var existing = apps[s.appId] {
+            let key = s.groupId
+            if var existing = apps[key] {
                 existing.seconds += s.duration
-                apps[s.appId] = existing
+                apps[key] = existing
             } else {
-                apps[s.appId] = AppUsage(appId: s.appId, appName: s.appName,
-                                         category: s.category, productivity: s.productivity,
-                                         seconds: s.duration)
+                apps[key] = AppUsage(appId: key, appName: s.groupName,
+                                     category: s.category, productivity: s.productivity,
+                                     seconds: s.duration, iconId: s.iconId, site: s.site)
             }
+            if let title = s.title { details[key, default: [:]][title, default: 0] += s.duration }
 
             spread(session: s, into: &hours)
         }
 
-        out.apps = apps.values.sorted { $0.seconds > $1.seconds }
+        out.apps = apps.values
+            .map { row in
+                var row = row
+                row.details = (details[row.appId] ?? [:])
+                    .map { DetailUsage(title: $0.key, seconds: $0.value) }
+                    .sorted { $0.seconds > $1.seconds }
+                return row
+            }
+            .sorted { $0.seconds > $1.seconds }
         out.categories = categories(from: out.apps)
         out.timeline = hours
         out.switches = countSwitches(sessions)
@@ -215,8 +240,8 @@ enum ActivityEngine {
         var count = 0
         var previous: String?
         for s in sessions {
-            if let previous, previous != s.appId { count += 1 }
-            previous = s.appId
+            if let previous, previous != s.groupId { count += 1 }
+            previous = s.groupId
         }
         return count
     }
@@ -242,15 +267,15 @@ enum ActivityEngine {
                     let gap = secondsBetween(c.end, s.startedAt)
                     if gap > focusGapTolerance {
                         close()
-                        current = (s.startedAt, s.endedAt, s.duration, [s.appName: s.duration])
+                        current = (s.startedAt, s.endedAt, s.duration, [s.groupName: s.duration])
                     } else {
                         c.end = s.endedAt
                         c.seconds += s.duration
-                        if productive { c.byApp[s.appName, default: 0] += s.duration }
+                        if productive { c.byApp[s.groupName, default: 0] += s.duration }
                         current = c
                     }
                 } else if productive {
-                    current = (s.startedAt, s.endedAt, s.duration, [s.appName: s.duration])
+                    current = (s.startedAt, s.endedAt, s.duration, [s.groupName: s.duration])
                 }
             } else {
                 close()
@@ -269,23 +294,21 @@ enum ActivityEngine {
 
     /// Summarise a set of days, reading raw sessions where they are still held
     /// and the compacted rollups where they are not.
-    static func weekSummary(doc: ActivityDoc, days: [String],
-                            device: ActivityDeviceFilter = .all) -> ActivityWeekSummary {
+    static func weekSummary(doc: ActivityDoc, days: [String]) -> ActivityWeekSummary {
         var out = ActivityWeekSummary(days: days)
         var apps: [String: AppUsage] = [:]
         var productiveByHour = [Int](repeating: 0, count: 24)
 
         for day in days {
-            let daySessions = sessions(doc.events, on: day, device: device)
+            let daySessions = sessions(doc.events, on: day)
             if !daySessions.isEmpty {
-                let s = summary(doc.events, day: day, device: device)
+                let s = summary(doc.events, day: day)
                 guard s.totalSeconds > 0 else { continue }
                 out.daysTracked += 1
                 out.totalSeconds += s.totalSeconds
                 out.dailyTotals[day] = s.totalSeconds
                 out.dailyProductive[day] = s.seconds(.productive)
                 out.switches += s.switches
-                for (d, v) in s.byDevice { out.byDevice[d, default: 0] += v }
                 for (p, v) in s.byProductivity { out.byProductivity[p, default: 0] += v }
                 for a in s.apps {
                     if var e = apps[a.appId] { e.seconds += a.seconds; apps[a.appId] = e }
@@ -295,39 +318,27 @@ enum ActivityEngine {
                 if let longest = s.longestFocus,
                    longest.seconds > (out.longestFocus?.seconds ?? 0) { out.longestFocus = longest }
             } else if let rollup = doc.days[day], rollup.totalSeconds > 0 {
-                // Compacted history: day totals and the device split survive,
-                // per-hour and per-app detail does not. A rollup can therefore
-                // answer a filtered question only as far as its device split
-                // goes — the apps in it are not attributed to a device, so a
-                // Mac-only or iPhone-only read deliberately leaves them out
-                // rather than crediting them to the wrong machine.
-                let deviceSeconds = device.device.map { rollup.seconds($0) } ?? rollup.totalSeconds
-                guard deviceSeconds > 0 else { continue }
-                let share = rollup.totalSeconds > 0
-                    ? Double(deviceSeconds) / Double(rollup.totalSeconds) : 0
-
+                // Compacted history: day totals survive, per-hour detail does
+                // not. A rollup's app rows kept only a display name, so a site
+                // row comes back as the site's name and is re-classified from
+                // it rather than being dropped.
                 out.daysTracked += 1
-                out.totalSeconds += deviceSeconds
-                out.dailyTotals[day] = deviceSeconds
-                out.dailyProductive[day] = Int(Double(rollup.seconds(.productive)) * share)
-                out.switches += Int(Double(rollup.switches) * share)
-                for (k, v) in rollup.byDevice {
-                    guard let d = DeviceType(rawValue: k), device.device == nil || device.device == d else { continue }
-                    out.byDevice[d, default: 0] += v
-                }
+                out.totalSeconds += rollup.totalSeconds
+                out.dailyTotals[day] = rollup.totalSeconds
+                out.dailyProductive[day] = rollup.seconds(.productive)
+                out.switches += rollup.switches
                 for (k, v) in rollup.byProductivity {
-                    if let p = ProductivityType(rawValue: k) {
-                        out.byProductivity[p, default: 0] += Int(Double(v) * share)
-                    }
+                    if let p = ProductivityType(rawValue: k) { out.byProductivity[p, default: 0] += v }
                 }
-                guard device == .all else { continue }
                 for (name, v) in rollup.byApp {
-                    let id = ActivityCatalog.slug(name)
+                    let site = name.contains(".") && !name.contains(" ") ? name : nil
+                    let id = site.map { "web." + $0 } ?? ActivityCatalog.slug(name)
                     if var e = apps[id] { e.seconds += v; apps[id] = e }
                     else {
-                        let c = ActivityCatalog.classify(appId: id, appName: name, rules: doc.rules)
+                        let c = ActivityCatalog.classify(appId: id, appName: name,
+                                                         site: site, rules: doc.rules)
                         apps[id] = AppUsage(appId: id, appName: name, category: c.category,
-                                            productivity: c.productivity, seconds: v)
+                                            productivity: c.productivity, seconds: v, site: site)
                     }
                 }
             }
@@ -374,7 +385,7 @@ enum ActivityEngine {
         out.totalSeconds = s.totalSeconds
         out.switches = s.switches
         out.longestFocusSeconds = s.longestFocus?.seconds ?? 0
-        for (d, v) in s.byDevice { out.byDevice[d.rawValue] = v }
+        out.byDevice = [DeviceType.mac.rawValue: s.totalSeconds]
         for (p, v) in s.byProductivity { out.byProductivity[p.rawValue] = v }
         // Only the apps worth remembering — a rollup is a summary, not an archive.
         for a in s.apps.prefix(12) { out.byApp[a.appName] = a.seconds }

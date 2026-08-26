@@ -32,10 +32,10 @@ final class ActivityEngineTests: XCTestCase {
 
     // MARK: Totals
 
-    func testTotalsSplitByDeviceAndWorth() {
+    func testTotalsSplitByWorth() {
         let events = [
             event("Xcode", 10, 0, minutes: 60),
-            event("WhatsApp", 11, 0, minutes: 20, .distracting, device: .iphone, category: .social),
+            event("Instagram", 11, 0, minutes: 20, .distracting, category: .social),
             event("Finder", 11, 30, minutes: 10, .neutral, category: .utility),
         ]
         let s = ActivityEngine.summary(events, day: day)
@@ -44,8 +44,6 @@ final class ActivityEngineTests: XCTestCase {
         XCTAssertEqual(s.seconds(.productive), 60 * 60)
         XCTAssertEqual(s.seconds(.distracting), 20 * 60)
         XCTAssertEqual(s.seconds(.neutral), 10 * 60)
-        XCTAssertEqual(s.seconds(.mac), 70 * 60)
-        XCTAssertEqual(s.seconds(.iphone), 20 * 60)
         XCTAssertEqual(s.share(.productive), 2.0 / 3.0, accuracy: 0.001)
     }
 
@@ -223,15 +221,15 @@ final class ActivityEngineTests: XCTestCase {
 
     // MARK: Merge
 
-    /// Both devices append to one last-write-wins key, so a pull that replaced
-    /// rather than merged would silently delete the other device's day.
-    func testMergeUnionsSessionsFromBothDevices() {
+    /// Two copies of one last-write-wins key, so a pull that replaced rather
+    /// than merged would silently delete whatever the other copy had recorded
+    /// since the last sync.
+    func testMergeUnionsSessionsFromBothCopies() {
         var mac = ActivityDoc(); mac.events = [event("Xcode", 10, 0, minutes: 30)]
-        var phone = ActivityDoc()
-        phone.events = [event("WhatsApp", 11, 0, minutes: 10, .distracting,
-                              device: .iphone, category: .social)]
+        var pulled = ActivityDoc()
+        pulled.events = [event("Slack", 11, 0, minutes: 10, .neutral, category: .communication)]
 
-        let merged = mac.merged(with: phone)
+        let merged = mac.merged(with: pulled)
         XCTAssertEqual(merged.events.count, 2)
         XCTAssertEqual(ActivityEngine.summary(merged.events, day: day).totalSeconds, 40 * 60)
     }

@@ -4,12 +4,12 @@ import SwiftUI
 ///
 /// It answers, in order: what am I doing right now, where has today's time
 /// actually gone, and what should I do about it. The middle one is a Screen
-/// Time answer — per app, per device — because "3 hours tracked" is a number
-/// you can't act on and "1h 20m in CapCut" is.
+/// Time answer — per place — because "3 hours tracked" is a number you can't
+/// act on and "1h 20m on youtube.com" is.
 ///
-/// The device switch is a control rather than two tiles: the Mac and the iPhone
-/// are separate sensors feeding one model, and which of them you are reading
-/// changes every number under it.
+/// The same card on both devices, showing the same day. The Mac records it; the
+/// phone reads it, including what the Mac is in front of at this second, which
+/// arrives as a note in the synced document rather than as a session.
 struct ActivityIntelligenceCard: View {
     /// The day being shown. Today unless the Today page has been swiped.
     var day: String? = nil
@@ -19,27 +19,14 @@ struct ActivityIntelligenceCard: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var coordinator = ActivityCoordinator.shared
 
-    /// Which device's time is on screen. Per device and not synced — reading the
-    /// phone's day on the Mac is a thing you do for a moment, not a preference
-    /// worth pushing to the other machine.
-    @AppStorage("myos.activity.deviceFilter") private var deviceRaw = ActivityDeviceFilter.all.rawValue
-
-    private var device: Binding<ActivityDeviceFilter> {
-        Binding(get: { ActivityDeviceFilter(rawValue: deviceRaw) ?? .all },
-                set: { deviceRaw = $0.rawValue })
-    }
-
     var body: some View {
         // One pass over the day's sessions, not three: this card is alive on
         // three Today pages at once.
         let key = day ?? state.todayKey
-        let summary = state.activitySummaryLive(key, device: device.wrappedValue)
-        let live = key == state.todayKey ? state.liveActivity : nil
-        // The verdict is always about the whole day, whichever device is being
-        // read — a good afternoon on the Mac is not undone by looking at the
-        // phone's tab.
-        let whole = device.wrappedValue == .all ? summary : state.activitySummaryLive(key)
-        let read = ActivityInsights.dayIntelligence(summary: whole, current: live,
+        let summary = state.activitySummaryLive(key)
+        let live = key == state.todayKey ? state.currentFocus : nil
+        let read = ActivityInsights.dayIntelligence(summary: summary, current: live,
+                                                    device: state.currentFocusDevice,
                                                     todos: state.todayPriorities, now: Date())
 
         Card(accent: .activity, look: .accent) {
@@ -54,15 +41,15 @@ struct ActivityIntelligenceCard: View {
                     idleHeader
                 }
 
-                if whole.isEmpty && !coordinator.enabled {
+                if summary.isEmpty && !tracking {
                     offState
                 } else {
                     Divider().overlay(Palette.divider)
                     ScreenTimeBreakdown(summary: summary,
-                                        device: device,
                                         appLimit: Self.appLimit,
                                         chartHeight: Self.chartHeight,
-                                        trailing: detailsButton)
+                                        trailing: detailsButton,
+                                        emptyLine: emptyLine)
                 }
 
                 if let action = read.action {
@@ -109,10 +96,37 @@ struct ActivityIntelligenceCard: View {
         }
     }
 
+    /// Whether a day *can* be recorded from where this card is being read. On
+    /// the phone the answer is always no, and that is not a failure to report —
+    /// the Mac is the sensor and this is the screen.
+    private var tracking: Bool {
+        #if os(macOS)
+        return coordinator.enabled
+        #else
+        return true
+        #endif
+    }
+
     private var idleLine: String {
+        #if os(macOS)
         if !coordinator.enabled { return "Not tracking on this device." }
         if (day ?? state.todayKey) != state.todayKey { return "A past day — no live session." }
         return "Nothing in front of you right now."
+        #else
+        if (day ?? state.todayKey) != state.todayKey { return "A past day — no live session." }
+        if state.activity.devices.isEmpty { return "Nothing recorded yet — your Mac does the recording." }
+        return "Your Mac isn't in front of anything right now."
+        #endif
+    }
+
+    /// An empty day on the phone is almost always a Mac that has not synced
+    /// yet, and saying "nothing recorded" would be a claim about the day.
+    private var emptyLine: String {
+        #if os(macOS)
+        return "Nothing recorded yet."
+        #else
+        return "Nothing from your Mac for this day yet."
+        #endif
     }
 
     /// Honest about which of the two possible nothings this is. A zero here
@@ -120,7 +134,7 @@ struct ActivityIntelligenceCard: View {
     /// not having watched.
     private var offState: some View {
         VStack(alignment: .leading, spacing: Space.md) {
-            Text("MyOS isn't recording where your time goes yet. Turn it on and this card starts answering what you're focused on and whether it's worth doing.")
+            Text("MyOS isn't recording where your time goes on this Mac. Turn it on and this card starts answering what you're focused on and whether it's worth doing.")
                 .font(.myBody)
                 .foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)

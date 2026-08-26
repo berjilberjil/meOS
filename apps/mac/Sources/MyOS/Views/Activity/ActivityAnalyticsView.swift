@@ -19,14 +19,6 @@ struct ActivityAnalyticsView: View {
     @ObservedObject private var coordinator = ActivityCoordinator.shared
     @State private var range: ActivityRange = .today
     @State private var editingApp: AppUsage?
-    /// Shared with the Today card, so switching device in one place does not
-    /// disagree with the other.
-    @AppStorage("myos.activity.deviceFilter") private var deviceRaw = ActivityDeviceFilter.all.rawValue
-
-    private var device: Binding<ActivityDeviceFilter> {
-        Binding(get: { ActivityDeviceFilter(rawValue: deviceRaw) ?? .all },
-                set: { deviceRaw = $0.rawValue })
-    }
 
     enum ActivityRange: String, CaseIterable, Identifiable {
         case today, week, month
@@ -60,19 +52,17 @@ struct ActivityAnalyticsView: View {
         var isEmpty: Bool { totalSeconds == 0 }
         var apps: [AppUsage] { isToday ? day.apps : week.apps }
         func seconds(_ p: ProductivityType) -> Int { isToday ? day.seconds(p) : week.seconds(p) }
-        func seconds(_ d: DeviceType) -> Int { isToday ? day.seconds(d) : week.seconds(d) }
     }
 
     private func read() -> Read {
         let keys = (0..<range.days).reversed().map { AppState.addDays(-$0, to: state.todayKey) }
-        let filter = device.wrappedValue
         // Only the one the range actually needs is computed; the other is empty.
         let day = range == .today
-            ? state.activitySummaryLive(state.todayKey, device: filter)
+            ? state.activitySummaryLive(state.todayKey)
             : ActivitySummary(day: state.todayKey)
         let week = range == .today
             ? ActivityWeekSummary()
-            : ActivityEngine.weekSummary(doc: state.activity, days: keys, device: filter)
+            : ActivityEngine.weekSummary(doc: state.activity, days: keys)
         return Read(range: range, day: day, week: week, dayKeys: keys)
     }
 
@@ -116,13 +106,6 @@ struct ActivityAnalyticsView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            if range != .today {
-                Picker("Device", selection: device) {
-                    ForEach(ActivityDeviceFilter.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
         }
     }
 
@@ -131,7 +114,6 @@ struct ActivityAnalyticsView: View {
         if read.isToday {
             screenTimeCard(read)
         } else {
-            devices(read)
             breakdown(read)
             dailyCard(read)
             appsCard(read)
@@ -140,47 +122,33 @@ struct ActivityAnalyticsView: View {
         verdictCard(read)
     }
 
-    /// Today gets the full Screen Time read in one card — device, hours, worth,
-    /// kinds of time, and the apps themselves — because that is one question
-    /// asked at four resolutions, not four cards.
+    /// Today gets the full Screen Time read in one card — hours, worth, kinds
+    /// of time, the places themselves and what each window said — because that
+    /// is one question asked at five resolutions, not five cards.
     private func screenTimeCard(_ read: Read) -> some View {
         Card {
             VStack(alignment: .leading, spacing: Gap.row) {
                 SectionTitle(text: "Where the time went")
                 ScreenTimeBreakdown(summary: read.day,
-                                    device: device,
                                     appLimit: 10,
+                                    detailLimit: Self.detailLimit,
                                     chartHeight: 140,
                                     showsCategories: true,
                                     onApp: { editingApp = $0 })
-                if device.wrappedValue != .mac && read.day.seconds(.iphone) == 0 {
-                    Text("iPhone activity needs a Shortcuts automation per app — iOS gives no app permission to read another app's usage. Set it up in Settings.")
-                        .font(.myCaption)
-                        .foregroundStyle(Palette.faint)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Text("Tap an app to change what it counts as.")
+                DetailHint()
+                Text("Tap a row to change what it counts as.")
                     .font(.myCaption).foregroundStyle(Palette.faint)
             }
         }
     }
 
-    // MARK: Devices
-
-    private func devices(_ read: Read) -> some View {
-        Card {
-            VStack(alignment: .leading, spacing: Gap.row) {
-                SectionTitle(text: "Devices")
-                DeviceSplit(mac: read.seconds(.mac), iphone: read.seconds(.iphone))
-                if read.seconds(.iphone) == 0 {
-                    Text("iPhone activity needs a Shortcuts automation per app — iOS gives no app permission to read another app's usage. Set it up in Settings.")
-                        .font(.myCaption)
-                        .foregroundStyle(Palette.faint)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
+    /// Window titles are worth three lines under a row on the Mac and none on
+    /// the phone, where this screen is already a scroll.
+    #if os(macOS)
+    private static let detailLimit = 3
+    #else
+    private static let detailLimit = 2
+    #endif
 
     // MARK: Breakdown
 

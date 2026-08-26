@@ -90,7 +90,6 @@ struct ActivityWeeklySection: View {
                     .font(.title3.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
             }
-            DeviceSplit(mac: week.seconds(.mac), iphone: week.seconds(.iphone), showsTotal: false)
         }
     }
 }

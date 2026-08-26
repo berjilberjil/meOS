@@ -15,9 +15,8 @@ import Foundation
 ///      only, which is the same as (2) one quit later.
 ///
 /// So every finished session is appended here first, on disk, in the clear —
-/// and "in the clear" is fine, because the *only* thing in it is an app's name
-/// and two timestamps, exactly what `ActivityInbox` already holds. The document
-/// then folds this in on the next unlock and dedupes by session id.
+/// an app's name, where inside it, and two timestamps. The document folds this
+/// in on the next unlock and dedupes by session id.
 ///
 /// This is what lets the Mac record from launch rather than from unlock.
 enum ActivityJournal {
@@ -32,9 +31,8 @@ enum ActivityJournal {
     /// older than a couple of days has either made it or never will.
     static let retentionDays = 3
 
-    /// The App Group container on iOS — shared with the Shortcuts intent — and
-    /// Application Support on the Mac, where the app is unsandboxed and has no
-    /// group container at all.
+    /// The App Group container where there is one, else Application Support —
+    /// the Mac is unsandboxed and has no group container at all.
     private static var fileURL: URL? {
         let fm = FileManager.default
         if let group = fm.containerURL(forSecurityApplicationGroupIdentifier: ShareInbox.appGroup) {
@@ -77,6 +75,10 @@ enum ActivityJournal {
         var items = items
         if let last = items.last,
            last.appId == event.appId,
+           // Same app is not the same *place*: two tabs, or two files, are two
+           // rows however close together they ran.
+           last.site == event.site,
+           last.title == event.title,
            last.deviceId == event.deviceId,
            last.day == event.day,
            gap(from: last.endedAt, to: event.startedAt) <= mergeGap {

@@ -10,7 +10,6 @@ struct RootView: View {
     @State private var unlocked = false
     /// When MyOS itself came to the front on the phone. iOS lets an app time
     /// exactly one app — itself — and this is that measurement.
-    @State private var foregroundSince: Date?
 
     var body: some View {
         ZStack {
@@ -75,7 +74,6 @@ struct RootView: View {
                 DietBridge.shared.start(state: state)
                 // Sensors last: they need a hydrated state to write into.
                 ActivityCoordinator.shared.configure(state: state)
-                foregroundSince = Date()
                 await state.generateWeeklyReportIfDue()
             }
         }
@@ -101,20 +99,12 @@ struct RootView: View {
             // worth spending requests on.
             state.isForeground = (newPhase == .active)
 
-            // Activity: bank this device's own foreground stretch, take whatever
-            // the iPhone's automations queued, and get it synced before the app
-            // is suspended.
-            if newPhase == .active {
-                foregroundSince = Date()
-                ActivityCoordinator.shared.drainInbox()
-            }
-            if newPhase == .background {
-                if let since = foregroundSince {
-                    ActivityCoordinator.shared.recordOwnForeground(from: since, to: Date())
-                    foregroundSince = nil
-                }
-                ActivityCoordinator.shared.flush()
-            }
+            // Activity: get whatever this device recorded synced before it is
+            // suspended. On the phone that is nothing — iOS cannot see other
+            // apps, and MyOS timing itself was never a measurement of the day —
+            // but the flush still matters, because the phone can hold rules and
+            // erasures the Mac has not seen.
+            if newPhase == .background { ActivityCoordinator.shared.flush() }
 
             if newPhase == .active {
                 Task {

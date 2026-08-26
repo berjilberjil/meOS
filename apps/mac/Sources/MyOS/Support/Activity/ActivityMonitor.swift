@@ -5,8 +5,9 @@ import AppKit
 import UIKit
 #endif
 
-/// This device, stably. The id is generated once and kept in UserDefaults so a
-/// Mac and an iPhone stay distinguishable in the combined model across relaunches.
+/// This device, stably. The id is generated once and kept in UserDefaults, so a
+/// Mac keeps its identity across relaunches and two Macs never merge into one
+/// row in the devices list.
 enum ActivityDeviceIdentity {
     private static let key = "myos.activity.deviceId"
 
@@ -45,12 +46,18 @@ enum ActivityDeviceIdentity {
 
 #if os(macOS)
 
-/// Watches which application is in front, and for how long.
+/// Watches what is in front, and for how long.
 ///
 /// This is the only real sensor MyOS has. `NSWorkspace` publishes activations to
-/// any app, with no entitlement and no accessibility prompt — it reports the
-/// application, never what you typed or which document is open, which is the
-/// line this deliberately does not cross.
+/// any app with no permission at all, and that alone answers "which app" — but
+/// "Chrome, 2 hours" is not an answer, because Chrome is where the work happens
+/// *and* where the day leaks. So a second, optional pass reads the frontmost
+/// window through Accessibility: its title, and for a browser the domain in the
+/// address bar. Deny the permission and everything here still works; it just
+/// cannot tell github.com from youtube.com.
+///
+/// The line: the title bar and the host. Never the page, never the path, never
+/// a keystroke.
 ///
 /// Three things end a session besides switching app: going idle at the keyboard,
 /// locking the screen, and the machine sleeping. Without those, walking away for
@@ -65,8 +72,14 @@ final class MacActivityMonitor {
     /// No keyboard or mouse for this long and the clock stops.
     static let idleThreshold: TimeInterval = 120
 
-    /// How often the current session is checked and extended.
-    private static let tick: TimeInterval = 20
+    /// How often the sensor looks. Fast enough that a tab change is caught
+    /// while it still is one — at the old 20 seconds a quick look at something
+    /// was credited to whatever came before it.
+    private static let tick: TimeInterval = 5
+
+    /// The live card does not need to be told the same thing every five
+    /// seconds; it is redrawn on a change, or on this.
+    private static let liveEmitInterval: TimeInterval = 20
 
     /// A session that has been running this long is banked and immediately
     /// restarted. Nothing about the day changes — `ActivityJournal` merges the
@@ -75,8 +88,13 @@ final class MacActivityMonitor {
     /// long you had been heads-down in one app.
     private static let bankInterval: TimeInterval = 5 * 60
 
-    private var currentApp: (id: String, name: String)?
+    private var currentApp: (id: String, name: String, pid: pid_t, bundleId: String?)?
+    /// What was in front *inside* the app — the domain, the document. Part of
+    /// the session's identity: a new site is a new session, not a footnote on
+    /// the old one.
+    private var context: WindowContext = .none
     private var startedAt: Date?
+    private var lastLiveEmit: Date = .distantPast
     /// When we last saw real input, so an idle stretch can be trimmed off the
     /// end of the session rather than counted.
     private var lastActive: Date = Date()
@@ -93,6 +111,10 @@ final class MacActivityMonitor {
     /// Rules, so a session is classified the way Berjil said rather than the way
     /// the catalogue guessed.
     var rules: [String: AppRule] = [:]
+
+    /// Whether window titles are recorded. Domains are read either way — a host
+    /// is where you were, a title can be the name of a document.
+    var recordsTitles: Bool = true
 
     func start() {
         guard !running else { return }
@@ -151,6 +173,7 @@ final class MacActivityMonitor {
         }
         observers = []
         onLiveChange?(nil)
+        WindowProbe.forgetAll()
     }
 
     private enum CloseReason { case switched, stopped }
@@ -185,6 +208,54 @@ final class MacActivityMonitor {
             bankLive()
             return
         }
+
+        // The app has not changed, but what is in front of you inside it may
+        // have. This is the whole browser story: one Chrome activation can be
+        // an hour of GitHub followed by forty minutes of YouTube, and without
+        // this it is one undifferentiated hour and forty minutes of "Chrome".
+        let fresh = probeContext()
+        if fresh != context {
+            contextChanged(to: fresh)
+            return
+        }
+
+        if Date().timeIntervalSince(lastLiveEmit) >= Self.liveEmitInterval { emitLive() }
+    }
+
+    /// Read the frontmost window, if Accessibility allows it.
+    private func probeContext() -> WindowContext {
+        guard let app = currentApp else { return .none }
+        let fresh = WindowProbe.read(pid: app.pid, bundleId: app.bundleId,
+                                     appName: app.name, titles: recordsTitles)
+        return WindowSense.settling(fresh, after: context,
+                                    isBrowser: WindowSense.isBrowser(bundleId: app.bundleId,
+                                                                     appName: app.name))
+    }
+
+    /// A new domain or a new document, in the same app.
+    ///
+    /// If the stretch that just ended is too short to be a row of its own, the
+    /// session is *relabelled* rather than split. Closing it would drop it under
+    /// the minimum and delete the seconds outright — and time that vanishes
+    /// because you glanced at a second tab is exactly the kind of quiet
+    /// inaccuracy this whole file exists to avoid.
+    private func contextChanged(to fresh: WindowContext) {
+        guard let app = currentApp, let started = startedAt else { context = fresh; return }
+        if Date().timeIntervalSince(started) < TimeInterval(Self.minimumSessionSeconds) {
+            context = fresh
+            emitLive()
+            return
+        }
+        close(reason: .switched)
+        currentApp = app
+        context = fresh
+        startedAt = Date()
+        lastActive = Date()
+        emitLive()
+    }
+
+    private func emitLive() {
+        lastLiveEmit = Date()
         onLiveChange?(liveSession())
     }
 
@@ -192,23 +263,32 @@ final class MacActivityMonitor {
     /// time so far is on disk. The journal merges them back into one row.
     private func bankLive() {
         guard let app = currentApp else { return }
+        let held = context
         close(reason: .switched)
         currentApp = app
+        context = held
         startedAt = Date()
         lastActive = Date()
-        onLiveChange?(liveSession())
+        emitLive()
     }
 
     private func switched(to app: NSRunningApplication?) {
         close(reason: .switched)
         guard let app,
               let name = app.localizedName ?? app.bundleIdentifier else { return }
-        // MyOS looking at itself is not activity worth reporting.
         let id = app.bundleIdentifier ?? ActivityCatalog.slug(name)
-        currentApp = (id, name)
+        // The cached address-bar element belongs to the window that just went
+        // away; a stale one reads the wrong tab.
+        WindowProbe.forget(pid: app.processIdentifier)
+        currentApp = (id, name, app.processIdentifier, app.bundleIdentifier)
         startedAt = Date()
         lastActive = Date()
-        onLiveChange?(liveSession())
+        // Cleared first: `probeContext` holds a browser's last known site across
+        // an unreadable moment, and that must never carry over from the app we
+        // just left.
+        context = .none
+        context = probeContext()
+        emitLive()
     }
 
     /// The session as it stands right now, for the live card.
@@ -222,7 +302,7 @@ final class MacActivityMonitor {
 
     private func close(reason: CloseReason) {
         defer {
-            if reason == .stopped { currentApp = nil; startedAt = nil }
+            if reason == .stopped { currentApp = nil; startedAt = nil; context = .none }
         }
         guard let app = currentApp, let started = startedAt else { return }
         // Idle time at the end of a session is not time spent in the app.
@@ -234,8 +314,10 @@ final class MacActivityMonitor {
         onSession?(event(app: app, started: started, ended: end, seconds: seconds))
     }
 
-    private func event(app: (id: String, name: String), started: Date, ended: Date, seconds: Int) -> ActivityEvent {
-        let classified = ActivityCatalog.classify(appId: app.id, appName: app.name, rules: rules)
+    private func event(app: (id: String, name: String, pid: pid_t, bundleId: String?),
+                       started: Date, ended: Date, seconds: Int) -> ActivityEvent {
+        let classified = ActivityCatalog.classify(appId: app.id, appName: app.name,
+                                                  site: context.site, rules: rules)
         return ActivityEvent(deviceId: ActivityDeviceIdentity.deviceId,
                              deviceType: .mac,
                              platform: ActivityDeviceIdentity.platform,
@@ -246,7 +328,9 @@ final class MacActivityMonitor {
                              endedAt: ActivityTime.stamp(ended),
                              duration: seconds,
                              productivity: classified.productivity,
-                             source: .macFrontmost)
+                             source: .macFrontmost,
+                             site: context.site,
+                             title: context.title)
     }
 }
 

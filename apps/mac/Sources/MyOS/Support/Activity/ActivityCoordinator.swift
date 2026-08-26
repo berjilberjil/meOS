@@ -20,6 +20,15 @@ final class ActivityCoordinator: ObservableObject {
 
     @Published private(set) var enabled: Bool
 
+    /// Whether window titles are recorded alongside the app.
+    ///
+    /// Separate from tracking, and separate from domains, because they are
+    /// different promises: a domain says where you were, a title can be the name
+    /// of a document. Per device, not synced, for the same reason `enabled` is
+    /// not — this is a decision about what *this* machine writes down.
+    private static let titlesKey = "myos.activity.titles"
+    @Published private(set) var recordsTitles: Bool
+
     /// Sessions land here constantly; the synced blob does not need to hear
     /// about each one. Flushed on this interval, and whenever the app leaves.
     private static let pushInterval: TimeInterval = 120
@@ -58,6 +67,10 @@ final class ActivityCoordinator: ObservableObject {
             defaults.set(true, forKey: ActivityCoordinator.enabledKey)
         }
         enabled = defaults.bool(forKey: ActivityCoordinator.enabledKey)
+        if defaults.object(forKey: ActivityCoordinator.titlesKey) == nil {
+            defaults.set(true, forKey: ActivityCoordinator.titlesKey)
+        }
+        recordsTitles = defaults.bool(forKey: ActivityCoordinator.titlesKey)
     }
 
     /// Start the sensor. Called at launch, *before* the vault is unlocked.
@@ -86,17 +99,28 @@ final class ActivityCoordinator: ObservableObject {
         begin()
         #if os(macOS)
         monitor.rules = state.activity.rules
+        monitor.recordsTitles = recordsTitles
         #endif
         // Anything recorded while the app was locked, offline, or between the
         // last push and the last quit is still on disk. Take it.
+        #if !os(macOS)
+        // The phone has no sensor any more, so anything still sitting in its
+        // journal is the old self-tracking on its way to being dropped twice a
+        // launch. Take it out at the source instead.
+        ActivityJournal.clear()
+        #endif
         var doc = state.activity
-        if ActivityJournal.fold(into: &doc) > 0 {
+        var changed = ActivityJournal.fold(into: &doc) > 0
+        // Everything the phone ever recorded comes out, on both devices, once.
+        // It was MyOS timing itself and nothing else, and a 16-minute "iPhone"
+        // sitting beside a real Mac day reads as a measurement of the phone.
+        if doc.dropPhoneSessions() > 0 { changed = true }
+        if changed {
             ActivityEngine.compact(&doc, today: state.todayKey)
             state.activity = doc
             pendingPush = true
         }
         registerDevice()
-        drainInbox()
         if enabled { start() }
         #if os(macOS)
         // macOS never goes `.background` when you switch to another app, so the
@@ -116,6 +140,15 @@ final class ActivityCoordinator: ObservableObject {
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.enabledKey)
         on ? start() : stop()
+    }
+
+    func setRecordsTitles(_ on: Bool) {
+        guard on != recordsTitles else { return }
+        recordsTitles = on
+        UserDefaults.standard.set(on, forKey: Self.titlesKey)
+        #if os(macOS)
+        monitor.recordsTitles = on
+        #endif
     }
 
     private func start() {
@@ -164,38 +197,12 @@ final class ActivityCoordinator: ObservableObject {
         if Date().timeIntervalSince(lastPush) >= Self.eagerPushAfter { flush() }
     }
 
-    /// Fold whatever the iPhone's Shortcuts automations queued into sessions.
-    /// Safe to call often — the inbox is emptied only once the sessions are in.
-    func drainInbox() {
-        guard let state else { return }
-        let pings = ActivityInbox.pending()
-        guard !pings.isEmpty else { return }
-        let sessions = ActivityInbox.sessions(from: pings, rules: state.activity.rules)
-        guard !sessions.isEmpty else { ActivityInbox.clear(); return }
-        for session in sessions { record(session) }
-        ActivityInbox.clear()
-        flush()
-    }
-
-    /// MyOS's own foreground time on the phone. Honest but small — it is the one
-    /// app iOS lets MyOS time directly.
-    func recordOwnForeground(from start: Date, to end: Date) {
-        let seconds = Int(end.timeIntervalSince(start))
-        guard seconds >= 10 else { return }
-        record(ActivityEvent(deviceId: ActivityDeviceIdentity.deviceId,
-                             deviceType: ActivityDeviceIdentity.deviceType,
-                             platform: ActivityDeviceIdentity.platform,
-                             appId: "com.berjil.myos",
-                             appName: "MyOS",
-                             category: .writing,
-                             startedAt: ActivityTime.stamp(start),
-                             endedAt: ActivityTime.stamp(end),
-                             duration: seconds,
-                             productivity: .productive,
-                             source: .iosForeground))
-    }
-
+    /// Note this machine as a device that reports. Only the Mac does — the
+    /// iPhone reads this document, it does not write sessions into it.
     private func registerDevice() {
+        #if !os(macOS)
+        return
+        #else
         guard let state else { return }
         var doc = state.activity
         doc.devices[ActivityDeviceIdentity.deviceId] = ActivityDevice(
@@ -205,15 +212,44 @@ final class ActivityCoordinator: ObservableObject {
             lastSeen: ActivityTime.stamp(Date()))
         state.activity = doc
         pendingPush = true
+        #endif
     }
 
     /// Send what has accumulated. Called on a timer, when tracking stops, and
     /// when the app goes away.
     func flush() {
-        guard pendingPush, let state, state.isHydrated else { return }
+        guard let state, state.isHydrated else { return }
+        refreshLiveNote()
+        guard pendingPush else { return }
         pendingPush = false
         lastPush = Date()
         state.push(StateKey.activity, state.activity)
+    }
+
+    /// Stamp what the Mac is in front of into the document, so the phone can
+    /// answer "focusing now" without a sensor of its own.
+    ///
+    /// This deliberately adds no pushes: a session that has been running five
+    /// minutes is banked and sent anyway, so riding along on that is enough to
+    /// keep the note inside its own freshness window. Nothing in front of us —
+    /// idle, asleep, locked, tracking off — clears it, because a stale note is
+    /// worse than a blank one.
+    private func refreshLiveNote() {
+        #if os(macOS)
+        guard let state else { return }
+        let note: ActivityLive? = (enabled ? state.liveActivity : nil).map {
+            ActivityLive(appId: $0.appId, appName: $0.appName, site: $0.site, title: $0.title,
+                         category: $0.category, productivity: $0.productivity,
+                         deviceName: ActivityDeviceIdentity.deviceName,
+                         startedAt: $0.startedAt, updatedAt: ActivityTime.stamp(Date()))
+        }
+        let was = state.activity.live
+        guard was?.appId != note?.appId || was?.site != note?.site
+                || was?.title != note?.title || was?.startedAt != note?.startedAt
+                || (note != nil && pendingPush) else { return }
+        state.activity.live = note
+        pendingPush = true
+        #endif
     }
 
     /// Wipe everything recorded. Deliberately total: a partial erase of an
@@ -222,7 +258,6 @@ final class ActivityCoordinator: ObservableObject {
         guard let state else { return }
         state.activity = ActivityDoc()
         state.liveActivity = nil
-        ActivityInbox.clear()
         ActivityJournal.clear()
         registerDevice()
         pendingPush = true
@@ -247,8 +282,8 @@ extension AppState {
         (days[todayKey]?.todos ?? []).filter { !$0.done }.map(\.text)
     }
 
-    func activitySummary(_ day: String, device: ActivityDeviceFilter = .all) -> ActivitySummary {
-        ActivityEngine.summary(activity.events, day: day, device: device)
+    func activitySummary(_ day: String) -> ActivitySummary {
+        ActivityEngine.summary(activity.events, day: day)
     }
 
     /// The seven days ending on `day`, oldest first.
@@ -263,25 +298,57 @@ extension AppState {
     /// The day's read, including the live session where there is one. Only the
     /// day being viewed *is* today can have a live session — yesterday has no
     /// "right now".
+    /// What is in front of you *now* — this Mac's own live session, or, on the
+    /// phone, the note the Mac left in the synced document. Never both, and
+    /// never counted into a total: the seconds it describes are still being
+    /// recorded on the Mac and arrive later as a real session.
+    var currentFocus: ActivityEvent? {
+        #if os(macOS)
+        return liveActivity
+        #else
+        guard let note = activity.live, note.isFresh() else { return nil }
+        return note.asEvent()
+        #endif
+    }
+
+    /// The name of the machine the live session is on, when that is not this
+    /// one. The phone says "on Berjil's MacBook Pro"; the Mac says nothing,
+    /// because you are looking at it.
+    var currentFocusDevice: String? {
+        #if os(macOS)
+        return nil
+        #else
+        guard let note = activity.live, note.isFresh() else { return nil }
+        return note.deviceName
+        #endif
+    }
+
     func activityIntelligence(_ day: String, now: Date = Date()) -> DayIntelligence {
         var summary = activitySummary(day)
-        let live = day == todayKey ? liveActivity : nil
+        let live = day == todayKey ? currentFocus : nil
         // The live session has not been banked yet, so add it in or the card
         // would show a total that lags reality by up to two minutes.
+        // Only this Mac's own live session is added to the total. The phone's
+        // copy came from a note whose seconds the Mac has not banked yet, and
+        // adding it there would double-count the moment it does.
+        #if os(macOS)
         if let live {
             summary = ActivityEngine.summary(activity.events + [live], day: day)
         }
+        #endif
         return ActivityInsights.dayIntelligence(summary: summary, current: live,
                                                 todos: todayPriorities, now: now)
     }
 
     /// Summary including the unbanked live session, for the surfaces that show
     /// totals next to "focusing now".
-    func activitySummaryLive(_ day: String, device: ActivityDeviceFilter = .all) -> ActivitySummary {
+    func activitySummaryLive(_ day: String) -> ActivitySummary {
+        #if os(macOS)
         if day == todayKey, let live = liveActivity {
-            return ActivityEngine.summary(activity.events + [live], day: day, device: device)
+            return ActivityEngine.summary(activity.events + [live], day: day)
         }
-        return activitySummary(day, device: device)
+        #endif
+        return activitySummary(day)
     }
 
     func eraseActivity() { ActivityCoordinator.shared.erase() }
@@ -293,8 +360,9 @@ extension AppState {
         doc.rules[appId] = AppRule(appId: appId, appName: appName,
                                    category: category, productivity: productivity)
         // Reclassify what is already recorded, or the breakdown would disagree
-        // with the rule until the events aged out.
-        for i in doc.events.indices where doc.events[i].appId == appId {
+        // with the rule until the events aged out. Keyed on the *row* — a rule
+        // set on youtube.com must not repaint the rest of the browser.
+        for i in doc.events.indices where doc.events[i].groupId == appId {
             doc.events[i].category = category
             doc.events[i].productivity = productivity
         }

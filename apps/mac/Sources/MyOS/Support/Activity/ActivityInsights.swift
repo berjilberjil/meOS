@@ -14,7 +14,12 @@ import Foundation
 
 /// What is happening right now, and whether it is worth doing.
 struct FocusNow: Hashable {
+    /// What you are in front of — the site where there is one, else the app.
     var appName: String
+    /// The window title under it: which repository, which video, which file.
+    var detail: String?
+    /// The machine this is happening on, when it is not the one being read.
+    var device: String?
     var category: ActivityCategory
     var productivity: ProductivityType
     var seconds: Int
@@ -127,8 +132,11 @@ enum ActivityInsights {
 
     // MARK: - Focusing now
 
-    static func focusNow(current: ActivityEvent?, todos: [String]) -> FocusNow? {
+    static func focusNow(current: ActivityEvent?, todos: [String], device: String? = nil) -> FocusNow? {
         guard let s = current else { return nil }
+        // The row's name, not the window's owner: two hours "on Chrome" is not
+        // something anyone can act on, and two hours on youtube.com is.
+        let place = s.groupName
         let aligned = task(matching: s.category, in: todos)
         let priority = topPriority(todos)
         let minutes = s.duration / 60
@@ -159,16 +167,17 @@ enum ActivityInsights {
             displaced = priority
             if let priority {
                 line = minutes >= 20
-                    ? "\(minutes) minutes on \(s.appName) instead of \(shorten(priority)). Close it and go back."
-                    : "You're on \(s.appName) rather than \(shorten(priority))."
+                    ? "\(minutes) minutes on \(place) instead of \(shorten(priority)). Close it and go back."
+                    : "You're on \(place) rather than \(shorten(priority))."
             } else {
                 line = minutes >= 20
-                    ? "\(minutes) minutes on \(s.appName). You're drifting — pick your highest-value task."
+                    ? "\(minutes) minutes on \(place). You're drifting — pick your highest-value task."
                     : "You're drifting from your priorities. Get back to your highest-value task."
             }
         }
 
-        return FocusNow(appName: s.appName, category: s.category, productivity: s.productivity,
+        return FocusNow(appName: place, detail: s.title, device: device,
+                        category: s.category, productivity: s.productivity,
                         seconds: s.duration, alignedTask: aligned, displacedTask: displaced,
                         insight: line)
     }
@@ -259,7 +268,7 @@ enum ActivityInsights {
         if let c = current, c.productivity == .distracting, c.duration >= 10 * 60 {
             let target = priority.map { " Go back to \(shorten($0))." } ?? " Pick your highest-value task."
             return ActivityAction(kind: .fixThisNow,
-                                  text: "\(Fmt.duration(c.duration)) on \(c.appName).\(target)")
+                                  text: "\(Fmt.duration(c.duration)) on \(c.groupName).\(target)")
         }
 
         // 2. Fragmentation. Only worth saying once there is enough of a day to
@@ -274,7 +283,7 @@ enum ActivityInsights {
         // 3. Protect a block that is already working.
         if let c = current, c.productivity == .productive, c.duration >= 20 * 60 {
             return ActivityAction(kind: .goodMove,
-                                  text: "\(Fmt.duration(c.duration)) in \(c.appName) without switching. Don't break it — stay here.")
+                                  text: "\(Fmt.duration(c.duration)) in \(c.groupName) without switching. Don't break it — stay here.")
         }
 
         // 4. A leak big enough to be worth naming.
@@ -341,10 +350,10 @@ enum ActivityInsights {
         return out
     }
 
-    static func dayIntelligence(summary: ActivitySummary, current: ActivityEvent?,
+    static func dayIntelligence(summary: ActivitySummary, current: ActivityEvent?, device: String? = nil,
                                 todos: [String], now: Date) -> DayIntelligence {
         var out = DayIntelligence()
-        out.focusNow = focusNow(current: current, todos: todos)
+        out.focusNow = focusNow(current: current, todos: todos, device: device)
         if let v = verdict(summary) { out.verdict = v.0; out.verdictLine = v.1 }
         out.action = action(summary, current: current, todos: todos, now: now)
         out.insights = insights(summary)
