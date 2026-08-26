@@ -15,9 +15,17 @@ struct FitnessDay: Codable, Hashable {
     var calories: Double?
     var proteinG: Double?
     var waterMl: Double?
-    var steps: Int?             // daily step count — manual for now; the iPhone client
-                               // (next month) writes this from HealthKit into the same key.
+    var steps: Int?             // daily step count — the iPhone writes this from
+                               // CMPedometer; the Mac can correct it by hand.
     var note: String?
+    /// Which step goals have already been congratulated for this day — 1 for the
+    /// mandatory goal, 2 for the stretch.
+    ///
+    /// It lives in synced state rather than on the device that noticed, because
+    /// crossing 8,000 is one moment in your day and it should be celebrated
+    /// once: not again when the Mac pulls the same number down, not again when
+    /// the pedometer re-reports the day, and not again tomorrow morning.
+    var hailed: [Int]?
 }
 
 // MARK: - Fitness profile  (key: myos.fitnessProfile)
@@ -91,12 +99,14 @@ struct FitnessProfile: Codable, Hashable {
     var calorieTargetKcal: Double? = nil
     var proteinTargetG: Double? = nil
     var waterTargetMl: Double? = nil
-    var stepsTarget: Int? = nil        // daily step goal (nil → the 8,000 default the UI shows)
+    var stepsTarget: Int? = nil        // mandatory daily step goal (nil → 8,000)
+    var stepsStretch: Int? = nil       // the optional second goal (nil → 10,000)
 
     init() {}
 
     enum CodingKeys: String, CodingKey {
-        case goal, sex, activity, targetWeightKg, calorieTargetKcal, proteinTargetG, waterTargetMl, stepsTarget
+        case goal, sex, activity, targetWeightKg, calorieTargetKcal, proteinTargetG, waterTargetMl
+        case stepsTarget, stepsStretch
     }
 
     // Lenient: a profile saved before a field existed still loads.
@@ -110,6 +120,7 @@ struct FitnessProfile: Codable, Hashable {
         proteinTargetG    = try c.decodeIfPresent(Double.self, forKey: .proteinTargetG)
         waterTargetMl     = try c.decodeIfPresent(Double.self, forKey: .waterTargetMl)
         stepsTarget       = try c.decodeIfPresent(Int.self, forKey: .stepsTarget)
+        stepsStretch      = try c.decodeIfPresent(Int.self, forKey: .stepsStretch)
     }
 }
 

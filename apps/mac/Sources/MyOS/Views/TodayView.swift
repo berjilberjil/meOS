@@ -512,14 +512,18 @@ struct TodayView: View {
         }
     }
 
-    /// `{fire|freeze} {n} days` — tap opens journal, hold opens the calendar.
+    /// `{mark} {n} days` — the streak, counted on steps. Tap opens Fitness,
+    /// hold opens the month.
+    ///
+    /// It used to count journal entries, which measured whether the day had been
+    /// written down rather than whether it had been walked. Steps is the thing
+    /// actually being worked at, so steps is what the number on Today means now.
     private var streakChip: some View {
-        let n = state.journalStreak
-        let todayDone = state.journalHasContent(state.todayKey)
-        let ice = n > 0 && !todayDone
-        return Button { go(.journal) } label: {
+        let n = state.stepStreak
+        let todayHit = state.steps(on: state.todayKey) >= state.stepGoals.daily
+        return Button { go(.fitness) } label: {
             HStack(spacing: 8) {
-                StreakFlame(day: ice ? .frozen : (n > 0 || todayDone ? .done : .none), size: 20)
+                StepMark(day: todayHit ? state.stepDay(state.todayKey) : (n > 0 ? .pending : .none), size: 20)
                 Text("\(n)")
                     .font(.title2.weight(.bold))
                     .monospacedDigit()
@@ -530,27 +534,26 @@ struct TodayView: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             .background(Palette.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder((ice ? Palette.information : Palette.activity).opacity(0.4), lineWidth: 1.5))
+            .overlay(Capsule().strokeBorder((todayHit ? Palette.complete : Palette.activity).opacity(0.4), lineWidth: 1.5))
         }
         .buttonStyle(.plain)
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
             Haptics.tap()
             showStreakCal = true
         })
-        .accessibilityLabel("Journal streak, \(n) days. Hold for calendar.")
-        .help("Tap to journal. Hold for the streak calendar.")
+        .accessibilityLabel("Step streak, \(n) days. Hold for calendar.")
+        .help("Tap for steps. Hold for the streak calendar.")
     }
 
     private var streakCalendarSheet: some View {
         NavigationStack {
-            StreakCalendar(
+            StepStreakCalendar(
                 viewedDate: .constant(state.todayKey),
                 isPresented: $showStreakCal,
                 wide: true,
-                onSelect: { key in
-                    UISignals.shared.pendingJournalDate = key
+                onSelect: { _ in
                     showStreakCal = false
-                    go(.journal)
+                    go(.fitness)
                 }
             )
             .padding(16)

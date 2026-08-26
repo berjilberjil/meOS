@@ -26,7 +26,8 @@ struct ActivitySheet: View {
         _anchor = State(initialValue: day)
     }
 
-    private var target: Int { state.stepsTarget }
+    private var goals: StepGoals { state.stepGoals }
+    private var target: Int { goals.daily }
     private func steps(_ key: String) -> Int { state.fitness[key]?.steps ?? 0 }
 
     /// The seven days ending on the anchor, oldest first.
@@ -45,7 +46,6 @@ struct ActivitySheet: View {
     }
 
     private var today: Int { steps(selected) }
-    private var fraction: Double { target > 0 ? min(1, Double(today) / Double(target)) : 0 }
 
     var body: some View {
         let content = ScrollView {
@@ -56,6 +56,7 @@ struct ActivitySheet: View {
                     .datePickerStyle(.compact)
                 weekStrip
                 ring
+                streak
                 stats
                 bars
             }
@@ -124,22 +125,40 @@ struct ActivitySheet: View {
     }
 
     private var ring: some View {
-        ZStack {
-            Circle().stroke(Palette.border, lineWidth: 14)
-            Circle().trim(from: 0, to: max(0.002, fraction))
-                .stroke(tint(today), style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            VStack(spacing: 1) {
-                Text(today.formatted())
-                    .font(.largeTitle.weight(.heavy)).monospacedDigit()
-                    .foregroundStyle(Palette.text)
-                Text("of \(target.formatted()) steps")
-                    .font(.caption2.weight(.heavy))
-                    .foregroundStyle(Palette.faint)
+        StepGoalRing(steps: today, goals: goals)
+    }
+
+    /// The streak lives here now, next to the thing it is counted on.
+    private var streak: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Text("\(state.stepStreak)")
+                    .font(.largeTitle.weight(.bold)).monospacedDigit()
+                    .foregroundStyle(state.stepStreak > 0 ? Palette.text : Palette.faint)
+                Text("day streak")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(state.stepStreak > 0 ? Palette.muted : Palette.faint)
+                Spacer(minLength: 0)
             }
+            Text(streakLine)
+                .font(.caption).foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            StepStreakStrip()
         }
-        .frame(width: 190, height: 190)
-        .frame(maxWidth: .infinity)
+    }
+
+    /// No freeze days, so the line has to be honest about what is at stake.
+    private var streakLine: String {
+        let n = state.stepStreak
+        let todayHit = steps(state.todayKey) >= goals.daily
+        if todayHit {
+            return n > 1 ? "\(n) days in a row at \(goals.daily.formatted())+." : "Day one. Tomorrow is what makes it a streak."
+        }
+        if n > 0 {
+            let left = max(0, goals.daily - steps(state.todayKey))
+            return "\(left.formatted()) more today or the \(n)-day run ends at midnight."
+        }
+        return "Hit \(goals.daily.formatted()) today to start one."
     }
 
     private var stats: some View {

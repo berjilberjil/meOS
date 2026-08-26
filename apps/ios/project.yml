@@ -71,6 +71,10 @@ targets:
       # One grid for every picture and video the app holds — no AppKit in it.
       - path: ../mac/Sources/MyOS/Views/GalleryView.swift
       - path: ../mac/Sources/MyOS/Views/ActivitySheet.swift
+      # The streak (steps, not journaling) and the goal celebration. Both are
+      # platform-neutral; the photo comparison beside them is Mac-only on purpose.
+      - path: ../mac/Sources/MyOS/Views/StepStreak.swift
+      - path: ../mac/Sources/MyOS/Views/StepCelebration.swift
       - path: ../mac/Sources/MyOS/Views/MacroPulseView.swift
       - path: ../mac/Sources/MyOS/Views/MacroMetricDetail.swift
       - path: ../mac/Sources/MyOS/Views/MacroMethodSheet.swift

@@ -25,6 +25,7 @@ struct ProgressPhotosCard: View {
     @State private var photos: [ProgressPhoto] = []
     @State private var selectedDate: String = AppState.dateKey(Date())
     @State private var viewing: ProgressPhoto?
+    @State private var comparing = false
     /// The month grid stays folded until you ask for it; the strip below shows
     /// every photo (newest first) while it's closed, and one day's while it's open.
     @State private var showCalendar = false
@@ -51,6 +52,13 @@ struct ProgressPhotosCard: View {
                         }
                         .buttonStyle(.borderless).tint(showCalendar ? Palette.action : Palette.faint)
                         .help(showCalendar ? "Hide the calendar" : "Pick a day")
+                    }
+                    if photos.count >= 2 {
+                        Button { comparing = true } label: {
+                            Label("Compare", systemImage: "rectangle.split.2x1")
+                        }
+                        .buttonStyle(.borderless).tint(Palette.action)
+                        .help("Two dates, side by side")
                     }
                     Button { chooseFile() } label: { Label("Add photo", systemImage: "camera.fill") }
                         .buttonStyle(.borderless).tint(Palette.action)
@@ -84,6 +92,10 @@ struct ProgressPhotosCard: View {
         .contentShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
         .onDrop(of: [.fileURL, .image, .png, .jpeg, .heic], isTargeted: $dropTargeted) { handleDrop($0) }
         .animation(.knFast, value: dropTargeted)
+        .sheet(isPresented: $comparing) {
+            ProgressCompareView(photos: photos) { comparing = false }
+                .environmentObject(state)
+        }
         .sheet(item: $viewing) { p in
             ProgressPhotoViewer(
                 start: p,

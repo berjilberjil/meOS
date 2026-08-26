@@ -66,6 +66,11 @@ final class AppState: ObservableObject {
     /// live reading, and by the time it reached another device it would be a
     /// claim about the past.
     @Published var liveActivity: ActivityEvent?
+
+    /// A step goal crossed just now, waiting to be celebrated on Today. Cleared
+    /// when the card is dismissed; never restored from state, because the party
+    /// is for the moment it happened, not for every launch afterwards.
+    @Published var stepCelebration: StepCelebration?
     @Published var weeklyError: String?
     /// In memory only: stops a failing report from re-running on every
     /// return to the foreground. See `generateWeeklyReportIfDue`.
@@ -894,16 +899,17 @@ final class AppState: ObservableObject {
         updateFitness(todayKey) { $0.weightKg = kg.map { max(0, $0) } }
     }
 
-    /// Set today's step count. Manual today; the iPhone client writes this same field
-    /// from HealthKit next month — nothing else has to change for it to sync.
+    /// Set today's step count by hand.
     func setTodaySteps(_ steps: Int?) {
         updateFitness(todayKey) { $0.steps = steps.map { max(0, $0) } }
+        celebrateStepsIfCrossed(on: todayKey)
     }
 
     /// Set (or clear) the step count for any day. The Mac has no pedometer, so
     /// a day you want to correct after the fact is typed in against its key.
     func setSteps(_ steps: Int?, on date: String) {
         updateFitness(date) { $0.steps = steps.map { max(0, $0) } }
+        celebrateStepsIfCrossed(on: date)
     }
 
     /// Fold a batch of pedometer readings in with ONE state push — backfilling a
@@ -925,9 +931,12 @@ final class AppState: ObservableObject {
         }
         guard changed else { return }
         push(StateKey.fitness, fitness)
+        // After the whole batch, not inside the loop: a backfill of seven days
+        // should not fire seven celebrations, and only today can produce one.
+        for key in byDay.keys where key == todayKey { celebrateStepsIfCrossed(on: key) }
     }
-    /// The daily step goal, defaulting to 8,000 when unset.
-    var stepsTarget: Int { fitnessProfile.stepsTarget ?? 8000 }
+    /// The mandatory daily step goal — the one the streak is counted on.
+    var stepsTarget: Int { stepGoals.daily }
 
     // MARK: - Fitness profile
 
@@ -1299,52 +1308,6 @@ final class AppState: ObservableObject {
     }
     func journalMood(_ date: String) -> Int? { journal[date]?.mood }
 
-    /// How a date renders on the streak calendar.
-    enum StreakDay {
-        case done       // journalled — lit fire
-        case frozen     // missed inside a live streak — frozen fire, streak survives
-        case none
-    }
-
-    /// Duolingo-style streak: walk back from today; a single missed day between
-    /// journalled days is auto-frozen (the streak survives it, but it doesn't
-    /// count), two consecutive missed days end the run. Today without an entry
-    /// is pending, not missed — the streak stays alive until midnight.
-    var journalStreakInfo: (count: Int, frozen: Set<String>) {
-        var frozen = Set<String>()
-        var count = 0
-        var key = todayKey
-        if !journalHasContent(key) { key = Self.addDays(-1, to: key) }
-        var steps = 0
-        while steps < 3650 {
-            steps += 1
-            if journalHasContent(key) {
-                count += 1
-                key = Self.addDays(-1, to: key)
-            } else {
-                let prev = Self.addDays(-1, to: key)
-                guard journalHasContent(prev) else { break }
-                frozen.insert(key)
-                key = prev
-            }
-        }
-        return (count, frozen)
-    }
-
-    var journalStreak: Int { journalStreakInfo.count }
-
-    /// Per-date streak state for calendar cells. A frozen day is either inside
-    /// the live run, or (historically) a single miss sandwiched between
-    /// journalled days — so old months still read as an unbroken fire line.
-    func journalStreakDay(_ date: String) -> StreakDay {
-        if journalHasContent(date) { return .done }
-        if journalStreakInfo.frozen.contains(date) { return .frozen }
-        if date < todayKey,
-           journalHasContent(Self.addDays(-1, to: date)),
-           journalHasContent(Self.addDays(1, to: date)) { return .frozen }
-        return .none
-    }
-
     // MARK: - Notes
 
     @discardableResult
@@ -1643,7 +1606,8 @@ final class AppState: ObservableObject {
         l.append("TODAY INTAKE: \(Int(td.calories)) kcal, \(Int(td.protein))g protein, \(Fmt.trimKg((fitnessDay(todayKey).waterMl ?? 0)/1000))L water.")
 
         let e = journalEntry(todayKey)
-        l.append("JOURNAL: \(journalStreak)-day streak" + (e.mood.map { ", mood today \($0)/5" } ?? ", no entry today yet") + ".")
+        l.append("JOURNAL: " + (e.mood.map { "mood today \($0)/5" } ?? "no entry today yet") + ".")
+        l.append("STEPS: \(steps(on: todayKey).formatted()) today, goal \(stepGoals.daily.formatted()), \(stepStreak)-day streak.")
         if !e.wins.isEmpty { l.append("TODAY WINS: \(e.wins.joined(separator: "; ")).") }
         if !e.mistakes.isEmpty { l.append("TODAY MISTAKES: \(e.mistakes.joined(separator: "; ")).") }
 

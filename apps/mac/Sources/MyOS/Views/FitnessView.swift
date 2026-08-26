@@ -120,14 +120,14 @@ struct FitnessView: View {
 
     private var stepsCard: some View {
         let steps = today.steps ?? 0
-        let target = state.stepsTarget
-        let frac = target > 0 ? min(1, Double(steps) / Double(target)) : 0
+        let goals = state.stepGoals
+        let target = goals.daily
         return Card {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     SectionTitle(text: "Steps")
                     Spacer()
-                    Text("goal \(steps.formatted()) / \(target.formatted())")
+                    Text("\(target.formatted()) · \(goals.stretch.formatted())")
                         .font(.caption2.weight(.semibold)).monospacedDigit().foregroundStyle(Palette.muted)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -136,12 +136,15 @@ struct FitnessView: View {
                         .foregroundStyle(Palette.text)
                     Text("steps today").font(.caption).foregroundStyle(Palette.muted)
                     Spacer()
-                    if steps >= target && target > 0 {
+                    if steps >= goals.stretch {
+                        Text("Both goals").font(.caption2.weight(.heavy))
+                            .foregroundStyle(Palette.complete)
+                    } else if steps >= target {
                         Text("Goal hit").font(.caption2.weight(.heavy))
-                            .foregroundStyle(Palette.activity)
+                            .foregroundStyle(Palette.complete)
                     }
                 }
-                ProgressView(value: frac).progressViewStyle(.linear).tint(Palette.activity)
+                StepGoalBar(steps: steps, goals: goals)
                 HStack(spacing: 10) {
                     HStack(spacing: 6) {
                         TextField("", text: $stepsInput,
@@ -163,8 +166,9 @@ struct FitnessView: View {
                     }
                     Spacer()
                 }
-                Text("Manual for now — your iPhone syncs this from Apple Health once the phone app ships.")
+                Text("\(target.formatted()) is the goal the streak counts. \(goals.stretch.formatted()) is the one worth chasing. Both are editable in your profile.")
                     .font(.caption2).foregroundStyle(Palette.faint)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -491,9 +495,17 @@ struct ActivityStepsCard: View {
     /// Bold on Today, washed on the Fitness tab. Read here so the chart's ink
     /// can flip to white without the card being told twice.
 
-    private var target: Int { state.stepsTarget }
+    private var goals: StepGoals { state.stepGoals }
+    private var target: Int { goals.daily }
     private func steps(_ key: String) -> Int { state.fitness[key]?.steps ?? 0 }
     private func fraction(_ n: Int) -> Double { target > 0 ? min(1, Double(n) / Double(target)) : 0 }
+
+    /// The celebration only belongs on the page for the day it happened — Today
+    /// swipes through days, and a party on last Tuesday is a bug.
+    private var celebration: StepCelebration? {
+        guard let c = state.stepCelebration, (day ?? state.todayKey) == c.day else { return nil }
+        return c
+    }
 
     /// nil = nothing logged. Otherwise goal hit / past halfway / short — the same
     /// green-amber-red reading the focus record uses.
@@ -501,6 +513,7 @@ struct ActivityStepsCard: View {
         let n = steps(key)
         guard n > 0 else { return nil }
         guard target > 0 else { return Palette.green }
+        if n >= goals.stretch { return Palette.complete }
         let f = Double(n) / Double(target)
         if f >= 1 { return Palette.green }
         if f >= 0.5 { return Palette.muted }
@@ -510,6 +523,11 @@ struct ActivityStepsCard: View {
     var body: some View {
         Card(padding: 14) {
             VStack(alignment: .leading, spacing: 12) {
+                if let celebration {
+                    StepCelebrationCard(celebration: celebration) {
+                        withAnimation(.knNormal) { state.stepCelebration = nil }
+                    }
+                }
                 summaryRow
                 if showCalendar {
                     Divider().overlay(Palette.border).padding(.top, 2)

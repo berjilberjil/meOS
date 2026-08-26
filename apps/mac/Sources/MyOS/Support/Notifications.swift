@@ -232,6 +232,19 @@ import UIKit
 /// `Reminder` — it goes out the moment a block ends, and only when nobody is
 /// looking at the app. Uses whatever authorization the reminders already have;
 /// it never prompts on its own.
+/// Whether MyOS is the thing being looked at. A notification for something the
+/// user can already see on screen is noise.
+@MainActor
+enum AppFocus {
+    static var isFrontmost: Bool {
+        #if os(macOS)
+        return NSApplication.shared.isActive
+        #else
+        return UIApplication.shared.applicationState == .active
+        #endif
+    }
+}
+
 @MainActor
 enum FocusNotify {
     static let id = "myos.focus.timesup"
@@ -247,12 +260,45 @@ enum FocusNotify {
             .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
     }
 
-    private static var appIsFrontmost: Bool {
-        #if os(macOS)
-        return NSApplication.shared.isActive
-        #else
-        return UIApplication.shared.applicationState == .active
-        #endif
+    private static var appIsFrontmost: Bool { AppFocus.isFrontmost }
+}
+
+/// A step goal, crossed.
+///
+/// Only fires when MyOS is not the thing in front of you — with the app open,
+/// the celebration card and the sound have already said it, and a banner on top
+/// of that is the app talking over itself.
+@MainActor
+enum StepNotify {
+    static let id = "myos.steps.goal"
+    static let route = "steps"
+
+    static func goalHit(_ c: StepCelebration) {
+        guard !AppFocus.isFrontmost else { return }
+        let n = UNMutableNotificationContent()
+        n.title = title(c)
+        n.body = body(c)
+        n.sound = .default
+        n.userInfo = ["route": route]
+        UNUserNotificationCenter.current()
+            .add(UNNotificationRequest(identifier: "\(id).\(c.day).\(c.level)",
+                                       content: n, trigger: nil))
+    }
+
+    /// Pure, so the wording is pinned by a test rather than read off a phone.
+    static func title(_ c: StepCelebration) -> String {
+        c.level >= 2 ? "\(c.steps.formatted()) steps — stretch goal"
+                     : "\(c.steps.formatted()) steps — goal hit"
+    }
+
+    static func body(_ c: StepCelebration) -> String {
+        var line = c.quote
+        if let remaining = c.remaining, let next = c.next, remaining > 0 {
+            line += " \(remaining.formatted()) to go for \(next.formatted())."
+        } else if c.streak > 1 {
+            line += " Day \(c.streak) of the streak."
+        }
+        return line
     }
 }
 

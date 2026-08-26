@@ -9,6 +9,10 @@ import UIKit
 /// when it closes — so no second asset and no system beeps.
 enum SoundPlayer {
     private static var player: AVAudioPlayer?
+    /// Held separately from `player` because the celebration is three overlapping
+    /// notes: assigning each one to `player` would release the note before it,
+    /// and the chord would come out as a single click.
+    private static var chorus: [AVAudioPlayer] = []
 
     /// Splash / launch.
     static func drop() { play(rate: 1.0, volume: 0.55) }
@@ -37,7 +41,24 @@ enum SoundPlayer {
         #endif
     }
 
-    private static func play(rate: Float, volume: Float) {
+    /// A step goal, crossed.
+    ///
+    /// The same drop three times, rising — 1.0, 1.26, 1.5 is a major triad, and
+    /// 90ms apart is fast enough to read as one gesture rather than three
+    /// sounds. It is a *ta-da* built out of the one asset the app ships, which
+    /// is the whole reason it exists rather than a second file.
+    static func celebrate() {
+        chorus.removeAll()
+        for (i, rate) in [Float(1.0), 1.26, 1.5].enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.09) {
+                play(rate: rate, volume: 0.6, sustained: true)
+            }
+        }
+        // Let the last note ring out before the players go.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { chorus.removeAll() }
+    }
+
+    private static func play(rate: Float, volume: Float, sustained: Bool = false) {
         guard let url = Bundle.main.url(forResource: "drop", withExtension: "wav") else { return }
         #if os(iOS)
         // `.playback`, NOT `.ambient` — the ring/silent switch mutes `.ambient`,
@@ -52,6 +73,10 @@ enum SoundPlayer {
         p?.volume = volume
         p?.prepareToPlay()
         p?.play()
-        player = p
+        if sustained {
+            if let p { chorus.append(p) }
+        } else {
+            player = p
+        }
     }
 }

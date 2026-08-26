@@ -153,7 +153,10 @@ extension AppState {
                      todos.prefix(5).map(\.text).joined(separator: "; ") + ".")
         }
         let e = journalEntry(todayKey)
-        if let mood = e.mood { l.append("Mood today \(mood)/5. Journal streak \(journalStreak) days.") }
+        if let mood = e.mood { l.append("Mood today \(mood)/5.") }
+        // The streak is steps now — a journal streak measured whether the day
+        // was written down, not whether it was worked.
+        l.append("Steps today \(steps(on: todayKey).formatted()) of \(stepGoals.daily.formatted()); \(stepStreak)-day streak.")
         return l
     }
 }

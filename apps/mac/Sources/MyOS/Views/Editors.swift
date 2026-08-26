@@ -46,6 +46,19 @@ struct FitnessProfileEditor: View {
                 KLabeledNumberField(label: "Water target (L)", placeholder: "3", decimals: 2,
                     value: Binding(get: { state.fitnessProfile.waterTargetMl.map { $0 / 1000 } },
                                    set: { v in state.updateFitnessProfile { $0.waterTargetMl = v.map { $0 * 1000 } } }))
+                // Two step goals: the one the streak is counted on, and the one
+                // above it. They are written together because the second is
+                // forced above the first — set separately, a stretch typed below
+                // the daily goal would be corrected on the next read and the
+                // field would spring back under the cursor.
+                KLabeledNumberField(label: "Steps goal", placeholder: "8000", decimals: 0,
+                    value: Binding(get: { Double(state.stepGoals.daily) },
+                                   set: { v in state.setStepGoals(daily: v.map { Int($0) },
+                                                                  stretch: state.fitnessProfile.stepsStretch) }))
+                KLabeledNumberField(label: "Steps stretch", placeholder: "10000", decimals: 0,
+                    value: Binding(get: { Double(state.stepGoals.stretch) },
+                                   set: { v in state.setStepGoals(daily: state.fitnessProfile.stepsTarget,
+                                                                  stretch: v.map { Int($0) }) }))
             }
         }
     }
