@@ -171,7 +171,7 @@ final class Vault {
         let dekData = dek.withUnsafeBytes { Data($0) }
         meta.passSalt = passSalt.base64EncodedString()
         meta.wrappedByPass = try MyOSCrypto.seal(dekData, key: kek, aad: Data("wrap:pass".utf8))
-        self.meta = meta
+        // Deliberately NOT assigned to `self.meta` — see `regenerateRecovery`.
         return meta
     }
 
@@ -186,7 +186,17 @@ final class Vault {
         let dekData = dek.withUnsafeBytes { Data($0) }
         meta.recoverySalt = salt.base64EncodedString()
         meta.wrappedByRecovery = try MyOSCrypto.seal(dekData, key: kek, aad: Data("wrap:recovery".utf8))
-        self.meta = meta
+        // Deliberately NOT assigned to `self.meta`. Both this and `rewrap` used
+        // to commit locally before the upload, so a failed PUT left the device
+        // holding credentials the server had never seen — and the next
+        // successful upload shipped them. Tap "New code" offline (the code is
+        // never even shown, because that only happens after the PUT), then
+        // change your passphrase later: `rewrap` reads this mutated meta, keeps
+        // the orphaned recovery wrap, and PUTs the lot. The recovery code
+        // written on paper no longer opens the vault. The mirror case is worse —
+        // a passphrase change that reported failure goes live on the next
+        // successful upload, and the old passphrase stops working at the next
+        // launch. The caller adopts, once the server has it.
         return (meta, code)
     }
 

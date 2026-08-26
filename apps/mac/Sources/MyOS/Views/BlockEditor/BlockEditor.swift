@@ -351,6 +351,13 @@ struct BlockEditor: NSViewRepresentable {
                 render(BlockDoc(blocks: blocks), caretBlock: bi - 1, caretWithin: 0)
                 return true
             }
+            // Never merge into an attachment. An image or link card renders as a
+            // single attachment character, so the merged spans are gone on the
+            // very next render — backspacing at the start of the line under a
+            // photo silently deleted that whole line of text, for good. The
+            // image itself is still removable by putting the caret on it (the
+            // branch above), so refusing here costs no affordance.
+            if prev.isAttachment { return true }
             let joinAt = prev.plainText as NSString
             var merged = prev
             merged.spans = prev.spans + cur.spans

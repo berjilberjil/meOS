@@ -258,7 +258,14 @@ enum BlockBridge {
             let checked = at[.todoChecked] as? Bool
             let language = at[.codeLanguage] as? String
             let spans = subRange.length > 0 ? Self.spans(in: attr, range: subRange) : []
-            blocks.append(Block(type: type, spans: spans,
+            // Carry the id through, exactly as the media branch above does.
+            // Minting a fresh one per serialization meant every block's identity
+            // changed on every save — so `toggleChecked`, which looks the block
+            // up by the id it read from the text storage, never found a match
+            // and silently returned. Checkboxes in notes could not be ticked by
+            // clicking at all.
+            blocks.append(Block(id: at[.blockID] as? String ?? Block.newID(),
+                                type: type, spans: spans,
                                 checked: type == .todo ? (checked ?? false) : nil,
                                 level: type == .heading ? (level ?? 1) : nil,
                                 language: type == .code ? language : nil))

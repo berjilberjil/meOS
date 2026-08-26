@@ -230,8 +230,14 @@ private struct NoteEditor: View {
         }
         .onDisappear {
             save()
+            // Blank title and body is not the same as empty. A note holding only
+            // a photo has exactly that — `plainText` for [image, paragraph("")]
+            // is "\n" and the derived title is "" — so merely opening one on the
+            // phone and tapping back destroyed it, and the image with it, on
+            // both devices.
             if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+               text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               state.note(id)?.content?.isEffectivelyEmpty ?? true {
                 state.deleteNote(id)
             }
         }

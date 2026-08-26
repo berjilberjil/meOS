@@ -186,12 +186,19 @@ final class MacActivityMonitor {
     }
 
     private func pulse() {
-        guard systemIdle < Self.idleThreshold else {
+        let idle = systemIdle
+        guard idle < Self.idleThreshold else {
             // Idle: bank what was real and wait for the machine to come back.
             if startedAt != nil { close(reason: .stopped) }
             return
         }
-        lastActive = Date()
+        // The moment of the last *input*, not of this pulse. Recording the pulse
+        // time made `close`'s idle trim — `min(Date(), lastActive)` — remove
+        // nothing, so every idle transition credited the app with the full two
+        // minutes it took to notice nobody was there. Step away fifteen times a
+        // day and half an hour of nothing went into the day's total, the app
+        // breakdown, and the productive share the verdict is built on.
+        lastActive = Date().addingTimeInterval(-idle)
 
         // Back at the keyboard after being away. Idle cleared the current app,
         // and `NSWorkspace` only speaks when the frontmost app *changes* — so
@@ -302,7 +309,17 @@ final class MacActivityMonitor {
 
     private func close(reason: CloseReason) {
         defer {
-            if reason == .stopped { currentApp = nil; startedAt = nil; context = .none }
+            if reason == .stopped {
+                currentApp = nil; startedAt = nil; context = .none
+                // Say out loud that nothing is running. Without this the last
+                // emitted live session stuck around after idle, sleep, a screen
+                // lock or termination — so `activitySummaryLive` added it on top
+                // of the real session that had just been banked (up to five
+                // minutes double-counted), and `refreshLiveNote` kept re-stamping
+                // it, leaving the iPhone showing "Focusing now — Xcode" with a
+                // rising counter for minutes after the Mac went to sleep.
+                onLiveChange?(nil)
+            }
         }
         guard let app = currentApp, let started = startedAt else { return }
         // Idle time at the end of a session is not time spent in the app.

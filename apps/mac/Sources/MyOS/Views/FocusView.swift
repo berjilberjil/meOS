@@ -92,7 +92,12 @@ final class FocusTimer: ObservableObject {
         let delta = max(0, Int(now.timeIntervalSince(lastTick ?? now).rounded()))
         lastTick = now
         guard delta > 0 else { return }
-        unbanked += min(delta, remaining + delta)
+        // `min(delta, remaining + delta)` was a no-op: `remaining` is never
+        // negative, so the cap was always `delta` itself. Shut the lid mid-block
+        // and the timer's one catch-up tick banked the whole eight hours as
+        // focused time — into synced state, into the day's total, into the
+        // focused-minutes the AI is told about.
+        unbanked += min(delta, remaining)
         remaining = max(0, remaining - delta)
         if remaining == 0 {
             running = false

@@ -143,6 +143,23 @@ struct BlockDoc: Codable, Hashable {
         blocks.allSatisfy { $0.type == .paragraph && $0.plainText.isEmpty }
     }
 
+    /// Rebuild from edited plain text without destroying what plain text cannot
+    /// carry.
+    ///
+    /// iOS edits the `body` mirror, and the save path used to replace `content`
+    /// with `BlockDoc.from(plainText:)` outright. Images and link cards
+    /// contribute nothing to `plainText`, so they were not flattened — they were
+    /// deleted, and the deletion synced straight back to the Mac. Losing heading
+    /// and checkbox styling is a fair price for typing into a plain-text field
+    /// on a phone; losing the photo is not, so attachments are carried over.
+    static func merging(plainText text: String, keepingAttachmentsOf old: BlockDoc?) -> BlockDoc {
+        var doc = BlockDoc.from(plainText: text)
+        let attachments = (old?.blocks ?? []).filter(\.isAttachment)
+        guard !attachments.isEmpty else { return doc }
+        doc.blocks.append(contentsOf: attachments)
+        return doc
+    }
+
     /// Equal in everything that is *content* — block ids excluded.
     ///
     /// `Block.newID()` mints a fresh id per block, so two documents built from

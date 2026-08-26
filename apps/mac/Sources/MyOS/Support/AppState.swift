@@ -424,6 +424,7 @@ final class AppState: ObservableObject {
         do {
             let meta = try vault.rewrap(newPassphrase: newPass)
             try await api.putCryptoMeta(meta)
+            vault.adoptMeta(meta)          // only now that the server has it
             vault.cacheToKeychain(username: username)
             return true
         } catch {
@@ -437,6 +438,7 @@ final class AppState: ObservableObject {
         do {
             let (meta, code) = try vault.regenerateRecovery()
             try await api.putCryptoMeta(meta)
+            vault.adoptMeta(meta)          // only now that the server has it
             recoveryCodeToShow = code
         } catch {
             vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -1570,7 +1572,8 @@ final class AppState: ObservableObject {
         guard notes[i].wouldChange(title: title, body: body) else { return }
         notes[i].title = title
         notes[i].body = body
-        notes[i].content = BlockDoc.from(plainText: body)
+        notes[i].content = BlockDoc.merging(plainText: body,
+                                            keepingAttachmentsOf: notes[i].content)
         notes[i].updatedAt = Self.nowStamp()
         push(StateKey.notes, notes)
     }

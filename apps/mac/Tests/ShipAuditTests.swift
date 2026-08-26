@@ -338,4 +338,42 @@ final class ShipAuditTests: XCTestCase {
         XCTAssertEqual(ProfileView.parseDecimal("175.5"), 175.5)
         XCTAssertEqual(ProfileView.parseDecimal("17a5"), 175, "stray letters are dropped, not fatal")
     }
+
+    // MARK: - A phone edit must not delete what the phone cannot show
+
+    // iOS edits the plain-text mirror, and the save path replaced `content` with
+    // BlockDoc.from(plainText:) outright. Images contribute nothing to plainText,
+    // so they were not flattened — they were deleted, and it synced to the Mac.
+    func testEditingOnThePhoneKeepsThePhotos() {
+        let old = BlockDoc(blocks: [
+            Block(type: .heading, spans: [TextSpan(text: "Trip")], level: 1),
+            Block(type: .image, src: "data:image/jpeg;base64,AAAA"),
+            Block(type: .paragraph, spans: [TextSpan(text: "book the flight")])
+        ])
+        let next = BlockDoc.merging(plainText: "Trip\nbook the flight tomorrow",
+                                    keepingAttachmentsOf: old)
+        XCTAssertEqual(next.blocks.filter { $0.isAttachment }.count, 1, "the photo survives")
+        XCTAssertTrue(next.plainText.contains("book the flight tomorrow"))
+    }
+
+    func testMergingWithoutAttachmentsIsJustTheText() {
+        let old = BlockDoc(blocks: [Block(type: .paragraph, spans: [TextSpan(text: "one")])])
+        let next = BlockDoc.merging(plainText: "one\ntwo", keepingAttachmentsOf: old)
+        XCTAssertTrue(next.blocks.filter { $0.isAttachment }.isEmpty)
+        XCTAssertEqual(next.plainText, "one\ntwo")
+    }
+
+    // An image-only note has a blank title and a blank body, which is what the
+    // phone's auto-delete tested — so opening one and going back destroyed it.
+    func testAnImageOnlyNoteIsNotEmpty() {
+        let doc = BlockDoc(blocks: [
+            Block(type: .image, src: "data:image/jpeg;base64,AAAA"),
+            Block(type: .paragraph, spans: [])
+        ])
+        XCTAssertFalse(doc.isEffectivelyEmpty, "there is a photo in it")
+    }
+
+    func testATrulyBlankNoteIsStillEmpty() {
+        XCTAssertTrue(BlockDoc(blocks: [Block(type: .paragraph, spans: [])]).isEffectivelyEmpty)
+    }
 }
