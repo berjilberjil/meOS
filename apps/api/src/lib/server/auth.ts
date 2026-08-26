@@ -30,14 +30,23 @@ export async function deleteSession(token: string): Promise<void> {
   await sql`delete from sessions where token = ${token}`;
 }
 
-export function cookieOptions() {
+/**
+ * `secure` is decided per request rather than pinned off.
+ *
+ * It was hardcoded false so the Mac app could talk to a plain-HTTP localhost
+ * dev backend — but that flag rides all the way to production, where it tells
+ * the browser this session cookie may be sent over plain HTTP. One downgraded
+ * request on a shared network is then enough to hand somebody a 60-day session.
+ * Dev keeps its exemption by looking at the URL it is actually serving.
+ */
+export function cookieOptions(url?: URL) {
+  const isLocal =
+    !!url && (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'));
   return {
     path: '/',
     httpOnly: true,
     sameSite: 'lax' as const,
-    // secure:false so the mac app also works against a plain-HTTP localhost dev
-    // backend; production is HTTPS and the cookie is fine either way.
-    secure: false,
+    secure: !isLocal,
     maxAge: 60 * 60 * 24 * SESSION_DAYS
   };
 }

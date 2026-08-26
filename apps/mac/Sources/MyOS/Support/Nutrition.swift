@@ -36,8 +36,12 @@ enum Nutrition {
                         activity: ActivityLevel, goal: FitnessGoal) -> CalorieTargets {
         let bmrV: Double = bmr(sex: sex, weightKg: weightKg, heightCm: heightCm, age: age)
         let tdee: Double = bmrV * activity.multiplier
-        let cut: Double = tdee + FitnessGoal.cut.calorieOffset
-        let bulk: Double = tdee + FitnessGoal.bulk.calorieOffset
+        // The same 1000 kcal floor as the selected goal. Without it the Calories
+        // card could offer a "Cut" number below — or under a nonsense profile,
+        // beneath zero — the floor the app enforces the moment you pick it, so
+        // the figure you chose from was never the figure you got.
+        let cut: Double = max(1000, tdee + FitnessGoal.cut.calorieOffset)
+        let bulk: Double = max(1000, tdee + FitnessGoal.bulk.calorieOffset)
         let goalCals: Double = max(1000, tdee + goal.calorieOffset)
 
         let protein: Double = proteinG(weightKg: weightKg, goal: goal)

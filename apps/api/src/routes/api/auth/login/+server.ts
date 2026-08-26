@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { sql } from '$lib/server/db';
 import { verifyPassword, createSession, cookieOptions, SESSION_COOKIE } from '$lib/server/auth';
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({ request, cookies, url }) => {
   const body = await request.json().catch(() => ({}));
   const name = String(body.username ?? '').trim().toLowerCase();
   const password = String(body.password ?? '');
@@ -15,6 +15,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
   }
 
   const token = await createSession(user.id);
-  cookies.set(SESSION_COOKIE, token, cookieOptions());
+  cookies.set(SESSION_COOKIE, token, cookieOptions(url));
   return json({ id: user.id, username: user.username });
 };

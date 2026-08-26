@@ -460,6 +460,21 @@ final class AppState: ObservableObject {
     /// can serve the previous value for a couple of seconds after PUT).
     private var lastLocalWrite: [String: Date] = [:]
 
+    /// How long to wait before each re-attempt of a failed PUT.
+    ///
+    /// A write that fails is not allowed to just vanish. The local model has
+    /// already changed by the time `push` is called, and `applyRemote` will
+    /// overwrite it with the server's older copy on the very next poll unless
+    /// the key is still marked pending. Without this, losing the network for a
+    /// moment meant the event you just added was silently deleted a second
+    /// later. Retrying holds the key pending for the whole window.
+    static let pushRetryDelays: [UInt64] = [
+        1_000_000_000,      // 1s
+        3_000_000_000,      // 3s
+        8_000_000_000,      // 8s
+        20_000_000_000      // 20s
+    ]
+
     // Internal, not private: the AI layer extends this type from Support/AI/*.
     func push(_ key: String, _ value: Encodable) {
         guard isHydrated else {
@@ -472,26 +487,59 @@ final class AppState: ObservableObject {
         pushTasks[key]?.cancel()
         pushTasks[key] = Task { [api] in
             try? await Task.sleep(nanoseconds: 80_000_000)
-            if Task.isCancelled { return }
-            do {
-                try await api.putState(key, value)
-                await MainActor.run {
-                    if self.pushGen[key] == gen { self.pushTasks[key] = nil }
-                    self.lastSyncError = nil
-                }
-            } catch is CancellationError {
+            if Task.isCancelled {
+                await self.finishPush(key, gen: gen, error: nil)
                 return
-            } catch let e as URLError where e.code == .cancelled {
-                return
-            } catch {
-                let msg = (error as? APIError)?.message ?? error.localizedDescription
-                await MainActor.run {
-                    if self.pushGen[key] == gen { self.pushTasks[key] = nil }
-                    self.lastSyncError = "Couldn't save \(key): \(msg)"
+            }
+            var attempt = 0
+            while true {
+                do {
+                    try await api.putState(key, value)
+                    await self.finishPush(key, gen: gen, error: nil)
+                    return
+                } catch is CancellationError {
+                    // Superseded by a newer push, which already owns the slot —
+                    // the generation guard inside `finishPush` makes this a no-op.
+                    await self.finishPush(key, gen: gen, error: nil)
+                    return
+                } catch let e as URLError where e.code == .cancelled {
+                    // NOT necessarily our own cancellation: URLSession reports
+                    // this when the app is backgrounded or the network changes
+                    // under an in-flight request. Returning without releasing
+                    // the slot left `hasPendingPush` true forever, which wedged
+                    // the key out of `applyRemote` — that module silently
+                    // stopped accepting anything from the other device until
+                    // the app was relaunched.
+                    await self.finishPush(key, gen: gen, error: nil)
+                    return
+                } catch {
+                    let msg = (error as? APIError)?.message ?? error.localizedDescription
+                    guard attempt < Self.pushRetryDelays.count,
+                          await self.isCurrentPush(key, gen: gen) else {
+                        await self.finishPush(key, gen: gen, error: msg)
+                        return
+                    }
+                    try? await Task.sleep(nanoseconds: Self.pushRetryDelays[attempt])
+                    if Task.isCancelled {
+                        await self.finishPush(key, gen: gen, error: nil)
+                        return
+                    }
+                    attempt += 1
                 }
             }
         }
     }
+
+    /// Release the pending slot for `key` — but only if this push is still the
+    /// current one. A newer push has already taken the slot, and clearing it
+    /// here would drop *its* protection rather than ours.
+    private func finishPush(_ key: String, gen: Int, error: String?) {
+        guard pushGen[key] == gen else { return }
+        pushTasks[key] = nil
+        lastSyncError = error.map { "Couldn't save \(key): \($0)" }
+    }
+
+    private func isCurrentPush(_ key: String, gen: Int) -> Bool { pushGen[key] == gen }
 
     private func hasPendingPush(_ key: String) -> Bool { pushTasks[key] != nil }
     private func wroteRecently(_ key: String, window: TimeInterval = 20) -> Bool {
@@ -875,11 +923,21 @@ final class AppState: ObservableObject {
             .max { $0.key < $1.key }?.value.weightKg
     }
 
-    /// The computed calorie/macro picture — nil until height, age and a weight
-    /// exist. Weight falls back to the target weight if nothing is logged yet.
+    /// The computed calorie/macro picture — nil until height, age and an
+    /// actually-logged weight exist.
+    ///
+    /// This used to fall back to `targetWeightKg` when nothing was logged, which
+    /// quietly computed the whole picture for a body the user does not have yet.
+    /// On a cut that is the wrong direction twice over: a lighter goal weight
+    /// lowers BMR, so the deficit is taken off an already-too-small maintenance
+    /// number, and the protein target — 2 g per kg of *goal* weight — comes out
+    /// below what it takes to hold muscle at the current one. Somebody at 90 kg
+    /// aiming for 70 was being handed ~275 kcal and ~40 g of protein less than
+    /// their own body called for. No weight logged is a thing we do not know,
+    /// so it returns nil and the UI asks for one (or uses the manual override).
     func calorieTargets() -> CalorieTargets? {
         guard let h = profile.heightCm, h > 0, let age = profile.age, age > 0 else { return nil }
-        guard let w = latestWeightKg ?? fitnessProfile.targetWeightKg, w > 0 else { return nil }
+        guard let w = latestWeightKg, w > 0 else { return nil }
         return Nutrition.targets(sex: fitnessProfile.sex, weightKg: w, heightCm: h, age: age,
                                  activity: fitnessProfile.activity, goal: fitnessProfile.goal)
     }
@@ -976,6 +1034,28 @@ final class AppState: ObservableObject {
         push(StateKey.nutrition, nutrition)
         return f
     }
+    /// Add a food, or replace the one already going by that name.
+    ///
+    /// The MCP tool is called `upsert_food` but ran through `addFood`, which
+    /// prepends unconditionally — so re-running an import appended the entire
+    /// library a second time rather than updating it, and a food could sit in
+    /// there three deep. The existing id is deliberately kept: meal plans and
+    /// day logs reference foods by id, and handing back a new one would orphan
+    /// every plan that already pointed at it.
+    @discardableResult
+    func upsertFood(_ food: Food) -> Food {
+        let key = Food.matchKey(food.name)
+        guard !key.isEmpty,
+              let i = nutrition.customFoods.firstIndex(where: { Food.matchKey($0.name) == key })
+        else { return addFood(food) }
+        var f = food
+        f.id = nutrition.customFoods[i].id
+        f.isDefault = false
+        nutrition.customFoods[i] = f
+        push(StateKey.nutrition, nutrition)
+        return f
+    }
+
     func updateFood(_ food: Food) {
         if let i = nutrition.customFoods.firstIndex(where: { $0.id == food.id }) {
             nutrition.customFoods[i] = food

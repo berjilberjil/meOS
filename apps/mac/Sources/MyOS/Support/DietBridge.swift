@@ -386,7 +386,7 @@ extension AppState {
                 fats: b.double("fat_g") ?? 0
             )
         )
-        let saved = addFood(food)
+        let saved = upsertFood(food)
         return ["id": saved.id, "name": saved.name]
     }
 

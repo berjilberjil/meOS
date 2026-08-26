@@ -74,6 +74,12 @@ struct Food: Codable, Identifiable, Hashable {
         self.vitamins = vitamins; self.isDefault = isDefault
     }
 
+    /// How two foods are judged to be the same thing when all you have is a
+    /// name — which is all an importer or the MCP bridge ever has.
+    static func matchKey(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
     enum CodingKeys: String, CodingKey { case id, name, category, servingLabel, perServing, vitamins, isDefault }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)

@@ -129,7 +129,12 @@ enum WeeklyReportMath {
     /// nothing and cost eight images.
     static func pick(_ photos: [ProgressPhoto], in window: ClosedRange<String>, limit: Int = 4) -> [ProgressPhoto] {
         let inWindow = photos.filter { window.contains($0.date) }.sorted { $0.id < $1.id }
+        guard limit > 0 else { return [] }
         guard inWindow.count > limit else { return inWindow }
+        // `limit == 1` would divide by zero here, and Int(infinity) traps rather
+        // than saturating — a crash, not a wrong answer. One photo asked for is
+        // the newest one.
+        guard limit > 1 else { return [inWindow[inWindow.count - 1]] }
         let step = Double(inWindow.count - 1) / Double(limit - 1)
         return (0..<limit).map { inWindow[Int((Double($0) * step).rounded())] }
     }

@@ -10,8 +10,18 @@ import { nowISO, sql } from './db';
  *
  * @cf/deepgram/aura-2-en costs 1363.64 neurons per 1,000 characters, so the
  * free 10,000 neurons buy ~7,333 characters. 7,000 leaves headroom.
+ *
+ * The neuron allowance belongs to the ACCOUNT, not to a person. A per-user cap
+ * alone therefore protects nothing the moment there is more than one user:
+ * two accounts each spending their own 7,000 characters is 19,090 neurons, and
+ * the second one is billed. So the account-wide ceiling is the real stop, and
+ * the per-user cap sits underneath it purely so one talkative account cannot
+ * drink the whole day before anyone else wakes up.
  */
-export const VOICE_DAILY_CHAR_CAP = 7000;
+export const VOICE_ACCOUNT_DAILY_CHAR_CAP = 7000;
+
+/** One account's share of the day. Never above the account-wide ceiling. */
+export const VOICE_DAILY_CHAR_CAP = 4000;
 
 /** The UTC calendar day an instant falls in. Workers AI resets at 00:00 UTC. */
 export function utcDayKey(iso: string): string {
@@ -74,11 +84,23 @@ export async function reserveVoiceChars(
   const now = nowISO();
   const day = utcDayKey(now);
 
+  // Both ledgers for the day in one read: this account's spend, and everyone's.
   const rows = await sql`
-    select chars from voice_budget where user_id = ${userId} and day = ${day}`;
-  const used = rows.length ? Number(rows[0].chars) : 0;
+    select
+      coalesce(sum(case when user_id = ${userId} then chars end), 0) as mine,
+      coalesce(sum(chars), 0)                                        as everyone
+    from voice_budget where day = ${day}`;
+  const used = Number(rows[0]?.mine ?? 0);
+  const usedByAll = Number(rows[0]?.everyone ?? 0);
 
-  const decision = budgetDecision(used, chars);
+  // Refuse on whichever ceiling binds first, and report the tighter remainder
+  // so the client is told the truth about what it can still ask for.
+  const mine = budgetDecision(used, chars);
+  const account = budgetDecision(usedByAll, chars, VOICE_ACCOUNT_DAILY_CHAR_CAP);
+  const decision = {
+    allowed: mine.allowed && account.allowed,
+    remaining: Math.min(mine.remaining, account.remaining)
+  };
   if (!decision.allowed) return decision;
 
   await sql`

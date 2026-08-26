@@ -140,4 +140,38 @@ enum ProgressPhotoStore {
     static func pending() -> [ProgressPhoto] {
         list().filter { !isSynced($0.id) }
     }
+
+    // MARK: - Deletions awaiting the server
+
+    // Deleting a photo removes it here immediately, then asks the server to drop
+    // the cloud copy — and that second half is best-effort. When it failed (no
+    // network, locked out, a 500) nothing recorded the intent, so the object sat
+    // in R2 and the next pull, seeing a remote photo this device didn't have,
+    // downloaded it straight back. The photo you deleted reappeared minutes
+    // later and deleting it again did exactly the same thing.
+    //
+    // A stem stays on this list until the server has confirmed it is gone. It is
+    // both the retry queue and the filter `pull()` checks before downloading.
+
+    private static let deletedKey = "myos.progress.deletedStems"
+
+    static var deletedIds: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: deletedKey) ?? [])
+    }
+
+    static func isDeleted(_ id: String) -> Bool { deletedIds.contains(id) }
+
+    static func markDeleted(_ id: String) {
+        var s = deletedIds
+        guard !s.contains(id) else { return }
+        s.insert(id)
+        UserDefaults.standard.set(Array(s), forKey: deletedKey)
+    }
+
+    /// The server has confirmed the cloud copy is gone — stop tracking it.
+    static func clearDeleted(_ id: String) {
+        var s = deletedIds
+        guard s.remove(id) != nil else { return }
+        UserDefaults.standard.set(Array(s), forKey: deletedKey)
+    }
 }
