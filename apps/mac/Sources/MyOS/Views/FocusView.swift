@@ -470,7 +470,12 @@ struct FocusSessionView: View {
 
     /// Nothing running: either the list is empty (write one) or the day is done.
     @ViewBuilder private var emptyState: some View {
-        let empty = items.isEmpty
+        // "Empty" is nothing left TO DO, not an empty list. Testing
+        // `items.isEmpty` meant stopping the timer on the last unticked task
+        // showed "Day crushed" over a hidden list with that task still open and
+        // no way to reach it from Task Mode. `TaskMode.dayCrushed` is the rule
+        // and was sitting unused.
+        let empty = !TaskMode.dayCrushed(items)
         VStack(spacing: 11) {
             Image(systemName: empty ? "list.bullet.rectangle" : "checkmark.seal.fill")
                 .font(.largeTitle.weight(.semibold))
@@ -487,7 +492,11 @@ struct FocusSessionView: View {
     }
 
     private func subtitle(empty: Bool) -> String {
-        if empty { return "Write down what you need to crush. The first one starts the clock." }
+        if empty {
+            return items.isEmpty
+                ? "Write down what you need to crush. The first one starts the clock."
+                : "Pick the next one to start the clock again."
+        }
         let streak = state.focusStreak()
         return streak > 0 ? "\(streak) clean day\(streak == 1 ? "" : "s") in a row." : "Everything on the list is done."
     }

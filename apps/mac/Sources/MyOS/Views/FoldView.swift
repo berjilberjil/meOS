@@ -346,6 +346,15 @@ private struct FoldTile: View {
 
 /// Phone OTP against Fold's own auth. Tokens stay in the device Keychain.
 private struct FoldLoginSheet: View {
+    /// The digits the user actually typed, with a leading country code removed.
+    /// The field starts life holding "+91", so a plain digit count reached ten
+    /// after eight keystrokes.
+    static func nationalDigits(_ phone: String) -> String {
+        var d = phone.filter(\.isNumber)
+        if d.count > 10, d.hasPrefix("91") { d.removeFirst(2) }
+        return d
+    }
+
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var phone = FoldClient.linkedPhone.isEmpty ? "+91" : FoldClient.linkedPhone
@@ -407,7 +416,10 @@ private struct FoldLoginSheet: View {
                         }
                     } label: { Label(state.foldBusy ? "Sending…" : "Send OTP", systemImage: "message") }
                     .buttonStyle(.borderedProminent)
-                    .disabled(phone.filter(\.isNumber).count < 10 || state.foldBusy)
+                    // The field is seeded with "+91", so counting every digit
+                    // enabled Send after eight typed ones and fired an OTP at a
+                    // half-typed number.
+                    .disabled(Self.nationalDigits(phone).count < 10 || state.foldBusy)
                 }
                 Spacer()
             }

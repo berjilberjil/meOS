@@ -6,7 +6,12 @@ import SwiftUI
 /// muscles → exercises) and a weekday grid could never hold one.
 struct WeeklyPlannerView: View {
     @EnvironmentObject var state: AppState
-    @State private var weekday: String = String(Calendar(identifier: .gregorian).component(.weekday, from: Date()) - 1)
+    /// Empty until `onAppear` resolves it, so the re-sync below can actually
+    /// fire. Seeding it from `Date()` at construction meant the
+    /// `!WeekdayKeys.all.contains(weekday)` guard was never true — the value was
+    /// always a valid weekday — so the planner kept editing yesterday's row
+    /// after midnight, and a view built before midnight never caught up.
+    @State private var weekday: String = ""
     @State private var addingMeal: MealKey?
     @State private var newFood = false
     @State private var showClearMeals = false
@@ -51,6 +56,7 @@ struct WeeklyPlannerView: View {
             mealsColumn.knRise(2)
         }
         .onAppear { if !WeekdayKeys.all.contains(weekday) { weekday = state.todayWeekday } }
+        .onChange(of: state.todayWeekday) { old, new in if weekday == old { weekday = new } }
         #if os(macOS)
         .alert("Generate a new week?", isPresented: $askGenerate) {
             Button("Cancel", role: .cancel) {}

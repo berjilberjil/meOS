@@ -37,6 +37,10 @@ struct MainView: View {
             ZStack {
                 // Macro Intelligence is a screen, not a dialog: it takes the whole
                 // content area the way a tab does, keeping the rail to get back.
+                // `openMacro` overlays every tab, so it has to be cleared when a
+                // tab is chosen — otherwise clicking the sidebar moved the
+                // highlight and persisted `lastTab` while the content area sat
+                // on Macro Intelligence, looking frozen.
                 if signals.openMacro {
                     MacroPulseView(onClose: { signals.openMacro = false })
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -102,6 +106,11 @@ struct MainView: View {
     }
 
     private func switchTo(_ t: NavTab) {
+        // Macro Intelligence overlays every tab, so choosing one has to close
+        // it. Without this the sidebar highlight moved and `lastTab` was
+        // persisted while the content area stayed on Macro — the app looked
+        // stuck, and the next launch opened a tab that had never been shown.
+        signals.openMacro = false
         withAnimation(.knPop) { tab = t }
         PrefsStore.shared.lastTab = t   // so reopening resumes here
     }

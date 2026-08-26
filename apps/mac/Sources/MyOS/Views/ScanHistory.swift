@@ -66,7 +66,11 @@ struct ScanVerdictView: View {
         Text("FOOD").font(.caption.weight(.heavy)).tracking(0.8)
             .foregroundStyle(Palette.green)
         Text(insight.summary).font(.body.weight(.semibold)).foregroundStyle(Palette.text)
-        ForEach(insight.foods, id: \.name) { f in
+        // By position, not by name. Unnamed entries all default to "Food", so
+        // keying on the name collapsed every one of them into a single row —
+        // while "Log this meal" went on logging the full list, and the totals
+        // disagreed with what was on screen.
+        ForEach(Array(insight.foods.enumerated()), id: \.offset) { _, f in
             VStack(alignment: .leading, spacing: 8) {
                 Text(f.name).font(.body.weight(.semibold))
                 Text(f.serving).font(.footnote).foregroundStyle(Palette.muted)

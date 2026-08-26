@@ -103,6 +103,10 @@ final class AISettingsStore: ObservableObject {
             loadError = nil
         } catch {
             loadError = Self.msg(error, .loading)
+            // Also loaded — the attempt is over. Leaving it false meant the card
+            // rendered its error notice and a "Loading your keys…" spinner at the
+            // same time, and never stopped.
+            loaded = true
         }
     }
 

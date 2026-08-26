@@ -141,7 +141,12 @@ struct SettingsView: View {
 
     private func exportData() {
         exportMsg = nil
-        guard let data = state.exportJSON() else { exportMsg = nil; return }
+        // Say so. Clearing the message on failure made a broken export look
+        // exactly like never having pressed the button.
+        guard let data = state.exportJSON() else {
+            exportMsg = "Couldn't build the export."
+            return
+        }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "myos-export.json"
         panel.allowedContentTypes = [.json]

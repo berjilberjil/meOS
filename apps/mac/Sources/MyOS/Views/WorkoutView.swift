@@ -7,6 +7,10 @@ struct WorkoutLibrarySection: View {
     @EnvironmentObject var state: AppState
     @State private var newExercise = false
     @State private var detail: Exercise?
+    /// A custom exercise being renamed or removed. `ExerciseEditor` has had an
+    /// edit/delete branch all along, but every call site passed nil — so an
+    /// exercise you added yourself could never be corrected or deleted.
+    @State private var editing: Exercise?
     @State private var libQuery = ""
     /// Filed by muscle group now — "Arms" was one shelf holding both the curls
     /// and the pushdowns, which is not how anyone looks for an exercise.
@@ -59,6 +63,10 @@ struct WorkoutLibrarySection: View {
             }
         }
         .sheet(isPresented: $newExercise) { ExerciseEditor(exercise: nil) }
+        // `editing` reaches ExerciseEditor's edit/delete branch, which was dead
+        // code because every call site passed nil — so a custom exercise could
+        // be created and then never renamed or removed.
+        .sheet(item: $editing) { ex in ExerciseEditor(exercise: ex) }
         .sheet(item: $detail) { ex in ExerciseDetailSheet(exercise: ex) }
     }
 
@@ -93,6 +101,14 @@ struct WorkoutLibrarySection: View {
         .frame(minHeight: 44)          // still a comfortable tap target
         .contentShape(Rectangle())
         .onTapGesture { detail = ex }
+        // Right-click is the only affordance the library has room for, and it
+        // is only offered for exercises the user made — the seeded ones are not
+        // theirs to rename.
+        .contextMenu {
+            if state.training.customExercises.contains(where: { $0.id == ex.id }) {
+                Button("Edit") { editing = ex }
+            }
+        }
     }
 }
 
