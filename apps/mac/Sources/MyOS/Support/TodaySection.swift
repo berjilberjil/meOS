@@ -6,7 +6,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
     /// `focusNow` is the activity-intelligence card. `activity` predates it and
     /// is about *walking* — the two were both called "Activity", which is why
     /// the older one now reads as "Steps".
-    case focusNow, activity, intake, meals, workout, comingUp, bodyPhotos, watchLog, focus, news
+    case focusNow, activity, weight, intake, meals, workout, comingUp, bodyPhotos, watchLog, focus, news
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
         switch self {
         case .focusNow: return "Activity"
         case .activity: return "Steps"
+        case .weight: return "Weight"
         case .intake: return "Intake"
         case .meals: return "Meals"
         case .workout: return "Workout"
@@ -29,6 +30,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
         switch self {
         case .focusNow: return "timer"
         case .activity: return "figure.walk"
+        case .weight: return "scalemass.fill"
         case .intake: return "flame.fill"
         case .meals: return "fork.knife"
         case .workout: return "dumbbell.fill"
@@ -49,6 +51,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
         switch self {
         case .focusNow:   return .activity
         case .activity:   return .green    // fitness
+        case .weight:     return .green    // fitness
         // Intake is the one *filled* card on Today — a solid block of the app's
         // colour. Its weight comes from being the only filled card, not from
         // being a different hue: orange there read as a warning, which is the
@@ -69,7 +72,7 @@ enum TodaySection: String, CaseIterable, Identifiable {
     var available: Bool { true }
 
     private static let defaultOrder: [TodaySection] = [
-        .focusNow, .activity, .intake, .meals, .workout, .comingUp, .bodyPhotos, .watchLog, .focus, .news
+        .focusNow, .activity, .weight, .intake, .meals, .workout, .comingUp, .bodyPhotos, .watchLog, .focus, .news
     ]
 
     /// Sections that belong at the top when they first appear, rather than at
@@ -77,6 +80,15 @@ enum TodaySection: String, CaseIterable, Identifiable {
     /// job is "what should I know right now", and an answer to that below the
     /// fold is not an answer.
     private static let pinnedToTop: Set<TodaySection> = [.focusNow]
+
+    /// Sections that belong *beside* an existing one when they first appear.
+    ///
+    /// A newly-added case lands at the bottom of a saved order, which for
+    /// Weight would be below News — under the fold, on a page whose whole job
+    /// is the top of it. Weight and Steps are the same kind of thing (a number
+    /// your body produced today), so it arrives next to Steps and can be
+    /// dragged anywhere from there.
+    private static let insertAfter: [TodaySection: TodaySection] = [.weight: .activity]
 
     static let storageKey = "today.sectionOrder"
 
@@ -107,7 +119,13 @@ enum TodaySection: String, CaseIterable, Identifiable {
         }
         var sections = ids.compactMap { TodaySection(rawValue: $0) }
         for s in TodaySection.allCases where !sections.contains(s) {
-            if pinnedToTop.contains(s) { sections.insert(s, at: 0) } else { sections.append(s) }
+            if pinnedToTop.contains(s) {
+                sections.insert(s, at: 0)
+            } else if let anchor = insertAfter[s], let i = sections.firstIndex(of: anchor) {
+                sections.insert(s, at: i + 1)
+            } else {
+                sections.append(s)
+            }
         }
         return sections.filter(\.available)
     }

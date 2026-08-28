@@ -1183,7 +1183,30 @@ final class AppState: ObservableObject {
 
     /// Set today's logged weight directly (used from Profile's editable field).
     func setTodayWeight(_ kg: Double?) {
-        updateFitness(todayKey) { $0.weightKg = kg.map { max(0, $0) } }
+        setWeight(kg, on: todayKey)
+    }
+
+    /// Set (or clear) the logged weight for any day.
+    ///
+    /// Today is a pager, so the weight dial can be sitting on Sunday while the
+    /// clock says Tuesday. It writes against the day on screen for the same
+    /// reason `setSteps(_:on:)` does — a number you correct after the fact
+    /// belongs to the day you were looking at, not the day it is now.
+    func setWeight(_ kg: Double?, on date: String) {
+        updateFitness(date) { $0.weightKg = kg.map { max(0, $0) } }
+    }
+
+    /// The most recent logged weight strictly before `date`, with the day it was
+    /// logged on. What the dial opens at, and what its delta reads against.
+    ///
+    /// Deliberately not `latestWeightKg`: that is the newest weight in the whole
+    /// history, so paging back to last Sunday would seed the dial from — and
+    /// compare it against — a number from the future.
+    func lastWeight(before date: String) -> (kg: Double, date: String)? {
+        let earlier = fitness.filter { $0.key < date && ($0.value.weightKg ?? 0) > 0 }
+        guard let entry = earlier.max(by: { $0.key < $1.key }),
+              let kg = entry.value.weightKg else { return nil }
+        return (kg, entry.key)
     }
 
     /// Set today's step count by hand.

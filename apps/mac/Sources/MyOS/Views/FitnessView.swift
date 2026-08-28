@@ -77,6 +77,9 @@ struct FitnessView: View {
 
     @ViewBuilder private var todayContent: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // First thing on the tab: the day's weight is the number every
+            // other number here is computed from.
+            WeightCard(day: state.todayKey).cardAccent(.green).knRise(1)
             FitnessTodayView().knRise(2)
             ActivityStepsCard().knRise(3)
             #if os(iOS)
