@@ -6,6 +6,7 @@ import AppKit
 struct TodayView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var order = TodaySection.OrderSignal.shared
+    @ObservedObject private var signals = UISignals.shared
     @Environment(\.openURL) private var openURL
     var go: (NavTab) -> Void
     /// Set when something outside owns which day is on screen — on iOS
@@ -78,6 +79,21 @@ struct TodayView: View {
                                initialItems: state.mealEditorItems(date: selectedDate, meal: meal))
         }
         .sheet(isPresented: $showStreakCal) { streakCalendarSheet }
+        // Tapped a meal reminder. On appear as well as on change, because from
+        // a killed app the route is delivered before this page exists.
+        .onAppear { consumeMeal() }
+        .onChange(of: signals.pendingMeal) { _, _ in consumeMeal() }
+    }
+
+    /// Open the meal editor a notification asked for.
+    ///
+    /// Guarded to the live page: the pager keeps three days built at once, so
+    /// without this the same tap would raise three sheets — and two of them
+    /// would be logging against the wrong day.
+    private func consumeMeal() {
+        guard selectedDate == state.todayKey, let meal = signals.pendingMeal else { return }
+        signals.pendingMeal = nil
+        editingMeal = meal
     }
 
     @ViewBuilder
@@ -87,6 +103,8 @@ struct TodayView: View {
             ActivityIntelligenceCard(day: selectedDate, go: go)
         case .activity:
             ActivityStepsCard(day: selectedDate, showsCalendar: false)
+        case .weight:
+            WeightCard(day: selectedDate)
         case .intake:
             DayMacroHero(day: selectedDate)
         case .meals:

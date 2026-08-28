@@ -112,6 +112,12 @@ struct MainView: View {
         // Tapped the Friday report notification. SettingsView clears the flag
         // once it is up, and opens on the report.
         .onChange(of: signals.openWeeklyReport) { _, on in if on { showSettings = true } }
+        // A tapped notification. Consumed on appear as well as on change, and
+        // that is the whole bug fix: from a killed app the route is delivered
+        // before this view exists, so `.onChange` never fires and the tap did
+        // nothing at all.
+        .onAppear { consumeRoute() }
+        .onChange(of: signals.pendingRoute) { _, _ in consumeRoute() }
         // Every heavy import lives here, not in the cards. Today is paged by
         // day, so a card-level `.task` runs once per live page — i.e. three
         // times, and again on every swipe.
@@ -147,6 +153,34 @@ struct MainView: View {
         await ProgressPhotoSync.syncAll()
         await HealthSteps.syncRecent(into: state)
         await state.drainShareInbox()
+    }
+
+    /// Take a tapped notification to the thing it is about.
+    ///
+    /// The tab is only the first half — a lunch reminder that lands on Today
+    /// and leaves you to find Meals has not really taken you anywhere — so the
+    /// second half is handed on to the page itself.
+    private func consumeRoute() {
+        guard let route = signals.pendingRoute else { return }
+        signals.pendingRoute = nil
+        switch route {
+        case .today:
+            select(.today)
+        case .weight:
+            select(.today)
+            signals.todayAnchor = TodaySection.weight.rawValue
+        case .steps:
+            select(.today)
+            signals.todayAnchor = TodaySection.activity.rawValue
+        case .breakfast, .lunch, .dinner:
+            select(.today)
+            signals.pendingMeal = route.meal
+        case .workout:
+            select(.fitness)
+        case .weekly:
+            signals.openWeeklyReport = true
+            showSettings = true
+        }
     }
 
     private func select(_ newValue: NavTab) {

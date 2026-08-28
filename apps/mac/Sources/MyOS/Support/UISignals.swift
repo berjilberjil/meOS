@@ -19,6 +19,23 @@ final class UISignals: ObservableObject {
     @Published var pendingJournalDate: String?
     /// Tapped the Friday report notification — open Settings on the report.
     @Published var openWeeklyReport = false
+
+    /// A tapped notification's destination, waiting for a screen to take it.
+    ///
+    /// It is *parked* rather than acted on because of when a tap arrives. From
+    /// a killed app the notification response is delivered before any SwiftUI
+    /// view exists, and MyOS then sits at the vault lock until Face ID or the
+    /// Keychain lets it through. A signal consumed only by `.onChange` is
+    /// therefore swallowed on exactly the journey that matters most — the phone
+    /// in your pocket, hours after you last opened the app. Screens consume this
+    /// on appear *and* on change; whichever happens second finds it already nil.
+    @Published var pendingRoute: NotifRoute?
+
+    /// Scroll the Today page to this section (a `TodaySection` raw value).
+    @Published var todayAnchor: String?
+
+    /// Open Today's editor for this meal.
+    @Published var pendingMeal: MealKey?
     /// Settings lives at the bottom of the iOS Today page, not in the toolbar.
     @Published var openSettings = false
     /// Macro Intelligence opens over the whole content area rather than in a

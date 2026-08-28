@@ -74,6 +74,42 @@ enum ReminderSound: String, Codable, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Where a tapped notification should land.
+///
+/// A notification that opens the app on whatever screen you happened to leave
+/// it on is a notification that made you do the work twice. Every one MyOS
+/// sends now names its destination, and the raw values are what travel in
+/// `userInfo` — so they are a wire format and must not be renamed lightly.
+enum NotifRoute: String, Codable, Hashable, CaseIterable {
+    case today, weight, breakfast, lunch, dinner, workout, steps, weekly
+
+    /// Where each of the five daily reminders goes.
+    ///
+    /// Pure, and tested, because the mapping is a set of small decisions that
+    /// are invisible from the outside: the wake reminder's own words are "log
+    /// your weight", so it opens on the dial rather than on the top of Today.
+    static func forReminder(_ id: String) -> NotifRoute {
+        switch id {
+        case "wake":      return .weight
+        case "breakfast": return .breakfast
+        case "lunch":     return .lunch
+        case "dinner":    return .dinner
+        case "workout":   return .workout
+        default:          return .today
+        }
+    }
+
+    /// The meal editor this route opens, if it is about a meal at all.
+    var meal: MealKey? {
+        switch self {
+        case .breakfast: return .breakfast
+        case .lunch:     return .lunch
+        case .dinner:    return .dinner
+        default:         return nil
+        }
+    }
+}
+
 /// One daily reminder — a fixed set of ids (wake / breakfast / lunch / workout /
 /// dinner); the user can move the time, switch each off, and give each its own
 /// sound. Device-local.
@@ -208,6 +244,9 @@ final class ReminderStore: ObservableObject {
             content.title = r.label
             content.body = r.body
             content.sound = r.sound.notificationSound
+            // Without this every reminder opened the app wherever it was last
+            // left. Tapping "Lunch" now opens the lunch editor.
+            content.userInfo = ["route": NotifRoute.forReminder(r.id).rawValue]
             var comps = DateComponents(); comps.hour = r.hour; comps.minute = r.minute
             let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
             let req = UNNotificationRequest(identifier: "myos.reminder.\(r.id)", content: content, trigger: trigger)
@@ -271,6 +310,7 @@ enum FocusNotify {
         c.body = task.trimmingCharacters(in: .whitespaces).isEmpty
             ? "Your focus block is done." : task
         c.sound = .default
+        c.userInfo = ["route": NotifRoute.today.rawValue]
         UNUserNotificationCenter.current()
             .add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
     }
@@ -358,10 +398,21 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         [.banner, .sound]
     }
 
+    /// Hand the tapped route to the UI.
+    ///
+    /// This used to `guard route == WeeklyNotify.route` and drop everything
+    /// else on the floor — which meant the step-goal banner's `"steps"` route
+    /// had never once been acted on, and the five daily reminders carried no
+    /// route to act on in the first place.
+    ///
+    /// Nothing is done here beyond parking the destination. A tap can arrive
+    /// before there is any UI at all (a cold launch) and before the vault is
+    /// unlocked, so the route waits in `UISignals` until a screen is ready to
+    /// take it.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse) async {
-        let route = response.notification.request.content.userInfo["route"] as? String
-        guard route == WeeklyNotify.route else { return }
-        await MainActor.run { UISignals.shared.openWeeklyReport = true }
+        let raw = response.notification.request.content.userInfo["route"] as? String
+        guard let route = NotifRoute(rawValue: raw ?? "") else { return }
+        await MainActor.run { UISignals.shared.pendingRoute = route }
     }
 }

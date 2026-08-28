@@ -36,6 +36,8 @@ struct TodayPager: View {
     /// to stay cheap.
     private static let backDays = 30
 
+    @ObservedObject private var signals = UISignals.shared
+
     @State private var day: String? = AppState.dateKey(Date())
     /// Section id every page is aligned on — see the note above.
     @State private var anchor: String? = TodayView.headerAnchor
@@ -57,9 +59,20 @@ struct TodayPager: View {
         // on the incoming day fades up from zero as it slides in.
         .environment(\.knEntrances, false)
         .background(Palette.background)
-        .onAppear(perform: rebuildWindow)
+        .onAppear { rebuildWindow(); consumeAnchor() }
         // The window is anchored to "today", so it has to move when midnight does.
         .onChange(of: state.todayKey) { _, _ in rebuildWindow() }
+        .onChange(of: signals.todayAnchor) { _, _ in consumeAnchor() }
+    }
+
+    /// A notification asked for a particular card. Reminders are always about
+    /// today, so this turns the page back to today before scrolling — tapping
+    /// "log your weight" while parked on last Tuesday must not log it there.
+    private func consumeAnchor() {
+        guard let target = signals.todayAnchor else { return }
+        signals.todayAnchor = nil
+        day = state.todayKey
+        withAnimation(.knNormal) { anchor = target }
     }
 
     private func page(_ date: String) -> some View {
