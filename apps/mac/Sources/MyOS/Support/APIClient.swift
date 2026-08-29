@@ -145,8 +145,35 @@ final class APIClient {
     /// envelopes and plaintext (crypto meta, ai.routes, or legacy pre-encryption).
     func fetchStateRaw() async throws -> [String: Any] {
         let data = try await request("GET", "api/state")
+        let map = try Self.stateMap(from: data)
         Self.writeCache(data, "state.json")
-        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        return map
+    }
+
+    /// Parse a state body into its key map, or throw.
+    ///
+    /// `as? [String: Any] ?? [:]` was the most destructive line in the app.
+    /// A 200 whose body is not a JSON object — a Cloudflare error page, a
+    /// captive-portal interstitial, a truncated response — parsed to an
+    /// EMPTY map, which `decodePayload` turned into an all-nil payload,
+    /// which `apply` turned into every module reset to its default. The
+    /// whole app emptied on screen, `isHydrated` was set true regardless,
+    /// and the next local edit pushed the emptied module up as fact.
+    ///
+    /// That is the "everything disappeared, then came back" report: it came
+    /// back on the next fetch that happened to return real JSON, and stayed
+    /// gone whenever a push landed inside that window.
+    ///
+    /// An unreadable body is a FAILED fetch, not an empty account. Throwing
+    /// routes it to the offline path, which keeps what is already on screen.
+    /// The cache is written only after this passes, so a bad body can never
+    /// become the copy we relaunch from either.
+    private static func stateMap(from data: Data) throws -> [String: Any] {
+        guard let obj = try? JSONSerialization.jsonObject(with: data),
+              let map = obj as? [String: Any] else {
+            throw APIError(status: -1, message: "Server sent something that isn't your data.")
+        }
+        return map
     }
 
     /// Last `ETag` seen for `GET api/state`.
@@ -178,9 +205,14 @@ final class APIClient {
         // actually applied, and storing it here meant a snapshot `applyRemote`
         // deliberately deferred — or one `decodePayload` threw on — was answered
         // 304 forever after and never offered again. See `AppState.applyRemote`.
+        // Parsed BEFORE the ETag is held or the cache is written. An
+        // unreadable body must not be remembered as "the version I have"
+        // — that would answer 304 forever after and leave the real state
+        // permanently unfetched. See `stateMap`.
+        let map = try Self.stateMap(from: data)
         pendingStateETag = http.value(forHTTPHeaderField: "ETag")
         Self.writeCache(data, "state.json")
-        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        return map
     }
 
     /// Accept the last fetch's ETag. Call only once its payload is fully applied.

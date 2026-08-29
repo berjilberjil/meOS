@@ -151,29 +151,50 @@ final class AppState: ObservableObject {
         else { d.removeObject(forKey: Self.kSessionUser) }
     }
 
+    /// Install a hydrated snapshot.
+    ///
+    /// A key the payload does NOT carry keeps whatever this device already
+    /// has. It used to fall back to the empty default — `?? [:]`, `?? []` —
+    /// which quietly made "the server did not send this module" and "you
+    /// have no data in this module" the same event.
+    ///
+    /// They are not the same event, and the difference is every note and
+    /// meal Berjil logged. A key goes missing from a payload for reasons
+    /// that have nothing to do with it being empty: `decodeSkippingBadKeys`
+    /// drops any module a newer build wrote in a shape this one cannot
+    /// read, `decodePayload` drops any key that arrives unsealed, and until
+    /// the fix above an unreadable body arrived as no keys at all. Each of
+    /// those blanked the module on screen — and because `apply` ends with
+    /// `isHydrated = true`, the next edit pushed the blank up as fact.
+    ///
+    /// Keeping the local value costs nothing in the cases that used to
+    /// justify the defaults: at first login every field is already its
+    /// default, and `logout()` resets them all before the next account
+    /// loads. A module that really is empty arrives as an empty array or
+    /// map, which is present in the payload and applied like anything else.
     private func apply(_ s: AppStatePayload) {
-        fitness = s.fitness ?? [:]
-        fitnessProfile = s.fitnessProfile ?? FitnessProfile()
-        journal = s.journal ?? [:]
-        journalPresets = s.journalPresets ?? JournalPresets()
-        notes   = s.notes ?? []
-        days    = s.days ?? [:]
-        profile = s.profile ?? Profile()
-        chat    = s.chat ?? ChatState()
-        nutrition = s.nutrition ?? NutritionState()
-        training  = s.training ?? TrainingState()
-        events    = s.events ?? []
-        eventTags = s.eventTags ?? []
+        fitness = s.fitness ?? fitness
+        fitnessProfile = s.fitnessProfile ?? fitnessProfile
+        journal = s.journal ?? journal
+        journalPresets = s.journalPresets ?? journalPresets
+        notes   = s.notes ?? notes
+        days    = s.days ?? days
+        profile = s.profile ?? profile
+        chat    = s.chat ?? chat
+        nutrition = s.nutrition ?? nutrition
+        training  = s.training ?? training
+        events    = s.events ?? events
+        eventTags = s.eventTags ?? eventTags
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
-        watch     = s.watch ?? []
-        memory    = s.memory ?? MemoryState()
-        scans     = s.scans ?? []
-        taskMode  = s.taskMode ?? TaskModeState()
-        weekly    = s.weekly ?? []
+        watch     = s.watch ?? watch
+        memory    = s.memory ?? memory
+        scans     = s.scans ?? scans
+        taskMode  = s.taskMode ?? taskMode
+        weekly    = s.weekly ?? weekly
         // Merged, not replaced: the other device has been appending sessions to
         // the same key. See `ActivityDoc.merged(with:)`.
         activity  = activity.merged(with: s.activity ?? ActivityDoc())
-        belongings = s.belongings ?? BelongingsState()
+        belongings = s.belongings ?? belongings
         // Only when the payload actually carries one. Falling back to the
         // default here would reset the theme on every launch of any device
         // whose last push had not landed yet — the local cache is a better
@@ -579,6 +600,13 @@ final class AppState: ObservableObject {
         let gen = pushGen[key] ?? 1
         pushTasks[key]?.cancel()
         pushTasks[key] = Task { [api] in
+            // Ask iOS for a moment past the home swipe. Without it the
+            // process is suspended mid-PUT: the request is cancelled, the
+            // retry never gets CPU to run, and the meal you logged on the
+            // walk home is reverted by the first poll after you unlock.
+            // Ended on every exit path — see `withBackgroundGrace`.
+            let grace = BackgroundGrace(name: "myos.push.\(key)")
+            defer { grace.end() }
             try? await Task.sleep(nanoseconds: 80_000_000)
             if Task.isCancelled {
                 await self.finishPush(key, gen: gen, error: nil)
@@ -595,14 +623,10 @@ final class AppState: ObservableObject {
                     // the generation guard inside `finishPush` makes this a no-op.
                     await self.finishPush(key, gen: gen, error: nil)
                     return
-                } catch let e as URLError where e.code == .cancelled {
-                    // NOT necessarily our own cancellation: URLSession reports
-                    // this when the app is backgrounded or the network changes
-                    // under an in-flight request. Returning without releasing
-                    // the slot left `hasPendingPush` true forever, which wedged
-                    // the key out of `applyRemote` — that module silently
-                    // stopped accepting anything from the other device until
-                    // the app was relaunched.
+                } catch let e as URLError where e.code == .cancelled && Task.isCancelled {
+                    // OUR cancellation — a newer push superseded this one and
+                    // already owns the slot. The generation guard inside
+                    // `finishPush` makes releasing it a no-op.
                     await self.finishPush(key, gen: gen, error: nil)
                     return
                 } catch {
@@ -668,6 +692,26 @@ final class AppState: ObservableObject {
     }
 
     private func hasPendingPush(_ key: String) -> Bool { pushTasks[key] != nil }
+
+    /// Block until every queued write has landed, or `timeout` passes.
+    ///
+    /// For callers that are about to stop existing. A push is debounced
+    /// and then retried, so `push()` returning means "queued", not
+    /// "saved" — fine when the app is on screen and will still be there
+    /// in a second, useless in a background wake, which is suspended the
+    /// moment it says it is done. The steps refresh writes and then
+    /// immediately hands control back to iOS; without this the PUT is
+    /// cancelled in flight and the wake accomplishes nothing at all.
+    ///
+    /// Returns whether the queue actually drained.
+    func waitForPushes(timeout: TimeInterval) async -> Bool {
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        while !pushTasks.isEmpty {
+            if Date() >= deadline { return false }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return true
+    }
     private func wroteRecently(_ key: String, window: TimeInterval = 20) -> Bool {
         guard let t = lastLocalWrite[key] else { return false }
         return Date().timeIntervalSince(t) < window
@@ -823,13 +867,38 @@ final class AppState: ObservableObject {
     /// remote change, or coming back to the app resets it. Sitting on a screen
     /// doing nothing costs about a fifth of what it used to; picking the phone up
     /// mid-edit is exactly as quick as before.
-    static let backoffPollCeiling: UInt64 = 12_000_000_000    // 12s
+    ///
+    /// The ceiling was 12s, and 12s is what "the Mac isn't live" actually
+    /// was: quicken only fires on a LOCAL write or a change that already
+    /// landed, so a device sitting idle-but-open had drifted to the
+    /// ceiling by the time the other one wrote — and then took up to
+    /// twelve seconds to notice. The worst case is what gets felt, so the
+    /// ceiling is the number that matters, not the floor.
+    ///
+    /// At 4s the drift is 1.5 → 3 → 4, averaging ~3.5s: about 6k requests
+    /// per device across a six-hour foreground day, ~12k for both. That is
+    /// an eighth of the 100k free-tier day, so the ceiling can come down
+    /// this far without putting [[myos-must-cost-nothing]] at risk.
+    static let backoffPollCeiling: UInt64 = 4_000_000_000     // 4s
 
     /// Current foreground interval, between `activePollInterval` and the ceiling.
     private var pollInterval: UInt64 = AppState.activePollInterval
 
+    /// Set by `quickenSync`, cleared by the next `easeOffPolling`.
+    ///
+    /// The tick order is sleep → pull → ease off, so a pull that
+    /// actually brought something down quickened the beat and was
+    /// then immediately doubled back out of it by the ease-off at the
+    /// end of its own tick. The one moment the fast beat is most worth
+    /// paying for — the other device is mid-edit, right now — was the
+    /// one moment it did not get a full interval.
+    private var skipNextEaseOff = false
+
     /// Something happened — poll fast again.
-    func quickenSync() { pollInterval = Self.activePollInterval }
+    func quickenSync() {
+        pollInterval = Self.activePollInterval
+        skipNextEaseOff = true
+    }
 
     /// Media keeps its own slower beat. A progress-photo sync lists an R2
     /// bucket and a media migration uploads — both far heavier than a
@@ -924,6 +993,7 @@ final class AppState: ObservableObject {
     /// pulls it straight back down the moment anything actually happens.
     private func easeOffPolling() {
         guard isForeground else { return }
+        if skipNextEaseOff { skipNextEaseOff = false; return }
         pollInterval = min(pollInterval * 2, Self.backoffPollCeiling)
     }
 

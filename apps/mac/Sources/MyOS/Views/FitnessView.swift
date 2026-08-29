@@ -80,14 +80,19 @@ struct FitnessView: View {
             // First thing on the tab: the day's weight is the number every
             // other number here is computed from.
             WeightCard(day: state.todayKey).cardAccent(.green).knRise(1)
-            FitnessTodayView().knRise(2)
-            ActivityStepsCard().knRise(3)
+            // Directly under the dial that logs it: log the number, then
+            // read it back. The seven-chip strip in Fitness settings was
+            // the only history there was, and it was buried under a
+            // disclosure inside a card you had to know to open.
+            WeightHistoryCard().cardAccent(.green).knRise(2)
+            FitnessTodayView().knRise(3)
+            ActivityStepsCard().knRise(4)
             #if os(iOS)
-            BodyPhotosCard().knRise(4)
+            BodyPhotosCard().knRise(5)
             #else
-            ProgressPhotosCard().knRise(4)
+            ProgressPhotosCard().knRise(5)
             #endif
-            settingsDisclosure.knRise(5)
+            settingsDisclosure.knRise(6)
         }
     }
 
@@ -148,32 +153,78 @@ struct FitnessView: View {
                     }
                 }
                 StepGoalBar(steps: steps, goals: goals)
-                HStack(spacing: 10) {
-                    HStack(spacing: 6) {
-                        TextField("", text: $stepsInput,
-                                  prompt: Text("Set today's steps").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.callout.weight(.heavy)).monospacedDigit()
-                            .foregroundStyle(Palette.text).frame(width: 140)
-                            .focused($stepsFocused)
-                            .onSubmit(saveSteps)
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(stepsFocused ? Palette.action : Palette.border, lineWidth: 2))
-                    Button("Log", action: saveSteps).buttonStyle(.borderedProminent)
-                        .disabled(Int(stepsInput.trimmingCharacters(in: .whitespaces)) == nil)
-                    ForEach([1000, 2000], id: \.self) { d in
-                        Button { state.setTodaySteps(steps + d) } label: { Text("+\(d / 1000)k") }
-                            .buttonStyle(.bordered).tint(Palette.activity)
-                    }
-                    Spacer()
-                }
+                stepsLogRow(steps)
                 Text("\(target.formatted()) is the goal the streak counts. \(goals.stretch.formatted()) is the one worth chasing. Both are editable in your profile.")
                     .font(.caption2).foregroundStyle(Palette.faint)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// The steps field plus its three buttons.
+    ///
+    /// This row is why "the fitness settings are all messed up" on the
+    /// phone. It was one `HStack`: a 140pt fixed field, a Log button, two
+    /// quick-add buttons and a `Spacer` — about 380pt of content, laid
+    /// out inside roughly 300pt of usable width on an iPhone. SwiftUI
+    /// does not wrap an HStack; it compresses it. So the field shrank
+    /// under its own text, the buttons squeezed to their titles and
+    /// then past them, and "+1k" and "+2k" ended up sharing a few
+    /// points of width each. They were not misbehaving — they were
+    /// slivers, and a sliver is very hard to hit.
+    ///
+    /// Two lines on the phone, one on the Mac. Nothing has a fixed
+    /// width on iOS and every button is a full `KTapTarget` tall, so
+    /// they are hittable without aiming.
+    @ViewBuilder private func stepsLogRow(_ steps: Int) -> some View {
+        let field = HStack(spacing: 6) {
+            TextField("", text: $stepsInput,
+                      prompt: Text("Set today's steps").foregroundColor(Palette.faint))
+                .textFieldStyle(.plain).font(.callout.weight(.heavy)).monospacedDigit()
+                .foregroundStyle(Palette.text)
+                .focused($stepsFocused)
+                .onSubmit(saveSteps)
+                #if os(iOS)
+                // A step count is digits. The default keyboard made
+                // every entry a two-step trip through the numeric plane.
+                .keyboardType(.numberPad)
+                #else
+                .frame(width: 140)
+                #endif
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            .strokeBorder(stepsFocused ? Palette.action : Palette.border, lineWidth: 2))
+
+        let logButton = Button("Log", action: saveSteps)
+            .buttonStyle(.borderedProminent)
+            .disabled(Int(stepsInput.trimmingCharacters(in: .whitespaces)) == nil)
+
+        #if os(iOS)
+        VStack(spacing: 10) {
+            field
+            HStack(spacing: 8) {
+                logButton.frame(maxWidth: .infinity, minHeight: KTapTarget.min)
+                ForEach([1000, 2000], id: \.self) { d in
+                    Button { state.setTodaySteps(steps + d) } label: {
+                        Text("+\(d / 1000)k").frame(maxWidth: .infinity, minHeight: KTapTarget.min)
+                    }
+                    .buttonStyle(.bordered).tint(Palette.activity)
+                }
+            }
+        }
+        #else
+        HStack(spacing: 10) {
+            field
+            logButton
+            ForEach([1000, 2000], id: \.self) { d in
+                Button { state.setTodaySteps(steps + d) } label: { Text("+\(d / 1000)k") }
+                    .buttonStyle(.bordered).tint(Palette.activity)
+            }
+            Spacer()
+        }
+        #endif
     }
 
     private func saveSteps() {
@@ -191,29 +242,60 @@ struct FitnessView: View {
                     Spacer()
                     if let t = fp.targetWeightKg { Text("goal \(Fmt.trimKg(t)) kg").font(.caption2).foregroundStyle(Palette.faint) }
                 }
-                HStack(spacing: 12) {
-                    // Type today's weight directly — no tapping a stepper 40 times.
-                    HStack(spacing: 6) {
-                        TextField("", text: $weightInput, prompt: Text(today.weightKg.map { Fmt.trimKg($0) } ?? "Today's weight").foregroundColor(Palette.faint))
-                            .textFieldStyle(.plain).font(.title2.weight(.heavy)).monospacedDigit()
-                            .foregroundStyle(Palette.text).frame(width: 120)
-                            .focused($weightFocused)
-                            .onSubmit(saveWeight)
-                        Text("kg").font(.footnote).foregroundStyle(Palette.muted)
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                        .strokeBorder(weightFocused ? Palette.action : Palette.border, lineWidth: 2))
-                    Button("Log", action: saveWeight).buttonStyle(.borderedProminent)
-                        .disabled(Double(weightInput.trimmingCharacters(in: .whitespaces)) == nil)
-                    KStepButton(icon: "minus", accent: Palette.blue) { bumpWeight(-0.5) }
-                    KStepButton(icon: "plus", accent: Palette.blue) { bumpWeight(0.5) }
-                    Spacer()
-                }
+                weightLogRow
                 recentWeightsInline
             }
         }
+    }
+
+    /// Same story as `stepsLogRow` — a Mac-width row of fixed-size
+    /// controls that an iPhone could only squash. Stacked on the
+    /// phone, with the two half-kilo steppers given a real tap
+    /// target instead of the 32×30 they had.
+    @ViewBuilder private var weightLogRow: some View {
+        let field = HStack(spacing: 6) {
+            TextField("", text: $weightInput,
+                      prompt: Text(today.weightKg.map { Fmt.trimKg($0) } ?? "Today's weight")
+                        .foregroundColor(Palette.faint))
+                .textFieldStyle(.plain).font(.title2.weight(.heavy)).monospacedDigit()
+                .foregroundStyle(Palette.text)
+                .focused($weightFocused)
+                .onSubmit(saveWeight)
+                #if os(iOS)
+                // Decimals: 72.4 is a normal thing to type here.
+                .keyboardType(.decimalPad)
+                #else
+                .frame(width: 120)
+                #endif
+            Text("kg").font(.footnote).foregroundStyle(Palette.muted)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            .strokeBorder(weightFocused ? Palette.action : Palette.border, lineWidth: 2))
+
+        let logButton = Button("Log", action: saveWeight)
+            .buttonStyle(.borderedProminent)
+            .disabled(Double(weightInput.trimmingCharacters(in: .whitespaces)) == nil)
+
+        #if os(iOS)
+        VStack(spacing: 10) {
+            field
+            HStack(spacing: 8) {
+                logButton.frame(maxWidth: .infinity, minHeight: KTapTarget.min)
+                KStepButton(icon: "minus", accent: Palette.blue) { bumpWeight(-0.5) }
+                KStepButton(icon: "plus", accent: Palette.blue) { bumpWeight(0.5) }
+            }
+        }
+        #else
+        HStack(spacing: 12) {
+            field
+            logButton
+            KStepButton(icon: "minus", accent: Palette.blue) { bumpWeight(-0.5) }
+            KStepButton(icon: "plus", accent: Palette.blue) { bumpWeight(0.5) }
+            Spacer()
+        }
+        #endif
     }
 
     @State private var weightInput = ""

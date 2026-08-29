@@ -76,6 +76,8 @@ targets:
       # The weight dial — Today and Fitness both show it; the maths beside it
       # in Support/ comes along with the whole directory.
       - path: ../mac/Sources/MyOS/Views/WeightDial.swift
+      # The weight trend chart — Charts only, no AppKit.
+      - path: ../mac/Sources/MyOS/Views/WeightHistoryCard.swift
       - path: ../mac/Sources/MyOS/Views/StepStreak.swift
       - path: ../mac/Sources/MyOS/Views/StepCelebration.swift
       - path: ../mac/Sources/MyOS/Views/MacroPulseView.swift

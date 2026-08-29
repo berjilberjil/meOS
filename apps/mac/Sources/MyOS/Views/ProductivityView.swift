@@ -24,9 +24,35 @@ struct ProductivityView: View {
     @State private var calMonth = CalMath.cal.component(.month, from: Date())
     @State private var mode: ViewMode = .log
 
+    /// The three things this tab can show.
+    ///
+    /// Screen time used to sit above all of this as the tab's headline,
+    /// on the argument that where your hours actually went is the more
+    /// honest answer to "was today productive". True, and beside the
+    /// point: logging a video is a thing you *do* here several times a
+    /// day, and reading the screen-time breakdown is a thing you do
+    /// occasionally and deliberately. Putting the reading above the
+    /// doing meant scrolling past a full analytics panel every single
+    /// time to reach a paste field.
+    ///
+    /// So the log leads and screen time is one tap away, on the same
+    /// switch that already toggled log and calendar — one control for
+    /// the tab rather than a picker inside a headline inside a page.
     enum ViewMode: String, CaseIterable, Hashable {
-        case log, calendar
-        var label: String { self == .log ? "Log" : "Calendar" }
+        case log, calendar, screenTime
+
+        var label: String {
+            switch self {
+            case .log:        return "Log"
+            case .calendar:   return "Calendar"
+            case .screenTime: return "Screen time"
+            }
+        }
+
+        /// Whether this mode is showing the watch log in some form —
+        /// the paste field and the category filter belong to those two
+        /// and would be meaningless above the screen-time breakdown.
+        var isWatchLog: Bool { self != .screenTime }
     }
 
     private let cols = [GridItem(.adaptive(minimum: 210), spacing: 14)]
@@ -60,10 +86,15 @@ struct ProductivityView: View {
         }
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom) {
-            addCard
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(.bar)
+            // Only while the log is what's on screen. A "paste a YouTube
+            // link" bar pinned over a screen-time breakdown is an input
+            // for something you are not looking at.
+            if mode.isWatchLog {
+                addCard
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.bar)
+            }
         }
         .sheet(item: $selected) { item in WatchDetailSheet(item: item) }
         #else
@@ -78,31 +109,34 @@ struct ProductivityView: View {
             ScreenTitle(text: "Productivity").knRise(0)
             #endif
 
-            // Where the time actually went. This is the tab's headline now; the
-            // watch log keeps everything it had, underneath.
-            ActivityAnalyticsView().knRise(1)
-
-            Divider().overlay(Palette.divider).padding(.vertical, Space.sm)
+            // Always shown, unlike before: the picker was gated on there
+            // being at least one video, which also made screen time
+            // unreachable on a day nothing had been logged.
+            Picker("", selection: $mode) {
+                ForEach(ViewMode.allCases, id: \.self) { m in Text(m.label).tag(m) }
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            .knRise(1)
 
             HStack(spacing: Space.sm) {
-                SectionTitle(text: "Watch log")
+                SectionTitle(text: mode.isWatchLog ? "Watch log" : "Screen time")
                 Spacer()
-                Text("\(state.watch.count) videos").font(.myCaption).foregroundStyle(Palette.faint)
-                if !state.watch.isEmpty {
-                    Picker("", selection: $mode) { ForEach(ViewMode.allCases.map { ($0, $0.label) }, id: \.0) { opt in Text(opt.1).tag(opt.0) } }.pickerStyle(.segmented).labelsHidden()
-                        .frame(maxWidth: 220)
+                if mode.isWatchLog {
+                    Text("\(state.watch.count) videos")
+                        .font(.myCaption).foregroundStyle(Palette.faint)
                 }
             }
             .knRise(2)
 
             #if os(macOS)
-            addCard.knRise(2)
+            if mode.isWatchLog { addCard.knRise(2) }
             #endif
-            if !state.watch.isEmpty { filterRow.knRise(2) }
+            if mode.isWatchLog, !state.watch.isEmpty { filterRow.knRise(2) }
             Group {
                 switch mode {
-                case .log:      content
-                case .calendar: calendarView
+                case .log:        content
+                case .calendar:   calendarView
+                case .screenTime: ActivityAnalyticsView()
                 }
             }
             .id(mode)

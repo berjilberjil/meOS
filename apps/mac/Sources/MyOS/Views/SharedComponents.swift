@@ -639,6 +639,23 @@ struct KLabeledDateField: View {
 
 // MARK: - Steppers
 
+/// The smallest a control is allowed to be, per platform.
+///
+/// A pointer lands where you put it, so 30pt on the Mac is fine and
+/// bigger would only be clumsy. A fingertip does not: Apple's floor
+/// is 44pt and everything under it gets mis-hit, which on this app
+/// meant the −/+ steppers, the small icon buttons and anything else
+/// sized for the cursor. That is most of what "the buttons are all
+/// misbehaving" was — not wrong actions, just targets too small to
+/// land on, which feels identical from the outside.
+enum KTapTarget {
+    #if os(iOS)
+    static let min: CGFloat = 44
+    #else
+    static let min: CGFloat = 30
+    #endif
+}
+
 /// The −/value/+ button. There were three of these — 22×20 at radius xs, 34×28
 /// at radius sm, and a third inline — for the same job. This is the only one.
 struct KStepButton: View {
@@ -651,7 +668,10 @@ struct KStepButton: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.caption2.weight(.bold)).foregroundStyle(accent)
-                .frame(width: 32, height: 30)
+                // Was a flat 32×30 — under the 44pt floor on the phone,
+                // and the two weight steppers sat right next to each
+                // other, so a miss on one was often a hit on the other.
+                .frame(minWidth: KTapTarget.min, minHeight: KTapTarget.min)
                 .background(hover ? accent.opacity(0.14) : Palette.surfaceElevated,
                             in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))

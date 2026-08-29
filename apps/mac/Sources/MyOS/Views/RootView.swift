@@ -97,7 +97,20 @@ struct RootView: View {
             // the app is the thing you are looking at — that is the only time a
             // sync delay is something you can see, and the only time it is
             // worth spending requests on.
-            state.isForeground = (newPhase == .active)
+            //
+            // `.inactive` means different things on the two platforms, and
+            // reading it as "not in front of you" was half of why the Mac
+            // felt dead. A Mac window that is merely unfocused — behind a
+            // browser, on the other half of the screen — is `.inactive`
+            // while still being fully visible and watched, so it dropped to
+            // the 15s idle beat at exactly the moment Berjil was looking at
+            // it waiting for the phone's edit to land. Only a hidden or
+            // minimised window is really away, and that is `.background`.
+            //
+            // On iOS `.inactive` is a genuine passing state — the app
+            // switcher, Control Centre, the Face ID sheet — and lasts
+            // seconds, so treating it as foreground there costs nothing.
+            state.isForeground = (newPhase != .background)
 
             // Activity: get whatever this device recorded synced before it is
             // suspended. On the phone that is nothing — iOS cannot see other

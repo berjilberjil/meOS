@@ -2,13 +2,25 @@ import SwiftUI
 
 /// Calories + macros first — intake vs target.
 ///
-/// This is the one **filled** card in MyOS: a solid block of the app's own
-/// colour, whatever Berjil has set it to. It was orange for exactly one build
-/// and looked like a warning sitting in the middle of Today, which is the one
-/// thing orange is for. The card earns its weight from being the only filled
-/// one on the page, not from being a different hue to everything else.
-/// Everything inside inherits its ink from `CardLook`, so nothing here names a
-/// colour for text.
+/// This was the one **filled** card in MyOS — a solid block of the app's
+/// own colour — on the theory that the page's most important number
+/// should be the page's loudest object. In practice it was a slab of
+/// saturated green in the middle of a page of near-black cards, and it
+/// wrecked the balance of Today: your eye went to it and stayed, and
+/// every other card read as background to it. Berjil's words were that
+/// it was killing the aesthetics, which is the correct verdict.
+///
+/// It reads as a card now, with the accent kept as the rule down its
+/// leading edge and on the bars — the same treatment activity and events
+/// get. It is still first on the page, still the biggest type on it, and
+/// still the thing you see first; it just no longer shouts. Weight from
+/// position and scale, not from a wall of colour.
+///
+/// Ink is named explicitly again. On a filled card everything inherited
+/// legible-on-colour ink from `CardLook` and hierarchy was opacity; on a
+/// plain card that is wrong twice over — opacity on a dark surface goes
+/// muddy rather than quieter — so the levels are `Palette` roles, like
+/// every other card.
 ///
 /// The four macros are still told apart by their bars and labels rather than by
 /// four unrelated colours.
@@ -24,30 +36,32 @@ struct DayMacroHero: View {
         let goal = t?.goalCalories ?? Int(state.fitnessProfile.calorieTargetKcal ?? 0)
         let remain = goal > 0 ? max(0, goal - Int(eaten.calories.rounded())) : 0
         let frac = goal > 0 ? min(1, eaten.calories / Double(goal)) : 0
-        return Card(padding: 18, accent: .nutrition, look: .filled) {
+        return Card(padding: 18, accent: .nutrition, look: .accent) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("INTAKE")
                     .font(.caption.weight(.heavy)).tracking(0.8)
-                    .opacity(0.7)
+                    .foregroundStyle(Palette.muted)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(Int(eaten.calories.rounded()))")
                         .font(.largeTitle.weight(.bold))
                         .monospacedDigit()
+                        .foregroundStyle(Palette.text)
                     Text(goal > 0 ? "/ \(goal) kcal" : "kcal")
                         .font(.body.weight(.semibold))
-                        .opacity(0.75)
+                        .foregroundStyle(Palette.muted)
                     Spacer()
                     if goal > 0 {
                         Text("\(remain) left")
                             .font(.footnote.weight(.semibold))
-                            .opacity(0.65)
+                            .foregroundStyle(Palette.faint)
                     }
                 }
-                // On a filled card the bar is ink-on-colour: the track is the
-                // card showing through, the fill is the same ink as the type.
+                // The accent survives the card going plain — on the bars,
+                // where it is reading a value rather than decorating a
+                // surface, which is the job colour is allowed to do here.
                 ProgressView(value: frac)
                     .progressViewStyle(.linear)
-                    .tint(Accent.nutrition.ink)
+                    .tint(Accent.nutrition.tint)
                 // Four macros, one visual system. They are told apart by their
                 // labels and their bars, not by four unrelated colours.
                 HStack(spacing: Space.sm) {
@@ -60,23 +74,26 @@ struct DayMacroHero: View {
         }
     }
 
-    /// Inside a filled card, hierarchy is opacity rather than colour — there is
-    /// only one ink here and three weights of it.
+    /// Three levels, as palette roles. Opacity was the right tool on a
+    /// block of colour and is the wrong one on a dark card, where a
+    /// faded white goes grey-muddy instead of quietly receding.
     private func macro(_ label: String, _ have: Int, _ target: Int?) -> some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Text(label.uppercased())
                 .font(.myCaption).tracking(0.4)
-                .opacity(0.65)
+                .foregroundStyle(Palette.faint)
             if let target, target > 0 {
                 Text("\(have)")
                     .font(.body.weight(.bold)).monospacedDigit()
-                Text("/ \(target)g").font(.caption2).opacity(0.65)
+                    .foregroundStyle(Palette.text)
+                Text("/ \(target)g").font(.caption2).foregroundStyle(Palette.faint)
                 ProgressView(value: min(1, Double(have) / Double(target)))
                     .progressViewStyle(.linear)
-                    .tint(Accent.nutrition.ink)
+                    .tint(Accent.nutrition.tint)
             } else {
                 Text("\(have)g")
                     .font(.body.weight(.bold)).monospacedDigit()
+                    .foregroundStyle(Palette.text)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -323,10 +340,13 @@ struct WorkoutChecklistCard: View {
                 Button("Start the log over") { state.resetSession(date: date) }
             }
         } label: {
+            // The overflow menu on every meal and workout card, and one
+            // of the most-tapped controls on the Fitness tab. 28pt is a
+            // cursor target, not a finger one.
             Image(systemName: "ellipsis").font(.footnote.weight(.bold)).foregroundStyle(Palette.faint)
-                .frame(width: 28, height: 28).contentShape(Rectangle())
+                .frame(width: KTapTarget.min, height: KTapTarget.min).contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: KTapTarget.min)
     }
 
     // MARK: Body

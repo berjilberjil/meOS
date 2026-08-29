@@ -70,9 +70,19 @@
 	<string>So you can talk to Catrine instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Your speech is transcribed on this device and never uploaded.</string>
+	<!-- `fetch` is what lets iOS wake the app to read the pedometer and
+	     push today's steps, so the Mac is current without anybody having
+	     opened the phone first. See StepsBackgroundRefresh. -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<string>fetch</string>
+	</array>
+	<!-- Every identifier the app registers a BGTask handler for has to
+	     be listed here. A handler for an unlisted id throws at launch. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.berjil.myos.steps.refresh</string>
 	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>MyOS uses Face ID to unlock your life data.</string>

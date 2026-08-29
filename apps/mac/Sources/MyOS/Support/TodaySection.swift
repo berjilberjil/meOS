@@ -52,10 +52,12 @@ enum TodaySection: String, CaseIterable, Identifiable {
         case .focusNow:   return .activity
         case .activity:   return .green    // fitness
         case .weight:     return .green    // fitness
-        // Intake is the one *filled* card on Today — a solid block of the app's
-        // colour. Its weight comes from being the only filled card, not from
-        // being a different hue: orange there read as a warning, which is the
-        // one job orange has.
+        // Intake used to be the one *filled* card on Today — a solid
+        // block of the app's colour. It drowned the page: every other
+        // card read as background to it. It takes the same accent rule
+        // as the rest now, and gets its weight from position and type
+        // size instead. (Orange was tried here too and read as a
+        // warning, which is the one job orange has.)
         case .intake:     return .nutrition
         case .meals:      return .nutrition
         case .workout:    return .green    // fitness
