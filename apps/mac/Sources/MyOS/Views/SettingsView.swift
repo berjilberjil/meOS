@@ -36,6 +36,10 @@ struct SettingsView: View {
             MemoryCard().knRise(3)
             AIProvidersCard().knRise(3)
             ActivitySettingsCard().knRise(3)
+            // Above the red, deliberately: the bin is where data comes BACK
+            // from, and it is the first thing to reach for before anything on
+            // the two cards below it.
+            TrashView().knRise(4)
             // Both of these can lose you data. They are the only red on the page.
             securityCard.knRise(4)
             DataManagementCard().knRise(5)

@@ -85,6 +85,8 @@ targets:
       - path: ../mac/Sources/MyOS/Views/MacroMethodSheet.swift
       - path: ../mac/Sources/MyOS/Views/WeeklyReportCard.swift
       - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
+      # The recycle bin — one screen, both platforms.
+      - path: ../mac/Sources/MyOS/Views/TrashView.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift
       - path: ../mac/Sources/MyOS/Views/SettingsKit.swift
       - path: ../mac/Sources/MyOS/Views/SharedComponents.swift

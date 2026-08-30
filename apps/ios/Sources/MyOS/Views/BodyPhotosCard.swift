@@ -180,6 +180,7 @@ struct BodyPhotosCard: View {
 /// can never be a stray tap — nothing is ever "soft-deleted", the file (and
 /// its cloud copy) is only removed once you hold to confirm.
 private struct ProgressGallery: View {
+    @EnvironmentObject var state: AppState
     let photos: [ProgressPhoto]
     let start: ProgressPhoto
     let onClose: () -> Void
@@ -308,14 +309,17 @@ private struct ProgressGallery: View {
         // today's shot, so clearing out a run of old ones meant scrolling back
         // from the top of the library every single time.
         let index = live.firstIndex { $0.id == deletingId } ?? 0
-        ProgressPhotoStore.delete(deletingId)
+        // Into the bin, not off the disk — the cloud copy is what lets the Mac
+        // give this back too, so it stays until the entry expires.
+        if let photo = live.first(where: { $0.id == deletingId }) {
+            state.recycleProgressPhoto(photo)
+        }
         live = ProgressPhotoStore.list()
         if live.isEmpty {
             onClose()
         } else {
             page = live[min(index, live.count - 1)].id
         }
-        Task { await ProgressPhotoSync.delete(id: deletingId) }
     }
 }
 

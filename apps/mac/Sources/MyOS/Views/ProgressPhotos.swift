@@ -284,6 +284,7 @@ struct DiskImage: View {
 /// counterpart of the iPhone's full-screen gallery. Delete lives top-left
 /// behind a hold-to-confirm, so it can never be a stray click.
 private struct ProgressPhotoViewer: View {
+    @EnvironmentObject var state: AppState
     let start: ProgressPhoto
     let onClose: () -> Void
     let onChanged: () -> Void
@@ -390,8 +391,9 @@ private struct ProgressPhotoViewer: View {
 
     private func deleteCurrent() {
         guard let p = current else { return }
-        ProgressPhotoStore.delete(p)
-        Task { await ProgressPhotoSync.delete(id: p.id) }
+        // Into the bin, not off the disk. The cloud copy stays until the entry
+        // expires — see `AppState.recycleProgressPhoto`.
+        state.recycleProgressPhoto(p)
         live = ProgressPhotoStore.list()
         onChanged()
         if live.isEmpty {

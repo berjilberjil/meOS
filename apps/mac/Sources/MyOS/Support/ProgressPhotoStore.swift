@@ -87,6 +87,90 @@ enum ProgressPhotoStore {
 
     static func url(for id: String) -> URL { dir.appendingPathComponent("\(id).jpg") }
 
+    // MARK: - The bin
+
+    /// Where a recycled photo waits out its 30 days.
+    ///
+    /// A subdirectory rather than a deletion, because a body photo is the one
+    /// thing in MyOS that may only exist here — the cloud copy is a backup of
+    /// this file, not the other way round. `list()` never sees it: everything in
+    /// here still ends in `.jpg`, but `list()` only enumerates `dir` itself and
+    /// does not descend.
+    static var trashDir: URL {
+        let d = dir.appendingPathComponent(".trash", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    static func trashURL(for id: String) -> URL { trashDir.appendingPathComponent("\(id).jpg") }
+
+    /// Move a photo into the bin. The cloud copy is deliberately left alone —
+    /// deleting it here is what would make a restore impossible on the other
+    /// device, and it is also what `pull()` would take as "deleted elsewhere".
+    @discardableResult
+    static func recycle(_ id: String) -> Bool {
+        let from = url(for: id), to = trashURL(for: id)
+        guard FileManager.default.fileExists(atPath: from.path) else { return false }
+        try? FileManager.default.removeItem(at: to)          // a re-delete of the same stem
+        do { try FileManager.default.moveItem(at: from, to: to) } catch { return false }
+        markRecycled(id)
+        NotificationCenter.default.post(name: .progressPhotosDidChange, object: id)
+        return true
+    }
+
+    /// Put it back where it was.
+    @discardableResult
+    static func restoreFromTrash(_ id: String) -> Bool {
+        let from = trashURL(for: id), to = url(for: id)
+        unmarkRecycled(id)
+        guard FileManager.default.fileExists(atPath: from.path) else {
+            // Nothing local to move — the next `pull()` brings it down again,
+            // which is the whole reason the cloud copy was left in place.
+            NotificationCenter.default.post(name: .progressPhotosDidChange, object: id)
+            return false
+        }
+        try? FileManager.default.removeItem(at: to)
+        do { try FileManager.default.moveItem(at: from, to: to) } catch { return false }
+        NotificationCenter.default.post(name: .progressPhotosDidChange, object: id)
+        return true
+    }
+
+    /// The 30 days are up. Only the local file — the caller is responsible for
+    /// the cloud copy, because that half can fail and has to be retried.
+    static func purgeFromTrash(_ id: String) {
+        try? FileManager.default.removeItem(at: trashURL(for: id))
+        unmarkRecycled(id)
+    }
+
+    /// True when this device is holding `id` in its bin rather than showing it.
+    static func isRecycled(_ id: String) -> Bool { recycledIds.contains(id) }
+
+    /// Stems in the bin on this device.
+    ///
+    /// Tracked separately from `deletedIds`, which means "the cloud copy should
+    /// go". A recycled photo's cloud copy must stay — otherwise the bin could
+    /// not give it back — so without this set `pull()` would see the photo still
+    /// listed on the server, not present locally, and download it straight back
+    /// out of the bin on the next sync.
+    private static var recycledKey: String { "myos.progress.recycledStems.\(account)" }
+
+    static var recycledIds: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: recycledKey) ?? [])
+    }
+
+    static func markRecycled(_ id: String) {
+        var s = recycledIds
+        guard !s.contains(id) else { return }
+        s.insert(id)
+        UserDefaults.standard.set(Array(s), forKey: recycledKey)
+    }
+
+    static func unmarkRecycled(_ id: String) {
+        var s = recycledIds
+        guard s.remove(id) != nil else { return }
+        UserDefaults.standard.set(Array(s), forKey: recycledKey)
+    }
+
     static func has(_ date: String) -> Bool {
         list().contains { $0.date == date }
     }

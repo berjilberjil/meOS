@@ -26,7 +26,7 @@ struct SettingsView: View {
     private var textInset: CGFloat { tile + 14 + 12 }
 
     private enum Page: String, Identifiable {
-        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data, calendar, weekly, activity
+        case you, appearance, launch, reminders, assistant, memory, keys, reorder, data, calendar, weekly, activity, trash
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -42,6 +42,7 @@ struct SettingsView: View {
             case .data: return "Data & resets"
             case .weekly: return "Weekly report"
             case .activity: return "Activity tracking"
+            case .trash: return "Recycle bin"
             }
         }
         var icon: String {
@@ -58,6 +59,7 @@ struct SettingsView: View {
             case .data: return "trash.fill"
             case .weekly: return "chart.line.uptrend.xyaxis"
             case .activity: return "timer"
+            case .trash: return "arrow.uturn.backward.circle.fill"
             }
         }
         var tint: Color {
@@ -74,6 +76,9 @@ struct SettingsView: View {
             case .data: return Palette.warning
             case .weekly: return Palette.attention
             case .activity: return Palette.activity
+            // Not the warning colour the reset row wears. This is where things
+            // come back from, which is the opposite meaning.
+            case .trash: return Palette.action
             }
         }
     }
@@ -147,7 +152,10 @@ struct SettingsView: View {
                 section("Security") { lockRow }
             }
 
-            section("Data") { row(.data) }
+            section("Data") {
+                row(.trash); divider
+                row(.data)
+            }
 
             signOutButton
         }
@@ -269,6 +277,7 @@ struct SettingsView: View {
                             case .keys: AIProvidersCard(boxed: false)
                             case .weekly: WeeklyReportCard(boxed: false)
                             case .activity: ActivitySettingsCard()
+                            case .trash: TrashView(boxed: false)
                             case .data: DataManagementCard(boxed: false)
                             case .reorder: EmptyView()
                             }

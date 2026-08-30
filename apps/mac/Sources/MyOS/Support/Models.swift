@@ -854,6 +854,7 @@ struct AppStatePayload: Codable {
     var weekly: [WeeklyReport]?
     var activity: ActivityDoc?
     var appearance: AppearanceSettings?
+    var trash: [TrashEntry]?
 
     init() {}
 
@@ -879,6 +880,7 @@ struct AppStatePayload: Codable {
         case weekly         = "myos.weekly"
         case activity       = "myos.activity"
         case appearance     = "myos.appearance"
+        case trash          = "myos.trash"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -992,4 +994,5 @@ enum StateKey {
     static let weekly         = "myos.weekly"
     static let activity       = "myos.activity"
     static let appearance     = "myos.appearance"
+    static let trash          = "myos.trash"
 }

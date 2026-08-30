@@ -68,8 +68,12 @@ extension AppState {
     }
 
     func deleteProgram(_ id: String) {
+        guard let program = training.programs.first(where: { $0.id == id }) else { return }
         training.programs.removeAll { $0.id == id }
         if training.activeProgramId == id { training.activeProgramId = training.programs.first?.id }
+        recycle(.program, id: id, title: program.name,
+                subtitle: "\(program.days.count) day\(program.days.count == 1 ? "" : "s")",
+                payload: TrashEntry.encode(program))
         push(StateKey.training, training)
     }
 

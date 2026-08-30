@@ -55,6 +55,9 @@ final class AppState: ObservableObject {
     @Published var belongings = BelongingsState()
     /// Everything the camera has read, newest first. See `Support/ScanRecord.swift`.
     @Published var scans: [ScanRecord] = []
+    /// Everything deleted in the last 30 days, newest first. Synced like any
+    /// other module, so emptying the bin on the Mac empties it on the phone.
+    @Published var trash: [TrashEntry] = []
     /// The synced Task Mode switch. See `Support/TaskMode.swift`.
     @Published var taskMode = TaskModeState()
     /// Friday progress reports, newest first. See `Support/WeeklyReport.swift`.
@@ -288,6 +291,10 @@ final class AppState: ObservableObject {
             phase = .loggedIn
             applyPendingMealPlanClear()
             healFoldSnapshot()
+            // Let go of anything past its thirty days, and make this device's
+            // photo folder agree with a bin that may have been emptied on the
+            // other one while this was closed.
+            sweepTrash()
             startLiveSync()
             DietBridge.shared.start(state: self)
             await purgeRemovedFinanceKeys()
@@ -420,7 +427,7 @@ final class AppState: ObservableObject {
             (StateKey.watch, watch), (StateKey.belongings, belongings),
             (StateKey.memory, memory), (StateKey.scans, scans),
             (StateKey.taskMode, taskMode), (StateKey.weekly, weekly),
-            (StateKey.activity, activity)
+            (StateKey.activity, activity), (StateKey.trash, trash)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -561,6 +568,7 @@ final class AppState: ObservableObject {
         add("belongings", belongings)
         add("scans", scans); add("taskMode", taskMode); add("weekly", weekly)
         add("activity", activity)
+        add("trash", trash)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -807,6 +815,7 @@ final class AppState: ObservableObject {
         if let v = s.memory, v != memory, !blocked(StateKey.memory) { memory = v }
         if let v = s.belongings, v != belongings, !blocked(StateKey.belongings) { belongings = v }
         if let v = s.scans, v != scans, !blocked(StateKey.scans) { scans = v }
+        if let v = s.trash, v != trash, !blocked(StateKey.trash) { trash = v }
         // The mode is the one switch meant to reach across devices — a flip on
         // the Mac lands here on the phone within one poll.
         if let v = s.taskMode, v != taskMode, !blocked(StateKey.taskMode) { taskMode = v }
@@ -1135,6 +1144,15 @@ final class AppState: ObservableObject {
         c.year = y; c.month = m; c.day = d
         return c
     }
+    /// First non-empty line of a body, clipped — what a bin row shows under a
+    /// title so an untitled note is still recognisable.
+    static func previewLine(_ body: String, limit: Int = 60) -> String {
+        let line = body.split(whereSeparator: \.isNewline)
+            .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty } ?? ""
+        let text = line.trimmingCharacters(in: .whitespaces)
+        return text.count <= limit ? text : String(text.prefix(limit)) + "…"
+    }
+
     static func nowStamp() -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -1403,7 +1421,11 @@ final class AppState: ObservableObject {
         push(StateKey.nutrition, nutrition)
     }
     func deleteFood(_ id: String) {
+        guard let food = nutrition.customFoods.first(where: { $0.id == id }) else { return }
         nutrition.customFoods.removeAll { $0.id == id }
+        recycle(.food, id: id, title: food.name,
+                subtitle: food.servingLabel,
+                payload: TrashEntry.encode(food))
         push(StateKey.nutrition, nutrition)
     }
 
@@ -1571,7 +1593,9 @@ final class AppState: ObservableObject {
         push(StateKey.training, training)
     }
     func deleteExercise(_ id: String) {
+        guard let ex = training.customExercises.first(where: { $0.id == id }) else { return }
         training.customExercises.removeAll { $0.id == id }
+        recycle(.exercise, id: id, title: ex.name, payload: TrashEntry.encode(ex))
         push(StateKey.training, training)
     }
 
@@ -1824,7 +1848,14 @@ final class AppState: ObservableObject {
     }
     func note(_ id: String) -> Note? { notes.first { $0.id == id } }
     func deleteNote(_ id: String) {
+        guard let note = notes.first(where: { $0.id == id }) else { return }
         notes.removeAll { $0.id == id }
+        // A locked note keeps its secret in the bin too. Its whole point is that
+        // the body is not shown without an unlock, and a bin row is still a
+        // place the body would be shown.
+        recycle(.note, id: id, title: note.title,
+                subtitle: note.locked ? "Locked" : Self.previewLine(note.body),
+                payload: TrashEntry.encode(note))
         push(StateKey.notes, notes)
     }
     func togglePinNote(_ id: String) {
@@ -1900,6 +1931,12 @@ final class AppState: ObservableObject {
     func removeTodo(_ id: String) {
         guard let key = dayKeyOwning(todo: id) else { return }
         var d = days[key] ?? DayPlan()
+        // Captured before the removal, and with the day it belonged to — a
+        // to-do restored without its day has nowhere to go back to.
+        if let todo = d.todos.first(where: { $0.id == id }) {
+            recycle(.todo, id: id, title: todo.text, subtitle: Fmt.day(key),
+                    payload: TrashEntry.encode(todo), context: key)
+        }
         d.todos.removeAll { $0.id == id }
         saveDay(d, on: key)
     }
@@ -2110,6 +2147,11 @@ final class AppState: ObservableObject {
     }
 
     func deleteChat(_ id: String) {
+        if let thread = chat.threads.first(where: { $0.id == id }) {
+            recycle(.chatThread, id: id, title: thread.title,
+                    subtitle: "\(thread.messages.count) message\(thread.messages.count == 1 ? "" : "s")",
+                    payload: TrashEntry.encode(thread))
+        }
         chat.threads.removeAll { $0.id == id }
         if chat.activeID == id { chat.activeID = chat.threads.first?.id }
         if isHydrated { push(StateKey.chat, chat) }
@@ -2365,23 +2407,24 @@ final class AppState: ObservableObject {
         push(StateKey.events, events)
     }
     func deleteEvent(_ id: String) {
-        // Take the sealed objects with it. Scans have done this since they were
-        // built (`AppState+TaskScan.dropPhotos`); events never did, so deleting
-        // a memory dropped the only references to its photos and video and left
-        // them in the bucket with nothing left that could name them. On a stack
-        // required to stay inside a free tier, that grows forever.
-        let orphans = events.filter { $0.id == id }
-            .flatMap(\.media)
+        guard let event = events.first(where: { $0.id == id }) else { return }
+        // The sealed objects go with it — eventually. They used to be deleted
+        // here, in the same breath as the event, which was right when a delete
+        // was forever: a memory removed left its photos and video in the bucket
+        // with nothing able to name them again, and on a stack that has to stay
+        // inside a free tier that grows without bound.
+        //
+        // Now the bin holds the keys open for its thirty days and `release`
+        // deletes them on the way out, because an event restored without its
+        // pictures is not the memory that was deleted.
+        let keys = event.media
             .flatMap { [$0.r2Key, $0.posterKey] }
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         events.removeAll { $0.id == id }
-        // (`resetEverything` does the same sweep over every event.)
+        recycle(.event, id: id, title: event.title, subtitle: Fmt.day(event.date),
+                payload: TrashEntry.encode(event), mediaKeys: keys)
         push(StateKey.events, events)
-        guard !orphans.isEmpty else { return }
-        Task { [api] in
-            for key in orphans { try? await api.deleteEventMedia(id: key) }
-        }
     }
     /// Whole days from today to a date (negative = past). Timezone-stable.
     func daysUntil(_ dateKey: String) -> Int? {
@@ -2499,7 +2542,12 @@ final class AppState: ObservableObject {
         push(StateKey.watch, watch)
     }
     func deleteWatchItem(_ id: String) {
+        guard let item = watch.first(where: { $0.id == id }) else { return }
         watch.removeAll { $0.id == id }
+        recycle(.watch, id: id,
+                title: item.title.isEmpty ? item.url : item.title,
+                subtitle: item.channel,
+                payload: TrashEntry.encode(item))
         push(StateKey.watch, watch)
     }
     // MARK: - Belongings (stuff you own)
@@ -2514,7 +2562,11 @@ final class AppState: ObservableObject {
         push(StateKey.belongings, belongings)
     }
     func deleteBelonging(_ id: String) {
+        guard let item = belongings.items.first(where: { $0.id == id }) else { return }
         belongings.items.removeAll { $0.id == id }
+        recycle(.belonging, id: id, title: item.name,
+                subtitle: belongingCategory(for: item).name,
+                payload: TrashEntry.encode(item))
         push(StateKey.belongings, belongings)
     }
     func setSalaryPaise(_ v: Int) {
@@ -2619,6 +2671,12 @@ final class AppState: ObservableObject {
         chat = ChatState();            push(StateKey.chat, chat)
         memory = MemoryState();        push(StateKey.memory, memory)
         eraseActivity()
+        // "All data" has to mean the bin as well. Everything above was routed
+        // through the recycle bin the moment it gained one, so without this the
+        // one button that promises to remove everything would leave thirty days
+        // of it sitting in Settings — including the R2 objects the entries were
+        // holding open, which is the leak this whole button exists to avoid.
+        emptyTrash()
 
         // Take the sealed event media with it, exactly as `deleteEvent` does.
         // Clearing `events` alone left every photo and video in the bucket with

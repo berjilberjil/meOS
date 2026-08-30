@@ -130,7 +130,15 @@ enum ProgressPhotoSync {
 
         let localIds = Set(ProgressPhotoStore.list().map(\.id))
         let deleted = ProgressPhotoStore.deletedIds
-        for photo in remote where !localIds.contains(photo.id) && !deleted.contains(photo.id) {
+        // A photo in the bin is absent from `list()` but still present on the
+        // server — its cloud copy is deliberately kept so the bin can give it
+        // back. Without this it would be downloaded straight out of the bin on
+        // the very next sync, which is the one way a recycle bin can be worse
+        // than no recycle bin.
+        let recycled = ProgressPhotoStore.recycledIds
+        for photo in remote
+        where !localIds.contains(photo.id) && !deleted.contains(photo.id)
+              && !recycled.contains(photo.id) {
             guard ProgressPhotoStore.account == account else { return }
             guard let urlString = photo.url, let url = URL(string: urlString) else { continue }
             guard let (data, response) = try? await URLSession.shared.data(from: url),

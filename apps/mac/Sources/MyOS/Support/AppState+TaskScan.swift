@@ -65,8 +65,13 @@ extension AppState {
     func deleteScan(_ id: String) {
         guard let i = scans.firstIndex(where: { $0.id == id }) else { return }
         let gone = scans.remove(at: i)
+        // The photo is handed to the bin rather than dropped here — the same
+        // change events got. `release` calls `dropPhotos`' equivalent when the
+        // entry finally expires.
+        recycle(.scan, id: gone.id, title: gone.title, subtitle: Fmt.day(String(gone.at.prefix(10))),
+                payload: TrashEntry.encode(gone),
+                mediaKeys: ScanRecord.orphanedKeys([gone]))
         push(StateKey.scans, scans)
-        dropPhotos(ScanRecord.orphanedKeys([gone]))
     }
 
     func clearScans() {

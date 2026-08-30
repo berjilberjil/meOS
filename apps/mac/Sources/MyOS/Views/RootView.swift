@@ -125,6 +125,10 @@ struct RootView: View {
                     // waiting out a tick for something that changed while this
                     // device was away.
                     await state.syncNow()
+                    // After the pull, not before: a bin emptied on the other
+                    // device only exists here once the sync has landed, and the
+                    // day may also have rolled over while this was away.
+                    state.sweepTrash()
                     // Friday 6pm: the first time the app is open and unlocked
                     // after it, the week gets read back.
                     await state.generateWeeklyReportIfDue()
