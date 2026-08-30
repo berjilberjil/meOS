@@ -64,6 +64,19 @@ cd apps/mac && xcodebuild test
 ```
 
 ## Conventions
+
+- **Deleting is not destroying.** Every user-facing delete captures the object
+  into the recycle bin (`Support/Trash.swift`, `AppState+Trash.swift`) and
+  releases its R2 objects only when the entry is purged 30 days later. A new
+  `delete*` that skips `recycle(...)` is a bug — and one that deletes media in
+  the same breath makes restore a lie.
+- **Notification ids are namespaced.** `myos.reminder.*` (daily) and
+  `myos.event.*` (events) each clear only their own prefix. Never call
+  `removeAllPendingNotificationRequests()` — it silently cancels the other
+  scheduler's work. iOS caps pending local notifications at 64.
+- **Event occurrences are projected, never stored** (`EventRecurrence`). A
+  yearly event is one row with a rule, and the day-of-month is always clamped
+  from the anchor so a 29 Feb birthday returns on the next leap year.
 - **Privacy:** single owner. Public signup disabled. RLS `user_id = auth.uid()` on every table. Private media buckets, signed URLs only. Add RLS + a policy test for every new table.
 - **Migrations:** every new table gets its own migration file in `supabase/migrations/`. Always include RLS policies.
 - **TDD**, frequent commits, conventional-commit messages.
@@ -81,5 +94,7 @@ cd apps/mac && xcodebuild test
 9. ✅ **Native iOS app** (SwiftUI, core modules)
 10. ✅ **Fold integration** (banking dashboard via MCP)
 11. ✅ **Diet MCP** (meal planning via stdio)
+12. ✅ **Recycle bin** (`myos.trash`, 30-day retention, Settings → Recycle bin)
+13. ✅ **Recurring events + reminders** (repeat rules, pre-event notifications)
 
 Next work = polish/iterate or extend a module; follow the same brainstorm → spec → plan → build cycle.
