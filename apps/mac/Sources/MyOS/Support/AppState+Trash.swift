@@ -1,5 +1,8 @@
 import Foundation
 
+// (Event reminder scheduling lives at the bottom of this file — it shares the
+// same "runs on hydrate and on every foreground" cadence as the trash sweep.)
+
 /// The recycle bin: capture on the way out, restore on the way back, and a
 /// sweep that lets go on the thirtieth day.
 ///
@@ -84,6 +87,8 @@ extension AppState {
             guard let v = e.decoded(EventItem.self) else { return false }
             if !events.contains(where: { $0.id == v.id }) { events.append(v) }
             push(StateKey.events, events)
+            // Its reminders come back with it.
+            rescheduleEventReminders()
 
         case .belonging:
             guard let v = e.decoded(BelongingItem.self) else { return false }

@@ -87,6 +87,9 @@ targets:
       - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
       # The recycle bin — one screen, both platforms.
       - path: ../mac/Sources/MyOS/Views/TrashView.swift
+      # Time / repeat / reminders — the same rule editor on both platforms, so a
+      # yearly event means the same thing wherever it was created.
+      - path: ../mac/Sources/MyOS/Views/EventScheduleEditor.swift
       - path: ../mac/Sources/MyOS/Views/Icons.swift
       - path: ../mac/Sources/MyOS/Views/SettingsKit.swift
       - path: ../mac/Sources/MyOS/Views/SharedComponents.swift

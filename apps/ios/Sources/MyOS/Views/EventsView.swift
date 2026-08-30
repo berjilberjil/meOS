@@ -21,9 +21,25 @@ struct EventsView: View {
     @State private var viewingMedia: EventMedia?
     @State private var viewingAll: [EventMedia] = []
 
-    private var sorted: [EventItem] { state.events.sorted { $0.date > $1.date } }
-    private var upcoming: [EventItem] { sorted.filter { $0.date >= state.todayKey } }
-    private var past: [EventItem] { sorted.filter { $0.date < state.todayKey } }
+    /// The day an event next happens, or nil if it is behind us for good.
+    ///
+    /// A repeating event always has a next one, which is why the split below is
+    /// on this rather than on `date`: a birthday anchored in 1965 is not a past
+    /// memory, it is the thing coming up in March.
+    private func nextDay(_ e: EventItem) -> String? {
+        EventRecurrence.next(e, onOrAfter: state.todayKey)
+    }
+
+    /// Soonest first, each paired with the occurrence it is showing.
+    private var upcoming: [(event: EventItem, day: String)] {
+        state.events.compactMap { e in nextDay(e).map { (event: e, day: $0) } }
+            .sorted { $0.day == $1.day ? $0.event.title < $1.event.title : $0.day < $1.day }
+    }
+
+    /// Only things that will not come round again.
+    private var past: [EventItem] {
+        state.events.filter { nextDay($0) == nil }.sorted { $0.date > $1.date }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
@@ -37,8 +53,12 @@ struct EventsView: View {
                 }
                 .onTapGesture(count: 2) { editTarget = EditTarget(nil) }
             } else {
-                if !upcoming.isEmpty { section("Upcoming", Array(upcoming.reversed())) }
-                if !past.isEmpty { section("Past", past) }
+                if !upcoming.isEmpty {
+                    section("Upcoming", upcoming.map { ($0.event, $0.day) })
+                }
+                if !past.isEmpty {
+                    section("Past", past.map { ($0, $0.date) })
+                }
             }
         }
         .sheet(item: $editTarget) { target in EventEditorSheet(event: target.event) }
@@ -63,14 +83,14 @@ struct EventsView: View {
         editTarget = EditTarget(nil)
     }
 
-    private func section(_ title: String, _ items: [EventItem]) -> some View {
+    private func section(_ title: String, _ items: [(EventItem, String)]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionTitle(text: title)
-            ForEach(items) { eventRow($0) }
+            ForEach(items, id: \.0.id) { pair in eventRow(pair.0, on: pair.1) }
         }
     }
 
-    private func eventRow(_ e: EventItem) -> some View {
+    private func eventRow(_ e: EventItem, on day: String) -> some View {
         Button { editTarget = EditTarget(e) } label: {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
@@ -82,7 +102,27 @@ struct EventsView: View {
                             .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
                         if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.attention) }
                         Spacer()
-                        Text(Fmt.day(e.date)).font(.caption2).foregroundStyle(Palette.faint)
+                        // The day it NEXT happens, not the day it was anchored.
+                        // A birthday row reading "12 Mar 1965" is a row about
+                        // the wrong thing.
+                        Text(Fmt.day(day)).font(.caption2).foregroundStyle(Palette.faint)
+                    }
+                    if e.recurrence.repeats || !e.reminders.isEmpty {
+                        HStack(spacing: 6) {
+                            if e.recurrence.repeats {
+                                chip(EventRecurrence.shortDescribe(e.recurrence),
+                                     "repeat", Palette.action)
+                            }
+                            if let n = EventRecurrence.ordinal(e, on: day) {
+                                chip(EventRecurrence.ordinalLabel(n), "gift", Palette.attention)
+                            }
+                            if let soonest = e.reminders.max(by: { $0.days < $1.days }) {
+                                chip(e.reminders.count == 1
+                                     ? soonest.shortLabel
+                                     : "\(soonest.shortLabel) +\(e.reminders.count - 1)",
+                                     "bell.fill", Palette.blue)
+                            }
+                        }
                     }
                     if !e.media.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -107,6 +147,16 @@ struct EventsView: View {
         .contextMenu {
             Button(role: .destructive) { pendingDelete = e } label: { Label("Delete", systemImage: "trash") }
         }
+    }
+
+    private func chip(_ text: String, _ symbol: String, _ tint: Color) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: symbol).font(.system(size: 8, weight: .bold))
+            Text(text).font(.caption2.weight(.semibold))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 7).padding(.vertical, 3)
+        .background(tint.opacity(0.14), in: Capsule())
     }
 
     private func thumb(_ m: EventMedia) -> some View {
@@ -152,6 +202,9 @@ private struct EventEditorSheet: View {
     /// that one rather than every tag the event has.
     @State private var originalTagID = ""
     @State private var special = false
+    @State private var time: String?
+    @State private var recurrence: Recurrence = .none
+    @State private var reminders: [ReminderLead] = []
     @State private var media: [EventMedia] = []
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var loaded = false
@@ -168,6 +221,11 @@ private struct EventEditorSheet: View {
                         DatePicker("", selection: $date, displayedComponents: .date)
                             .labelsHidden().tint(Palette.action)
                     }
+
+                    // Straight after the date, because "when" is one question
+                    // and this is the rest of the answer to it.
+                    EventScheduleEditor(time: $time, recurrence: $recurrence,
+                                        reminders: $reminders)
 
                     VStack(alignment: .leading, spacing: 6) {
                         KFieldLabel(text: "Tag")
@@ -238,7 +296,7 @@ private struct EventEditorSheet: View {
                         }
                         .holdToDelete(isPresented: $showDelete,
                                       title: "Delete this event?",
-                                      message: "This can't be undone.") {
+                                      message: "It goes to the recycle bin for \(TrashRetention.days) days.") {
                             if let e = event { state.deleteEvent(e.id) }
                             dismiss()
                         }
@@ -251,6 +309,7 @@ private struct EventEditorSheet: View {
                 loaded = true
                 if let e = event {
                     title = e.title; note = e.note; special = e.special; media = e.media
+                    time = e.time; recurrence = e.recurrence; reminders = e.reminders
                     tagID = e.tagIDs.first ?? ""
                     originalTagID = tagID
                     if let d = AppState.date(fromKey: e.date) { date = d }
@@ -308,9 +367,11 @@ private struct EventEditorSheet: View {
         let t = title.trimmingCharacters(in: .whitespaces)
         if var e = event {
             e.title = t; e.date = key; e.note = note; e.tagIDs = tagIDs; e.special = special; e.media = media
+            e.time = time; e.recurrence = recurrence; e.reminders = reminders
             state.updateEvent(e)
         } else {
-            state.addEvent(date: key, title: t, tagIDs: tagIDs, note: note, special: special, media: media)
+            state.addEvent(date: key, title: t, tagIDs: tagIDs, note: note, special: special,
+                           media: media, time: time, recurrence: recurrence, reminders: reminders)
         }
         dismiss()
     }

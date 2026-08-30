@@ -295,6 +295,7 @@ final class AppState: ObservableObject {
             // photo folder agree with a bin that may have been emptied on the
             // other one while this was closed.
             sweepTrash()
+            rescheduleEventReminders()
             startLiveSync()
             DietBridge.shared.start(state: self)
             await purgeRemovedFinanceKeys()
@@ -2393,18 +2394,24 @@ final class AppState: ObservableObject {
     }
 
     func addEvent(date: String, title: String, tagIDs: [String] = [], note: String = "",
-                  special: Bool = false, media: [EventMedia] = []) {
+                  special: Bool = false, media: [EventMedia] = [],
+                  time: String? = nil, recurrence: Recurrence = .none,
+                  reminders: [ReminderLead] = []) {
         let t = title.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty, !date.isEmpty else { return }
         let tags = tagIDs.isEmpty ? [EventVoice.tagID(forTitle: t)] : tagIDs
-        events.append(EventItem(date: date, title: t, tagIDs: tags, note: note, media: media, special: special))
+        events.append(EventItem(date: date, title: t, tagIDs: tags, note: note, media: media,
+                                special: special, time: time,
+                                recurrence: recurrence, reminders: reminders))
         push(StateKey.events, events)
+        rescheduleEventReminders()
     }
     func updateEvent(_ e: EventItem) {
         guard let i = events.firstIndex(where: { $0.id == e.id }) else { return }
         var ev = e; ev.title = ev.title.trimmingCharacters(in: .whitespaces)
         events[i] = ev
         push(StateKey.events, events)
+        rescheduleEventReminders()
     }
     func deleteEvent(_ id: String) {
         guard let event = events.first(where: { $0.id == id }) else { return }
@@ -2425,6 +2432,8 @@ final class AppState: ObservableObject {
         recycle(.event, id: id, title: event.title, subtitle: Fmt.day(event.date),
                 payload: TrashEntry.encode(event), mediaKeys: keys)
         push(StateKey.events, events)
+        // A reminder for something that no longer exists still rings.
+        rescheduleEventReminders()
     }
     /// Whole days from today to a date (negative = past). Timezone-stable.
     func daysUntil(_ dateKey: String) -> Int? {

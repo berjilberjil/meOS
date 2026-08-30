@@ -69,9 +69,19 @@ final class NotificationsTests: XCTestCase {
     /// The raw values travel in `userInfo`, so they are a wire format: a
     /// notification scheduled by yesterday's build is still sitting in the
     /// system waiting to fire against today's.
+    ///
+    /// Adding a name is safe — an old build simply cannot parse it and drops the
+    /// route, which is the same as the no-route behaviour it already had.
+    /// Renaming or removing one strands every notification already scheduled
+    /// under it, which is what this pins.
     func testRouteNamesAreTheWireFormatAndDoNotChange() {
-        XCTAssertEqual(Set(NotifRoute.allCases.map(\.rawValue)),
-                       ["today", "weight", "breakfast", "lunch", "dinner", "workout", "steps", "weekly"])
+        let established: Set<String> = ["today", "weight", "breakfast", "lunch",
+                                        "dinner", "workout", "steps", "weekly"]
+        let current = Set(NotifRoute.allCases.map(\.rawValue))
+        XCTAssertTrue(established.isSubset(of: current),
+                      "missing: \(established.subtracting(current)) — those are already in flight")
+        // And the one added since, so this keeps being an exact list.
+        XCTAssertEqual(current, established.union(["events"]))
     }
 
     /// The two notifications that already set a route by hand have to keep

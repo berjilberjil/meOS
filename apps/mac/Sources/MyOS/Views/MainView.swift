@@ -91,6 +91,11 @@ struct MainView: View {
         .animation(.knTheme, value: themeStore.theme.id)
         .tint(Palette.accent)
         .onChange(of: tab) { _, _ in Haptics.selection() }
+        // A tapped notification parks its destination in `UISignals`; the Mac
+        // had no one taking it, so every banner just brought the window forward
+        // and left you where you were.
+        .onAppear { consumeRoute() }
+        .onChange(of: signals.pendingRoute) { _, _ in consumeRoute() }
         // Tapped the Friday report notification.
         .onAppear { consumeWeeklySignal() }
         .onChange(of: signals.openWeeklyReport) { _, on in if on { consumeWeeklySignal() } }
@@ -103,6 +108,22 @@ struct MainView: View {
         guard signals.openWeeklyReport else { return }
         signals.openWeeklyReport = false
         switchTo(.settings)
+    }
+
+    /// Take a tapped notification's destination and go there.
+    ///
+    /// Only the tabs the Mac actually has. A meal reminder on the Mac opens
+    /// Today, which is where its editor lives.
+    private func consumeRoute() {
+        guard let route = signals.pendingRoute else { return }
+        signals.pendingRoute = nil
+        switch route {
+        case .events:                                   switchTo(.events)
+        case .workout:                                  switchTo(.fitness)
+        case .weekly:                                   switchTo(.settings)
+        case .today, .weight, .steps,
+             .breakfast, .lunch, .dinner:               switchTo(.today)
+        }
     }
 
     private func switchTo(_ t: NavTab) {

@@ -723,6 +723,115 @@ struct EventMedia: Codable, Identifiable, Hashable {
     }
 }
 
+/// How an event repeats.
+///
+/// A birthday is not an event on one date — it is the same event every year, and
+/// logging thirty-one of them by hand is how you end up with none of them logged.
+struct Recurrence: Codable, Hashable, Sendable {
+    enum Unit: String, Codable, Hashable, CaseIterable, Identifiable, Sendable {
+        case none, daily, weekly, monthly, yearly
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .none:    return "Never"
+            case .daily:   return "Daily"
+            case .weekly:  return "Weekly"
+            case .monthly: return "Monthly"
+            case .yearly:  return "Yearly"
+            }
+        }
+        /// What one step is called when there is more than one of them.
+        var plural: String {
+            switch self {
+            case .none:    return "never"
+            case .daily:   return "days"
+            case .weekly:  return "weeks"
+            case .monthly: return "months"
+            case .yearly:  return "years"
+            }
+        }
+    }
+
+    var unit: Unit
+    /// Every N units. Clamped to at least 1 — an interval of zero is an infinite
+    /// loop wearing a data model.
+    var interval: Int
+    /// Last day it may occur, inclusive. `nil` means it goes on forever, which
+    /// is the right default for a birthday.
+    var until: String?
+
+    init(unit: Unit = .none, interval: Int = 1, until: String? = nil) {
+        self.unit = unit
+        self.interval = max(1, interval)
+        self.until = until
+    }
+
+    static let none = Recurrence()
+    var repeats: Bool { unit != .none }
+
+    enum CodingKeys: String, CodingKey { case unit, interval, until }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        unit     = (try? c.decode(Unit.self, forKey: .unit)) ?? .none
+        interval = max(1, (try? c.decode(Int.self, forKey: .interval)) ?? 1)
+        until    = try c.decodeIfPresent(String.self, forKey: .until)
+    }
+}
+
+/// How far ahead of an event its reminder lands.
+///
+/// A fixed set rather than a free number of days: these are the ones that mean
+/// something ("a month out" is when you can still book a flight, "the day
+/// before" is when you can still buy a present), and a picker of seven is a
+/// choice while a stepper of 365 is a chore.
+enum ReminderLead: String, Codable, CaseIterable, Identifiable, Hashable, Sendable {
+    case sameDay, oneDay, twoDays, threeDays, oneWeek, twoWeeks, thirtyDays
+
+    var id: String { rawValue }
+
+    /// Days before the event.
+    var days: Int {
+        switch self {
+        case .sameDay:    return 0
+        case .oneDay:     return 1
+        case .twoDays:    return 2
+        case .threeDays:  return 3
+        case .oneWeek:    return 7
+        case .twoWeeks:   return 14
+        case .thirtyDays: return 30
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .sameDay:    return "On the day"
+        case .oneDay:     return "1 day before"
+        case .twoDays:    return "2 days before"
+        case .threeDays:  return "3 days before"
+        case .oneWeek:    return "1 week before"
+        case .twoWeeks:   return "2 weeks before"
+        case .thirtyDays: return "30 days before"
+        }
+    }
+
+    /// Short form, for a chip on an event row.
+    var shortLabel: String {
+        switch self {
+        case .sameDay:    return "day of"
+        case .oneDay:     return "1d"
+        case .twoDays:    return "2d"
+        case .threeDays:  return "3d"
+        case .oneWeek:    return "1w"
+        case .twoWeeks:   return "2w"
+        case .thirtyDays: return "30d"
+        }
+    }
+
+    /// Soonest first, which is also the order the picker shows them in.
+    static var ordered: [ReminderLead] { allCases.sorted { $0.days < $1.days } }
+}
+
 /// One logged life event — a memory. Past, present, or future. Carries multiple tags and
 /// photo/video media. Sorted by `date`.
 struct EventItem: Codable, Identifiable, Hashable {
@@ -733,19 +842,35 @@ struct EventItem: Codable, Identifiable, Hashable {
     var note: String
     var media: [EventMedia]
     var special: Bool           // the big ones (a wedding, a lifetime trip) — highlighted
+    /// `HH:mm`. `nil` is an all-day event, which most memories are — a birthday
+    /// has a date, not a time. Set it and reminders count back from that moment
+    /// rather than from a default morning.
+    var time: String?
+    /// How this repeats. `.none` for the one-off memories the tab started as.
+    var recurrence: Recurrence
+    /// Which reminders to fire before each occurrence. Empty means silent.
+    var reminders: [ReminderLead]
     // Legacy fields — kept so pre-tag events still decode and migrate. Not used by new UI.
     var category: EventCategory
     var done: Bool
 
     init(id: String = UUID().uuidString.lowercased(), date: String, title: String,
          tagIDs: [String] = [], note: String = "", media: [EventMedia] = [],
-         special: Bool = false, category: EventCategory = .personal, done: Bool = false) {
+         special: Bool = false, time: String? = nil,
+         recurrence: Recurrence = .none, reminders: [ReminderLead] = [],
+         category: EventCategory = .personal, done: Bool = false) {
         self.id = id; self.date = date; self.title = title
         self.tagIDs = tagIDs; self.note = note; self.media = media
-        self.special = special; self.category = category; self.done = done
+        self.special = special; self.time = time
+        self.recurrence = recurrence; self.reminders = reminders
+        self.category = category; self.done = done
     }
 
-    enum CodingKeys: String, CodingKey { case id, date, title, tagIDs, note, media, special, category, done }
+    enum CodingKeys: String, CodingKey {
+        case id, date, title, tagIDs, note, media, special
+        case time, recurrence, reminders
+        case category, done
+    }
 
     // Lenient + migrating: an event saved before a field existed still loads, and a
     // pre-tag event (no `tagIDs`, has `category`) maps its category → the built-in tag id.
@@ -757,6 +882,11 @@ struct EventItem: Codable, Identifiable, Hashable {
         note     = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         media    = (try? c.decodeIfPresent([EventMedia].self, forKey: .media)) ?? []
         special  = try c.decodeIfPresent(Bool.self, forKey: .special) ?? false
+        // Every event written before this existed is an all-day one-off with no
+        // reminders, which is exactly what these defaults say.
+        time       = try c.decodeIfPresent(String.self, forKey: .time)
+        recurrence = (try? c.decode(Recurrence.self, forKey: .recurrence)) ?? .none
+        reminders  = (try? c.decodeIfPresent([ReminderLead].self, forKey: .reminders)) ?? []
         category = (try? c.decode(EventCategory.self, forKey: .category)) ?? .personal
         done     = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
         if c.contains(.tagIDs), let t = try? c.decode([String].self, forKey: .tagIDs) {

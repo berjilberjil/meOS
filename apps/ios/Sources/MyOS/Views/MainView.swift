@@ -15,6 +15,8 @@ struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: NavTab = PrefsStore.shared.resolveOpeningTab(allowed: NavTab.iosTabs)
     @State private var showSettings = false
+    /// Drives the programmatic push to Journal/Events from a notification.
+    @State private var showJournal = false
     @ObservedObject private var signals = UISignals.shared
 
     private var selection: Binding<NavTab> {
@@ -81,6 +83,13 @@ struct MainView: View {
                 NavigationStack {
                     NotesView()
                         .chrome(NavTab.notes)
+                        // The same destination the toolbar link pushes, reachable
+                        // without a tap — a tapped event reminder has to be able
+                        // to open the screen it is about.
+                        .navigationDestination(isPresented: $showJournal) {
+                            screen { JournalView() }
+                                .pushedChrome(NavTab.journal)
+                        }
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink {
@@ -180,6 +189,13 @@ struct MainView: View {
         case .weekly:
             signals.openWeeklyReport = true
             showSettings = true
+        case .events:
+            // Events is not a tab of its own here — it is the first segment of
+            // the Journal screen, which is pushed from Notes. Landing on Notes
+            // and leaving you to find it is exactly the half-journey the comment
+            // above warns about, so the push is programmatic.
+            select(.notes)
+            showJournal = true
         }
     }
 

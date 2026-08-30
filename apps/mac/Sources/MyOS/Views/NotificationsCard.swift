@@ -45,8 +45,59 @@ struct NotificationsCard: View {
                         reminderRow(r)
                     }
                 }
+
+                SettingsGroup(title: "Events",
+                              footer: "Set which reminders an event gets when you create it — 30 days before, the day before, on the day.") {
+                    eventSoundRow
+                }
             }
         }
+    }
+
+    /// Events share one voice rather than picking a sound each.
+    ///
+    /// The five daily reminders each get their own because they are five fixed
+    /// things you learn to tell apart by ear. Events are one kind of thing that
+    /// happens to be many, so a picker per event would be a lot of screen spent
+    /// on a decision made once.
+    private var eventSoundRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Event reminders").font(.callout.weight(.semibold))
+                    .foregroundStyle(Palette.text)
+                Text("Birthdays, anniversaries, anything with a date.")
+                    .font(.caption).foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Menu {
+                ForEach(ReminderSound.available) { choice in
+                    Button {
+                        store.eventSound = choice
+                        ReminderSoundPreview.play(choice)
+                    } label: {
+                        if choice == store.eventSound {
+                            Label(choice.label, systemImage: "checkmark")
+                        } else {
+                            Text(choice.label)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: store.eventSound == .silent
+                          ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .font(.caption2)
+                    Text(store.eventSound.label).font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(Palette.muted)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("Notification sound for event reminders")
+        }
+        .padding(.horizontal, SettingsMetrics.rowPadH)
+        .padding(.vertical, 11)
     }
 
     private func reminderRow(_ r: Reminder) -> some View {

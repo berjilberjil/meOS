@@ -79,7 +79,7 @@ enum ReminderSound: String, Codable, CaseIterable, Identifiable, Hashable {
 /// sends now names its destination, and the raw values are what travel in
 /// `userInfo` — so they are a wire format and must not be renamed lightly.
 enum NotifRoute: String, Codable, Hashable, CaseIterable {
-    case today, weight, breakfast, lunch, dinner, workout, steps, weekly
+    case today, weight, breakfast, lunch, dinner, workout, steps, weekly, events
 
     /// Where each of the five daily reminders goes.
     ///
@@ -183,9 +183,18 @@ final class ReminderStore: ObservableObject {
     private let kEnabled = "myos.reminders.enabled"
     private let kList = "myos.reminders.list"
 
+    private let kEventSound = "myos.reminders.eventSound"
+
     @Published var enabled: Bool { didSet { persist(); Task { await reschedule() } } }
     @Published var reminders: [Reminder] { didSet { persist(); Task { await reschedule() } } }
     @Published var authorized = false
+    /// One voice for every event reminder.
+    ///
+    /// Per-event would mean a sound picker inside the event editor, which is a
+    /// lot of screen for a choice you would make once. The five daily reminders
+    /// each get their own because they are five *fixed* things you learn to tell
+    /// apart by ear; events are one kind of thing that happens to be many.
+    @Published var eventSound: ReminderSound { didSet { persist() } }
 
     private init() {
         enabled = UserDefaults.standard.object(forKey: kEnabled) as? Bool ?? false
@@ -195,6 +204,8 @@ final class ReminderStore: ObservableObject {
         } else {
             reminders = ReminderDefaults.all()
         }
+        eventSound = ReminderSound(rawValue: UserDefaults.standard.string(forKey: kEventSound) ?? "")
+            ?? .standard
     }
 
     /// Ask for notification permission; on grant, enable + schedule.
@@ -232,10 +243,23 @@ final class ReminderStore: ObservableObject {
         if enabled && authorized { await reschedule() }
     }
 
-    /// Replace all pending reminder notifications with the current enabled set.
+    /// Every daily reminder id starts with this.
+    static let idPrefix = "myos.reminder."
+
+    /// Replace all pending *daily* reminder notifications with the current
+    /// enabled set.
+    ///
+    /// Targeted, not `removeAllPendingNotificationRequests()`. That took out
+    /// every pending notification the app had, which was harmless while these
+    /// five were the only scheduled ones — and became a silent bug the moment
+    /// events could schedule their own: nudging lunch by a minute would have
+    /// cancelled every birthday reminder in the app, and nothing would have
+    /// said so. Each scheduler now owns its own id prefix and removes only that.
     func reschedule() async {
         let center = UNUserNotificationCenter.current()
-        center.removeAllPendingNotificationRequests()
+        let pending = await center.pendingNotificationRequests()
+        let ours = pending.map(\.identifier).filter { $0.hasPrefix(Self.idPrefix) }
+        if !ours.isEmpty { center.removePendingNotificationRequests(withIdentifiers: ours) }
         guard enabled else { return }
         for r in reminders where r.enabled {
             let content = UNMutableNotificationContent()
@@ -247,7 +271,7 @@ final class ReminderStore: ObservableObject {
             content.userInfo = ["route": NotifRoute.forReminder(r.id).rawValue]
             var comps = DateComponents(); comps.hour = r.hour; comps.minute = r.minute
             let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-            let req = UNNotificationRequest(identifier: "myos.reminder.\(r.id)", content: content, trigger: trigger)
+            let req = UNNotificationRequest(identifier: "\(Self.idPrefix)\(r.id)", content: content, trigger: trigger)
             try? await center.add(req)
         }
     }
@@ -270,6 +294,7 @@ final class ReminderStore: ObservableObject {
 
     private func persist() {
         UserDefaults.standard.set(enabled, forKey: kEnabled)
+        UserDefaults.standard.set(eventSound.rawValue, forKey: kEventSound)
         if let d = try? JSONEncoder().encode(reminders) { UserDefaults.standard.set(d, forKey: kList) }
     }
 }

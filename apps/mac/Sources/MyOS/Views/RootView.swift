@@ -129,6 +129,9 @@ struct RootView: View {
                     // device only exists here once the sync has landed, and the
                     // day may also have rolled over while this was away.
                     state.sweepTrash()
+                    // Only the next occurrence of each event reminder is ever
+                    // pending, so the set has to be rebuilt as days roll over.
+                    state.rescheduleEventReminders()
                     // Friday 6pm: the first time the app is open and unlocked
                     // after it, the week gets read back.
                     await state.generateWeeklyReportIfDue()

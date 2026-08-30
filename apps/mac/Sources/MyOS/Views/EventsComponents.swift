@@ -22,13 +22,39 @@ struct EventsView: View {
         var label: String { rawValue.capitalized }
     }
 
-    private var eventsByDay: [String: [EventItem]] { Dictionary(grouping: state.events, by: { $0.date }) }
+    /// Which events land on each day of a window, with repeats projected out.
+    ///
+    /// Not `Dictionary(grouping: state.events, by: \.date)` any more. That put an
+    /// event on exactly one day ever, which for a yearly birthday meant a single
+    /// dot in 1965 and nothing in any year you would actually be looking at.
+    /// Occurrences are computed per visible window rather than stored, so the
+    /// calendar can show a rule forever without the events array growing a row
+    /// a year.
+    private func eventsByDay(from start: String, to end: String) -> [String: [EventItem]] {
+        var out: [String: [EventItem]] = [:]
+        for event in state.events {
+            for day in EventRecurrence.occurrences(event, from: start, to: end) {
+                out[day, default: []].append(event)
+            }
+        }
+        return out
+    }
+
+    private var monthWindow: (String, String) {
+        let start = String(format: "%04d-%02d-01", viewYear, viewMonth)
+        let last = EventRecurrence.daysIn(year: viewYear, month: viewMonth)
+        return (start, String(format: "%04d-%02d-%02d", viewYear, viewMonth, last))
+    }
+
+    private var yearWindow: (String, String) {
+        (String(format: "%04d-01-01", viewYear), String(format: "%04d-12-31", viewYear))
+    }
 
     /// Precomputed once per render — the dot colour for each day. Cheap O(1) lookups keep
     /// the Year view (12 mini-months × ~40 cells) from rebuilding this per cell.
-    private var dayColors: [String: Color] {
+    private func dayColors(_ byDay: [String: [EventItem]]) -> [String: Color] {
         var m: [String: Color] = [:]
-        for (day, evs) in eventsByDay {
+        for (day, evs) in byDay {
             if evs.contains(where: { $0.special }) { m[day] = Palette.attention }
             else if let first = evs.first, let t = state.primaryTag(for: first) { m[day] = t.color }
             else { m[day] = Palette.action }
@@ -73,8 +99,9 @@ struct EventsView: View {
     // MARK: - Month calendar + always-visible month list
 
     private var monthView: some View {
-        let byDay = eventsByDay
-        let colors = dayColors
+        let window = monthWindow
+        let byDay = eventsByDay(from: window.0, to: window.1)
+        let colors = dayColors(byDay)
         return VStack(alignment: .leading, spacing: 16) {
             Card {
                 VStack(spacing: 16) {
@@ -126,8 +153,9 @@ struct EventsView: View {
     // MARK: - Year overview (12 mini months) + always-visible year list
 
     private var yearView: some View {
-        let byDay = eventsByDay
-        let colors = dayColors
+        let window = yearWindow
+        let byDay = eventsByDay(from: window.0, to: window.1)
+        let colors = dayColors(byDay)
         let cols = [GridItem(.adaptive(minimum: 150), spacing: 14)]
         return VStack(alignment: .leading, spacing: 16) {
             Card {
@@ -278,7 +306,7 @@ private struct EventRow: View {
             Button { showConfirm = true } label: { Image(systemName: "trash").font(.caption2.weight(.bold)) }
                 .buttonStyle(.borderless).tint(Palette.warning).opacity(hover ? 1 : 0.001).help("Delete")
                 .holdToDelete(isPresented: $showConfirm, title: "Delete this memory?",
-                              message: "\(event.title) — this can't be undone.") { delete() }
+                              message: "\(event.title) — it goes to the recycle bin for \(TrashRetention.days) days.") { delete() }
         }
         .padding(.horizontal, 8).padding(.vertical, 8)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
@@ -466,6 +494,9 @@ private struct EventEditor: View {
     @State private var selectedTags: Set<String> = []
     @State private var special = false
     @State private var note = ""
+    @State private var time: String?
+    @State private var recurrence: Recurrence = .none
+    @State private var reminders: [ReminderLead] = []
     @State private var media: [EventMedia] = []
     @State private var uploads: [MediaUpload] = []
     @State private var showCal = false
@@ -519,6 +550,9 @@ private struct EventEditor: View {
                 .buttonStyle(.plain)
                 .help("Mark the big, once-in-a-lifetime ones")
             }
+
+            // Under the date row, because it is the rest of the same question.
+            EventScheduleEditor(time: $time, recurrence: $recurrence, reminders: $reminders)
 
             VStack(alignment: .leading, spacing: 6) {
                 KFieldLabel(text: "Tags")
@@ -762,6 +796,9 @@ private struct EventEditor: View {
             special = e.special
             note = e.note
             media = e.media
+            time = e.time
+            recurrence = e.recurrence
+            reminders = e.reminders
         } else if let pd = target.presetDate {
             date = pd
         }
@@ -775,9 +812,11 @@ private struct EventEditor: View {
         if let e = target.event {
             var ev = e
             ev.date = key; ev.title = t; ev.tagIDs = tagIDs; ev.note = note; ev.special = special; ev.media = media
+            ev.time = time; ev.recurrence = recurrence; ev.reminders = reminders
             state.updateEvent(ev)
         } else {
-            state.addEvent(date: key, title: t, tagIDs: tagIDs, note: note, special: special, media: media)
+            state.addEvent(date: key, title: t, tagIDs: tagIDs, note: note, special: special,
+                           media: media, time: time, recurrence: recurrence, reminders: reminders)
         }
         dismiss()
     }
