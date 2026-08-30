@@ -95,11 +95,22 @@ struct WeightHistoryCard: View {
     }
 
     private func chart(_ pts: [WeightHistory.Point]) -> some View {
-        Chart {
+        let window = WeightHistory.domain(pts, target: target)
+        return Chart {
             // The area is what makes a two-kilo drift legible at this
             // height — the line alone reads as almost horizontal.
+            //
+            // `yStart` is not decoration. An `AreaMark` given only a `y`
+            // fills from the value down to a baseline of zero, and zero
+            // kilos is about thirty plot-heights below a window that
+            // spans 76 to 81. Charts does not clip marks to the plot
+            // area, so that fill painted straight out of the bottom of
+            // the card and on down the page, over everything under it.
+            // The floor of the window is where the area actually ends.
             ForEach(pts) { p in
-                AreaMark(x: .value("Day", p.date), y: .value("kg", p.kg))
+                AreaMark(x: .value("Day", p.date),
+                         yStart: .value("kg", window.lowerBound),
+                         yEnd: .value("kg", p.kg))
                     .interpolationMethod(.monotone)
                     .foregroundStyle(.linearGradient(colors: [Palette.action.opacity(0.28),
                                                               Palette.action.opacity(0.02)],
@@ -129,7 +140,7 @@ struct WeightHistoryCard: View {
                     }
             }
         }
-        .chartYScale(domain: WeightHistory.domain(pts, target: target))
+        .chartYScale(domain: window)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine().foregroundStyle(Palette.border)

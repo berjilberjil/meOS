@@ -7,10 +7,13 @@ import UserNotifications
 /// without looking. Giving each one its own voice means the phone in your
 /// pocket can tell you it is lunch without you taking it out.
 ///
-/// The catch is platform: macOS can name any of the system sounds, while iOS
-/// resolves a named sound only against files inside the app bundle. So the
-/// cross-platform set is Standard, MyOS's own `drop.wav`, and Silent; the rest
-/// are macOS system sounds and are only offered there.
+/// This used to be lopsided. macOS can name any system sound by name, but iOS
+/// resolves a named notification sound *only* against files inside the app
+/// bundle — so the phone, which is the device actually in your pocket when a
+/// reminder fires, was the one offering three sounds while the Mac offered
+/// sixteen. Every sound now ships as a file in `Resources/Sounds`, so both
+/// platforms offer the same list and a sound picked on one means the same thing
+/// on the other.
 enum ReminderSound: String, Codable, CaseIterable, Identifiable, Hashable {
     case standard, drop, silent
     case ping, glass, hero, submarine, funk, tink, pop, sosumi, purr, morse, bottle, blow, frog, basso
@@ -26,27 +29,24 @@ enum ReminderSound: String, Codable, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// True for the three that exist on both platforms.
-    var isPortable: Bool {
+    /// The file this sound ships as, or `nil` for the two that are deliberately
+    /// fileless — Standard is the system's own alert and Silent is no sound.
+    ///
+    /// The fourteen named ones are IMA4 `.caf`, which is one of the handful of
+    /// formats `UNNotificationSound` will accept, and about a quarter the size
+    /// of the AIFF they came from.
+    var bundledFile: (name: String, ext: String)? {
         switch self {
-        case .standard, .drop, .silent: return true
-        default: return false
+        case .standard, .silent: return nil
+        case .drop:              return ("drop", "wav")
+        default:                 return (label, "caf")
         }
     }
 
-    /// The system sound file behind a macOS-only case.
-    var systemName: String? {
-        isPortable ? nil : label
-    }
-
-    /// What this device can actually offer.
-    static var available: [ReminderSound] {
-        #if os(macOS)
-        return allCases
-        #else
-        return allCases.filter(\.isPortable)
-        #endif
-    }
+    /// Every sound, on every platform. Kept as a separate name from `allCases`
+    /// because the call sites read better and because this is the seam where a
+    /// future platform-specific sound would be filtered out.
+    static var available: [ReminderSound] { allCases }
 
     /// What `UNNotificationContent` should be handed.
     ///
@@ -56,22 +56,20 @@ enum ReminderSound: String, Codable, CaseIterable, Identifiable, Hashable {
         switch resolved {
         case .silent:   return nil
         case .standard: return .default
-        case .drop:     return UNNotificationSound(named: UNNotificationSoundName("drop.wav"))
         default:
-            guard let name = systemName else { return .default }
-            return UNNotificationSound(named: UNNotificationSoundName(name))
+            guard let file = resolved.bundledFile else { return .default }
+            return UNNotificationSound(named: UNNotificationSoundName("\(file.name).\(file.ext)"))
         }
     }
 
-    /// Fall back rather than go silent by accident: a sound saved on the Mac
-    /// and synced to a phone that has never heard of it becomes Standard.
-    var resolved: ReminderSound {
-        #if os(macOS)
-        return self
-        #else
-        return isPortable ? self : .standard
-        #endif
-    }
+    /// Identity, now that every sound exists everywhere.
+    ///
+    /// Kept rather than deleted because it is the one place a sound gets a
+    /// chance to say "not here, use Standard instead", and losing that seam is
+    /// how a sound goes silently missing on one device. A file that failed to
+    /// ship already degrades safely without it — the notification API falls back
+    /// to the default rather than firing mute — so this no longer has to guess.
+    var resolved: ReminderSound { self }
 }
 
 /// Where a tapped notification should land.

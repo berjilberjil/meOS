@@ -18,6 +18,34 @@ final class WeightHistoryTests: XCTestCase {
         return out
     }
 
+    // MARK: area baseline
+
+    /// The bug this pins: the area fill used to run out of the bottom of the card.
+    ///
+    /// `AreaMark` with only a `y` fills down to a baseline of zero. Nothing on
+    /// this chart is anywhere near zero — a weight window is 76 to 81 — and
+    /// Charts does not clip marks to the plot area, so the gradient painted
+    /// down the page over whatever was below it. The fill has to start at the
+    /// floor of the window, and the floor is never zero for real weigh-ins.
+    func testAreaBaselineIsTheWindowFloorAndNotZero() {
+        let f = fitness([("2026-08-20", 80), ("2026-08-25", 78), ("2026-08-27", 79)])
+        let pts = WeightHistory.series(f, range: .all, today: today)
+        let window = WeightHistory.domain(pts, target: nil)
+        XCTAssertEqual(window.lowerBound, 77.5, accuracy: 0.0001)   // 78 − 0.5 floor pad
+        XCTAssertGreaterThan(window.lowerBound, 70,
+                             "an area starting here would paint far below the plot")
+    }
+
+    /// A goal well under the data drags the floor down — but only to the goal,
+    /// never to zero.
+    func testAreaBaselineFollowsAGoalBelowTheData() {
+        let f = fitness([("2026-08-20", 80), ("2026-08-25", 79)])
+        let pts = WeightHistory.series(f, range: .all, today: today)
+        let window = WeightHistory.domain(pts, target: 74)
+        XCTAssertEqual(window.lowerBound, 74 - 0.6, accuracy: 0.0001)   // pad = (80−74)*0.1
+        XCTAssertGreaterThan(window.lowerBound, 0)
+    }
+
     // MARK: series
 
     func testSeriesIsOldestFirst() {

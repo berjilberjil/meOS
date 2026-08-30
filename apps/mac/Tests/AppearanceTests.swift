@@ -181,15 +181,35 @@ final class ReminderSoundTests: XCTestCase {
         XCTAssertEqual(r.hour, 12)
     }
 
-    /// A sound chosen on the Mac and synced to a phone that has never heard of
-    /// it must fall back — never fall silent by accident.
-    func testMacOnlySoundsResolveSafely() {
-        #if os(macOS)
+    /// Every sound is offered on both platforms now, so a sound chosen on the
+    /// Mac means the same thing on the phone. It used to fall back to Standard
+    /// there, which is why the iPhone only ever offered three.
+    func testEverySoundIsOfferedOnBothPlatforms() {
+        XCTAssertEqual(ReminderSound.available.count, ReminderSound.allCases.count)
         XCTAssertEqual(ReminderSound.sosumi.resolved, .sosumi)
-        #else
-        XCTAssertEqual(ReminderSound.sosumi.resolved, .standard)
-        #endif
         XCTAssertEqual(ReminderSound.silent.resolved, .silent)
+    }
+
+    /// The one that would have caught a sound that never made it into the app.
+    ///
+    /// iOS resolves a named notification sound only against files inside the
+    /// bundle — a missing file is not an error, it just quietly plays the
+    /// default. So the only way to know all fourteen actually shipped is to
+    /// look for them.
+    func testEverySoundHasItsFileInTheBundle() throws {
+        try XCTSkipIf(Bundle.main.url(forResource: "drop", withExtension: "wav") == nil,
+                      "not hosted by the app bundle — nothing to look in")
+        for choice in ReminderSound.allCases {
+            guard let file = choice.bundledFile else { continue }
+            XCTAssertNotNil(Bundle.main.url(forResource: file.name, withExtension: file.ext),
+                            "\(choice.label) is offered but \(file.name).\(file.ext) is not in the bundle")
+        }
+    }
+
+    /// Standard and Silent are the two that are deliberately fileless.
+    func testOnlyStandardAndSilentShipNoFile() {
+        let fileless = ReminderSound.allCases.filter { $0.bundledFile == nil }
+        XCTAssertEqual(Set(fileless), Set([.standard, .silent]))
     }
 
     func testSilentIsActuallySilent() {

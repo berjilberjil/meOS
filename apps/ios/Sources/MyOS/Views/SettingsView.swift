@@ -9,10 +9,17 @@ struct SettingsView: View {
     @ObservedObject private var themeStore = ThemeStore.shared
     @AppStorage(BiometricLock.key) private var faceIDEnabled = false
     @State private var page: Page?
-    /// How tall the open sub-page's content is. A screen with two theme
-    /// previews on it has no business covering the whole display, so the sheet
-    /// is only as tall as what it contains — see `detents`.
-    @State private var sheetHeight: CGFloat = 0
+    /// How tall each sub-page's content is, keyed by page. A screen with two
+    /// theme previews on it has no business covering the whole display, so the
+    /// sheet is only as tall as what it contains — see `detents(for:)`.
+    ///
+    /// Per page, not one shared value, and never cleared on dismiss. Both of
+    /// those were the same bug: the detent set is derived from this, so zeroing
+    /// it the instant the sheet started leaving swapped `[.height(h), .large]`
+    /// for `[.large]` mid-animation and the sheet snapped to full screen on its
+    /// way out. Keeping the measurement also means the second time you open a
+    /// page it is already the right size instead of resizing in front of you.
+    @State private var sheetHeights: [String: CGFloat] = [:]
 
     /// Icon tile, and the divider inset that lines up with the text beside it.
     private let tile: CGFloat = 34
@@ -96,7 +103,11 @@ struct SettingsView: View {
         .presentationDragIndicator(.visible)
         .animation(.knTheme, value: themeStore.theme.id)
         .sheet(item: $page) { p in editorSheet(p) }
-        .onChange(of: page) { _, now in if now == nil { sheetHeight = 0 } }
+        // Heights are remembered across launches, so the next open of a page
+        // already knows its size.
+        .onChange(of: sheetHeights) { _, now in
+            for (page, h) in now { SheetHeightCache.shared.record(page, h) }
+        }
         // Arrived from the Friday report notification — open straight on it.
         //
         // Also on every later change, not just `onAppear`: if Settings was
@@ -285,9 +296,9 @@ struct SettingsView: View {
         .animation(.knTheme, value: themeStore.theme.id)
         .onPreferenceChange(SheetContentHeight.self) { h in
             guard h > 0 else { return }
-            sheetHeight = min(h + Self.sheetChrome, Self.sheetCap)
+            sheetHeights[p.rawValue] = min(h + Self.sheetChrome, Self.sheetCap)
         }
-        .presentationDetents(detents)
+        .presentationDetents(detents(for: p))
         .presentationDragIndicator(.visible)
         // Scrolling a short page should not drag the sheet taller.
         .presentationContentInteraction(.scrolls)
@@ -303,8 +314,13 @@ struct SettingsView: View {
     /// page you want more room on can be dragged up. A page that already needs
     /// the full screen just gets `.large` — offering both would be one detent
     /// pretending to be two.
-    private var detents: Set<PresentationDetent> {
-        guard sheetHeight > 0, sheetHeight < Self.sheetCap - 1 else { return [.large] }
-        return [.height(sheetHeight), .large]
+    ///
+    /// Falls back to the height this page measured on a previous launch, so the
+    /// only time a settings page ever resizes itself is the very first time it
+    /// is opened on a device.
+    private func detents(for page: Page) -> Set<PresentationDetent> {
+        let h = sheetHeights[page.rawValue] ?? SheetHeightCache.shared.height(page.rawValue) ?? 0
+        guard h > 0, h < Self.sheetCap - 1 else { return [.large] }
+        return [.height(h), .large]
     }
 }

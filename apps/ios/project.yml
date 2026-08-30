@@ -95,6 +95,11 @@ targets:
       - path: ../mac/Sources/MyOS/Views/ProductivityView.swift
       - path: ../mac/Sources/MyOS/Resources/drop.wav
         buildPhase: resources
+      # Every reminder sound, as a file. iOS resolves a named notification sound
+      # only against the bundle, so without these the phone could offer three
+      # sounds while the Mac offered sixteen.
+      - path: ../mac/Sources/MyOS/Resources/Sounds
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.berjil.myos

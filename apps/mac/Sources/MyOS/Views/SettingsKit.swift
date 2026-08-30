@@ -300,3 +300,43 @@ extension View {
         )
     }
 }
+
+/// Remembers how tall each settings sub-page measured, so opening one does not
+/// have to guess.
+///
+/// The sheet's resting detent is its content's height, which is only knowable
+/// after the content has been laid out — so the first paint of a page had to
+/// happen at some other size and then resize. Worse, the height was reset to
+/// zero the moment the sheet started dismissing, which swapped the detent set
+/// out from under an in-flight animation and snapped the sheet to full screen
+/// on its way off screen. That was the jerk.
+///
+/// Caching per page fixes both ends: a page you have opened before opens at the
+/// right size immediately, and nothing about a page's height changes while it is
+/// leaving. Persisted because a measurement is worth keeping across launches —
+/// it is only geometry, and a stale one self-corrects on the next layout.
+@MainActor
+final class SheetHeightCache {
+    static let shared = SheetHeightCache()
+
+    private let key = "myos.sheetHeights"
+    private var heights: [String: CGFloat]
+
+    private init() {
+        let raw = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+        heights = raw.mapValues { CGFloat($0) }
+    }
+
+    func height(_ page: String) -> CGFloat? {
+        guard let h = heights[page], h > 0 else { return nil }
+        return h
+    }
+
+    /// Ignores zero — a view that has not been laid out yet reports 0, and
+    /// storing that would teach the cache the one value it must never return.
+    func record(_ page: String, _ height: CGFloat) {
+        guard height > 0, heights[page] != height else { return }
+        heights[page] = height
+        UserDefaults.standard.set(heights.mapValues { Double($0) }, forKey: key)
+    }
+}

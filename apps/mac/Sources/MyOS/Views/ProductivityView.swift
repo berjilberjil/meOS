@@ -14,6 +14,10 @@ struct ProductivityView: View {
     @State private var urlInput = ""
     @State private var addError: String?
     @FocusState private var urlFocused: Bool
+    /// iOS only: whether the bottom bar is showing the field or just the pill.
+    /// A paste field pinned open over the grid spent the whole screen's bottom
+    /// on an input you use in bursts and then not at all for an hour.
+    @State private var composing = false
     @State private var filter: WatchCategory? = nil
     @State private var selected: WatchItem?
     @State private var dayFilter: String? = nil
@@ -90,12 +94,25 @@ struct ProductivityView: View {
             // link" bar pinned over a screen-time breakdown is an input
             // for something you are not looking at.
             if mode.isWatchLog {
-                addCard
+                addBar
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.bar)
+                    .padding(.top, 12)
+                    .padding(.bottom, 6)
+                    // A fade, not `.bar`. The pill is small enough to float
+                    // over the grid, and a full-width material strip under it
+                    // read as a second tab bar stacked on the real one.
+                    .background(
+                        LinearGradient(colors: [Palette.background.opacity(0),
+                                                Palette.background.opacity(0.92),
+                                                Palette.background],
+                                       startPoint: .top, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                    )
             }
         }
+        // Switching to Screen time with the field open would otherwise leave it
+        // open, and half-typed, for whenever you came back.
+        .onChange(of: mode) { _, now in if !now.isWatchLog { collapseCompose() } }
         .sheet(item: $selected) { item in WatchDetailSheet(item: item) }
         #else
         stack
@@ -146,36 +163,106 @@ struct ProductivityView: View {
 
     // MARK: - Add
 
-    private var addCard: some View {
-        #if os(iOS)
-        // Pinned over the tab bar, so it is an input BAR: one rounded field and
-        // a send button. The boxed card below belongs on Mac, where it sits
-        // inline in the page instead of hovering over the chrome.
-        VStack(spacing: 6) {
+    private var hasURLInput: Bool {
+        !urlInput.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// Put the bottom bar away and forget what was half-typed in it.
+    private func collapseCompose() {
+        composing = false
+        urlFocused = false
+        urlInput = ""
+        addError = nil
+    }
+
+    #if os(iOS)
+    /// The bottom bar, in one of its two states.
+    ///
+    /// It used to be a permanently-open stock `.roundedBorder` field on a `.bar`
+    /// material — the one piece of the app wearing system chrome, sitting across
+    /// the bottom of a screen you mostly come to to *look* at the grid. Logging
+    /// happens in bursts; browsing does not. So the resting state is a pill that
+    /// gives the grid its height back, and the field is one tap away.
+    private var addBar: some View {
+        Group {
+            if composing { composeField } else { composePill }
+        }
+        .animation(.knFast, value: composing)
+    }
+
+    private var composePill: some View {
+        Button {
+            composing = true
+            urlFocused = true
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "plus").font(.caption.weight(.bold))
+                Text("Log a video").font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(Palette.action)
+            .padding(.horizontal, 18).padding(.vertical, 11)
+            .background(Palette.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(Palette.action.opacity(0.35), lineWidth: 1))
+            .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
+        .transition(.scale(scale: 0.9).combined(with: .opacity))
+    }
+
+    private var composeField: some View {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 10) {
-                TextField("Paste a YouTube link", text: $urlInput)
-                    .textFieldStyle(.roundedBorder)
+                Image(systemName: "link")
+                    .font(.caption.weight(.bold)).foregroundStyle(Palette.faint)
+                TextField("", text: $urlInput,
+                          prompt: Text("Paste a YouTube link…").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain)
+                    .font(.footnote).foregroundStyle(Palette.text)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                     .submitLabel(.done)
                     .focused($urlFocused)
                     .onSubmit(addVideo)
-                Button(action: addVideo) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                        .symbolRenderingMode(.hierarchical)
+                // One button, and it is whichever one you actually want: send
+                // while there is something to send, close while there is not.
+                // A permanently-disabled send button is a dead control.
+                if hasURLInput {
+                    Button(action: addVideo) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title3).foregroundStyle(Palette.action)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button(action: collapseCompose) {
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.bold)).foregroundStyle(Palette.faint)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .disabled(urlInput.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .strokeBorder(urlFocused ? Palette.action : Palette.border, lineWidth: 1.5))
+            .animation(.knFast, value: urlFocused)
+            .animation(.knFast, value: hasURLInput)
+
             if let err = addError {
                 Label(err, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption2).foregroundStyle(Palette.warning)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 4)
             }
         }
-        #else
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+    #endif
+
+    #if os(macOS)
+    /// The Mac's inline version — it sits in the page rather than hovering over
+    /// the chrome, so it stays a boxed card with a real Add button.
+    private var addCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: "Log a video")
@@ -206,8 +293,8 @@ struct ProductivityView: View {
                 }
             }
         }
-        #endif
     }
+    #endif
 
     // MARK: - Filter
 
