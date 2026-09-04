@@ -7,6 +7,10 @@
 #   ./scripts/install-apps.sh ios 0        build, install if the phone is there, don't wait
 #   ./scripts/install-apps.sh ios 60       wait up to an hour for the phone
 #
+# This is the hands-on installer. The nightly one that keeps the free-team
+# 7-day signature from lapsing is scripts/refresh-ios.sh; both share the device
+# plumbing in scripts/lib/ios-device.sh so they cannot drift apart.
+#
 # The iPhone install works over Wi-Fi once the device is set to "Connect via
 # network" (Xcode > Window > Devices and Simulators > select iPhone > tick the
 # box). That is a one-time Xcode step — devicectl has no CLI equivalent, it
@@ -21,8 +25,7 @@
 set -euo pipefail
 
 ROOT="${0:A:h:h}"
-DEVICE="2224632C-57C6-555C-8280-459061A2883F"   # iPhone 15
-HOSTNAME_LOCAL="Berjil-Jacob.coredevice.local"
+source "$ROOT/scripts/lib/ios-device.sh"
 TARGET="${1:-both}"
 WAIT_MINS="${2:-20}"
 
@@ -64,9 +67,9 @@ install_ios() {
   # Wait for the phone BEFORE building, not after. A generic build installs
   # fine and then sits on the phone as "Not Verified", so waiting to build the
   # right thing beats building the wrong thing quickly.
-  local dest="id=$DEVICE"
-  if ! device_present; then
-    wait_for_device || {
+  local dest="id=$IOS_DEVICE_ID"
+  if ! ios_device_present; then
+    ios_wait_for_device "$WAIT_MINS" || {
       dest="generic/platform=iOS"
       print "    building generic — the app WILL need a manual Verify on the phone"
     }
@@ -76,83 +79,15 @@ install_ios() {
              -allowProvisioningUpdates build >/dev/null
 
   banner "iPhone: install"
-  ios_install_waiting
-  ios_profile_expiry
-}
-
-# This is a free personal team, so the profile lasts 7 days and the app simply
-# stops launching when it lapses. Better to see the date than to be surprised.
-ios_profile_expiry() {
-  local plist=/tmp/myos-profile.plist
-  security cms -D -i build/Build/Products/Release-iphoneos/MyOS.app/embedded.mobileprovision \
-    >"$plist" 2>/dev/null || return 0
-  local exp
-  exp=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$plist" 2>/dev/null || true)
-  [[ -n "$exp" ]] && print "    signing profile good until: $exp"
-  rm -f "$plist"
-}
-
-# The phone only has to be on the same LAN — the install goes over the local
-# network, so a Wi-Fi with no internet is still fine for this.
-wait_for_device() {
-  (( WAIT_MINS == 0 )) && return 1
-  print "    waiting up to ${WAIT_MINS}m for the phone to join this Wi-Fi…"
-  local deadline=$(( $(date +%s) + WAIT_MINS * 60 ))
-  while (( $(date +%s) < deadline )); do
-    if device_present; then print "    phone is here"; return 0; fi
-    sleep 10
-  done
-  return 1
-}
-
-device_present() {
-  # "unavailable" contains "available", so matching the word is not enough —
-  # this check claimed the phone was there every time it was not, and the build
-  # then failed on a destination that could not be resolved.
-  local line
-  line=$(xcrun devicectl list devices 2>/dev/null | grep "$DEVICE" || true)
-  [[ -n "$line" && "$line" != *unavailable* ]]
-}
-
-# Says which of the three things is wrong, instead of "unavailable".
-ios_reachability() {
-  local tunnel
-  tunnel=$(xcrun devicectl list devices -v 2>/dev/null | grep -oE "TunnelState\.[a-z]+" | head -1 || true)
-  case "$tunnel" in
-    *connected)
-      print "    wireless: connected — cable not required"
-      return ;;
-  esac
-  if ping -c 1 -W 1500 "$HOSTNAME_LOCAL" >/dev/null 2>&1; then
-    print "    phone is on this network but the tunnel is down — it should come back on wake"
-  else
-    print "    phone is NOT on this Wi-Fi (cellular, another network, or asleep)"
-    print "    wireless debugging needs both on the same LAN; this Mac is on $(ipconfig getifaddr en0 2>/dev/null || print '?')"
-  fi
-}
-
-# Retries until the phone shows up. The whole point: an install you start and
-# walk away from.
-ios_install_waiting() {
   local app="build/Build/Products/Release-iphoneos/MyOS.app"
-  local deadline=$(( $(date +%s) + WAIT_MINS * 60 ))
-  local first=1
-  while :; do
-    if xcrun devicectl device install app --device "$DEVICE" "$app" 2>/dev/null \
-         | grep -E "App installed|bundleID"; then
-      print "    installed"
-      return 0
-    fi
-    if (( $(date +%s) >= deadline )); then
-      print "    phone never came back within ${WAIT_MINS}m — rerun: ./scripts/install-apps.sh ios"
-      return 1
-    fi
-    if (( first )); then
-      print "    waiting for the phone (up to ${WAIT_MINS}m) — unlock it on this Wi-Fi and it installs itself"
-      first=0
-    fi
-    sleep 10
-  done
+  ios_install_waiting "$app" "$WAIT_MINS" \
+    || print "    rerun: ./scripts/install-apps.sh ios"
+
+  # This is a free personal team, so the profile lasts 7 days and the app simply
+  # stops launching when it lapses. Better to see the date than to be surprised.
+  local exp
+  exp=$(ios_profile_expiry_human "$app" 2>/dev/null || true)
+  [[ -n "$exp" ]] && print "    signing profile good until: $exp  ($(ios_profile_days_left "$app") days)"
 }
 
 case "$TARGET" in

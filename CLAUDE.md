@@ -14,7 +14,7 @@ MyOS/
 │   └── api/       # Headless SvelteKit backend API (deployed to Netlify) — no web UI
 ├── supabase/      # Postgres migrations (0001–0014)
 ├── mcp/           # MCP servers (diet/)
-└── scripts/       # Backend LaunchAgent installer
+└── scripts/       # LaunchAgent installers + app install/refresh scripts
 ```
 
 ## Stack
@@ -65,6 +65,15 @@ cd apps/mac && xcodebuild test
 
 ## Conventions
 
+- **The iPhone build expires every 7 days.** This is a free personal team
+  (ACDQ327MPR, under the `berjil@skcript.com` Apple ID), so the embedded
+  provisioning profile lasts a week and the app stops launching when it lapses.
+  `scripts/refresh-ios.sh` runs nightly at 22:00 via the
+  `com.berjil.myos.iosrefresh` LaunchAgent to mint a new profile and reinstall.
+  Reinstalling the same build does NOT reset the clock — the date lives in the
+  profile, so the script deletes the cached profile and the built `.app` to
+  force a real re-sign, then reads the expiry back out of the bundle to prove
+  it moved. Any change to the build must keep that proof step.
 - **Deleting is not destroying.** Every user-facing delete captures the object
   into the recycle bin (`Support/Trash.swift`, `AppState+Trash.swift`) and
   releases its R2 objects only when the entry is purged 30 days later. A new
@@ -96,5 +105,6 @@ cd apps/mac && xcodebuild test
 11. ✅ **Diet MCP** (meal planning via stdio)
 12. ✅ **Recycle bin** (`myos.trash`, 30-day retention, Settings → Recycle bin)
 13. ✅ **Recurring events + reminders** (repeat rules, pre-event notifications)
+14. ✅ **Nightly iOS re-sign** (`scripts/refresh-ios.sh` + 22:00 LaunchAgent, beats the free-team 7-day expiry)
 
 Next work = polish/iterate or extend a module; follow the same brainstorm → spec → plan → build cycle.
