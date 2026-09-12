@@ -160,32 +160,17 @@ struct EventsView: View {
     }
 
     private func thumb(_ m: EventMedia) -> some View {
-        Group {
-            if let img = eventImage(m) {
-                Image(uiImage: img).resizable().scaledToFill()
-                    .overlay {
-                        if m.kind == .video {
-                            Image(systemName: "play.circle.fill").font(.body).foregroundStyle(.white)
-                        }
-                    }
-            } else {
+        ZStack {
+            EventThumb(media: m, width: 64, height: 64) {
                 Palette.surfaceElevated
+            }
+            if m.kind == .video {
+                Image(systemName: "play.circle.fill").font(.body).foregroundStyle(.white)
             }
         }
         .frame(width: 64, height: 64)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
-}
-
-/// Thumbnail for a media item, wherever its bytes live.
-@MainActor func eventImage(_ m: EventMedia) -> UIImage? {
-    guard let d = EventMediaStore.shared.poster(for: m) else { return nil }
-    return UIImage(data: d)
-}
-
-func eventImage(_ base64: String) -> UIImage? {
-    guard let d = Data(base64Encoded: base64) else { return nil }
-    return UIImage(data: d)
 }
 
 /// Add / edit one event (iOS). Image-first via PhotosPicker.
@@ -257,11 +242,11 @@ private struct EventEditorSheet: View {
                                 HStack(spacing: 8) {
                                     ForEach(media) { m in
                                         ZStack(alignment: .topTrailing) {
-                                            if let img = eventImage(m) {
-                                                Image(uiImage: img).resizable().scaledToFill()
-                                                    .frame(width: 72, height: 72)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                            EventThumb(media: m, width: 72, height: 72) {
+                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                    .fill(Palette.surfaceElevated)
                                             }
+                                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                             Button { media.removeAll { $0.id == m.id } } label: {
                                                 Image(systemName: "xmark.circle.fill").font(.callout)
                                                     .foregroundStyle(.white).background(Circle().fill(.black.opacity(0.4)))

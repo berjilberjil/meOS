@@ -39,6 +39,32 @@ enum ThumbCache {
         if let image { cache.setObject(image, forKey: key as NSString) }
         return image
     }
+
+    /// Same, for bytes that never lived in a file — event media arrives as
+    /// `Data` from the sealed store. Decoded to thumbnail size, off-main,
+    /// cached by the media's stable id.
+    static func load(data: Data, key: String, maxPixel: CGFloat) async -> UIImage? {
+        if let hit = cached(key) { return hit }
+        let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+            downsampled(data: data, maxPixel: maxPixel)
+        }.value
+        if let image { cache.setObject(image, forKey: key as NSString) }
+        return image
+    }
+
+    private static func downsampled(data: Data, maxPixel: CGFloat) -> UIImage? {
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard !data.isEmpty,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        else { return nil }
+        return UIImage(cgImage: cg)
+    }
 }
 
 /// A thumbnail that never decodes on the main thread. A cached image is there on
@@ -69,6 +95,48 @@ struct ThumbImage<Placeholder: View>: View {
             loaded = await ThumbCache.load(url, key: key,
                                            maxPixel: max(width, height) * UIScreen.main.scale)
         }
+    }
+}
+
+/// An event-media thumbnail that never decodes on the main thread.
+///
+/// Event bytes come from the sealed store as `Data` — a synchronous hit, or
+/// nil while the R2 fetch is in flight (which bumps `version` when it lands).
+/// Either way the `UIImage(data:)` full-resolution decode used to run inline
+/// in the row body, on every pass. This resolves bytes, downsamples to the
+/// drawn size off-main, and caches by the media's stable id.
+struct EventThumb<Placeholder: View>: View {
+    let media: EventMedia
+    let width: CGFloat
+    let height: CGFloat
+    /// Longest side, in pixels, to decode. Pass screen size for the viewer.
+    var maxPixel: CGFloat? = nil
+    @ViewBuilder var placeholder: Placeholder
+
+    @ObservedObject private var store = EventMediaStore.shared
+    @State private var loaded: UIImage?
+
+    var body: some View {
+        Group {
+            if let image = loaded ?? ThumbCache.cached(media.id) {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: width, height: height)
+        .clipped()
+        .task(id: media.id) { await reload() }
+        .onChange(of: store.version) { _, _ in Task { await reload() } }
+    }
+
+    private func reload() async {
+        if ThumbCache.cached(media.id) != nil { return }
+        // A miss starts the R2 fetch and returns nil; `version` bumps when
+        // the bytes land, which retries this.
+        guard let data = EventMediaStore.shared.poster(for: media) else { return }
+        let cap = maxPixel ?? max(width, height) * UIScreen.main.scale
+        loaded = await ThumbCache.load(data: data, key: media.id, maxPixel: cap)
     }
 }
 #endif

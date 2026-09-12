@@ -215,7 +215,7 @@ struct ProgressPhotosCard: View {
         Button { viewing = p } label: {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 4) {
-                    DiskImage(url: p.url)
+                    DiskThumbImage(url: p.url, key: p.id)
                         .frame(width: 92, height: 122)
                         .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
@@ -262,20 +262,6 @@ private struct DeleteWithConfirmButton: View {
                 }
                 .padding(16)
             }
-    }
-}
-
-/// Loads an NSImage from a disk URL for display.
-struct DiskImage: View {
-    let url: URL
-    /// `.fill` for thumbnails, `.fit` for the big viewer so nothing gets cropped.
-    var contentMode: ContentMode = .fill
-    var body: some View {
-        if let img = NSImage(contentsOf: url) {
-            Image(nsImage: img).resizable().aspectRatio(contentMode: contentMode)
-        } else {
-            Palette.surfaceElevated.opacity(0.5)
-        }
     }
 }
 
@@ -344,7 +330,7 @@ private struct ProgressPhotoViewer: View {
     @ViewBuilder private var image: some View {
         if let p = current {
             ZStack {
-                DiskImage(url: p.url, contentMode: .fit)
+                DiskThumbImage(url: p.url, key: p.id, contentMode: .fit, maxPixel: 1600)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
                 HStack {

@@ -45,10 +45,8 @@ struct EventMediaViewer: View {
                         Group {
                             if m.kind == .video {
                                 VideoPage(media: m, isActive: page == m.id)
-                            } else if let img = eventImage(m) {
-                                ZoomableImage(image: img)
                             } else {
-                                Palette.surfaceElevated
+                                EventZoomImage(media: m)
                             }
                         }
                         .tag(m.id)
@@ -137,9 +135,39 @@ private struct VideoPage: View {
     }
 }
 
+/// Full-screen event photo: bytes resolve from the sealed store (kicking off
+/// the R2 fetch on a miss), the full-resolution `UIImage(data:)` decode that
+/// used to run inline in the page body now happens once, downsampled to
+/// screen size, off the main thread, cached by media id.
+private struct EventZoomImage: View {
+    let media: EventMedia
+    @ObservedObject private var mediaStore = EventMediaStore.shared
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                ZoomableImage(image: image)
+            } else {
+                ProgressView().tint(Palette.action)
+            }
+        }
+        .task(id: media.id) { await reload() }
+        .onChange(of: mediaStore.version) { _, _ in Task { await reload() } }
+    }
+
+    private func reload() async {
+        if let hit = ThumbCache.cached(media.id) { image = hit; return }
+        guard let data = EventMediaStore.shared.poster(for: media) else { return }
+        let scale = UIScreen.main.scale
+        let size = UIScreen.main.bounds.size
+        image = await ThumbCache.load(data: data, key: media.id,
+                                      maxPixel: max(size.width, size.height) * scale)
+    }
+}
+
 /// Zoomable image — pinch to zoom, double-tap to toggle, drag when zoomed.
-private struct ZoomableImage: View {
-    let image: UIImage
+private struct ZoomableImage: View {    let image: UIImage
     @State private var scale: CGFloat = 1
     @State private var lastScale: CGFloat = 1
     @State private var offset: CGSize = .zero
