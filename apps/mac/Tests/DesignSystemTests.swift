@@ -40,17 +40,22 @@ final class DesignSystemTests: XCTestCase {
     /// colours can share a luminance and still be obviously different, which is
     /// why this compares channels rather than contrast.
     func testAccentsAreDistinct() {
-        for scheme in [ColorScheme.light, .dark] {
-            let tints = Accent.allCases.filter { $0 != .none }.map { $0.raw(scheme) }
-            for (i, a) in tints.enumerated() {
-                for b in tints[(i + 1)...] {
-                    let ca = platformComponents(a, fallback: .black)
-                    let cb = platformComponents(b, fallback: .black)
-                    let distance = abs(ca.r - cb.r) + abs(ca.g - cb.g) + abs(ca.b - cb.b)
-                    XCTAssertGreaterThan(distance, 0.5,
-                        "two accents are too close to tell apart in \(scheme)")
-                }
-            }
+        // The shipped defaults, not `Accent.raw` — that follows the live
+        // appearance, and mono collapses the three hues onto one ink at
+        // different opacities, which this test would read as "the same colour".
+        let pairs: [(Color, Color, String)] = [
+            (Palette.Dark.defaultGreen, Palette.Dark.defaultOrange, "dark green/orange"),
+            (Palette.Dark.defaultGreen, Palette.Dark.defaultBlue, "dark green/blue"),
+            (Palette.Dark.defaultOrange, Palette.Dark.defaultBlue, "dark orange/blue"),
+            (Palette.Light.defaultGreen, Palette.Light.defaultOrange, "light green/orange"),
+            (Palette.Light.defaultGreen, Palette.Light.defaultBlue, "light green/blue"),
+            (Palette.Light.defaultOrange, Palette.Light.defaultBlue, "light orange/blue"),
+        ]
+        for (a, b, name) in pairs {
+            let ca = platformComponents(a, fallback: .black)
+            let cb = platformComponents(b, fallback: .black)
+            let distance = abs(ca.r - cb.r) + abs(ca.g - cb.g) + abs(ca.b - cb.b)
+            XCTAssertGreaterThan(distance, 0.5, "two accents are too close to tell apart (\(name))")
         }
     }
 
@@ -89,7 +94,7 @@ final class DesignSystemTests: XCTestCase {
     /// Today is the screen Berjil actually looks at every day, and it is the one
     /// that went orange. Nothing on it may claim orange: orange means something
     /// has gone wrong, and eating lunch has not gone wrong. Intake is loud
-    /// because it is the only *filled* card, not because it is a second colour.
+    /// because the number is huge, not because it is a second colour.
     func testNoTodaySectionIsOrange() {
         let orange = TodaySection.allCases.filter { $0.accent == .orange }
         XCTAssertTrue(orange.isEmpty,
@@ -126,9 +131,16 @@ final class DesignSystemTests: XCTestCase {
     /// ~100ms. If a redesign "tidies" these, heroes stop dominating and
     /// presses stop feeling instant.
     func testTypeAndPressTokensAreFoldScale() {
-        XCTAssertEqual(FluidType.displayTracking, -0.5)
+        XCTAssertEqual(FluidType.displayTracking, -1.2)
         XCTAssertEqual(FluidType.sectionTracking, 0.8)
         XCTAssertEqual(FluidType.bodyTracking, 0)
         XCTAssertEqual(FluidPressStyle().scale, 0.97, accuracy: 0.001)
+        XCTAssertEqual(HeroBar.clamped(-0.2), 0, accuracy: 0.0001)
+        XCTAssertEqual(HeroBar.clamped(0.4), 0.4, accuracy: 0.0001)
+        XCTAssertEqual(HeroBar.clamped(1.7), 1, accuracy: 0.0001)
+        XCTAssertEqual(IntakeHero.remain(calories: 2_100, goal: 2_000), 0)
+        XCTAssertEqual(IntakeHero.remain(calories: 1_200, goal: 2_000), 800)
+        XCTAssertEqual(IntakeHero.fraction(calories: 500, goal: 0), 0, accuracy: 0.0001)
+        XCTAssertEqual(IntakeHero.fraction(calories: 1_000, goal: 2_000), 0.5, accuracy: 0.0001)
     }
 }

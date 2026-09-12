@@ -1,104 +1,108 @@
 import SwiftUI
 
-/// Calories + macros first — intake vs target.
+/// Calories first — the day's one number, Fold-style.
 ///
-/// This was the one **filled** card in MyOS — a solid block of the app's
-/// own colour — on the theory that the page's most important number
-/// should be the page's loudest object. In practice it was a slab of
-/// saturated green in the middle of a page of near-black cards, and it
-/// wrecked the balance of Today: your eye went to it and stayed, and
-/// every other card read as background to it. Berjil's words were that
-/// it was killing the aesthetics, which is the correct verdict.
+/// A filled green slab was tried and rejected (it stole the page). Putting
+/// the number on the same line as "/ 2000 kcal" was tried next and still
+/// read as a dashboard row. The layout that actually feels like Fold:
 ///
-/// It reads as a card now, with the accent kept as the rule down its
-/// leading edge and on the bars — the same treatment activity and events
-/// get. It is still first on the page, still the biggest type on it, and
-/// still the thing you see first; it just no longer shouts. Weight from
-/// position and scale, not from a wall of colour.
+///   INTAKE
+///   1,847
+///   kcal · 153 left of 2,000
+///   [=========>    ]
+///   Protein  Carbs  Fibre  Fat
 ///
-/// Ink is named explicitly again. On a filled card everything inherited
-/// legible-on-colour ink from `CardLook` and hierarchy was opacity; on a
-/// plain card that is wrong twice over — opacity on a dark surface goes
-/// muddy rather than quieter — so the levels are `Palette` roles, like
-/// every other card.
-///
-/// The four macros are still told apart by their bars and labels rather than by
-/// four unrelated colours.
-struct DayMacroHero: View {
-    /// The day being shown. Today unless the Today page has been swiped.
-    var day: String? = nil
-    @EnvironmentObject var state: AppState
+/// No card chrome — the number sits on the canvas. One bar. Macros are
+/// numbers, not four more bars. Values in, so a meal log rebuilds this
+/// and not news.
+enum IntakeHero {
+    static func remain(calories: Int, goal: Int) -> Int {
+        guard goal > 0 else { return 0 }
+        return max(0, goal - calories)
+    }
+    static func fraction(calories: Int, goal: Int) -> Double {
+        guard goal > 0 else { return 0 }
+        return min(1, Double(calories) / Double(goal))
+    }
+}
 
-    var body: some View {
-        let date = day ?? state.todayKey
-        let eaten = state.consumed(date)
+struct DayMacroHero: View, Equatable {
+    let calories: Int
+    let goal: Int
+    let protein: Int
+    let proteinGoal: Int?
+    let carbs: Int
+    let carbGoal: Int?
+    let fiber: Int
+    let fats: Int
+    let fatGoal: Int?
+
+    /// Snapshot from the store. Today and Fitness both go through here so
+    /// the hero cannot quietly start reading `AppState` again.
+    static func make(state: AppState, day: String) -> DayMacroHero {
+        let eaten = state.consumed(day)
         let t = state.calorieTargets()
         let goal = t?.goalCalories ?? Int(state.fitnessProfile.calorieTargetKcal ?? 0)
-        let remain = goal > 0 ? max(0, goal - Int(eaten.calories.rounded())) : 0
-        let frac = goal > 0 ? min(1, eaten.calories / Double(goal)) : 0
-        return Card(padding: 18, accent: .nutrition, look: .accent) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("INTAKE")
-                    .font(.caption.weight(.heavy)).tracking(0.8)
-                    .foregroundStyle(Palette.muted)
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    // The one number the day exists for: display-sized,
-                    // monospaced so logging a meal does not jitter its width.
-                    Text("\(Int(eaten.calories.rounded()))")
-                        .fluidDisplay()
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.text)
-                    Text(goal > 0 ? "/ \(goal) kcal" : "kcal")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Palette.muted)
-                    Spacer()
-                    if goal > 0 {
-                        Text("\(remain) left")
-                            .font(.myCaption.weight(.semibold))
-                            .foregroundStyle(Palette.faint)
-                    }
-                }
-                // The accent survives the card going plain — on the bars,
-                // where it is reading a value rather than decorating a
-                // surface, which is the job colour is allowed to do here.
-                ProgressView(value: frac)
-                    .progressViewStyle(.linear)
-                    .tint(Accent.nutrition.tint)
-                // Four macros, one visual system. They are told apart by their
-                // labels and their bars, not by four unrelated colours.
-                HStack(spacing: Space.sm) {
-                    macro("Protein", Int(eaten.protein.rounded()), t?.proteinG)
-                    macro("Carbs", Int(eaten.carbs.rounded()), t?.carbG)
-                    macro("Fibre", Int(eaten.fiber.rounded()), 30)
-                    macro("Fat", Int(eaten.fats.rounded()), t?.fatG)
-                }
-            }
-        }
+        return DayMacroHero(
+            calories: Int(eaten.calories.rounded()),
+            goal: goal,
+            protein: Int(eaten.protein.rounded()),
+            proteinGoal: t?.proteinG,
+            carbs: Int(eaten.carbs.rounded()),
+            carbGoal: t?.carbG,
+            fiber: Int(eaten.fiber.rounded()),
+            fats: Int(eaten.fats.rounded()),
+            fatGoal: t?.fatG
+        )
     }
 
-    /// Three levels, as palette roles. Opacity was the right tool on a
-    /// block of colour and is the wrong one on a dark card, where a
-    /// faded white goes grey-muddy instead of quietly receding.
+    var body: some View {
+        let remain = IntakeHero.remain(calories: calories, goal: goal)
+        let frac = IntakeHero.fraction(calories: calories, goal: goal)
+        let unit: String = {
+            if goal > 0 { return "kcal · \(remain.formatted()) left of \(goal.formatted())" }
+            return "kcal"
+        }()
+        return VStack(alignment: .leading, spacing: Space.lg) {
+            Text("INTAKE")
+                .font(.myCaption.weight(.semibold))
+                .tracking(FluidType.sectionTracking)
+                .foregroundStyle(Palette.faint)
+            HeroMetric(value: calories.formatted(), unit: unit)
+                .animation(.knFast, value: calories)
+            HeroBar(fraction: frac)
+            HStack(spacing: Space.lg) {
+                macro("Protein", protein, proteinGoal)
+                macro("Carbs", carbs, carbGoal)
+                macro("Fibre", fiber, 30)
+                macro("Fat", fats, fatGoal)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Intake \(calories.formatted()) kilocalories")
+    }
+
     private func macro(_ label: String, _ have: Int, _ target: Int?) -> some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
                 .font(.myCaption).tracking(0.4)
                 .foregroundStyle(Palette.faint)
             if let target, target > 0 {
                 Text("\(have)")
-                    .font(.body.weight(.bold)).monospacedDigit()
+                    .font(.myBody.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
+                    .contentTransition(.numericText())
                 Text("/ \(target)g").font(.myCaption).foregroundStyle(Palette.faint)
-                ProgressView(value: min(1, Double(have) / Double(target)))
-                    .progressViewStyle(.linear)
-                    .tint(Accent.nutrition.tint)
             } else {
                 Text("\(have)g")
-                    .font(.body.weight(.bold)).monospacedDigit()
+                    .font(.myBody.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
+                    .contentTransition(.numericText())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.knFast, value: have)
     }
 }
 
@@ -117,7 +121,7 @@ struct FitnessTodayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            DayMacroHero()
+            DayMacroHero.make(state: state, day: date)
             ForEach(MealKey.allCases) { meal in
                 MealChecklistCard(meal: meal,
                                   edit: { editingMeal = meal },

@@ -57,11 +57,11 @@ struct TodayView: View {
                 // types themselves stay unaware they are on Today.
                 Group {
                     if section == .intake {
-                        // The hero: display-sized number, and the larger
-                        // between-section air below it — wherever the order
-                        // puts it, it reads as the reason for the page.
+                        // The hero sits on the canvas with extra air under it
+                        // so the rest of the page recedes — wherever reorder
+                        // puts it.
                         todaySection(section)
-                            .padding(.bottom, Space.screen - Gap.screen)
+                            .padding(.bottom, Space.section)
                     } else {
                         todaySection(section)
                     }
@@ -129,7 +129,7 @@ struct TodayView: View {
         case .weight:
             WeightCard(day: selectedDate)
         case .intake:
-            DayMacroHero(day: selectedDate)
+            DayMacroHero.make(state: state, day: selectedDate)
         case .meals:
             // Snapshot: a meal log rebuilds this grid, nothing else on the page.
             MealsGridView(tiles: MealKey.allCases.map(mealTileData),
@@ -421,14 +421,14 @@ struct TodayView: View {
             Card {
                 HStack(spacing: 10) {
                     Image(systemName: "gearshape.fill").foregroundStyle(Palette.muted)
-                    Text("Settings").font(.body).foregroundStyle(Palette.text)
+                    Text("Settings").font(.myBody).foregroundStyle(Palette.text)
                     Spacer()
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    Image(systemName: "chevron.right").font(.myCaption.weight(.semibold))
                         .foregroundStyle(Palette.faint)
                 }
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable(scale: 0.99)
     }
     #endif
 
@@ -586,7 +586,7 @@ private struct MealTileView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(minHeight: 30, alignment: .top)
             }
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             // State is carried by the tick and the type, not by a fill — a
             // logged meal is not a different kind of thing from a planned one.

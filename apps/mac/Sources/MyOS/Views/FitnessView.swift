@@ -636,7 +636,7 @@ struct ActivityStepsCard: View {
     private var summaryRow: some View {
         HStack(spacing: 12) {
             Button { showSheet = true } label: { summary.contentShape(Rectangle()) }
-                .buttonStyle(.plain)
+                .fluidPressable(scale: 0.99)
                 .accessibilityLabel("See this week's activity")
 
             if showsCalendar {
@@ -660,21 +660,30 @@ struct ActivityStepsCard: View {
         let n = steps(key)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Image(systemName: "figure.walk").font(.callout.weight(.semibold))
-                Text("Activity").font(.subheadline.weight(.semibold))
+                Image(systemName: "figure.walk").font(.myCaption.weight(.semibold))
+                    .foregroundStyle(Palette.faint)
+                Text("STEPS")
+                    .font(.myCaption.weight(.semibold))
+                    .tracking(FluidType.sectionTracking)
+                    .foregroundStyle(Palette.faint)
                 Spacer(minLength: 4)
                 if target > 0 {
                     Text("\(Int((fraction(n) * 100).rounded()))%")
-                        .font(.caption.weight(.heavy)).monospacedDigit().opacity(0.85)
+                        .font(.myCaption.weight(.heavy)).monospacedDigit()
+                        .foregroundStyle(Palette.muted)
                 }
-                Image(systemName: "chevron.right").font(.caption2.weight(.bold)).opacity(0.7)
+                Image(systemName: "chevron.right").font(.myCaption.weight(.bold))
+                    .foregroundStyle(Palette.faint)
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(n.formatted())
-                    .font(.largeTitle.weight(.heavy)).monospacedDigit()
-                Text("of \(target.formatted()) steps")
-                    .font(.footnote.weight(.semibold)).opacity(0.85)
+                    .font(.myHeading).monospacedDigit()
+                    .contentTransition(.numericText())
+                Text("of \(target.formatted())")
+                    .font(.myCaption.weight(.semibold))
+                    .foregroundStyle(Palette.muted)
             }
+            .animation(.knFast, value: n)
             weekChart(endingOn: key)
             #if os(iOS)
             Text("from Apple Health").font(.caption2).opacity(0.7)

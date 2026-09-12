@@ -377,11 +377,10 @@ enum Space {
 /// `myDisplay` is an explicit size (there is no text style bigger than
 /// `largeTitle`), the rest are Dynamic Type text styles.
 extension Font {
-    /// Hero metrics — the one number a card exists to show. Bigger than
-    /// `largeTitle`, bold, with `FluidType.displayTracking` negative tracking
-    /// (see `.fluidDisplay()`). Numbers add `.monospacedDigit()` at the call
-    /// site so a ticking value does not jitter its width.
-    static var myDisplay: Font { .system(size: 52, design: .default).weight(.bold) }
+    /// Hero metrics — the one number a card exists to show. Fold-scale: a
+    /// stacked giant, not `largeTitle` sitting next to its unit. Numbers add
+    /// `.monospacedDigit()` and `.fluidDisplay()` at the call site.
+    static var myDisplay: Font { .system(size: 64, design: .default).weight(.bold) }
     /// Screen/section names when they are content, not chrome.
     static var myHeading: Font { .system(.title3).weight(.semibold) }
     /// Descriptions, insight text, list rows. Readable copy — never footnote.

@@ -122,6 +122,11 @@ struct HoldToConfirmButton: View {
                 .frame(maxWidth: .infinity)
             }
             .contentShape(Capsule())
+            // Press-down feedback lands the instant the finger does (§1);
+            // releasing early cancels (§10: cancel by dragging away and back
+            // is inherently supported — any release before the end cancels).
+            .scaleEffect(holding ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.1), value: holding)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in if !holding { start() } }
@@ -151,7 +156,9 @@ struct HoldToConfirmButton: View {
     private func cancel() {
         fireTask?.cancel(); fireTask = nil
         holding = false
-        withAnimation(.easeOut(duration: 0.16)) { progress = 0 }
+        // Interruptible spring from the live fill level — grabbing again
+        // mid-drain re-targets instead of jumping (§3).
+        withAnimation(.fluidUI) { progress = 0 }
     }
 }
 
@@ -254,8 +261,18 @@ struct SlideConfirmState {
     /// End the drag. Returns `true` exactly once — when released at/after the
     /// threshold. Below threshold it snaps progress back to 0.
     mutating func end() -> Bool {
+        end(velocity: 0)
+    }
+
+    /// Velocity-aware end (§5, §10): a fast fling toward commit (≥400pt/s)
+    /// commits even from just short of the threshold, and a fling back
+    /// reverses even from just past it — velocity sign wins over position.
+    mutating func end(velocity v: CGFloat) -> Bool {
         guard !confirmed else { progress = 1; return false }
-        if progress >= threshold { confirmed = true; progress = 1; return true }
+        if Fluid.shouldCommit(progress: progress, threshold: threshold,
+                              velocity: Double(v), flingThreshold: 400) {
+            confirmed = true; progress = 1; return true
+        }
         progress = 0
         return false
     }
@@ -266,12 +283,21 @@ struct SlideConfirmState {
 /// A drag-to-commit control: drag the thumb to the end to fire `action`; snaps
 /// back if released early; fires a success haptic on commit. The commit-side
 /// counterpart to `HoldToConfirmButton` (which is destructive hold-to-delete).
+///
+/// Fluid behaviour (§2, §5, §9, §10): 1:1 tracking with rubber-banded ends,
+/// velocity-aware commit at release, and an interruptible momentum spring back
+/// to rest — the state mutation always happens *inside* the animation so the
+/// knob travels instead of teleporting.
 struct SlideToConfirm: View {
     var label: String = "Slide to confirm"
     var tint: Color = Palette.action
     let action: () -> Void
 
     @State private var state = SlideConfirmState()
+    @State private var tracker = VelocityTracker()
+    /// Visual overshoot past the end, rubber-banded (§9). The logic progress
+    /// stays clamped at 1; this is only the stretch you see.
+    @State private var overshoot: CGFloat = 0
     /// One size everywhere — big enough for a thumb on iPhone.
     static let height: CGFloat = 56
     private var thumb: CGFloat { Self.height }
@@ -289,29 +315,46 @@ struct SlideToConfirm: View {
                     .minimumScaleFactor(0.8)
                     .lineLimit(1)
                 Capsule().fill(tint)
-                    .frame(width: thumb + state.progress * travel)
+                    .frame(width: thumb + state.progress * travel + overshoot)
                 Image(systemName: state.confirmed ? "checkmark" : "chevron.right.2")
                     .font(.body.weight(.heavy))
                     .foregroundStyle(Palette.background)
                     .frame(width: thumb, height: thumb)
-                    .offset(x: state.progress * travel)
+                    .offset(x: state.progress * travel + overshoot)
             }
             .contentShape(Capsule())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { v in
+                        tracker.append(Double(v.translation.width))
+                        let raw = Double(v.translation.width)
                         let ticks: Int = {
                             var next = state
                             let n = next.drag(translationX: v.translation.width, width: travel)
-                            withAnimation(.knFast) { state = next }
+                            withAnimation(.fluidUI) { state = next }
                             return n
                         }()
+                        // Past the end: stretch with progressive resistance
+                        // instead of stopping hard (§9).
+                        withAnimation(.fluidUI) {
+                            overshoot = CGFloat(FluidRubberband.apply(
+                                overshoot: max(0, raw - Double(travel)),
+                                dimension: Double(travel)))
+                        }
                         if ticks > 0 { Haptics.slideTicks(ticks) }
                     }
                     .onEnded { _ in
-                        let fired = state.end()
-                        if fired { Haptics.slideCommit(); action() }
-                        else { Haptics.slideCancel(); withAnimation(.knFast) { } }
+                        let v = CGFloat(tracker.velocity)
+                        tracker.reset()
+                        // The mutation rides inside the spring so the knob
+                        // travels from its live position — and a grab
+                        // mid-flight re-targets it instead of jumping (§3, §5).
+                        withAnimation(.fluidMomentum) {
+                            overshoot = 0
+                            let fired = state.end(velocity: v)
+                            if fired { Haptics.slideCommit(); action() }
+                            else { Haptics.slideCancel() }
+                        }
                     }
             )
             .onAppear { Haptics.prepare() }

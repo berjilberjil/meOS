@@ -18,7 +18,12 @@ struct FoldView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
             HStack(spacing: 8) {
-                ScreenTitle(text: "Fold")
+                #if os(macOS)
+                Text("FOLD")
+                    .font(.myCaption.weight(.semibold))
+                    .tracking(FluidType.sectionTracking)
+                    .foregroundStyle(Palette.faint)
+                #endif
                 Spacer()
                 Button {
                     Task { await state.refreshFold() }
@@ -77,61 +82,51 @@ struct FoldView: View {
         // Hero — net worth + sparkline + rollup, Fold-home style. It is the
         // number the tab exists for; that is carried by size and position, not
         // by filling the card with a colour.
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(foldINR(f.netWorth, hidden: prefs.hideFoldNumbers))
-                            .fluidDisplay()
-                            .monospacedDigit()
-                            .foregroundStyle(Palette.text)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                        Text("Net worth").font(.myCaption).foregroundStyle(Palette.muted)
-                    }
-                    Spacer()
-                    if f.changeValue != 0 { changeChip(f) }
-                }
-                if f.history.count > 1 {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(inr(f.history.max() ?? 0))
-                                .font(.myCaption.weight(.semibold)).monospacedDigit()
-                                .foregroundStyle(Palette.faint)
-                            Spacer()
-                            if !f.changeLabel.isEmpty {
-                                Text(f.changeLabel)
-                                    .font(.myCaption.weight(.semibold)).tracking(0.3)
-                                    .foregroundStyle(Palette.faint)
-                            }
-                        }
-                        Sparkline(values: f.history).frame(height: 92)
-                        Text(inr(f.history.min() ?? 0))
+        VStack(alignment: .leading, spacing: Space.lg) {
+            HStack(alignment: .bottom, spacing: Space.md) {
+                HeroMetric(value: foldINR(f.netWorth, hidden: prefs.hideFoldNumbers),
+                           unit: "net worth")
+                    .animation(.knFast, value: f.netWorth)
+                Spacer(minLength: 8)
+                if f.changeValue != 0 { changeChip(f) }
+            }
+            if f.history.count > 1 {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(inr(f.history.max() ?? 0))
                             .font(.myCaption.weight(.semibold)).monospacedDigit()
                             .foregroundStyle(Palette.faint)
+                        Spacer()
+                        if !f.changeLabel.isEmpty {
+                            Text(f.changeLabel)
+                                .font(.myCaption.weight(.semibold)).tracking(0.3)
+                                .foregroundStyle(Palette.faint)
+                        }
                     }
+                    Sparkline(values: f.history).frame(height: 120)
+                    Text(inr(f.history.min() ?? 0))
+                        .font(.myCaption.weight(.semibold)).monospacedDigit()
+                        .foregroundStyle(Palette.faint)
                 }
-                Divider().overlay(Palette.border)
+            }
+            HStack(spacing: 0) {
+                heroStat("Liquid", inr(f.liquid))
+                heroStat("Investments", inr(f.investments))
+                heroStat("This month", inr(f.spentThisMonth))
+            }
+            // Only show the stocks/MF breakdown when it adds information —
+            // identical "Investments" + "Stocks" rows are noise.
+            let showStocks = f.stocksValue > 0 && abs(f.stocksValue - f.investments) > 1
+            let showMf = f.mfValue > 0
+            if f.debt > 0 || showStocks || showMf {
                 HStack(spacing: 0) {
-                    heroStat("Liquid", inr(f.liquid))
-                    heroStat("Investments", inr(f.investments))
-                    heroStat("This month", inr(f.spentThisMonth))
-                }
-                // Only show the stocks/MF breakdown when it adds information —
-                // identical "Investments" + "Stocks" rows are noise.
-                let showStocks = f.stocksValue > 0 && abs(f.stocksValue - f.investments) > 1
-                let showMf = f.mfValue > 0
-                if f.debt > 0 || showStocks || showMf {
-                    HStack(spacing: 0) {
-                        if showStocks { heroStat("Stocks", inr(f.stocksValue)) }
-                        if showMf { heroStat("Mutual funds", inr(f.mfValue)) }
-                        if f.debt > 0 { heroStat("Debt", inr(f.debt)) }
-                    }
+                    if showStocks { heroStat("Stocks", inr(f.stocksValue)) }
+                    if showMf { heroStat("Mutual funds", inr(f.mfValue)) }
+                    if f.debt > 0 { heroStat("Debt", inr(f.debt)) }
                 }
             }
         }
-        // Air under the hero: the number is the layout, the rest sits below it.
-        .padding(.bottom, Space.screen - Gap.screen)
+        .padding(.bottom, Space.section)
         .knRise(1)
 
         if !f.banks.isEmpty {
@@ -189,9 +184,9 @@ struct FoldView: View {
         let up = f.changeValue >= 0
         let c = up ? Palette.green : Palette.warning
         return HStack(spacing: 3) {
-            Image(systemName: up ? "arrow.up.right" : "arrow.down.right").font(.caption2.weight(.bold))
-            Text(inr(abs(f.changeValue))).font(.caption.weight(.semibold)).monospacedDigit()
-            Text("· \(Int((abs(f.changePercent) * 100).rounded()))%").font(.caption2).opacity(0.85)
+            Image(systemName: up ? "arrow.up.right" : "arrow.down.right").font(.myCaption.weight(.bold))
+            Text(inr(abs(f.changeValue))).font(.myCaption.weight(.semibold)).monospacedDigit()
+            Text("· \(Int((abs(f.changePercent) * 100).rounded()))%").font(.myCaption).opacity(0.85)
         }
         .foregroundStyle(c)
         .padding(.horizontal, 10).padding(.vertical, 6)
