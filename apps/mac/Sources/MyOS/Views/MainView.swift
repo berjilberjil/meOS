@@ -23,6 +23,12 @@ struct MainView: View {
     }
     private static let kCollapsed = "myos.sidebar.collapsed"
     @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
+    /// Tabs already visited this launch. The content view keeps its identity
+    /// across tab switches (no `.id(tab)` remount), so a branch's cards would
+    /// otherwise replay their rise-in entrance on every return. Entrances run
+    /// on first arrival only — the same rule `TodayPager` applies to day pages
+    /// via `knEntrances = false`.
+    @State private var seenTabs: Set<NavTab> = []
 
     var body: some View {
         // A plain HStack, NOT NavigationSplitView. The split view auto-injects a
@@ -50,6 +56,7 @@ struct MainView: View {
                 } else if tab == .notes {
                     NotesView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .environment(\.knEntrances, !seenTabs.contains(tab))
                 } else {
                     ScrollView {
                         Group {
@@ -75,9 +82,16 @@ struct MainView: View {
                         .frame(maxWidth: tab == .events ? .infinity : 1120)
                         .frame(maxWidth: .infinity)
                     }
-                    // Re-key on tab so each screen's cards replay the rise-in entrance.
-                    .id(tab)
-                    .transition(.opacity)
+                    // The content view keeps its identity across tabs: no `.id(tab)`
+                    // remount, no fade. Re-keying destroyed and rebuilt the whole
+                    // screen on every sidebar click.
+                    //
+                    // A tab is marked seen when it is left, not when it is
+                    // entered: the incoming branch reads the flag at insertion,
+                    // and marking the new tab in the same transaction would flip
+                    // its entrance off mid-flight.
+                    .environment(\.knEntrances, !seenTabs.contains(tab))
+                    .onChange(of: tab) { old, _ in seenTabs.insert(old) }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
