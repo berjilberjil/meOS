@@ -120,4 +120,15 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(Fmt.shortDuration(7 * 3600 + 44 * 60), "7h44")
         XCTAssertEqual(Fmt.shortDuration(5 * 60), "5m")
     }
+
+    /// Fold scale, as numbers: display tracking stays negative, section
+    /// tracking stays positive, and press answers on finger-down at ~0.97 in
+    /// ~100ms. If a redesign "tidies" these, heroes stop dominating and
+    /// presses stop feeling instant.
+    func testTypeAndPressTokensAreFoldScale() {
+        XCTAssertEqual(FluidType.displayTracking, -0.5)
+        XCTAssertEqual(FluidType.sectionTracking, 0.8)
+        XCTAssertEqual(FluidType.bodyTracking, 0)
+        XCTAssertEqual(FluidPressStyle().scale, 0.97, accuracy: 0.001)
+    }
 }
