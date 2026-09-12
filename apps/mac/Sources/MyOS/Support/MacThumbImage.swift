@@ -30,6 +30,18 @@ enum MacThumbCache {
         return image
     }
 
+    /// Same, for bytes that never lived in a file — sealed media arrives as
+    /// `Data` from the store. Decoded to the drawn size, off-main, cached by
+    /// stable id.
+    static func load(data: Data, key: String, maxPixel: CGFloat) async -> NSImage? {
+        if let hit = cached(key) { return hit }
+        let image = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            downsampled(data: data, maxPixel: maxPixel)
+        }.value
+        if let image { cache.setObject(image, forKey: key as NSString) }
+        return image
+    }
+
     static func downsampled(data: Data, maxPixel: CGFloat) -> NSImage? {
         let options = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,

@@ -1,52 +1,21 @@
 import SwiftUI
 import AVKit
 
-/// Decoded gallery thumbnails, keyed by item id.
-///
-/// Same reasoning as `ScanThumbCache`: a JPEG is cheap to decode once and
-/// ruinous to decode on every body pass, which is exactly what a scrolling grid
-/// does. Bounded crudely, because the alternative is an LRU nobody will tune.
-@MainActor
-enum GalleryThumbCache {
-    private static var cache: [String: Image] = [:]
-
-    static func image(id: String, data: Data) -> Image? {
-        if let hit = cache[id] { return hit }
-        guard let img = MediaJPEG.image(from: data) else { return nil }
-        if cache.count > 200 { cache.removeAll() }
-        cache[id] = img
-        return img
-    }
-
-    static func clear() { cache.removeAll() }
-}
-
-/// One square in the grid.
+/// One square in the grid. Bytes resolve, then decode to thumbnail size
+/// off the main thread, cached by item id — the old path ran a full-resolution
+/// decode inline in the row body on every pass, which is what made the grid
+/// hitch mid-scroll.
 struct GalleryThumb: View {
     let item: GalleryItem
     var side: CGFloat
 
     @ObservedObject private var media = EventMediaStore.shared
-
-    /// Bytes for the *preview* — a video's poster, an image's own data. Nil
-    /// means the sealed fetch is still in flight; the store bumps its version
-    /// when it lands, which re-renders this.
-    private var previewData: Data? {
-        switch item.location {
-        case let .sealed(key, posterKey):
-            return media.data(key: item.kind == .video ? (posterKey ?? key) : key)
-        case let .inline(base64, poster):
-            let source = item.kind == .video ? (poster ?? base64) : base64
-            return Data(base64Encoded: source)
-        case let .file(url):
-            return try? Data(contentsOf: url)
-        }
-    }
+    @State private var image: Image?
 
     var body: some View {
         ZStack {
             Palette.surfaceElevated
-            if let data = previewData, let image = GalleryThumbCache.image(id: item.id, data: data) {
+            if let image {
                 image.resizable().aspectRatio(contentMode: .fill)
             } else {
                 Image(systemName: item.source.icon)
@@ -72,6 +41,58 @@ struct GalleryThumb: View {
         .frame(width: side, height: side)
         .clipped()
         .contentShape(Rectangle())
+        .task(id: item.id) { await reload() }
+        .onChange(of: media.version) { _, _ in Task { await reload() } }
+    }
+
+    private var maxPixel: CGFloat {
+        #if os(iOS)
+        side * UIScreen.main.scale
+        #else
+        side * 2
+        #endif
+    }
+
+    private func reload() async {
+        #if os(iOS)
+        if let hit = ThumbCache.cached(item.id) { image = Image(uiImage: hit); return }
+        #else
+        if let hit = MacThumbCache.cached(item.id) { image = Image(nsImage: hit); return }
+        #endif
+        // A sealed miss starts the fetch and returns nil; the store bumps
+        // `version` when the bytes land, which retries this.
+        switch item.location {
+        case let .sealed(key, posterKey):
+            let k = item.kind == .video ? (posterKey ?? key) : key
+            guard let data = media.data(key: k) else { return }
+            await decode(data)
+        case let .inline(base64, poster):
+            let source = item.kind == .video ? (poster ?? base64) : base64
+            guard let data = Data(base64Encoded: source) else { return }
+            await decode(data)
+        case let .file(url):
+            #if os(iOS)
+            if let ui = await ThumbCache.load(url, key: item.id, maxPixel: maxPixel) {
+                image = Image(uiImage: ui)
+            }
+            #else
+            if let ns = await MacThumbCache.load(url: url, key: item.id, maxPixel: maxPixel) {
+                image = Image(nsImage: ns)
+            }
+            #endif
+        }
+    }
+
+    private func decode(_ data: Data) async {
+        #if os(iOS)
+        if let ui = await ThumbCache.load(data: data, key: item.id, maxPixel: maxPixel) {
+            image = Image(uiImage: ui)
+        }
+        #else
+        if let ns = await MacThumbCache.load(data: data, key: item.id, maxPixel: maxPixel) {
+            image = Image(nsImage: ns)
+        }
+        #endif
     }
 }
 
@@ -219,18 +240,14 @@ struct GalleryViewer: View {
 
     @State private var index: Int = 0
     @ObservedObject private var media = EventMediaStore.shared
+    /// Decoded full-size photo for the page on screen, or the video file
+    /// written for it. Resolved in `.task`, never in the body: the old path
+    /// read the file and ran a full-resolution decode inline on every pass.
+    @State private var photo: Image?
+    @State private var videoURL: URL?
 
     private var current: GalleryItem? {
         items.indices.contains(index) ? items[index] : nil
-    }
-
-    /// The full-size bytes — never the poster, even for a video.
-    private func fullData(_ item: GalleryItem) -> Data? {
-        switch item.location {
-        case let .sealed(key, _):     return media.data(key: key)
-        case let .inline(base64, _):  return Data(base64Encoded: base64)
-        case let .file(url):          return try? Data(contentsOf: url)
-        }
     }
 
     var body: some View {
@@ -261,13 +278,53 @@ struct GalleryViewer: View {
     }
 
     @ViewBuilder private func content(_ item: GalleryItem) -> some View {
-        if item.kind == .video, let data = fullData(item), let url = GalleryVideoFile.url(for: item.id, data: data) {
-            VideoPlayer(player: AVPlayer(url: url))
-        } else if let data = fullData(item), let image = MediaJPEG.image(from: data) {
-            image.resizable().aspectRatio(contentMode: .fit)
-        } else {
-            ProgressView().controlSize(.large).tint(.white)
+        Group {
+            if let url = videoURL, item.kind == .video {
+                VideoPlayer(player: AVPlayer(url: url))
+            } else if let photo, item.kind == .image {
+                photo.resizable().aspectRatio(contentMode: .fit)
+            } else {
+                ProgressView().controlSize(.large).tint(.white)
+            }
         }
+        .task(id: item.id) { await reload(item) }
+        .onChange(of: media.version) { _, _ in Task { await reload(item) } }
+    }
+
+    /// The full-size bytes — never the poster, even for a video. A sealed
+    /// miss starts the fetch and returns nil; the store bumps `version` when
+    /// the bytes land, which retries this.
+    private func reload(_ item: GalleryItem) async {
+        photo = nil; videoURL = nil
+        let data: Data?
+        switch item.location {
+        case let .sealed(key, _):    data = media.data(key: key)
+        case let .inline(base64, _): data = Data(base64Encoded: base64)
+        case let .file(url):
+            data = await Task.detached(priority: .userInitiated) {
+                try? Data(contentsOf: url)
+            }.value
+        }
+        guard let data else { return }
+        if item.kind == .video {
+            videoURL = await Task.detached(priority: .userInitiated) {
+                GalleryVideoFile.url(for: item.id, data: data)
+            }.value
+            return
+        }
+        let key = "full-\(item.id)"
+        #if os(iOS)
+        let scale = UIScreen.main.scale
+        let size = UIScreen.main.bounds.size
+        if let ui = await ThumbCache.load(data: data, key: key,
+                                          maxPixel: max(size.width, size.height) * scale) {
+            photo = Image(uiImage: ui)
+        }
+        #else
+        if let ns = await MacThumbCache.load(data: data, key: key, maxPixel: 1600) {
+            photo = Image(nsImage: ns)
+        }
+        #endif
     }
 
     private var controls: some View {
