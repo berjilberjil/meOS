@@ -41,7 +41,9 @@ struct ActivityIntelligenceCard: View {
                                                     device: state.currentFocusDevice,
                                                     todos: state.todayPriorities, now: Date())
 
-        Card(accent: .activity, look: .accent) {
+        // Plain, not accent: on Today the intake hero owns the one accent
+        // rule. This card's meaning still reads from its SectionLabel.
+        Card(accent: .activity) {
             VStack(alignment: .leading, spacing: Gap.row) {
                 if let focus = read.focusNow {
                     FocusNowHeader(focus: focus)

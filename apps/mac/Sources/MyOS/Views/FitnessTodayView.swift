@@ -42,8 +42,10 @@ struct DayMacroHero: View {
                     .font(.caption.weight(.heavy)).tracking(0.8)
                     .foregroundStyle(Palette.muted)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    // The one number the day exists for: display-sized,
+                    // monospaced so logging a meal does not jitter its width.
                     Text("\(Int(eaten.calories.rounded()))")
-                        .font(.largeTitle.weight(.bold))
+                        .fluidDisplay()
                         .monospacedDigit()
                         .foregroundStyle(Palette.text)
                     Text(goal > 0 ? "/ \(goal) kcal" : "kcal")
@@ -52,7 +54,7 @@ struct DayMacroHero: View {
                     Spacer()
                     if goal > 0 {
                         Text("\(remain) left")
-                            .font(.footnote.weight(.semibold))
+                            .font(.myCaption.weight(.semibold))
                             .foregroundStyle(Palette.faint)
                     }
                 }
@@ -86,7 +88,7 @@ struct DayMacroHero: View {
                 Text("\(have)")
                     .font(.body.weight(.bold)).monospacedDigit()
                     .foregroundStyle(Palette.text)
-                Text("/ \(target)g").font(.caption2).foregroundStyle(Palette.faint)
+                Text("/ \(target)g").font(.myCaption).foregroundStyle(Palette.faint)
                 ProgressView(value: min(1, Double(have) / Double(target)))
                     .progressViewStyle(.linear)
                     .tint(Accent.nutrition.tint)
