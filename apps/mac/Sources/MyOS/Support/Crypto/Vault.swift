@@ -7,7 +7,7 @@ import CryptoKit
 ///   - `wrappedByPass` / `wrappedByRecovery` are the DEK sealed under keys derived
 ///     from the passphrase and the recovery code respectively,
 ///   - `check` is a fixed token sealed under the DEK, used to confirm an unlock.
-struct CryptoMeta: Codable, Equatable {
+struct CryptoMeta: Codable, Equatable, Sendable {
     var v: Int
     var kdf: String
     var iterations: Int
@@ -77,6 +77,22 @@ final class Vault {
     /// passphrase and the recovery code, and return the meta to upload plus the
     /// recovery code to show the user ONCE. The DEK is held in memory on success.
     func setup(passphrase: String) throws -> (meta: CryptoMeta, recoveryCode: String) {
+        let m = try Self.deriveSetup(passphrase: passphrase)
+        adoptSetup(m)
+        return (m.meta, m.recoveryCode)
+    }
+
+    /// Everything `setup` computes, without touching `self`. Pure + CPU-heavy
+    /// (two 600k-round PBKDF2 derivations, ~1.5s) — callers run this off the
+    /// main thread (see `verifyPassphrase` for the pattern) and adopt the
+    /// result back on the main actor.
+    struct SetupMaterial: Sendable {
+        var meta: CryptoMeta
+        var recoveryCode: String
+        var dekData: Data
+    }
+
+    static func deriveSetup(passphrase: String) throws -> SetupMaterial {
         let dek = MyOSCrypto.newDEK()
         let recoveryCode = MyOSCrypto.newRecoveryCode()
         let passSalt = MyOSCrypto.newSalt()
@@ -96,29 +112,58 @@ final class Vault {
             wrappedByPass: try MyOSCrypto.seal(dekData, key: kekPass, aad: Data("wrap:pass".utf8)),
             wrappedByRecovery: try MyOSCrypto.seal(dekData, key: kekRec, aad: Data("wrap:recovery".utf8)),
             check: try MyOSCrypto.seal(Self.checkToken, key: dek, aad: Data("check".utf8)))
-        self.dek = dek
-        self.meta = meta
-        return (meta, recoveryCode)
+        return SetupMaterial(meta: meta, recoveryCode: recoveryCode, dekData: dekData)
+    }
+
+    /// Adopt a derived setup on the main actor. The double-setup guard lives
+    /// with the caller (`AppState.completeVaultSetup`), not here.
+    func adoptSetup(_ m: SetupMaterial) {
+        dek = SymmetricKey(data: m.dekData)
+        meta = m.meta
     }
 
     /// Unlock with the passphrase. Throws `.decryptFailed` if it's wrong.
     func unlock(passphrase: String) throws {
         guard let meta else { throw VaultError.noMeta }
+        try adoptUnwrapped(Self.deriveUnlockDEK(passphrase: passphrase, meta: meta), meta: meta)
+    }
+
+    /// The KDF half of `unlock(passphrase:)`, without touching `self`. Run off
+    /// the main thread; adopt the bytes back on the main actor.
+    static func deriveUnlockDEK(passphrase: String, meta: CryptoMeta) throws -> Data {
         let kek = try MyOSCrypto.deriveKey(from: passphrase,
                                            salt: Self.b64(meta.passSalt),
                                            iterations: meta.iterations)
-        let dekData = try MyOSCrypto.open(meta.wrappedByPass, key: kek, aad: Data("wrap:pass".utf8))
-        try adoptUnwrapped(dekData, meta: meta)
+        return try openAndCheck(wrapped: meta.wrappedByPass, key: kek,
+                                aad: Data("wrap:pass".utf8), meta: meta)
     }
 
     /// Unlock with the one-time recovery code (for a lost device / forgotten pass).
     func unlock(recoveryCode: String) throws {
         guard let meta else { throw VaultError.noMeta }
+        try adoptUnwrapped(Self.deriveUnlockDEK(recoveryCode: recoveryCode, meta: meta), meta: meta)
+    }
+
+    /// The KDF half of `unlock(recoveryCode:)`, without touching `self`. Run
+    /// off the main thread; adopt the bytes back on the main actor.
+    static func deriveUnlockDEK(recoveryCode: String, meta: CryptoMeta) throws -> Data {
         let kek = try MyOSCrypto.deriveKey(from: MyOSCrypto.normalizeRecoveryCode(recoveryCode),
                                            salt: Self.b64(meta.recoverySalt),
                                            iterations: meta.iterations)
-        let dekData = try MyOSCrypto.open(meta.wrappedByRecovery, key: kek, aad: Data("wrap:recovery".utf8))
-        try adoptUnwrapped(dekData, meta: meta)
+        return try openAndCheck(wrapped: meta.wrappedByRecovery, key: kek,
+                                aad: Data("wrap:recovery".utf8), meta: meta)
+    }
+
+    /// Unwrap a DEK and confirm it against the check token before trusting it.
+    /// Pure: safe to run wherever the derivation ran.
+    private static func openAndCheck(wrapped: String, key: SymmetricKey, aad: Data,
+                                     meta: CryptoMeta) throws -> Data {
+        let dekData = try MyOSCrypto.open(wrapped, key: key, aad: aad)
+        let candidate = SymmetricKey(data: dekData)
+        guard (try? MyOSCrypto.open(meta.check, key: candidate, aad: Data("check".utf8))) == Self.checkToken else {
+            throw MyOSCryptoError.decryptFailed
+        }
+        return dekData
     }
 
     /// Is this the owner's passphrase? Derives and unwraps exactly like `unlock`
@@ -136,8 +181,9 @@ final class Vault {
         return (try? MyOSCrypto.open(meta.check, key: key, aad: Data("check".utf8))) == Self.checkToken
     }
 
-    private func adoptUnwrapped(_ dekData: Data, meta: CryptoMeta) throws {
-        let key = SymmetricKey(data: dekData)
+    /// Adopt unwrapped DEK bytes on the main actor, after an off-main
+    /// derivation. Called from `AppState` (different file), so internal.
+    func adoptUnwrapped(_ dekData: Data, meta: CryptoMeta) throws {        let key = SymmetricKey(data: dekData)
         // Confirm this really is the right DEK before trusting it.
         guard (try? MyOSCrypto.open(meta.check, key: key, aad: Data("check".utf8))) == Self.checkToken else {
             throw MyOSCryptoError.decryptFailed

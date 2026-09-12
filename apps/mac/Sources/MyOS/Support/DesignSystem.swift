@@ -371,20 +371,28 @@ enum Space {
 // MARK: - Type
 
 /// Four roles. A card that needs a fifth size is a card that is doing too much.
-/// All of these are Dynamic Type text styles, so they scale with the system.
+///
+/// Fold scale: the hero dominates, headings carry sections, body reads,
+/// captions whisper. All of these scale with the system text size —
+/// `myDisplay` is an explicit size (there is no text style bigger than
+/// `largeTitle`), the rest are Dynamic Type text styles.
 extension Font {
-    /// Hero metrics — the one number a card exists to show.
-    static var myDisplay: Font { .system(.largeTitle, design: .default).weight(.bold) }
-    /// Section titles.
-    static var myHeading: Font { .system(.subheadline).weight(.semibold) }
-    /// Descriptions, insight text, list rows.
-    static var myBody: Font { .system(.footnote) }
-    /// Metadata, units, timestamps.
-    static var myCaption: Font { .system(.caption2).weight(.medium) }
+    /// Hero metrics — the one number a card exists to show. Fold-scale: a
+    /// stacked giant, not `largeTitle` sitting next to its unit. Numbers add
+    /// `.monospacedDigit()` and `.fluidDisplay()` at the call site.
+    static var myDisplay: Font { .system(size: 64, design: .default).weight(.bold) }
+    /// Screen/section names when they are content, not chrome.
+    static var myHeading: Font { .system(.title3).weight(.semibold) }
+    /// Descriptions, insight text, list rows. Readable copy — never footnote.
+    static var myBody: Font { .system(.body) }
+    /// Metadata, units, timestamps. The only thing allowed to be small.
+    static var myCaption: Font { .system(.caption).weight(.medium) }
 }
 
 /// A section header: uppercase, tracked, muted — or accented when the section
-/// has earned a colour.
+/// has earned a colour. The tracking is the size-specific value for an
+/// uppercase caption (§15, `FluidType.sectionTracking`): small text wants
+/// positive tracking for legibility, and this is the one place that rule lives.
 struct SectionLabel: View {
     let text: String
     var accent: Accent = .none

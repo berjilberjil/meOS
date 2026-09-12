@@ -6,6 +6,9 @@ import SwiftUI
 /// muscles → exercises) and a weekday grid could never hold one.
 struct WeeklyPlannerView: View {
     @EnvironmentObject var state: AppState
+    /// Plan-generation state — observed here so building the week rebuilds
+    /// only this screen, never the shell or Today.
+    @ObservedObject private var busy = ModuleBusyStore.shared
     /// Empty until `onAppear` resolves it, so the re-sync below can actually
     /// fire. Seeding it from `Date()` at construction meant the
     /// `!WeekdayKeys.all.contains(weekday)` guard was never true — the value was
@@ -112,12 +115,12 @@ struct WeeklyPlannerView: View {
                     Spacer()
                     Button { askGenerate = true } label: {
                         HStack(spacing: 6) {
-                            if state.planBusy { ProgressView().controlSize(.small).tint(.white) }
-                            Text(state.planBusy ? "Building…" : "Generate plan")
+                            if busy.plan { ProgressView().controlSize(.small).tint(.white) }
+                            Text(busy.plan ? "Building…" : "Generate plan")
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(state.planBusy)
+                    .disabled(busy.plan)
                 }
                 if let s = state.planSummary {
                     Label(s, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(Palette.green)

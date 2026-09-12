@@ -62,13 +62,24 @@ final class AppState: ObservableObject {
     @Published var taskMode = TaskModeState()
     /// Friday progress reports, newest first. See `Support/WeeklyReport.swift`.
     @Published var weekly: [WeeklyReport] = []
-    @Published var weeklyBusy = false
+    /// Module fetch flags live in `ModuleBusyStore` (see `HotState.swift`) so a
+    /// busy spinner rebuilds only its own screen — never the shell or Today.
+    /// Same names as before, so call sites are untouched.
+    var weeklyBusy: Bool {
+        get { ModuleBusyStore.shared.weekly }
+        set { ModuleBusyStore.shared.weekly = newValue }
+    }
     /// Where time actually went, on every device. See `Support/Activity/`.
     @Published var activity = ActivityDoc()
     /// The session happening right now on THIS device. Never synced — it is a
     /// live reading, and by the time it reached another device it would be a
-    /// claim about the past.
-    @Published var liveActivity: ActivityEvent?
+    /// claim about the past. Lives in `LiveActivityStore` (see `HotState.swift`):
+    /// the sensor emits on every app switch + every 20s, and that tick must
+    /// reach only `ActivityIntelligenceCard`, not every `AppState` observer.
+    var liveActivity: ActivityEvent? {
+        get { LiveActivityStore.shared.event }
+        set { LiveActivityStore.shared.event = newValue }
+    }
 
     /// A step goal crossed just now, waiting to be celebrated on Today. Cleared
     /// when the card is dismissed; never restored from state, because the party
@@ -81,11 +92,19 @@ final class AppState: ObservableObject {
     /// Macro Intelligence — the snapshot on screen, and every one fetched this
     /// session. Not synced: it is public market data, re-fetchable anywhere.
     @Published var macro: MacroSnapshot?
-    @Published var macroBusy = false
+    /// See `weeklyBusy` above — observed by `MacroPulseView` only.
+    var macroBusy: Bool {
+        get { ModuleBusyStore.shared.macro }
+        set { ModuleBusyStore.shared.macro = newValue }
+    }
     @Published var macroError: String?
     var macroCache: [String: MacroSnapshot] = [:]
     @Published var fold: FoldData?
-    @Published var foldBusy = false
+    /// See `weeklyBusy` above — observed by `FoldView` only.
+    var foldBusy: Bool {
+        get { ModuleBusyStore.shared.fold }
+        set { ModuleBusyStore.shared.fold = newValue }
+    }
     @Published var foldError: String?
     @Published var foldLinked = FoldClient.isLinked
 
@@ -176,34 +195,39 @@ final class AppState: ObservableObject {
     /// loads. A module that really is empty arrives as an empty array or
     /// map, which is present in the payload and applied like anything else.
     private func apply(_ s: AppStatePayload) {
-        fitness = s.fitness ?? fitness
-        fitnessProfile = s.fitnessProfile ?? fitnessProfile
-        journal = s.journal ?? journal
-        journalPresets = s.journalPresets ?? journalPresets
-        notes   = s.notes ?? notes
-        days    = s.days ?? days
-        profile = s.profile ?? profile
-        chat    = s.chat ?? chat
-        nutrition = s.nutrition ?? nutrition
-        training  = s.training ?? training
-        events    = s.events ?? events
-        eventTags = s.eventTags ?? eventTags
+        // Assign only what changed. Every `@Published` set fires
+        // `objectWillChange` even for an identical value, so an unconditional
+        // fan-out here rebuilt the tree twenty times on every hydrate — same
+        // rule `applyRemote` already follows per key.
+        if let v = s.fitness, v != fitness { fitness = v }
+        if let v = s.fitnessProfile, v != fitnessProfile { fitnessProfile = v }
+        if let v = s.journal, v != journal { journal = v }
+        if let v = s.journalPresets, v != journalPresets { journalPresets = v }
+        if let v = s.notes, v != notes { notes = v }
+        if let v = s.days, v != days { days = v }
+        if let v = s.profile, v != profile { profile = v }
+        if let v = s.chat, v != chat { chat = v }
+        if let v = s.nutrition, v != nutrition { nutrition = v }
+        if let v = s.training, v != training { training = v }
+        if let v = s.events, v != events { events = v }
+        if let v = s.eventTags, v != eventTags { eventTags = v }
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
-        watch     = s.watch ?? watch
-        memory    = s.memory ?? memory
-        scans     = s.scans ?? scans
-        taskMode  = s.taskMode ?? taskMode
-        weekly    = s.weekly ?? weekly
+        if let v = s.watch, v != watch { watch = v }
+        if let v = s.memory, v != memory { memory = v }
+        if let v = s.scans, v != scans { scans = v }
+        if let v = s.taskMode, v != taskMode { taskMode = v }
+        if let v = s.weekly, v != weekly { weekly = v }
         // Merged, not replaced: the other device has been appending sessions to
         // the same key. See `ActivityDoc.merged(with:)`.
-        activity  = activity.merged(with: s.activity ?? ActivityDoc())
-        belongings = s.belongings ?? belongings
+        let mergedActivity = activity.merged(with: s.activity ?? ActivityDoc())
+        if mergedActivity != activity { activity = mergedActivity }
+        if let v = s.belongings, v != belongings { belongings = v }
         // Only when the payload actually carries one. Falling back to the
         // default here would reset the theme on every launch of any device
         // whose last push had not landed yet — the local cache is a better
         // answer than a default in that window.
         if let appearance = s.appearance { AppearanceStore.shared.apply(appearance) }
-        if let v = s.fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
+        if let v = s.fold, v != fold, !FoldSnapshotBuilder.isBare(v) { fold = v }
         ingestLocalFold()
         restoreFoldIfBare()
     }
@@ -382,20 +406,26 @@ final class AppState: ObservableObject {
     func completeVaultSetup(passphrase: String) async {
         vaultError = nil
         // One at a time. The submit path is not disabled while this runs, and
-        // `vault.setup()` spends ~1.5s in two 600k-round PBKDF2 derivations on
-        // the main thread with nothing on screen changing — so a second Return
-        // was easy, and it minted a SECOND DEK over the first. Both then PUT
-        // their own meta while `migrateEncryptExisting` sealed twenty modules
-        // under whichever was current. If the server kept the first meta, the
-        // passphrase derived DEK1, the check token validated, the vault
-        // "unlocked" — and every data key failed to open, from the recovery code
-        // too. A brand-new account, permanently unopenable, on its first run.
+        // a second Return was easy — it minted a SECOND DEK over the first.
+        // Both then PUT their own meta while `migrateEncryptExisting` sealed
+        // twenty modules under whichever was current. If the server kept the
+        // first meta, the passphrase derived DEK1, the check token validated,
+        // the vault "unlocked" — and every data key failed to open, from the
+        // recovery code too. A brand-new account, permanently unopenable, on
+        // its first run. The guard below stays exactly as it was.
+        //
+        // The two 600k-round PBKDF2 derivations (~1.5s) run off the main actor
+        // now (`Vault.deriveSetup`); only the adopt-back touches `vault`.
         guard !vaultBusy else { return }
         guard let raw = pendingRaw else { vaultError = "Lost the sync — reopen the app."; return }
         guard passphrase.count >= 8 else { vaultError = "Use at least 8 characters."; return }
         vaultBusy = true; defer { vaultBusy = false }
         do {
-            let (meta, code) = try vault.setup(passphrase: passphrase)
+            let material = try await Task.detached(priority: .userInitiated) {
+                try Vault.deriveSetup(passphrase: passphrase)
+            }.value
+            vault.adoptSetup(material)
+            let (meta, code) = (material.meta, material.recoveryCode)
             // The raw pulled at login is all plaintext (pre-encryption) → passes through.
             let payload = try api.decodePayload(fromRaw: raw)
             apply(payload)
@@ -440,7 +470,13 @@ final class AppState: ObservableObject {
         vaultError = nil
         vaultBusy = true; defer { vaultBusy = false }
         do {
-            try vault.unlock(passphrase: passphrase)
+            // The 600k-round PBKDF2 derivation runs off the main actor; the
+            // adopt-back (and its check-token confirm) stays on it.
+            guard let meta = vault.meta else { throw VaultError.noMeta }
+            let dekData = try await Task.detached(priority: .userInitiated) {
+                try Vault.deriveUnlockDEK(passphrase: passphrase, meta: meta)
+            }.value
+            try vault.adoptUnwrapped(dekData, meta: meta)
             vault.cacheToKeychain(username: username)
             await finishUnlock()
         } catch {
@@ -452,7 +488,11 @@ final class AppState: ObservableObject {
         vaultError = nil
         vaultBusy = true; defer { vaultBusy = false }
         do {
-            try vault.unlock(recoveryCode: code)
+            guard let meta = vault.meta else { throw VaultError.noMeta }
+            let dekData = try await Task.detached(priority: .userInitiated) {
+                try Vault.deriveUnlockDEK(recoveryCode: code, meta: meta)
+            }.value
+            try vault.adoptUnwrapped(dekData, meta: meta)
             vault.cacheToKeychain(username: username)
             await finishUnlock()
         } catch {
@@ -916,8 +956,10 @@ final class AppState: ObservableObject {
     static let mediaSyncInterval: TimeInterval = 15
 
     /// Whether the app is the thing you are looking at. Set from `scenePhase`;
-    /// drives which of the two poll speeds is in use.
-    @Published var isForeground = true
+    /// drives which of the two poll speeds is in use. Plain, not `@Published`:
+    /// no view reads it — only the sync loop — and publishing it rebuilt every
+    /// screen on every focus change.
+    var isForeground = true
 
     private var lastMediaSync = Date.distantPast
 
@@ -1181,7 +1223,11 @@ final class AppState: ObservableObject {
 
     // MARK: - AI: food photo reading
 
-    @Published var imageBusy = false
+    /// See `weeklyBusy` above — observed by `ScanView` / `FoodView` only.
+    var imageBusy: Bool {
+        get { ModuleBusyStore.shared.image }
+        set { ModuleBusyStore.shared.image = newValue }
+    }
     @Published var imageError: String?
 
     /// Read a photo of a packaged food (nutrition label, product pack, menu item)
@@ -1629,7 +1675,11 @@ final class AppState: ObservableObject {
     }
     // MARK: - AI plan generation ("Generate my week")
 
-    @Published var planBusy = false
+    /// See `weeklyBusy` above — observed by `WeeklyPlannerView` only.
+    var planBusy: Bool {
+        get { ModuleBusyStore.shared.plan }
+        set { ModuleBusyStore.shared.plan = newValue }
+    }
     @Published var planError: String?
     @Published var planSummary: String?
 
@@ -1998,7 +2048,12 @@ final class AppState: ObservableObject {
 
     // MARK: - AI quick-log
 
-    @Published var quickLogBusy = false
+    /// See `weeklyBusy` above — no screen observes it yet; the proxy keeps the
+    /// API stable without broadcasting.
+    var quickLogBusy: Bool {
+        get { ModuleBusyStore.shared.quickLog }
+        set { ModuleBusyStore.shared.quickLog = newValue }
+    }
     @Published var quickLogResult: String?
 
     /// Send one line to /api/parse and file the structured result into modules.
@@ -2052,20 +2107,51 @@ final class AppState: ObservableObject {
 
     // MARK: - Mentor chat + Today suggestions
 
-    @Published var chatBusy = false
-    @Published var chatError: String?
+    /// Chat presence lives in `ChatUIStore` / `SuggestUIStore` / `NewsUIStore`
+    /// (see `HotState.swift`): Catherine thinking, a suggestion refresh, or a
+    /// news fetch must rebuild only the card showing it — never the shell or
+    /// Today. Same names as before, so call sites are untouched.
+    var chatBusy: Bool {
+        get { ChatUIStore.shared.busy }
+        set { ChatUIStore.shared.busy = newValue }
+    }
+    var chatError: String? {
+        get { ChatUIStore.shared.chatError }
+        set { ChatUIStore.shared.chatError = newValue }
+    }
     /// Extra sends that arrived while a reply was still streaming.
     private var chatQueue: [String] = []
     /// A prompt requested from elsewhere (e.g. "Ask AI" on a news story). The chat
     /// widget observes this, opens itself, and sends it.
-    @Published var pendingChatPrompt: String? = nil
+    var pendingChatPrompt: String? {
+        get { ChatUIStore.shared.pendingPrompt }
+        set { ChatUIStore.shared.pendingPrompt = newValue }
+    }
     func askMentor(_ prompt: String) { pendingChatPrompt = prompt }
-    @Published var suggestions: SuggestResult?
-    @Published var suggestBusy = false
-    @Published var suggestError: String?
-    @Published var news: NewsResult?
-    @Published var newsBusy = false
-    @Published var newsError: String?
+    var suggestions: SuggestResult? {
+        get { SuggestUIStore.shared.result }
+        set { SuggestUIStore.shared.result = newValue }
+    }
+    var suggestBusy: Bool {
+        get { SuggestUIStore.shared.busy }
+        set { SuggestUIStore.shared.busy = newValue }
+    }
+    var suggestError: String? {
+        get { SuggestUIStore.shared.error }
+        set { SuggestUIStore.shared.error = newValue }
+    }
+    var news: NewsResult? {
+        get { NewsUIStore.shared.result }
+        set { NewsUIStore.shared.result = newValue }
+    }
+    var newsBusy: Bool {
+        get { NewsUIStore.shared.busy }
+        set { NewsUIStore.shared.busy = newValue }
+    }
+    var newsError: String? {
+        get { NewsUIStore.shared.error }
+        set { NewsUIStore.shared.error = newValue }
+    }
     @Published var anatomy: AnatomyData?
     @Published var anatomyError: String?
 

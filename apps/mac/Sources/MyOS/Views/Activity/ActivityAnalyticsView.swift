@@ -17,6 +17,9 @@ import Charts
 struct ActivityAnalyticsView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var coordinator = ActivityCoordinator.shared
+    /// Live reading — observed here so the verdict card follows the session
+    /// without routing the sensor tick through `AppState`.
+    @ObservedObject private var live = LiveActivityStore.shared
     @State private var range: ActivityRange = .today
     @State private var editingApp: AppUsage?
 
@@ -270,7 +273,7 @@ struct ActivityAnalyticsView: View {
     private func verdictCard(_ read: Read) -> some View {
         if read.isToday {
             let intelligence = ActivityInsights.dayIntelligence(summary: read.day,
-                                                                current: state.liveActivity,
+                                                                current: live.event,
                                                                 todos: state.todayPriorities,
                                                                 now: Date())
             if let verdict = intelligence.verdict {

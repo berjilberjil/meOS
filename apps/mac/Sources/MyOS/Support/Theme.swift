@@ -114,7 +114,15 @@ enum Radius {
     static let xl: CGFloat = 24
 }
 
-// Motion tokens.
+// Motion tokens — fluid-interface springs (§3, §4).
+//
+// Every token is a critically-damped spring (damping 1.0, no overshoot) on a
+// SwiftUI `value:`, so motion starts from the live on-screen value, inherits
+// velocity, and can be grabbed and reversed mid-flight. Fixed-duration eases
+// can't do any of that, which is why nothing here is an ease except under
+// reduced motion (§14), where springs become short cross-fades.
+// Bounce (damping ~0.8) lives only in `FluidSpring.momentum` / `.fluidMomentum`
+// for gestures that carried a flick — never for state-driven UI.
 enum Motion {
     static let fast   = 0.10
     static let normal = 0.18
@@ -131,15 +139,33 @@ enum Motion {
 }
 
 extension Animation {
-    // Stiff on purpose. These were the system spring presets for half a day and
-    // the app read as "buggy and stuck" — a page still settling when your thumb
-    // arrives feels broken, not lively.
-    static let knFast     = Animation.easeOut(duration: Motion.fast)
-    static let knNormal   = Animation.easeInOut(duration: Motion.normal)
-    /// Screens arrive by fading, not by moving. See `RiseIn`.
-    static let knEntrance = Animation.easeOut(duration: 0.14)
-    /// No bounce. A control that overshoots reads as loose.
-    static let knPop      = Animation.spring(response: 0.26, dampingFraction: 1.0)
+    /// Snappy control feedback (focus rings, hovers, chips). Critically damped
+    /// spring — interruptible and re-targetable mid-flight (§3).
+    static var knFast: Animation {
+        Motion.reduceMotion
+            ? .easeOut(duration: Motion.fast)
+            : .spring(response: 0.22, dampingFraction: 1.0)
+    }
+    /// General state change (toggles, expands, page turns). The §4 default:
+    /// damping 1.0, response ~0.3, no overshoot.
+    static var knNormal: Animation {
+        Motion.reduceMotion
+            ? .easeOut(duration: 0.2)
+            : .spring(response: 0.32, dampingFraction: 1.0)
+    }
+    /// Screens arrive by fading, not by moving. Opacity-only, so it is already
+    /// the reduced-motion-safe entrance (§14) — the spring just settles it.
+    static var knEntrance: Animation {
+        Motion.reduceMotion
+            ? .easeOut(duration: 0.2)
+            : .spring(response: 0.32, dampingFraction: 1.0)
+    }
+    /// Small control pop. No bounce — a control that overshoots reads as loose.
+    static var knPop: Animation {
+        Motion.reduceMotion
+            ? .easeOut(duration: 0.12)
+            : .spring(response: 0.26, dampingFraction: 1.0)
+    }
     /// Dark ↔ light.
     static var knTheme: Animation {
         Motion.reduceMotion
@@ -287,12 +313,16 @@ extension View {
 
 // MARK: - Labels
 
-/// The name of a screen.
+/// The name of a screen. Large text gets negative tracking — letters read too
+/// far apart as they grow (§15). Weight carries the emphasis so size alone
+/// doesn't have to. (Leading stays the system default: largeTitle already
+/// sets tight leading, and overriding it per-screen is how dense UIs drift.)
 struct ScreenTitle: View {
     let text: String
     var body: some View {
         Text(text)
             .font(.largeTitle.bold())
+            .tracking(FluidType.displayTracking)
             .foregroundStyle(Palette.text)
     }
 }
@@ -302,6 +332,54 @@ struct SectionTitle: View {
     let text: String
     var accent: Accent = .none
     var body: some View { SectionLabel(text: text, accent: accent) }
+}
+
+/// Fold-style stacked metric: the number is the layout, the unit whispers
+/// underneath. Never put the unit on the same baseline as the number — that
+/// is what made 52pt heroes still read as a dashboard row.
+struct HeroMetric: View {
+    let value: String
+    var unit: String = ""
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .fluidDisplay()
+                .monospacedDigit()
+                .foregroundStyle(Palette.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .contentTransition(.numericText())
+            if !unit.isEmpty {
+                Text(unit)
+                    .font(.myCaption.weight(.semibold))
+                    .foregroundStyle(Palette.muted)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One green bar. The only bar a hero is allowed — nested mini-bars under
+/// it turn the page back into a widget dashboard.
+struct HeroBar: View {
+    var fraction: Double
+    static func clamped(_ fraction: Double) -> Double { min(1, max(0, fraction)) }
+    var body: some View {
+        let t = Self.clamped(fraction)
+        Capsule()
+            .fill(Palette.surfaceElevated)
+            .frame(height: 8)
+            .overlay(alignment: .leading) {
+                GeometryReader { g in
+                    Capsule()
+                        .fill(Palette.action)
+                        .frame(width: max(t > 0 ? 6 : 0, g.size.width * t))
+                }
+            }
+            .clipShape(Capsule())
+            .animation(.knNormal, value: t)
+            .accessibilityValue("\(Int((t * 100).rounded())) percent")
+    }
 }
 
 extension View {
@@ -393,13 +471,14 @@ extension View {
     func knRise(_ index: Int = 0) -> some View { modifier(RiseIn(index: index)) }
 }
 
-/// Subtle hover feedback for tappable cards.
+/// Subtle hover feedback for tappable cards. Scale travel is dropped under
+/// reduced motion (§14) — the cursor change is the feedback there.
 struct HoverLift: ViewModifier {
     @State private var hover = false
     func body(content: Content) -> some View {
         content
-            .scaleEffect(hover ? 1.008 : 1)
-            .brightness(hover ? 0.04 : 0)
+            .scaleEffect(hover && !Motion.reduceMotion ? 1.008 : 1)
+            .brightness(hover && !Motion.reduceMotion ? 0.04 : 0)
             .animation(.knFast, value: hover)
             .onHover { h in hover = h; cursor(h) }
     }

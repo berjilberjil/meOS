@@ -8,6 +8,9 @@ import SwiftUI
 struct FoldView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var prefs = PrefsStore.shared
+    /// Fold fetch state — observed here so checking for new money rebuilds only
+    /// this screen, never the shell or Today.
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @State private var showLogin = false
 
     private let cols = [GridItem(.adaptive(minimum: 170), spacing: 12)]
@@ -15,19 +18,24 @@ struct FoldView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Gap.screen) {
             HStack(spacing: 8) {
-                ScreenTitle(text: "Fold")
+                #if os(macOS)
+                Text("FOLD")
+                    .font(.myCaption.weight(.semibold))
+                    .tracking(FluidType.sectionTracking)
+                    .foregroundStyle(Palette.faint)
+                #endif
                 Spacer()
                 Button {
                     Task { await state.refreshFold() }
                 } label: {
-                    if state.foldBusy {
+                    if busy.fold {
                         ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
                 .buttonStyle(.borderless).tint(Palette.muted)
-                .disabled(state.foldBusy)
+                .disabled(busy.fold)
                 .help("Pull latest from Fold")
                 if state.fold != nil {
                     Button { prefs.hideFoldNumbers.toggle() } label: {
@@ -47,10 +55,10 @@ struct FoldView: View {
             .knRise(0)
 
             if let err = state.foldError {
-                Text(err).font(.footnote).foregroundStyle(Palette.warning)
+                Text(err).font(.myBody).foregroundStyle(Palette.warning)
             } else if !state.foldLinked, state.fold != nil {
                 Text("This is a saved snapshot, not a live pull. Tap Connect Fold, enter the OTP Fold texts you, then refresh. The date only changes after Fold answers.")
-                    .font(.footnote).foregroundStyle(Palette.warning)
+                    .font(.myBody).foregroundStyle(Palette.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let f = state.fold { dashboard(f) } else { connectState }
@@ -74,59 +82,51 @@ struct FoldView: View {
         // Hero — net worth + sparkline + rollup, Fold-home style. It is the
         // number the tab exists for; that is carried by size and position, not
         // by filling the card with a colour.
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(foldINR(f.netWorth, hidden: prefs.hideFoldNumbers))
-                            .font(.largeTitle.weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(Palette.text)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                        Text("Net worth").font(.footnote).foregroundStyle(Palette.muted)
-                    }
-                    Spacer()
-                    if f.changeValue != 0 { changeChip(f) }
-                }
-                if f.history.count > 1 {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(inr(f.history.max() ?? 0))
-                                .font(.caption2.weight(.semibold)).monospacedDigit()
-                                .foregroundStyle(Palette.faint)
-                            Spacer()
-                            if !f.changeLabel.isEmpty {
-                                Text(f.changeLabel)
-                                    .font(.caption2.weight(.semibold)).tracking(0.3)
-                                    .foregroundStyle(Palette.faint)
-                            }
-                        }
-                        Sparkline(values: f.history).frame(height: 92)
-                        Text(inr(f.history.min() ?? 0))
-                            .font(.caption2.weight(.semibold)).monospacedDigit()
+        VStack(alignment: .leading, spacing: Space.lg) {
+            HStack(alignment: .bottom, spacing: Space.md) {
+                HeroMetric(value: foldINR(f.netWorth, hidden: prefs.hideFoldNumbers),
+                           unit: "net worth")
+                    .animation(.knFast, value: f.netWorth)
+                Spacer(minLength: 8)
+                if f.changeValue != 0 { changeChip(f) }
+            }
+            if f.history.count > 1 {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(inr(f.history.max() ?? 0))
+                            .font(.myCaption.weight(.semibold)).monospacedDigit()
                             .foregroundStyle(Palette.faint)
+                        Spacer()
+                        if !f.changeLabel.isEmpty {
+                            Text(f.changeLabel)
+                                .font(.myCaption.weight(.semibold)).tracking(0.3)
+                                .foregroundStyle(Palette.faint)
+                        }
                     }
+                    Sparkline(values: f.history).frame(height: 120)
+                    Text(inr(f.history.min() ?? 0))
+                        .font(.myCaption.weight(.semibold)).monospacedDigit()
+                        .foregroundStyle(Palette.faint)
                 }
-                Divider().overlay(Palette.border)
+            }
+            HStack(spacing: 0) {
+                heroStat("Liquid", inr(f.liquid))
+                heroStat("Investments", inr(f.investments))
+                heroStat("This month", inr(f.spentThisMonth))
+            }
+            // Only show the stocks/MF breakdown when it adds information —
+            // identical "Investments" + "Stocks" rows are noise.
+            let showStocks = f.stocksValue > 0 && abs(f.stocksValue - f.investments) > 1
+            let showMf = f.mfValue > 0
+            if f.debt > 0 || showStocks || showMf {
                 HStack(spacing: 0) {
-                    heroStat("Liquid", inr(f.liquid))
-                    heroStat("Investments", inr(f.investments))
-                    heroStat("This month", inr(f.spentThisMonth))
-                }
-                // Only show the stocks/MF breakdown when it adds information —
-                // identical "Investments" + "Stocks" rows are noise.
-                let showStocks = f.stocksValue > 0 && abs(f.stocksValue - f.investments) > 1
-                let showMf = f.mfValue > 0
-                if f.debt > 0 || showStocks || showMf {
-                    HStack(spacing: 0) {
-                        if showStocks { heroStat("Stocks", inr(f.stocksValue)) }
-                        if showMf { heroStat("Mutual funds", inr(f.mfValue)) }
-                        if f.debt > 0 { heroStat("Debt", inr(f.debt)) }
-                    }
+                    if showStocks { heroStat("Stocks", inr(f.stocksValue)) }
+                    if showMf { heroStat("Mutual funds", inr(f.mfValue)) }
+                    if f.debt > 0 { heroStat("Debt", inr(f.debt)) }
                 }
             }
         }
+        .padding(.bottom, Space.section)
         .knRise(1)
 
         if !f.banks.isEmpty {
@@ -135,10 +135,10 @@ struct FoldView: View {
                     SectionTitle(text: "Where your money is")
                     ForEach(f.banks) { b in
                         HStack(spacing: 8) {
-                            Text(b.name).font(.footnote.weight(.medium)).foregroundStyle(Palette.text)
-                            Text("••\(b.last4)").font(.caption2).foregroundStyle(Palette.faint)
+                            Text(b.name).font(.myBody.weight(.medium)).foregroundStyle(Palette.text)
+                            Text("••\(b.last4)").font(.myCaption).foregroundStyle(Palette.faint)
                             Spacer()
-                            Text(inr(b.balance)).font(.footnote.weight(.semibold)).monospacedDigit()
+                            Text(inr(b.balance)).font(.myBody.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -154,9 +154,9 @@ struct FoldView: View {
                     SectionTitle(text: "Top spends this month")
                     ForEach(f.topSpends.filter { !FoldSpend.isNonSpend($0.category) }) { s in
                         HStack {
-                            Text(s.category).font(.footnote).foregroundStyle(Palette.text)
+                            Text(s.category).font(.myBody).foregroundStyle(Palette.text)
                             Spacer()
-                            Text(inr(s.amount)).font(.footnote.weight(.semibold)).monospacedDigit()
+                            Text(inr(s.amount)).font(.myBody.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -168,8 +168,8 @@ struct FoldView: View {
 
         Button { Task { await state.refreshFold() } } label: {
             HStack(spacing: 6) {
-                Image(systemName: state.foldBusy ? "arrow.clockwise" : "circle.fill")
-                    .font(.system(size: state.foldBusy ? 11 : 6))
+                Image(systemName: busy.fold ? "arrow.clockwise" : "circle.fill")
+                    .font(.system(size: busy.fold ? 11 : 6))
                     .foregroundStyle(Palette.green)
                 Text(FoldCaption.line(asOf: f.asOf, linked: state.foldLinked, error: state.foldError))
                     .font(.caption.weight(.semibold))
@@ -184,9 +184,9 @@ struct FoldView: View {
         let up = f.changeValue >= 0
         let c = up ? Palette.green : Palette.warning
         return HStack(spacing: 3) {
-            Image(systemName: up ? "arrow.up.right" : "arrow.down.right").font(.caption2.weight(.bold))
-            Text(inr(abs(f.changeValue))).font(.caption.weight(.semibold)).monospacedDigit()
-            Text("· \(Int((abs(f.changePercent) * 100).rounded()))%").font(.caption2).opacity(0.85)
+            Image(systemName: up ? "arrow.up.right" : "arrow.down.right").font(.myCaption.weight(.bold))
+            Text(inr(abs(f.changeValue))).font(.myCaption.weight(.semibold)).monospacedDigit()
+            Text("· \(Int((abs(f.changePercent) * 100).rounded()))%").font(.myCaption).opacity(0.85)
         }
         .foregroundStyle(c)
         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -195,9 +195,9 @@ struct FoldView: View {
 
     private func heroStat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased()).font(.caption2.weight(.heavy)).tracking(0.6)
+            Text(label.uppercased()).font(.myCaption.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
-            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
+            Text(value).font(.myBody.weight(.semibold)).monospacedDigit()
                 .foregroundStyle(Palette.text).lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -218,7 +218,7 @@ struct FoldView: View {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: "Connect your Fold account")
                 Text("Sign in with the same phone OTP Fold texts you. Refresh then pulls net worth, banks and this month’s spends.")
-                    .font(.footnote).foregroundStyle(Palette.muted)
+                    .font(.myBody).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button { showLogin = true } label: {
                     Label("Connect with phone OTP", systemImage: "iphone")
@@ -361,6 +361,7 @@ private struct FoldTile: View {
 private struct FoldLoginSheet: View {
 
     @EnvironmentObject var state: AppState
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var phone = FoldClient.linkedPhone.isEmpty ? "+91" : FoldClient.linkedPhone
     @State private var otp = ""
@@ -410,21 +411,21 @@ private struct FoldLoginSheet: View {
                         Task {
                             if await state.verifyFoldOTP(phone, otp: otp) { dismiss() }
                         }
-                    } label: { Label(state.foldBusy ? "Checking…" : "Verify & pull", systemImage: "checkmark") }
+                    } label: { Label(busy.fold ? "Checking…" : "Verify & pull", systemImage: "checkmark") }
                     .buttonStyle(.borderedProminent)
-                    .disabled(otp.count < 4 || state.foldBusy)
+                    .disabled(otp.count < 4 || busy.fold)
                 } else {
                     Button {
                         Task {
                             await state.sendFoldOTP(phone)
                             if state.foldError == nil { sent = true; focus = .otp }
                         }
-                    } label: { Label(state.foldBusy ? "Sending…" : "Send OTP", systemImage: "message") }
+                    } label: { Label(busy.fold ? "Sending…" : "Send OTP", systemImage: "message") }
                     .buttonStyle(.borderedProminent)
                     // The field is seeded with "+91", so counting every digit
                     // enabled Send after eight typed ones and fired an OTP at a
                     // half-typed number.
-                    .disabled(FoldData.nationalDigits(phone).count < 10 || state.foldBusy)
+                    .disabled(FoldData.nationalDigits(phone).count < 10 || busy.fold)
                 }
                 Spacer()
             }

@@ -28,7 +28,9 @@ import SwiftUI
 /// same *section*: the page you are on publishes which section is at the top,
 /// and the others follow. Swipe from Meals and you arrive at Meals.
 struct TodayPager: View {
-    @EnvironmentObject var state: AppState
+    // No `AppState` here on purpose: every materialized page (~3 `TodayView`s)
+    // used to rebuild mid-swipe on any store tick. The window is anchored to
+    // the calendar day, observed via the system day-change note.
     var go: (NavTab) -> Void
 
     /// Swiping is for nearby days. Jumping somewhere far away is what the
@@ -61,7 +63,7 @@ struct TodayPager: View {
         .background(Palette.background)
         .onAppear { rebuildWindow(); consumeAnchor() }
         // The window is anchored to "today", so it has to move when midnight does.
-        .onChange(of: state.todayKey) { _, _ in rebuildWindow() }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in rebuildWindow() }
         .onChange(of: signals.todayAnchor) { _, _ in consumeAnchor() }
     }
 
@@ -71,7 +73,7 @@ struct TodayPager: View {
     private func consumeAnchor() {
         guard let target = signals.todayAnchor else { return }
         signals.todayAnchor = nil
-        day = state.todayKey
+        day = AppState.dateKey(Date())
         withAnimation(.knNormal) { anchor = target }
     }
 
@@ -99,7 +101,7 @@ struct TodayPager: View {
 
     /// today − backDays … today + DayPaging.maxForwardDays.
     private func rebuildWindow() {
-        let today = state.todayKey
+        let today = AppState.dateKey(Date())
         let window = (-Self.backDays...DayPaging.maxForwardDays).map { AppState.addDays($0, to: today) }
         guard window != days else { return }
         // What "today" was before this rebuild — the page the user is on if they

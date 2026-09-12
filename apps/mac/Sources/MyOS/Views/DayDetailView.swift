@@ -59,7 +59,7 @@ struct DayDetailView: View {
             .padding(.bottom, 2)
 
             ActivityStepsCard(day: selected, showsCalendar: false)
-            DayMacroHero(day: selected)
+            DayMacroHero.make(state: state, day: selected)
             mealsRow
             WorkoutChecklistCard(day: selected)
             WatchLogCard(day: selected)

@@ -3,7 +3,9 @@ import SwiftUI
 // NavTab now lives in Support/Navigation.swift, shared with iOS.
 
 struct MainView: View {
-    @EnvironmentObject var state: AppState
+    // No `AppState` here on purpose: the shell must not rebuild when a module
+    // ticks (live activity, chat, sync). Status that does need the store lives
+    // in `SidebarStatusView` below and invalidates only itself.
     @ObservedObject private var themeStore = ThemeStore.shared
     @ObservedObject private var signals = UISignals.shared
     @State private var tab: NavTab = MainView.openingTab()
@@ -21,6 +23,12 @@ struct MainView: View {
     }
     private static let kCollapsed = "myos.sidebar.collapsed"
     @State private var collapsed = UserDefaults.standard.bool(forKey: MainView.kCollapsed)
+    /// Tabs already visited this launch. The content view keeps its identity
+    /// across tab switches (no `.id(tab)` remount), so a branch's cards would
+    /// otherwise replay their rise-in entrance on every return. Entrances run
+    /// on first arrival only — the same rule `TodayPager` applies to day pages
+    /// via `knEntrances = false`.
+    @State private var seenTabs: Set<NavTab> = []
 
     var body: some View {
         // A plain HStack, NOT NavigationSplitView. The split view auto-injects a
@@ -48,6 +56,7 @@ struct MainView: View {
                 } else if tab == .notes {
                     NotesView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .environment(\.knEntrances, !seenTabs.contains(tab))
                 } else {
                     ScrollView {
                         Group {
@@ -73,9 +82,16 @@ struct MainView: View {
                         .frame(maxWidth: tab == .events ? .infinity : 1120)
                         .frame(maxWidth: .infinity)
                     }
-                    // Re-key on tab so each screen's cards replay the rise-in entrance.
-                    .id(tab)
-                    .transition(.opacity)
+                    // The content view keeps its identity across tabs: no `.id(tab)`
+                    // remount, no fade. Re-keying destroyed and rebuilt the whole
+                    // screen on every sidebar click.
+                    //
+                    // A tab is marked seen when it is left, not when it is
+                    // entered: the incoming branch reads the flag at insertion,
+                    // and marking the new tab in the same transaction would flip
+                    // its entrance off mid-flight.
+                    .environment(\.knEntrances, !seenTabs.contains(tab))
+                    .onChange(of: tab) { old, _ in seenTabs.insert(old) }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -162,6 +178,64 @@ struct MainView: View {
 
             Spacer()
 
+            SidebarStatusView(collapsed: collapsed)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // The rail is the same near-black as a card, separated from the canvas
+        // by a hairline. It does not change colour with the open tab — that was
+        // the loudest part of the old palette. It stays opaque on purpose: no
+        // content scrolls underneath a full-height desktop rail, so a
+        // translucent material (§12) would buy nothing here.
+        .background(Palette.sidebar.ignoresSafeArea())
+        .overlay(alignment: .trailing) {
+            Rectangle().fill(Palette.border).frame(width: 1)
+        }
+    }
+
+    // Logo + wordmark + a collapse/expand toggle. Collapsed: logo over the toggle.
+    private var sidebarHeader: some View {
+        let logo = Image("LogoMark")
+            .resizable().interpolation(.high)
+            .frame(width: 32, height: 32)
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .knShadow()
+        let toggle = Button {
+            collapsed.toggle()
+            UserDefaults.standard.set(collapsed, forKey: Self.kCollapsed)
+        } label: {
+            Image(systemName: "sidebar.left").font(.footnote.weight(.semibold))
+        }
+        .buttonStyle(.borderless).tint(Palette.faint)
+        .help(collapsed ? "Expand sidebar" : "Collapse sidebar")
+
+        return Group {
+            if collapsed {
+                VStack(spacing: 10) { logo; toggle }
+                    .padding(.top, 30).padding(.bottom, 14)
+            } else {
+                HStack(spacing: 9) {
+                    logo
+                    Text("MyOS")
+                        .font(.title2.weight(.heavy))
+                        .foregroundStyle(Palette.action)
+                    Spacer(minLength: 0)
+                    toggle
+                }
+                .padding(.horizontal, 14).padding(.top, 34).padding(.bottom, 16)
+            }
+        }
+    }
+}
+
+/// The only part of the Mac shell that observes `AppState`: the sync-error
+/// line, Task Mode, and logout. Everything else in the rail is static, so a
+/// store tick invalidates this footer alone — never the sidebar or content.
+private struct SidebarStatusView: View {
+    @EnvironmentObject var state: AppState
+    var collapsed: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
             if let err = state.lastSyncError ?? state.lastHydrateError {
                 Group {
                     if collapsed {
@@ -213,48 +287,6 @@ struct MainView: View {
             .padding(.horizontal, 8).padding(.bottom, 12)
             .help(collapsed ? (state.username.isEmpty ? "Log out" : "@\(state.username)") : "")
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // The rail is the same near-black as a card, separated from the canvas
-        // by a hairline. It does not change colour with the open tab — that was
-        // the loudest part of the old palette.
-        .background(Palette.sidebar.ignoresSafeArea())
-        .overlay(alignment: .trailing) {
-            Rectangle().fill(Palette.border).frame(width: 1)
-        }
-    }
-
-    // Logo + wordmark + a collapse/expand toggle. Collapsed: logo over the toggle.
-    private var sidebarHeader: some View {
-        let logo = Image("LogoMark")
-            .resizable().interpolation(.high)
-            .frame(width: 32, height: 32)
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .knShadow()
-        let toggle = Button {
-            collapsed.toggle()
-            UserDefaults.standard.set(collapsed, forKey: Self.kCollapsed)
-        } label: {
-            Image(systemName: "sidebar.left").font(.footnote.weight(.semibold))
-        }
-        .buttonStyle(.borderless).tint(Palette.faint)
-        .help(collapsed ? "Expand sidebar" : "Collapse sidebar")
-
-        return Group {
-            if collapsed {
-                VStack(spacing: 10) { logo; toggle }
-                    .padding(.top, 30).padding(.bottom, 14)
-            } else {
-                HStack(spacing: 9) {
-                    logo
-                    Text("MyOS")
-                        .font(.title2.weight(.heavy))
-                        .foregroundStyle(Palette.action)
-                    Spacer(minLength: 0)
-                    toggle
-                }
-                .padding(.horizontal, 14).padding(.top, 34).padding(.bottom, 16)
-            }
-        }
     }
 }
 
@@ -290,7 +322,9 @@ private struct NavItem: View {
             )
             .contentShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        // Press-down physics (§1): the row answers the instant the click lands,
+        // not on release. Plain chrome — the tint already carries the meaning.
+        .buttonStyle(FluidPressStyle(scale: 0.99))
         .onHover { h in hover = h; cursor(h) }
         .animation(.knFast, value: hover)
         .animation(.knFast, value: active)

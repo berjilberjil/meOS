@@ -5,6 +5,9 @@ import SwiftUI
 struct WeeklyReportCard: View {
     var boxed = true
     @EnvironmentObject var state: AppState
+    /// Report-generation state — observed here so reading the week rebuilds
+    /// only this card, never the shell or Today.
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @State private var openID: String?
 
     private var latest: WeeklyReport? { state.weekly.first }
@@ -88,18 +91,18 @@ struct WeeklyReportCard: View {
     private var generateButton: some View {
         Button { Task { await state.generateWeeklyReport(notify: false) } } label: {
             HStack(spacing: 6) {
-                if state.weeklyBusy {
+                if busy.weekly {
                     ProgressView().controlSize(.small)
                 } else {
                     Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                 }
-                Text(state.weeklyBusy ? "Reading your week…"
+                Text(busy.weekly ? "Reading your week…"
                                       : (latest == nil ? "Read my week now" : "Read it again"))
             }
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
-        .disabled(state.weeklyBusy)
+        .disabled(busy.weekly)
     }
 }
 

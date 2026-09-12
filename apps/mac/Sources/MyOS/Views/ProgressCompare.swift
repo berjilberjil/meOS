@@ -150,7 +150,7 @@ struct ProgressCompareView: View {
             }
 
             if let photo {
-                DiskImage(url: photo.url, contentMode: .fit)
+                DiskThumbImage(url: photo.url, key: photo.id, contentMode: .fit, maxPixel: 1600)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
             } else {

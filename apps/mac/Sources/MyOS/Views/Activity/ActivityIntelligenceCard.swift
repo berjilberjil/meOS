@@ -18,18 +18,32 @@ struct ActivityIntelligenceCard: View {
 
     @EnvironmentObject var state: AppState
     @ObservedObject private var coordinator = ActivityCoordinator.shared
+    /// The live reading only — observed here so the sensor's app-switch + 20s
+    /// tick rebuilds this card and nothing else.
+    @ObservedObject private var live = LiveActivityStore.shared
 
     var body: some View {
         // One pass over the day's sessions, not three: this card is alive on
         // three Today pages at once.
         let key = day ?? state.todayKey
-        let summary = state.activitySummaryLive(key)
-        let live = key == state.todayKey ? state.currentFocus : nil
-        let read = ActivityInsights.dayIntelligence(summary: summary, current: live,
+        // The Mac reads its own sensor; the phone reads the note the Mac left
+        // in the synced document. Either way only this card observes the live
+        // value.
+        #if os(macOS)
+        let liveEvent = key == state.todayKey ? live.event : nil
+        let summary = liveEvent.map { ActivityEngine.summary(state.activity.events + [$0], day: key) }
+            ?? state.activitySummary(key)
+        #else
+        let liveEvent = key == state.todayKey ? state.currentFocus : nil
+        let summary = state.activitySummary(key)
+        #endif
+        let read = ActivityInsights.dayIntelligence(summary: summary, current: liveEvent,
                                                     device: state.currentFocusDevice,
                                                     todos: state.todayPriorities, now: Date())
 
-        Card(accent: .activity, look: .accent) {
+        // Plain, not accent: on Today the intake hero owns the one accent
+        // rule. This card's meaning still reads from its SectionLabel.
+        Card(accent: .activity) {
             VStack(alignment: .leading, spacing: Gap.row) {
                 if let focus = read.focusNow {
                     FocusNowHeader(focus: focus)

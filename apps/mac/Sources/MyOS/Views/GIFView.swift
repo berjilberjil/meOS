@@ -19,7 +19,7 @@ struct GIFView: View {
         ZStack {
             Palette.surfaceElevated.opacity(0.5)
             if let data {
-                AnimatedGIF(data: data)
+                AnimatedGIF(data: data, urlKey: url.absoluteString)
             } else if failed {
                 VStack(spacing: 6) {
                     Image(systemName: "wifi.slash").font(.title3).foregroundStyle(Palette.faint)
@@ -45,6 +45,8 @@ struct GIFView: View {
 /// NSImageView wrapper that animates a GIF from raw data.
 private struct AnimatedGIF: NSViewRepresentable {
     let data: Data
+    /// Cache key on iOS only; kept here so the shared call site stays one line.
+    var urlKey: String? = nil
     func makeNSView(context: Context) -> NSImageView {
         let v = NSImageView()
         v.imageScaling = .scaleProportionallyUpOrDown
@@ -61,13 +63,24 @@ private struct AnimatedGIF: NSViewRepresentable {
 }
 #else
 /// Static first-frame fallback — good enough for a demo thumbnail on iOS.
+/// Decoded once, downsampled, off the main thread and cached by URL: the
+/// `UIImage(data:)` full decode used to run inline in the body on every pass.
 private struct AnimatedGIF: View {
     let data: Data
+    var urlKey: String? = nil
+    @State private var frame: UIImage?
+
     var body: some View {
-        if let img = UIImage(data: data) {
-            Image(uiImage: img).resizable().aspectRatio(contentMode: .fit)
-        } else {
-            Color.clear
+        Group {
+            if let frame {
+                Image(uiImage: frame).resizable().aspectRatio(contentMode: .fit)
+            } else {
+                Color.clear
+            }
+        }
+        .task(id: data.count) {
+            frame = await ThumbCache.load(data: data, key: urlKey ?? "gif-\(data.count)",
+                                          maxPixel: 480)
         }
     }
 }

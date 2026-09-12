@@ -4,6 +4,9 @@ import SwiftUI
 /// from Catherine, grounded in the user's own data.
 struct ScanView: View {
     @EnvironmentObject var state: AppState
+    /// Image-read state — observed here so analysing a photo rebuilds only this
+    /// screen, never the shell or Today.
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @State private var result: ScanInsight?
     @State private var logged = false
     /// The history record for the scan on screen, so logging the meal marks it.
@@ -25,7 +28,7 @@ struct ScanView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if state.imageBusy {
+            if busy.image {
                 readingCard
             } else if let r = result, !r.failed {
                 resultCard(r)
@@ -50,7 +53,7 @@ struct ScanView: View {
             title: "Take a photo",
             subtitle: "A meal, a pack, or whatever’s in front of you.",
             tint: Palette.success,
-            busy: state.imageBusy,
+            busy: busy.image,
             startWithCamera: true
         ) { images, media in
             logged = false

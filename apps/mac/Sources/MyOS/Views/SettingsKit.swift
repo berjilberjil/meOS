@@ -101,7 +101,7 @@ struct SettingsRow<Trailing: View>: View {
     @ViewBuilder
     var body: some View {
         if let action {
-            Button(action: action) { line }.buttonStyle(.plain)
+            Button(action: action) { line }.fluidPressable(scale: 0.99)
         } else {
             line
         }

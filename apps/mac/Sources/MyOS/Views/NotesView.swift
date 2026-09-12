@@ -191,7 +191,7 @@ struct NotesView: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .fluidPressable()
         .knHoverLift()
         .contextMenu { noteMenu(note) }
     }
@@ -286,7 +286,7 @@ struct NotesView: View {
                 .frame(minHeight: 0, alignment: .topLeading)
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable()
         .knHoverLift()
         .contextMenu { noteMenu(note) }
     }
@@ -412,7 +412,7 @@ struct NotesView: View {
                 .strokeBorder(selected ? Palette.attention.opacity(0.5) : .clear, lineWidth: 1))
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .fluidPressable(scale: 0.99)
         .padding(.horizontal, 8)
         .contextMenu { noteMenu(note) }
     }

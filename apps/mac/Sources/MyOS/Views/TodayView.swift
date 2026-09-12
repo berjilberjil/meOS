@@ -6,6 +6,10 @@ import AppKit
 struct TodayView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var order = TodaySection.OrderSignal.shared
+    /// News + suggestions fetch state — observed by those two cards only, so a
+    /// refresh or a chat reply never rebuilds the whole page.
+    @ObservedObject private var newsUI = NewsUIStore.shared
+    @ObservedObject private var suggestUI = SuggestUIStore.shared
     @ObservedObject private var signals = UISignals.shared
     @Environment(\.openURL) private var openURL
     var go: (NavTab) -> Void
@@ -23,6 +27,10 @@ struct TodayView: View {
     @State private var showStreakCal = false
     /// The day this page is showing when nobody outside is driving it.
     @State private var ownDate: String = ""
+    /// `todayKey` is derived from the clock, not published, so midnight is
+    /// observed via the system day-change note — not via an `AppState` tick.
+    /// (The old 20s live-activity broadcast used to drag this along for free.)
+    @State private var lastKnownToday: String = ""
 
     /// The day the whole page is showing. Every card reads this, so the screen
     /// is always one coherent day rather than cards disagreeing.
@@ -38,21 +46,28 @@ struct TodayView: View {
     /// Identity of the header as a scroll target. Sections use their own ids.
     static let headerAnchor = "today.header"
 
-    private let cols = [GridItem(.adaptive(minimum: 168), spacing: 12)]
-    private let mealCols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
-
     var body: some View {
         let sections = TodaySection.ordered()
         VStack(alignment: .leading, spacing: Gap.screen) {
-            header.knRise(0).id(Self.headerAnchor)
+            todayHeader.knRise(0).id(Self.headerAnchor)
                 // Deliberately NOT on the outer stack: two `.sheet` modifiers on
                 // the same view means only one of them presents.
                     ForEach(Array(sections.enumerated()), id: \.element.id) { idx, section in
                 // Each section hands its own colour and fill down; the card
                 // types themselves stay unaware they are on Today.
-                todaySection(section)
-                    .cardAccent(section.accent)
-                    .knRise(idx + 1)
+                Group {
+                    if section == .intake {
+                        // The hero sits on the canvas with extra air under it
+                        // so the rest of the page recedes — wherever reorder
+                        // puts it.
+                        todaySection(section)
+                            .padding(.bottom, Space.section)
+                    } else {
+                        todaySection(section)
+                    }
+                }
+                .cardAccent(section.accent)
+                .knRise(idx + 1)
             }
             #if os(macOS)
             settingsCard.knRise(7)
@@ -66,13 +81,21 @@ struct TodayView: View {
         // Observed so a reorder in Settings redraws immediately; `ordered()` is
         // a plain function call SwiftUI cannot depend on by itself.
         .onChange(of: order.version) { _, _ in }
-        .onAppear { if ownDate.isEmpty { ownDate = state.todayKey } }
+        .onAppear { if ownDate.isEmpty { ownDate = state.todayKey }; lastKnownToday = state.todayKey }
         // Seeded once and never re-synced, so a Mac left open overnight kept
         // showing — and writing to — yesterday: tapping Breakfast logged the meal
         // against the old key, ticking the workout marked the old day done.
-        .onChange(of: state.todayKey) { old, new in if ownDate == old { ownDate = new } }
+        .onChange(of: state.todayKey) { old, new in
+            lastKnownToday = new
+            if ownDate == old { ownDate = new }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            let t = state.todayKey
+            if ownDate == lastKnownToday { ownDate = t }
+            lastKnownToday = t
+        }
         .task {
-            if state.news == nil { await state.fetchNews() }
+            if newsUI.result == nil { await state.fetchNews() }
         }
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: selectedDate, meal: meal,
@@ -106,13 +129,15 @@ struct TodayView: View {
         case .weight:
             WeightCard(day: selectedDate)
         case .intake:
-            DayMacroHero(day: selectedDate)
+            DayMacroHero.make(state: state, day: selectedDate)
         case .meals:
-            mealsCard
+            // Snapshot: a meal log rebuilds this grid, nothing else on the page.
+            MealsGridView(tiles: MealKey.allCases.map(mealTileData),
+                          onTap: { Haptics.tap(); editingMeal = $0 })
         case .workout:
             WorkoutChecklistCard(day: selectedDate)
         case .comingUp:
-            comingUpCard
+            ComingUpView(rows: state.nextEvents.map(comingUpRow), onOpen: { go(.events) })
         case .bodyPhotos:
             #if os(iOS)
             BodyPhotosCard()
@@ -124,106 +149,35 @@ struct TodayView: View {
         case .focus:
             FocusCard(day: selectedDate, showsCalendar: false)
         case .news:
-            newsCard
+            NewsSectionView(
+                result: newsUI.result, busy: newsUI.busy, error: newsUI.error,
+                expanded: expandedNews,
+                onToggle: { id in
+                    if expandedNews.contains(id) { expandedNews.remove(id) } else { expandedNews.insert(id) }
+                },
+                onRefresh: { Task { await state.fetchNews() } },
+                onAsk: askAboutNews,
+                onOpenLink: { openURL($0) }
+            )
         }
     }
 
-    private var mealsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(text: "Meals")
-            LazyVGrid(columns: mealCols, spacing: 10) {
-                ForEach(MealKey.allCases) { meal in mealTile(meal) }
-            }
-        }
-    }
-
-    private func mealTile(_ meal: MealKey) -> some View {
-        let st = state.mealState(selectedDate, meal)
+    private func mealTileData(_ meal: MealKey) -> MealTileData {
         let items = state.mealDisplayItems(date: selectedDate, meal: meal)
-        let names = items.compactMap { state.food($0.foodId)?.name }
-        return Button { editingMeal = meal } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Image(systemName: meal.icon).font(.caption.weight(.semibold))
-                    Text(meal.label).font(.footnote.weight(.semibold))
-                    Spacer(minLength: 0)
-                    if st == .logged {
-                        Image(systemName: "checkmark.circle.fill").font(.footnote)
-                            .foregroundStyle(Palette.complete)
-                    }
-                }
-                .foregroundStyle(Palette.text)
-                Text(mealSubtitle(st, names))
-                    .font(.caption2).foregroundStyle(Palette.muted)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(minHeight: 28, alignment: .top)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // A logged meal fills with its own colour; one still open stays
-            // washed, so the grid reads at a glance without a legend.
-            // State is carried by the tick and the type, not by a fill — a
-            // logged meal is not a different kind of thing from a planned one.
-            .cardSkin(.plain)
-        }
-        .buttonStyle(.plain)
+        return MealTileData(meal: meal,
+                            state: state.mealState(selectedDate, meal),
+                            names: items.compactMap { state.food($0.foodId)?.name })
     }
 
-    private func mealSubtitle(_ st: MealLog.MealState, _ names: [String]) -> String {
-        switch st {
-        case .logged: return names.isEmpty ? "Logged" : names.joined(separator: ", ")
-        case .skipped: return "Skipped"
-        case .unconfirmed: return names.isEmpty ? "Nothing planned — tap to log" : names.joined(separator: ", ")
-        }
+    private func comingUpRow(_ e: EventItem) -> ComingUpRow {
+        let tag = state.primaryTag(for: e)
+        return ComingUpRow(id: e.id, title: e.title, special: e.special,
+                           countdown: eventCountdown(e),
+                           icon: tag?.symbol ?? "calendar",
+                           tint: tag?.color ?? Palette.action)
     }
 
     // MARK: - Coming up (next life events)
-
-    private var comingUpCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    SectionTitle(text: "Coming up")
-                    Spacer()
-                    Button { go(.events) } label: { Label("All events", systemImage: "calendar") }
-                        .buttonStyle(.borderless)
-                }
-                if state.nextEvents.isEmpty {
-                    Text("Nothing coming up. Tap All events to add one.")
-                        .font(.footnote).foregroundStyle(Palette.faint)
-                } else {
-                    ForEach(state.nextEvents) { e in
-                        Button { go(.events) } label: { eventLine(e) }
-                            .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private func eventLine(_ e: EventItem) -> some View {
-        let tag = state.primaryTag(for: e)
-        let color = tag?.color ?? Palette.action
-        let icon = tag?.symbol ?? "calendar"
-        return HStack(spacing: 11) {
-            Image(systemName: icon)
-                .font(.footnote.weight(.semibold)).foregroundStyle(color)
-                .frame(width: 30, height: 30)
-                .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    if e.special { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Palette.attention) }
-                    Text(e.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
-                }
-                Text(eventCountdown(e)).font(.caption2.weight(.heavy)).foregroundStyle(Palette.muted)
-            }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(Palette.faint)
-        }
-        .padding(.vertical, 3)
-        .contentShape(Rectangle())
-    }
 
     private func eventCountdown(_ e: EventItem) -> String {
         guard let d = state.daysUntil(e.date) else { return Fmt.day(e.date) }
@@ -241,162 +195,10 @@ struct TodayView: View {
     private let techCats: Set<String> = ["tech", "ai"]
     private let financeCats: Set<String> = ["markets", "india", "finance", "crypto"]
 
-    private var newsCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 8) {
-                    Image(systemName: "newspaper.fill").font(.footnote.weight(.bold)).foregroundStyle(Palette.blue)
-                    SectionTitle(text: "Tech & finance news")
-                    Spacer()
-                    Button { Task { await state.fetchNews() } } label: {
-                        HStack(spacing: 5) {
-                            if state.newsBusy { ProgressView().controlSize(.small) }
-                            Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(state.newsBusy)
-                }
-                if let n = state.news, !n.items.isEmpty {
-                    newsColumns(n)
-                    Text("Surfaced with AI · Google Search · tap a story for more")
-                        .font(.caption2).foregroundStyle(Palette.faint)
-                } else if state.newsBusy {
-                    HStack(spacing: 8) { ProgressView().controlSize(.small)
-                        Text("Getting today's news…").font(.footnote).foregroundStyle(Palette.muted) }
-                        .padding(.vertical, 6)
-                } else if let err = state.newsError {
-                    Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.warning)
-                } else {
-                    Button { Task { await state.fetchNews() } } label: { Label("Get today's news", systemImage: "newspaper") }
-                        .buttonStyle(.bordered)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func newsColumns(_ n: NewsResult) -> some View {
-        let tech = newsColumn("Tech", tint: Palette.information, icon: "cpu.fill",
-                              items: n.items.filter { techCats.contains($0.category) })
-        let finance = newsColumn("Finance", tint: Palette.green, icon: "indianrupeesign.circle.fill",
-                                 items: n.items.filter { financeCats.contains($0.category) })
-        #if os(iOS)
-        VStack(alignment: .leading, spacing: 16) { tech; finance }
-        #else
-        HStack(alignment: .top, spacing: 18) {
-            tech
-            Rectangle().fill(Palette.border).frame(width: 1)
-            finance
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        #endif
-    }
-
-    private func newsColumn(_ title: String, tint: Color, icon: String, items: [NewsResult.Item]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Image(systemName: icon).font(.caption2.weight(.bold)).foregroundStyle(tint)
-                Text(title.uppercased()).font(.caption2.weight(.heavy))
-                    .tracking(0.6).foregroundStyle(tint)
-            }
-            if items.isEmpty {
-                Text("Nothing today.").font(.caption).foregroundStyle(Palette.faint)
-            } else {
-                ForEach(items) { item in newsRow(item, tint: tint) }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func newsRow(_ item: NewsResult.Item, tint: Color) -> some View {
-        let open = expandedNews.contains(item.id)
-        return VStack(alignment: .leading, spacing: 8) {
-            Button {
-                withAnimation(.knFast) {
-                    if open { expandedNews.remove(item.id) } else { expandedNews.insert(item.id) }
-                }
-            } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(item.category.uppercased())
-                            .font(.caption2.weight(.heavy)).tracking(0.5)
-                            .foregroundStyle(newsColor(item.category))
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(newsColor(item.category).opacity(0.15), in: Capsule())
-                        if let t = item.time, !t.isEmpty {
-                            Text(t).font(.caption2.weight(.medium)).foregroundStyle(Palette.faint)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: open ? "chevron.up" : "chevron.down")
-                            .font(.caption2.weight(.bold)).foregroundStyle(Palette.faint)
-                    }
-                    Text(item.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
-                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
-                    Text(item.summary).font(.caption).foregroundStyle(Palette.muted)
-                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if open {
-                if let d = item.detail, !d.isEmpty {
-                    Text(d).font(.caption).foregroundStyle(Palette.muted)
-                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
-                }
-                HStack(spacing: 8) {
-                    if let s = item.source, !s.isEmpty {
-                        Button {
-                            if let u = item.url, let url = URL(string: u) { openURL(url) }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "link").font(.caption2.weight(.bold))
-                                Text(s).font(.caption2.weight(.heavy)).lineLimit(1)
-                                if item.url != nil { Image(systemName: "arrow.up.right").font(.caption2.weight(.bold)) }
-                            }
-                            .foregroundStyle(tint)
-                            .padding(.horizontal, 8).padding(.vertical, 5)
-                            .background(tint.opacity(0.14), in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(item.url == nil)
-                        .help(item.url ?? s)
-                    }
-                    Button { askAboutNews(item) } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "sparkles").font(.caption2.weight(.bold))
-                            Text("Ask AI").font(.caption2.weight(.heavy))
-                        }
-                        .foregroundStyle(Palette.action)
-                        .padding(.horizontal, 8).padding(.vertical, 5)
-                        .background(Palette.action.opacity(0.14), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Chat about this with your mentor")
-                    Spacer(minLength: 0)
-                }
-            }
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.surfaceElevated.opacity(open ? 0.4 : 0.18),
-                    in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
-    }
-
     private func askAboutNews(_ item: NewsResult.Item) {
         var p = "Explain this news and what it means for me and my finance content: \(item.title). \(item.summary)"
         if let d = item.detail, !d.isEmpty { p += " \(d)" }
         state.askMentor(p)
-    }
-
-    private func newsColor(_ cat: String) -> Color {
-        switch cat {
-        case "ai", "tech": return Palette.information
-        case "markets", "india": return Palette.green
-        case "crypto": return Palette.attention
-        default: return Palette.blue
-        }
     }
 
     // MARK: - AI "what to do now"
@@ -411,16 +213,16 @@ struct TodayView: View {
                     Spacer()
                     Button { Task { await state.fetchSuggestions() } } label: {
                         HStack(spacing: 5) {
-                            if state.suggestBusy { ProgressView().controlSize(.small) }
+                            if suggestUI.busy { ProgressView().controlSize(.small) }
                             Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                         }
                     }
                     .buttonStyle(.borderless)
-                    .disabled(state.suggestBusy)
+                    .disabled(suggestUI.busy)
                     .help("Refresh suggestions")
                 }
 
-                if let s = state.suggestions {
+                if let s = suggestUI.result {
                     if !s.headline.isEmpty {
                         Text(s.headline).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                             .fixedSize(horizontal: false, vertical: true)
@@ -428,13 +230,13 @@ struct TodayView: View {
                     ForEach(Array(s.suggestions.enumerated()), id: \.element.id) { i, item in
                         suggestionRow(index: i + 1, item: item)
                     }
-                } else if state.suggestBusy {
+                } else if suggestUI.busy {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Reading your day…").font(.footnote).foregroundStyle(Palette.muted)
                     }
                     .padding(.vertical, 6)
-                } else if let err = state.suggestError {
+                } else if let err = suggestUI.error {
                     VStack(alignment: .leading, spacing: 8) {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(Palette.attention)
@@ -515,60 +317,24 @@ struct TodayView: View {
         return f.string(from: parsed)
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(greeting + ", " + state.profile.name)
-                    .font(.subheadline).foregroundStyle(Palette.muted)
-                ScreenTitle(text: pagedWeekdayName)
-                HStack(spacing: 8) {
-                    Text(pagedPrettyDate).font(.footnote).foregroundStyle(Palette.muted)
-                    if selectedDate != state.todayKey {
-                        // The only affordance for getting home — the page has no
-                        // arrows by design, so leaving without one would strand you.
-                        Button("Today") { withAnimation(.knNormal) { setDate(state.todayKey) } }
-                            .buttonStyle(.plain)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(Palette.action)
-                    }
-                }
-            }
-            Spacer(minLength: 8)
-            streakChip
-        }
-    }
-
-    /// `{mark} {n} days` — the streak, counted on steps. Tap opens Fitness,
-    /// hold opens the month.
-    ///
-    /// It used to count journal entries, which measured whether the day had been
-    /// written down rather than whether it had been walked. Steps is the thing
-    /// actually being worked at, so steps is what the number on Today means now.
-    private var streakChip: some View {
+    /// The header as values: greeting, day, streak snapshot. A data tick that
+    /// changes none of it skips the row via `Equatable`.
+    private var todayHeader: some View {
         let n = state.stepStreak
         let todayHit = state.steps(on: state.todayKey) >= state.stepGoals.daily
-        return Button { go(.fitness) } label: {
-            HStack(spacing: 8) {
-                StepMark(day: todayHit ? state.stepDay(state.todayKey) : (n > 0 ? .pending : .none), size: 20)
-                Text("\(n)")
-                    .font(.title2.weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.text)
-                Text(n == 1 ? "day" : "days")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Palette.muted)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(Palette.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder((todayHit ? Palette.complete : Palette.activity).opacity(0.4), lineWidth: 1.5))
-        }
-        .buttonStyle(.plain)
-        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-            Haptics.tap()
-            showStreakCal = true
-        })
-        .accessibilityLabel("Step streak, \(n) days. Hold for calendar.")
-        .help("Tap for steps. Hold for the streak calendar.")
+        return TodayHeaderView(
+            greeting: greeting,
+            name: state.profile.name,
+            weekday: pagedWeekdayName,
+            prettyDate: pagedPrettyDate,
+            isToday: selectedDate == state.todayKey,
+            streak: n,
+            todayHit: todayHit,
+            mark: todayHit ? state.stepDay(state.todayKey) : (n > 0 ? .pending : .none),
+            onToday: { withAnimation(.knNormal) { setDate(state.todayKey) } },
+            onFitness: { go(.fitness) },
+            onCalendar: { showStreakCal = true }
+        )
     }
 
     private var streakCalendarSheet: some View {
@@ -655,14 +421,14 @@ struct TodayView: View {
             Card {
                 HStack(spacing: 10) {
                     Image(systemName: "gearshape.fill").foregroundStyle(Palette.muted)
-                    Text("Settings").font(.body).foregroundStyle(Palette.text)
+                    Text("Settings").font(.myBody).foregroundStyle(Palette.text)
                     Spacer()
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    Image(systemName: "chevron.right").font(.myCaption.weight(.semibold))
                         .foregroundStyle(Palette.faint)
                 }
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable(scale: 0.99)
     }
     #endif
 
@@ -692,10 +458,409 @@ struct TodayView: View {
     }
 }
 
+// MARK: - Value-driven Today sections
+//
+// TodayView still observes the store, so its body re-runs on any data tick.
+// These sections take snapshots instead: when a tick changes nothing they
+// show, `Equatable` skips their bodies — logging a meal rebuilds meals and
+// the hero, not news, photos, and the header.
+
+/// Greeting + weekday + streak. Values in, no store reads.
+struct TodayHeaderView: View, Equatable {
+    let greeting: String
+    let name: String
+    let weekday: String
+    let prettyDate: String
+    let isToday: Bool
+    let streak: Int
+    let todayHit: Bool
+    let mark: StepDay
+    let onToday: () -> Void
+    let onFitness: () -> Void
+    let onCalendar: () -> Void
+
+    static func == (lhs: TodayHeaderView, rhs: TodayHeaderView) -> Bool {
+        lhs.greeting == rhs.greeting && lhs.name == rhs.name
+            && lhs.weekday == rhs.weekday && lhs.prettyDate == rhs.prettyDate
+            && lhs.isToday == rhs.isToday && lhs.streak == rhs.streak
+            && lhs.todayHit == rhs.todayHit && lhs.mark == rhs.mark
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(greeting + ", " + name)
+                    .font(.myBody).foregroundStyle(Palette.muted)
+                Text(weekday)
+                    .font(.myHeading).foregroundStyle(Palette.text)
+                HStack(spacing: 8) {
+                    Text(prettyDate).font(.myCaption).foregroundStyle(Palette.muted)
+                    if !isToday {
+                        // The only affordance for getting home — the page has no
+                        // arrows by design, so leaving without one would strand you.
+                        Button("Today") { onToday() }
+                            .buttonStyle(.plain)
+                            .font(.myCaption.weight(.bold))
+                            .foregroundStyle(Palette.action)
+                    }
+                }
+            }
+            Spacer(minLength: 8)
+            Button { onFitness() } label: {
+                HStack(spacing: 8) {
+                    StepMark(day: mark, size: 20)
+                    Text("\(streak)")
+                        .font(.title2.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.text)
+                    Text(streak == 1 ? "day" : "days")
+                        .font(.myCaption.weight(.semibold))
+                        .foregroundStyle(Palette.muted)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 10)
+                .background(Palette.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder((todayHit ? Palette.complete : Palette.activity).opacity(0.4), lineWidth: 1.5))
+            }
+            .fluidPressable(scale: 0.99)
+            .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                Haptics.tap()
+                onCalendar()
+            })
+            .accessibilityLabel("Step streak, \(streak) days. Hold for calendar.")
+            .help("Tap for steps. Hold for the streak calendar.")
+        }
+    }
+}
+
+/// One meal tile's snapshot. State travels as a value; the tick — not a fill —
+/// carries logged vs open.
+struct MealTileData: Equatable {
+    let meal: MealKey
+    let state: MealLog.MealState
+    let names: [String]
+}
+
+/// The 2×2 meal grid. Body type, press-down tiles, tick-not-fill.
+struct MealsGridView: View, Equatable {
+    let tiles: [MealTileData]
+    let onTap: (MealKey) -> Void
+
+    static func == (lhs: MealsGridView, rhs: MealsGridView) -> Bool {
+        lhs.tiles == rhs.tiles
+    }
+
+    private let cols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionTitle(text: "Meals")
+            LazyVGrid(columns: cols, spacing: 10) {
+                ForEach(tiles, id: \.meal) { tile in
+                    MealTileView(tile: tile, onTap: { onTap(tile.meal) })
+                }
+            }
+        }
+    }
+}
+
+private struct MealTileView: View {
+    let tile: MealTileData
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: tile.meal.icon).font(.myBody.weight(.semibold))
+                    Text(tile.meal.label).font(.myBody.weight(.semibold))
+                    Spacer(minLength: 0)
+                    if tile.state == .logged {
+                        Image(systemName: "checkmark.circle.fill").font(.myBody)
+                            .foregroundStyle(Palette.complete)
+                    }
+                }
+                .foregroundStyle(Palette.text)
+                Text(MealsGridView.subtitle(tile.state, tile.names))
+                    .font(.myCaption).foregroundStyle(Palette.muted)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 30, alignment: .top)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // State is carried by the tick and the type, not by a fill — a
+            // logged meal is not a different kind of thing from a planned one.
+            .cardSkin(.plain)
+        }
+        .fluidPressable()
+    }
+}
+
+extension MealsGridView {
+    fileprivate static func subtitle(_ st: MealLog.MealState, _ names: [String]) -> String {
+        switch st {
+        case .logged: return names.isEmpty ? "Logged" : names.joined(separator: ", ")
+        case .skipped: return "Skipped"
+        case .unconfirmed: return names.isEmpty ? "Nothing planned — tap to log" : names.joined(separator: ", ")
+        }
+    }
+}
+
+/// One coming-up row's snapshot.
+struct ComingUpRow: Equatable {
+    let id: String
+    let title: String
+    let special: Bool
+    let countdown: String
+    let icon: String
+    let tint: Color
+}
+
+/// Coming up, chromeless: a section title plus rows, not another card.
+struct ComingUpView: View, Equatable {
+    let rows: [ComingUpRow]
+    let onOpen: () -> Void
+
+    static func == (lhs: ComingUpView, rhs: ComingUpView) -> Bool {
+        lhs.rows == rhs.rows
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                SectionTitle(text: "Coming up")
+                Spacer()
+                Button { onOpen() } label: { Label("All events", systemImage: "calendar") }
+                    .buttonStyle(.borderless)
+            }
+            if rows.isEmpty {
+                Text("Nothing coming up. Tap All events to add one.")
+                    .font(.myBody).foregroundStyle(Palette.faint)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(rows, id: \.id) { row in
+                        Button { onOpen() } label: { ComingUpRowView(row: row) }
+                            .buttonStyle(.plain)
+                            .fluidPressable(scale: 0.99)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ComingUpRowView: View {
+    let row: ComingUpRow
+
+    var body: some View {
+        HStack(spacing: 11) {
+            Image(systemName: row.icon)
+                .font(.myBody.weight(.semibold)).foregroundStyle(row.tint)
+                .frame(width: 30, height: 30)
+                .background(row.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    if row.special { Image(systemName: "star.fill").font(.myCaption).foregroundStyle(Palette.attention) }
+                    Text(row.title).font(.myBody.weight(.semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                }
+                Text(row.countdown).font(.myCaption.weight(.heavy)).foregroundStyle(Palette.muted)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.myCaption.weight(.semibold)).foregroundStyle(Palette.faint)
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+    }
+}
+
+/// News, chromeless: section title plus rows. Reads the news store through
+/// values, so a data tick that is not news skips it.
+struct NewsSectionView: View, Equatable {
+    let result: NewsResult?
+    let busy: Bool
+    let error: String?
+    let expanded: Set<String>
+    let onToggle: (String) -> Void
+    let onRefresh: () -> Void
+    let onAsk: (NewsResult.Item) -> Void
+    let onOpenLink: (URL) -> Void
+
+    static func == (lhs: NewsSectionView, rhs: NewsSectionView) -> Bool {
+        lhs.result == rhs.result && lhs.busy == rhs.busy
+            && lhs.error == rhs.error && lhs.expanded == rhs.expanded
+    }
+
+    private let techCats: Set<String> = ["tech", "ai"]
+    private let financeCats: Set<String> = ["markets", "india", "finance", "crypto"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "newspaper.fill").font(.myBody.weight(.bold)).foregroundStyle(Palette.blue)
+                SectionTitle(text: "Tech & finance news")
+                Spacer()
+                Button { onRefresh() } label: {
+                    HStack(spacing: 5) {
+                        if busy { ProgressView().controlSize(.small) }
+                        Image(systemName: "arrow.clockwise").font(.myCaption.weight(.bold))
+                    }
+                }
+                .buttonStyle(.borderless)
+                .disabled(busy)
+            }
+            if let n = result, !n.items.isEmpty {
+                newsColumns(n)
+                Text("Surfaced with AI · Google Search · tap a story for more")
+                    .font(.myCaption).foregroundStyle(Palette.faint)
+            } else if busy {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Getting today's news…").font(.myBody).foregroundStyle(Palette.muted)
+                }
+                .padding(.vertical, 6)
+            } else if let error {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.myCaption).foregroundStyle(Palette.warning)
+            } else {
+                Button { onRefresh() } label: { Label("Get today's news", systemImage: "newspaper") }
+                    .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func newsColumns(_ n: NewsResult) -> some View {
+        let tech = newsColumn("Tech", tint: Palette.information, icon: "cpu.fill",
+                              items: n.items.filter { techCats.contains($0.category) })
+        let finance = newsColumn("Finance", tint: Palette.green, icon: "indianrupeesign.circle.fill",
+                                 items: n.items.filter { financeCats.contains($0.category) })
+        #if os(iOS)
+        VStack(alignment: .leading, spacing: 16) { tech; finance }
+        #else
+        HStack(alignment: .top, spacing: 18) {
+            tech
+            Rectangle().fill(Palette.border).frame(width: 1)
+            finance
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        #endif
+    }
+
+    private func newsColumn(_ title: String, tint: Color, icon: String, items: [NewsResult.Item]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: icon).font(.myCaption.weight(.bold)).foregroundStyle(tint)
+                Text(title.uppercased()).font(.myCaption.weight(.heavy))
+                    .tracking(0.6).foregroundStyle(tint)
+            }
+            if items.isEmpty {
+                Text("Nothing today.").font(.myCaption).foregroundStyle(Palette.faint)
+            } else {
+                ForEach(items) { item in
+                    NewsRowView(item: item, tint: tint, open: expanded.contains(item.id),
+                                onToggle: { onToggle(item.id) },
+                                onAsk: { onAsk(item) },
+                                onOpenLink: onOpenLink)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    static func color(for category: String) -> Color {
+        switch category {
+        case "ai", "tech": return Palette.information
+        case "markets", "india": return Palette.green
+        case "crypto": return Palette.attention
+        default: return Palette.blue
+        }
+    }
+}
+
+private struct NewsRowView: View {
+    let item: NewsResult.Item
+    let tint: Color
+    let open: Bool
+    let onToggle: () -> Void
+    let onAsk: () -> Void
+    let onOpenLink: (URL) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.knFast) { onToggle() }
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(item.category.uppercased())
+                            .font(.myCaption.weight(.heavy)).tracking(0.5)
+                            .foregroundStyle(NewsSectionView.color(for: item.category))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(NewsSectionView.color(for: item.category).opacity(0.15), in: Capsule())
+                        if let t = item.time, !t.isEmpty {
+                            Text(t).font(.myCaption.weight(.medium)).foregroundStyle(Palette.faint)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: open ? "chevron.up" : "chevron.down")
+                            .font(.myCaption.weight(.bold)).foregroundStyle(Palette.faint)
+                    }
+                    Text(item.title).font(.myBody.weight(.semibold)).foregroundStyle(Palette.text)
+                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
+                    Text(item.summary).font(.myCaption).foregroundStyle(Palette.muted)
+                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if open {
+                if let d = item.detail, !d.isEmpty {
+                    Text(d).font(.myCaption).foregroundStyle(Palette.muted)
+                        .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.leading)
+                }
+                HStack(spacing: 8) {
+                    if let s = item.source, !s.isEmpty {
+                        Button {
+                            if let u = item.url, let url = URL(string: u) { onOpenLink(url) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "link").font(.myCaption.weight(.bold))
+                                Text(s).font(.myCaption.weight(.heavy)).lineLimit(1)
+                                if item.url != nil { Image(systemName: "arrow.up.right").font(.myCaption.weight(.bold)) }
+                            }
+                            .foregroundStyle(tint)
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .background(tint.opacity(0.14), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(item.url == nil)
+                        .help(item.url ?? s)
+                    }
+                    Button(action: onAsk) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles").font(.myCaption.weight(.bold))
+                            Text("Ask AI").font(.myCaption.weight(.heavy))
+                        }
+                        .foregroundStyle(Palette.action)
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .background(Palette.action.opacity(0.14), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Chat about this with your mentor")
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.surfaceElevated.opacity(open ? 0.4 : 0.18),
+                    in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+    }
+}
+
 /// `scrollTargetLayout` only where a pager needs it — applying it on Mac would
 /// make every card a scroll target for no reason.
-private struct ScrollAnchors: ViewModifier {
-    let enabled: Bool
+private struct ScrollAnchors: ViewModifier {    let enabled: Bool
     @ViewBuilder
     func body(content: Content) -> some View {
         if enabled { content.scrollTargetLayout() } else { content }

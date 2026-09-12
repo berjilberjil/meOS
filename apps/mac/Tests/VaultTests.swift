@@ -124,4 +124,32 @@ final class VaultTests: XCTestCase {
         XCTAssertEqual(k1.withUnsafeBytes { Data($0) }, k1b.withUnsafeBytes { Data($0) })
         XCTAssertNotEqual(k1.withUnsafeBytes { Data($0) }, k2.withUnsafeBytes { Data($0) })
     }
+
+    /// The off-main-thread split (`derive*` pure, `adopt*` on the actor) must
+    /// derive exactly what the inline path derives: a fresh device adopting a
+    /// derived setup unlocks and reads, and a wrong passphrase still fails.
+    func testDerivedSetupAdoptsIntoWorkingVault() throws {
+        let m = try Vault.deriveSetup(passphrase: "off-main-pass-1")
+        let v = Vault()
+        XCTAssertFalse(v.isUnlocked)
+        v.adoptSetup(m)
+        XCTAssertTrue(v.isUnlocked)
+        let env = try v.sealValue(financeJSON, key: "myos.finance")
+        let envObj = try JSONSerialization.jsonObject(with: env) as! [String: Any]
+        XCTAssertEqual(try v.openValue(envObj, key: "myos.finance"), financeJSON)
+
+        // Same meta, derived unlock path.
+        let other = Vault(); other.adoptMeta(m.meta)
+        let dekData = try Vault.deriveUnlockDEK(passphrase: "off-main-pass-1", meta: m.meta)
+        try other.adoptUnwrapped(dekData, meta: m.meta)
+        XCTAssertTrue(other.isUnlocked)
+        XCTAssertEqual(try other.openValue(envObj, key: "myos.finance"), financeJSON)
+
+        let recovery = Vault(); recovery.adoptMeta(m.meta)
+        let recData = try Vault.deriveUnlockDEK(recoveryCode: m.recoveryCode, meta: m.meta)
+        try recovery.adoptUnwrapped(recData, meta: m.meta)
+        XCTAssertTrue(recovery.isUnlocked)
+
+        XCTAssertThrowsError(try Vault.deriveUnlockDEK(passphrase: "wrong-pass", meta: m.meta))
+    }
 }

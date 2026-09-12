@@ -49,7 +49,10 @@ struct WorkoutSessionView: View {
                                 .font(.footnote).foregroundStyle(Palette.faint)
                         }
                     }
-                    ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                    // Keyed by muscle group, not position: groups come and go as
+                    // exercises are added, and an index id would remount every
+                    // card below the insertion and lose their in-flight state.
+                    ForEach(Array(sections.enumerated()), id: \.element.0) { _, section in
                         VStack(alignment: .leading, spacing: Gap.tight) {
                             HStack(spacing: 8) {
                                 Circle().fill(section.group.tint).frame(width: 7, height: 7)
