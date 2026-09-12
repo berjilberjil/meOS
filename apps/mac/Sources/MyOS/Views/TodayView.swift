@@ -6,6 +6,10 @@ import AppKit
 struct TodayView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var order = TodaySection.OrderSignal.shared
+    /// News + suggestions fetch state — observed by those two cards only, so a
+    /// refresh or a chat reply never rebuilds the whole page.
+    @ObservedObject private var newsUI = NewsUIStore.shared
+    @ObservedObject private var suggestUI = SuggestUIStore.shared
     @ObservedObject private var signals = UISignals.shared
     @Environment(\.openURL) private var openURL
     var go: (NavTab) -> Void
@@ -23,6 +27,10 @@ struct TodayView: View {
     @State private var showStreakCal = false
     /// The day this page is showing when nobody outside is driving it.
     @State private var ownDate: String = ""
+    /// `todayKey` is derived from the clock, not published, so midnight is
+    /// observed via the system day-change note — not via an `AppState` tick.
+    /// (The old 20s live-activity broadcast used to drag this along for free.)
+    @State private var lastKnownToday: String = ""
 
     /// The day the whole page is showing. Every card reads this, so the screen
     /// is always one coherent day rather than cards disagreeing.
@@ -66,13 +74,21 @@ struct TodayView: View {
         // Observed so a reorder in Settings redraws immediately; `ordered()` is
         // a plain function call SwiftUI cannot depend on by itself.
         .onChange(of: order.version) { _, _ in }
-        .onAppear { if ownDate.isEmpty { ownDate = state.todayKey } }
+        .onAppear { if ownDate.isEmpty { ownDate = state.todayKey }; lastKnownToday = state.todayKey }
         // Seeded once and never re-synced, so a Mac left open overnight kept
         // showing — and writing to — yesterday: tapping Breakfast logged the meal
         // against the old key, ticking the workout marked the old day done.
-        .onChange(of: state.todayKey) { old, new in if ownDate == old { ownDate = new } }
+        .onChange(of: state.todayKey) { old, new in
+            lastKnownToday = new
+            if ownDate == old { ownDate = new }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            let t = state.todayKey
+            if ownDate == lastKnownToday { ownDate = t }
+            lastKnownToday = t
+        }
         .task {
-            if state.news == nil { await state.fetchNews() }
+            if newsUI.result == nil { await state.fetchNews() }
         }
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: selectedDate, meal: meal,
@@ -250,22 +266,22 @@ struct TodayView: View {
                     Spacer()
                     Button { Task { await state.fetchNews() } } label: {
                         HStack(spacing: 5) {
-                            if state.newsBusy { ProgressView().controlSize(.small) }
+                            if newsUI.busy { ProgressView().controlSize(.small) }
                             Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                         }
                     }
                     .buttonStyle(.borderless)
-                    .disabled(state.newsBusy)
+                    .disabled(newsUI.busy)
                 }
-                if let n = state.news, !n.items.isEmpty {
+                if let n = newsUI.result, !n.items.isEmpty {
                     newsColumns(n)
                     Text("Surfaced with AI · Google Search · tap a story for more")
                         .font(.caption2).foregroundStyle(Palette.faint)
-                } else if state.newsBusy {
+                } else if newsUI.busy {
                     HStack(spacing: 8) { ProgressView().controlSize(.small)
                         Text("Getting today's news…").font(.footnote).foregroundStyle(Palette.muted) }
                         .padding(.vertical, 6)
-                } else if let err = state.newsError {
+                } else if let err = newsUI.error {
                     Label(err, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.warning)
                 } else {
                     Button { Task { await state.fetchNews() } } label: { Label("Get today's news", systemImage: "newspaper") }
@@ -411,16 +427,16 @@ struct TodayView: View {
                     Spacer()
                     Button { Task { await state.fetchSuggestions() } } label: {
                         HStack(spacing: 5) {
-                            if state.suggestBusy { ProgressView().controlSize(.small) }
+                            if suggestUI.busy { ProgressView().controlSize(.small) }
                             Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
                         }
                     }
                     .buttonStyle(.borderless)
-                    .disabled(state.suggestBusy)
+                    .disabled(suggestUI.busy)
                     .help("Refresh suggestions")
                 }
 
-                if let s = state.suggestions {
+                if let s = suggestUI.result {
                     if !s.headline.isEmpty {
                         Text(s.headline).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
                             .fixedSize(horizontal: false, vertical: true)
@@ -428,13 +444,13 @@ struct TodayView: View {
                     ForEach(Array(s.suggestions.enumerated()), id: \.element.id) { i, item in
                         suggestionRow(index: i + 1, item: item)
                     }
-                } else if state.suggestBusy {
+                } else if suggestUI.busy {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Reading your day…").font(.footnote).foregroundStyle(Palette.muted)
                     }
                     .padding(.vertical, 6)
-                } else if let err = state.suggestError {
+                } else if let err = suggestUI.error {
                     VStack(alignment: .leading, spacing: 8) {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
                             .font(.caption).foregroundStyle(Palette.attention)

@@ -279,6 +279,7 @@ struct FoodScanPayload: Identifiable {
 /// it into one or more draft Foods, reviewed next in `FoodScanReviewSheet`.
 struct FoodScanSheet: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @Environment(\.dismiss) private var dismiss
     let onRead: (String, [Food]) -> Void
 
@@ -294,7 +295,7 @@ struct FoodScanSheet: View {
                 title: "Drop a nutrition label or product photo",
                 subtitle: "A packaged snack, a menu item, anything with visible macros. AI adds it to your food library and you confirm before it's logged.",
                 tint: Palette.action,
-                busy: state.imageBusy
+                busy: busy.image
             ) { imgs, mt in
                 Task { @MainActor in
                     let r = await state.analyzeFood(imagesBase64: imgs, mediaType: mt)

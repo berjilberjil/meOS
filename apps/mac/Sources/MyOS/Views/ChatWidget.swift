@@ -19,6 +19,10 @@ extension ChatWidget {
 struct ChatWidget: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var agent = AgentConfig.shared
+    /// Chat presence — observed here so Catherine thinking rebuilds only this
+    /// widget, never the shell or Today.
+    @ObservedObject private var chatUI = ChatUIStore.shared
+    @ObservedObject private var suggestUI = SuggestUIStore.shared
     @ObservedObject private var themeStore = ThemeStore.shared
     @State private var pres = ChatPresentation()
     @State private var showHistory = false
@@ -36,13 +40,20 @@ struct ChatWidget: View {
             else { launcher.transition(.scale.combined(with: .opacity)) }
         }
         .animation(.knPop, value: pres.open)
-        .onChange(of: state.pendingChatPrompt) { _, p in handlePending(p) }
+        .onChange(of: chatUI.pendingPrompt) { _, p in handlePending(p) }
     }
 
     private var macPanel: some View {
         panelBody
             .frame(width: 384, height: 544)
-            .background(Palette.elevated, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+            // A parallel, non-blocking panel (§12): translucency and offset,
+            // no scrim — the flow behind it isn't broken. The material blurs
+            // the desktop; the canvas tint keeps the one-black identity; the
+            // system renders it solid under Reduce Transparency.
+            .background(Palette.elevated.opacity(0.55),
+                        in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+            .background(.ultraThinMaterial,
+                        in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
                 .strokeBorder(Palette.border, lineWidth: 1))
             .knShadow(true)
@@ -50,7 +61,7 @@ struct ChatWidget: View {
     #else
     private var content: some View {
         launcher
-            .onChange(of: state.pendingChatPrompt) { _, p in handlePending(p) }
+            .onChange(of: chatUI.pendingPrompt) { _, p in handlePending(p) }
             // ONE cover. Starting a call swaps its contents; a second
             // `.fullScreenCover` on this same view would silently never open,
             // because the button that triggers it lives inside this one.
@@ -74,7 +85,7 @@ struct ChatWidget: View {
     private func handlePending(_ p: String?) {
         guard let p, !p.isEmpty else { return }
         pres.openChat(); showHistory = false
-        state.pendingChatPrompt = nil
+        chatUI.pendingPrompt = nil
         Task { await state.sendChat(p) }
     }
 
@@ -94,7 +105,7 @@ struct ChatWidget: View {
             }
             .frame(width: 40, height: 40)
             .overlay(alignment: .topTrailing) {
-                if state.chatBusy {
+                if chatUI.busy {
                     Circle().fill(Palette.attention).frame(width: 12, height: 12)
                         .overlay(Circle().strokeBorder(Palette.background, lineWidth: 2))
                         .offset(x: 2, y: -2)
@@ -179,20 +190,20 @@ struct ChatWidget: View {
                     let msgs = state.activeThread?.messages ?? []
                     if msgs.isEmpty { emptyState }
                     ForEach(msgs) { m in bubble(m).id(m.id) }
-                    if state.chatBusy, (msgs.last?.content.isEmpty ?? true) {
+                    if chatUI.busy, (msgs.last?.content.isEmpty ?? true) {
                         HStack(spacing: 6) {
                             ProgressView().controlSize(.small)
                             Text("Thinking…").font(.caption).foregroundStyle(Palette.faint)
                         }
                     }
-                    if let err = state.chatError {
+                    if let err = chatUI.chatError {
                         HStack(spacing: 8) {
                             Label(err, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption2).foregroundStyle(Palette.warning)
+                                .font(.caption).foregroundStyle(Palette.warning)
                             Button("Retry") { Task { await state.retryLastChat() } }
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(Palette.action)
-                                .disabled(state.chatBusy)
+                                .disabled(chatUI.busy)
                         }
                     }
                     Color.clear.frame(height: 1).id("chat-bottom")
@@ -206,7 +217,7 @@ struct ChatWidget: View {
             .onAppear { scrollDown(proxy) }
             .onChange(of: state.activeThread?.messages.count ?? 0) { _, _ in scrollDown(proxy) }
             .onChange(of: state.activeThread?.messages.last?.content.count ?? 0) { _, _ in scrollDown(proxy) }
-            .onChange(of: state.chatBusy) { _, _ in scrollDown(proxy) }
+            .onChange(of: chatUI.busy) { _, _ in scrollDown(proxy) }
             .onChange(of: state.chat.activeID) { _, _ in scrollDown(proxy) }
             .onChange(of: inputFocused) { _, on in if on { scrollDown(proxy) } }
         }
@@ -274,11 +285,11 @@ struct ChatWidget: View {
                     .font(.caption2.weight(.heavy)).tracking(0.7)
                     .foregroundStyle(Palette.muted)
                 Spacer()
-                if state.suggestBusy {
+                if suggestUI.busy {
                     ProgressView().controlSize(.small)
                 }
             }
-            if let s = state.suggestions {
+            if let s = suggestUI.result {
                 if !s.headline.isEmpty {
                     Text(s.headline)
                         .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
@@ -291,9 +302,9 @@ struct ChatWidget: View {
                     }
                     .padding(.top, 2)
                 }
-            } else if state.suggestBusy {
+            } else if suggestUI.busy {
                 Text("Reading your day…").font(.footnote).foregroundStyle(Palette.faint)
-            } else if let err = state.suggestError {
+            } else if let err = suggestUI.error {
                 Text(err).font(.footnote).foregroundStyle(Palette.warning)
             } else {
                 Text("Open this and I’ll tell you what’s going on.")
@@ -392,12 +403,12 @@ struct ChatWidget: View {
     }
 
     private var canSend: Bool {
-        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !state.chatBusy
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !chatUI.busy
     }
 
     private func send() {
         let t = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, !state.chatBusy else { return }
+        guard !t.isEmpty, !chatUI.busy else { return }
         draft = ""
         Task { await state.sendChat(t) }
     }

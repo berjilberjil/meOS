@@ -11,6 +11,9 @@ struct MacroPulseView: View {
     var onClose: (() -> Void)? = nil
 
     @EnvironmentObject var state: AppState
+    /// Macro fetch state — observed here so a refresh rebuilds only this
+    /// screen, never the shell or Today.
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var date = AppState.dateKey(Date())
@@ -36,7 +39,7 @@ struct MacroPulseView: View {
                         if !snap.regime.isEmpty { regimeBlock(snap) }
                         if let brief = snap.brief { briefBlock(brief) }
                         provenance(snap)
-                    } else if state.macroBusy {
+                    } else if busy.macro {
                         loading
                     } else {
                         empty
@@ -75,7 +78,7 @@ struct MacroPulseView: View {
                 Text("MACRO PULSE")
                     .font(.caption2.weight(.heavy)).tracking(1.2)
                     .foregroundStyle(Palette.action)
-                if state.macroBusy {
+                if busy.macro {
                     Text("reading…")
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.faint)
@@ -94,7 +97,7 @@ struct MacroPulseView: View {
                 Image(systemName: "arrow.clockwise").font(.caption.weight(.bold))
             }
             .buttonStyle(.borderless)
-            .disabled(state.macroBusy)
+            .disabled(busy.macro)
             .help("Fetch again now")
         }
         .padding(.horizontal, 16).padding(.vertical, 12)

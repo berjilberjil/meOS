@@ -10,9 +10,10 @@ import SwiftUI
 /// large-title block eating the top of the page. Screens must therefore NOT draw
 /// their own title — theirs are `#if os(macOS)`.
 struct MainView: View {
-    @EnvironmentObject var state: AppState
+    // No `AppState` here on purpose: the shell must not rebuild when a module
+    // ticks (chat, sync, activity). Feed/sync work lives in `SyncHooks` below
+    // and never invalidates the tab chrome.
     @ObservedObject private var themeStore = ThemeStore.shared
-    @Environment(\.scenePhase) private var scenePhase
     @State private var tab: NavTab = PrefsStore.shared.resolveOpeningTab(allowed: NavTab.iosTabs)
     @State private var showSettings = false
     /// Drives the programmatic push to Journal/Events from a notification.
@@ -127,18 +128,12 @@ struct MainView: View {
         // nothing at all.
         .onAppear { consumeRoute() }
         .onChange(of: signals.pendingRoute) { _, _ in consumeRoute() }
-        // Every heavy import lives here, not in the cards. Today is paged by
-        // day, so a card-level `.task` runs once per live page — i.e. three
-        // times, and again on every swipe.
-        .task { await refreshFeeds() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                Task {
-                    await state.pullRemote()
-                    await refreshFeeds()
-                }
-            }
-        }
+        // Heavy imports + live sync live in `SyncHooks`, not in the cards and
+        // not in this shell. Today is paged by day, so a card-level `.task`
+        // runs once per live page — i.e. three times, and again on every
+        // swipe — and shell-level observation would rebuild every tab on
+        // every tick.
+        .background(SyncHooks())
     }
 
     /// Screens other than Today and Productivity carry no `ScrollView` of their
@@ -152,16 +147,6 @@ struct MainView: View {
                 .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-    }
-
-    /// Photos, steps and anything shared in from outside. `drainShareInbox`
-    /// runs last so a video shared while the app was away is appended to fresh
-    /// state rather than a stale copy.
-    private func refreshFeeds() async {
-        await FavoritesBodyImporter.sync()
-        await ProgressPhotoSync.syncAll()
-        await HealthSteps.syncRecent(into: state)
-        await state.drainShareInbox()
     }
 
     /// Take a tapped notification to the thing it is about.
@@ -206,22 +191,58 @@ struct MainView: View {
     }
 }
 
+/// Feed + sync work for the iOS shell, isolated in one invisible view.
+///
+/// The only thing in this shell that observes `AppState`. Heavy imports run
+/// once here (never per Today page), and a sync/chat/activity tick
+/// invalidates this empty view — never the tab bar or its content.
+private struct SyncHooks: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .task { await Self.refreshFeeds(into: state) }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    Task {
+                        await state.pullRemote()
+                        await Self.refreshFeeds(into: state)
+                    }
+                }
+            }
+    }
+
+    /// Photos, steps and anything shared in from outside. `drainShareInbox`
+    /// runs last so a video shared while the app was away is appended to fresh
+    /// state rather than a stale copy.
+    static func refreshFeeds(into state: AppState) async {
+        await FavoritesBodyImporter.sync()
+        await ProgressPhotoSync.syncAll()
+        await HealthSteps.syncRecent(into: state)
+        await state.drainShareInbox()
+    }
+}
+
 private extension View {
-    /// One screen's bar: compact, name on the left, and a tab bar that actually
-    /// draws its material. Applied per tab — `.toolbarBackground` set on the
-    /// TabView itself does not reach the bars inside each tab, which is why
-    /// content was showing through the tab labels.
+    /// One screen's bar: compact, name on the left, and bars that float.
+    /// Applied per tab — `.toolbarBackground` set on the TabView itself does
+    /// not reach the bars inside each tab, which is why content was showing
+    /// through the tab labels.
+    ///
+    /// The bars are translucent material (§12), not opaque strips: content
+    /// scrolls underneath a blurred layer. Over the black canvas the material
+    /// reads near-black, so the one-canvas identity holds — and the system
+    /// renders the material solid automatically under Reduce Transparency.
     func chrome(_ tab: NavTab) -> some View {
         self
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .pageBackground()
-            // The bars take the canvas too. Left to itself the default bar
-            // material renders a grey slab over a black page, so the top and
-            // bottom of every screen read as a different colour from the middle.
-            .toolbarBackground(Palette.background, for: .tabBar)
+            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
-            .toolbarBackground(Palette.background, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -230,15 +251,16 @@ private extension View {
             }
     }
 
-    /// A pushed screen. Same colour treatment, but the navigation bar draws its
-    /// own title so this must not plant a second one.
+    /// A pushed screen. Same material treatment, but the navigation bar draws
+    /// its own title so this must not plant a second one. Enter and exit along
+    /// the same push path (§7) — the system push transition, symmetric both ways.
     func pushedChrome(_ tab: NavTab) -> some View {
         self
             .navigationBarTitleDisplayMode(.inline)
             .pageBackground()
-            .toolbarBackground(Palette.background, for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(Palette.background, for: .tabBar)
+            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
     }
 }

@@ -8,6 +8,9 @@ import SwiftUI
 struct FoldView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var prefs = PrefsStore.shared
+    /// Fold fetch state — observed here so checking for new money rebuilds only
+    /// this screen, never the shell or Today.
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @State private var showLogin = false
 
     private let cols = [GridItem(.adaptive(minimum: 170), spacing: 12)]
@@ -20,14 +23,14 @@ struct FoldView: View {
                 Button {
                     Task { await state.refreshFold() }
                 } label: {
-                    if state.foldBusy {
+                    if busy.fold {
                         ProgressView().controlSize(.small)
                     } else {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
                 .buttonStyle(.borderless).tint(Palette.muted)
-                .disabled(state.foldBusy)
+                .disabled(busy.fold)
                 .help("Pull latest from Fold")
                 if state.fold != nil {
                     Button { prefs.hideFoldNumbers.toggle() } label: {
@@ -168,8 +171,8 @@ struct FoldView: View {
 
         Button { Task { await state.refreshFold() } } label: {
             HStack(spacing: 6) {
-                Image(systemName: state.foldBusy ? "arrow.clockwise" : "circle.fill")
-                    .font(.system(size: state.foldBusy ? 11 : 6))
+                Image(systemName: busy.fold ? "arrow.clockwise" : "circle.fill")
+                    .font(.system(size: busy.fold ? 11 : 6))
                     .foregroundStyle(Palette.green)
                 Text(FoldCaption.line(asOf: f.asOf, linked: state.foldLinked, error: state.foldError))
                     .font(.caption.weight(.semibold))
@@ -361,6 +364,7 @@ private struct FoldTile: View {
 private struct FoldLoginSheet: View {
 
     @EnvironmentObject var state: AppState
+    @ObservedObject private var busy = ModuleBusyStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var phone = FoldClient.linkedPhone.isEmpty ? "+91" : FoldClient.linkedPhone
     @State private var otp = ""
@@ -410,21 +414,21 @@ private struct FoldLoginSheet: View {
                         Task {
                             if await state.verifyFoldOTP(phone, otp: otp) { dismiss() }
                         }
-                    } label: { Label(state.foldBusy ? "Checking…" : "Verify & pull", systemImage: "checkmark") }
+                    } label: { Label(busy.fold ? "Checking…" : "Verify & pull", systemImage: "checkmark") }
                     .buttonStyle(.borderedProminent)
-                    .disabled(otp.count < 4 || state.foldBusy)
+                    .disabled(otp.count < 4 || busy.fold)
                 } else {
                     Button {
                         Task {
                             await state.sendFoldOTP(phone)
                             if state.foldError == nil { sent = true; focus = .otp }
                         }
-                    } label: { Label(state.foldBusy ? "Sending…" : "Send OTP", systemImage: "message") }
+                    } label: { Label(busy.fold ? "Sending…" : "Send OTP", systemImage: "message") }
                     .buttonStyle(.borderedProminent)
                     // The field is seeded with "+91", so counting every digit
                     // enabled Send after eight typed ones and fired an OTP at a
                     // half-typed number.
-                    .disabled(FoldData.nationalDigits(phone).count < 10 || state.foldBusy)
+                    .disabled(FoldData.nationalDigits(phone).count < 10 || busy.fold)
                 }
                 Spacer()
             }
