@@ -264,7 +264,7 @@ struct WeightCard: View {
                 .background(Circle().fill(Palette.surfaceElevated))
                 .overlay(Circle().strokeBorder(Palette.border, lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .fluidPressable()
         .accessibilityLabel(delta > 0 ? "Add half a kilo" : "Take off half a kilo")
     }
 

@@ -91,7 +91,7 @@ struct EventsView: View {
     }
 
     private func eventRow(_ e: EventItem, on day: String) -> some View {
-        Button { editTarget = EditTarget(e) } label: {
+        Button { Haptics.tap(); editTarget = EditTarget(e) } label: {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
@@ -143,7 +143,7 @@ struct EventsView: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable(scale: 0.99)
         .contextMenu {
             Button(role: .destructive) { pendingDelete = e } label: { Label("Delete", systemImage: "trash") }
         }

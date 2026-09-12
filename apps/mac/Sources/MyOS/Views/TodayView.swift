@@ -132,7 +132,8 @@ struct TodayView: View {
             DayMacroHero(day: selectedDate)
         case .meals:
             // Snapshot: a meal log rebuilds this grid, nothing else on the page.
-            MealsGridView(tiles: MealKey.allCases.map(mealTileData), onTap: { editingMeal = $0 })
+            MealsGridView(tiles: MealKey.allCases.map(mealTileData),
+                          onTap: { Haptics.tap(); editingMeal = $0 })
         case .workout:
             WorkoutChecklistCard(day: selectedDate)
         case .comingUp:
@@ -520,7 +521,7 @@ struct TodayHeaderView: View, Equatable {
                 .background(Palette.surface, in: Capsule())
                 .overlay(Capsule().strokeBorder((todayHit ? Palette.complete : Palette.activity).opacity(0.4), lineWidth: 1.5))
             }
-            .buttonStyle(.plain)
+            .fluidPressable(scale: 0.99)
             .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
                 Haptics.tap()
                 onCalendar()

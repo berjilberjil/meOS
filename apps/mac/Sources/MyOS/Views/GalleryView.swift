@@ -189,10 +189,10 @@ struct GalleryView: View {
             ForEach(GalleryFeed.months(shown), id: \.month) { section in
                 Section {
                     ForEach(section.items) { item in
-                        Button { viewing = item } label: {
+                        Button { Haptics.tap(); viewing = item } label: {
                             GalleryThumb(item: item, side: side)
                         }
-                        .buttonStyle(.plain)
+                        .fluidPressable()
                         .help("\(item.title) — \(Fmt.day(item.day))")
                         .accessibilityLabel("\(item.title), \(Fmt.day(item.day))")
                     }

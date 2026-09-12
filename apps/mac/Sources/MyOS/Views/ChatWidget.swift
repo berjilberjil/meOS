@@ -93,6 +93,7 @@ struct ChatWidget: View {
 
     private var launcher: some View {
         Button {
+            Haptics.tap()
             pres.openChat()
             showHistory = false
             inputFocused = true
@@ -112,7 +113,7 @@ struct ChatWidget: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable()
         .onHover { h in cursor(h) }
         .help("Catherine")
         .accessibilityLabel("Catherine")
@@ -332,7 +333,7 @@ struct ChatWidget: View {
     }
 
     private func starter(_ text: String) -> some View {
-        Button { draft = text; send() } label: {
+        Button { Haptics.tap(); draft = text; send() } label: {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.up.right").font(.caption2.weight(.bold))
                 Text(text).font(.caption.weight(.medium)).multilineTextAlignment(.leading)
@@ -343,7 +344,7 @@ struct ChatWidget: View {
             .background(Palette.surfaceElevated.opacity(0.55), in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .fluidPressable()
         .onHover { h in cursor(h) }
     }
 

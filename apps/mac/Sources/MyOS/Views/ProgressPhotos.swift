@@ -212,7 +212,7 @@ struct ProgressPhotosCard: View {
     }
 
     private func thumb(_ p: ProgressPhoto) -> some View {
-        Button { viewing = p } label: {
+        Button { Haptics.tap(); viewing = p } label: {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 4) {
                     DiskThumbImage(url: p.url, key: p.id)
@@ -231,7 +231,7 @@ struct ProgressPhotosCard: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable()
         .onHover { h in cursor(h) }
     }
 
