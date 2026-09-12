@@ -111,7 +111,7 @@ struct WeightDialControl: View {
                     .foregroundStyle(logged ? Palette.text : Palette.faint)
                     .contentTransition(.numericText())
                 Text("kg")
-                    .font(.caption2.weight(.bold))
+                    .font(.myCaption.weight(.bold))
                     .foregroundStyle(Palette.faint)
                     .textCase(.uppercase)
                     .tracking(1)
@@ -217,7 +217,7 @@ struct WeightCard: View {
             Spacer()
             if let t = state.fitnessProfile.targetWeightKg, t > 0 {
                 Text("goal \(Fmt.trimKg(t))")
-                    .font(.caption2.weight(.semibold)).monospacedDigit()
+                    .font(.myCaption.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(Palette.faint)
             }
         }
@@ -230,16 +230,16 @@ struct WeightCard: View {
         HStack(spacing: 6) {
             if let delta = WeightDial.deltaLabel(kg, from: previous?.kg), let p = previous {
                 Image(systemName: delta.hasPrefix("+") ? "arrow.up.right" : "arrow.down.right")
-                    .font(.caption2.weight(.bold))
+                    .font(.myCaption.weight(.bold))
                 Text("\(delta) kg since \(Fmt.day(p.date))")
-                    .font(.caption.weight(.semibold)).monospacedDigit()
+                    .font(.myCaption.weight(.semibold)).monospacedDigit()
             } else if isLogged {
-                Image(systemName: "checkmark.circle.fill").font(.caption2)
-                Text("Logged for \(Fmt.day(day))").font(.caption.weight(.semibold))
+                Image(systemName: "checkmark.circle.fill").font(.myCaption)
+                Text("Logged for \(Fmt.day(day))").font(.myCaption.weight(.semibold))
             } else {
-                Image(systemName: "hand.draw").font(.caption2)
+                Image(systemName: "hand.draw").font(.myCaption)
                 Text("Turn to log · tap to keep \(WeightDial.format(kg))")
-                    .font(.caption.weight(.semibold))
+                    .font(.myCaption.weight(.semibold))
             }
             Spacer(minLength: 0)
         }

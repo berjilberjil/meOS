@@ -50,10 +50,10 @@ struct FoldView: View {
             .knRise(0)
 
             if let err = state.foldError {
-                Text(err).font(.footnote).foregroundStyle(Palette.warning)
+                Text(err).font(.myBody).foregroundStyle(Palette.warning)
             } else if !state.foldLinked, state.fold != nil {
                 Text("This is a saved snapshot, not a live pull. Tap Connect Fold, enter the OTP Fold texts you, then refresh. The date only changes after Fold answers.")
-                    .font(.footnote).foregroundStyle(Palette.warning)
+                    .font(.myBody).foregroundStyle(Palette.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let f = state.fold { dashboard(f) } else { connectState }
@@ -82,12 +82,12 @@ struct FoldView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(foldINR(f.netWorth, hidden: prefs.hideFoldNumbers))
-                            .font(.largeTitle.weight(.bold))
+                            .fluidDisplay()
                             .monospacedDigit()
                             .foregroundStyle(Palette.text)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
-                        Text("Net worth").font(.footnote).foregroundStyle(Palette.muted)
+                        Text("Net worth").font(.myCaption).foregroundStyle(Palette.muted)
                     }
                     Spacer()
                     if f.changeValue != 0 { changeChip(f) }
@@ -96,18 +96,18 @@ struct FoldView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text(inr(f.history.max() ?? 0))
-                                .font(.caption2.weight(.semibold)).monospacedDigit()
+                                .font(.myCaption.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.faint)
                             Spacer()
                             if !f.changeLabel.isEmpty {
                                 Text(f.changeLabel)
-                                    .font(.caption2.weight(.semibold)).tracking(0.3)
+                                    .font(.myCaption.weight(.semibold)).tracking(0.3)
                                     .foregroundStyle(Palette.faint)
                             }
                         }
                         Sparkline(values: f.history).frame(height: 92)
                         Text(inr(f.history.min() ?? 0))
-                            .font(.caption2.weight(.semibold)).monospacedDigit()
+                            .font(.myCaption.weight(.semibold)).monospacedDigit()
                             .foregroundStyle(Palette.faint)
                     }
                 }
@@ -130,6 +130,8 @@ struct FoldView: View {
                 }
             }
         }
+        // Air under the hero: the number is the layout, the rest sits below it.
+        .padding(.bottom, Space.screen - Gap.screen)
         .knRise(1)
 
         if !f.banks.isEmpty {
@@ -138,10 +140,10 @@ struct FoldView: View {
                     SectionTitle(text: "Where your money is")
                     ForEach(f.banks) { b in
                         HStack(spacing: 8) {
-                            Text(b.name).font(.footnote.weight(.medium)).foregroundStyle(Palette.text)
-                            Text("••\(b.last4)").font(.caption2).foregroundStyle(Palette.faint)
+                            Text(b.name).font(.myBody.weight(.medium)).foregroundStyle(Palette.text)
+                            Text("••\(b.last4)").font(.myCaption).foregroundStyle(Palette.faint)
                             Spacer()
-                            Text(inr(b.balance)).font(.footnote.weight(.semibold)).monospacedDigit()
+                            Text(inr(b.balance)).font(.myBody.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -157,9 +159,9 @@ struct FoldView: View {
                     SectionTitle(text: "Top spends this month")
                     ForEach(f.topSpends.filter { !FoldSpend.isNonSpend($0.category) }) { s in
                         HStack {
-                            Text(s.category).font(.footnote).foregroundStyle(Palette.text)
+                            Text(s.category).font(.myBody).foregroundStyle(Palette.text)
                             Spacer()
-                            Text(inr(s.amount)).font(.footnote.weight(.semibold)).monospacedDigit()
+                            Text(inr(s.amount)).font(.myBody.weight(.semibold)).monospacedDigit()
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -198,9 +200,9 @@ struct FoldView: View {
 
     private func heroStat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased()).font(.caption2.weight(.heavy)).tracking(0.6)
+            Text(label.uppercased()).font(.myCaption.weight(.heavy)).tracking(0.6)
                 .foregroundStyle(Palette.faint)
-            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit()
+            Text(value).font(.myBody.weight(.semibold)).monospacedDigit()
                 .foregroundStyle(Palette.text).lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -221,7 +223,7 @@ struct FoldView: View {
             VStack(alignment: .leading, spacing: 10) {
                 SectionTitle(text: "Connect your Fold account")
                 Text("Sign in with the same phone OTP Fold texts you. Refresh then pulls net worth, banks and this month’s spends.")
-                    .font(.footnote).foregroundStyle(Palette.muted)
+                    .font(.myBody).foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button { showLogin = true } label: {
                     Label("Connect with phone OTP", systemImage: "iphone")
