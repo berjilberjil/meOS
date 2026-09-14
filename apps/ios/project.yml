@@ -28,8 +28,6 @@ targets:
       # models, crypto) plus every view that has no AppKit dependency. Kept as
       # ONE source of truth in apps/mac/Sources; nothing here is a copy.
       - path: ../mac/Sources/MyOS/Support
-        excludes:
-          - "VideoMedia.swift"   # AVFoundation compression, macOS-only for now — Events tab isn't ported yet
       - path: ../mac/Sources/MyOS/Views/RootView.swift
       - path: ../mac/Sources/MyOS/Views/VaultViews.swift
       - path: ../mac/Sources/MyOS/Views/LoginView.swift
