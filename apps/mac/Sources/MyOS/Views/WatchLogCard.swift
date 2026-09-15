@@ -20,8 +20,7 @@ struct WatchLogCard: View {
     }
 
     var body: some View {
-        Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     SectionTitle(text: "Videos")
                     Spacer()
@@ -42,9 +41,16 @@ struct WatchLogCard: View {
                     .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .strokeBorder(urlFocused ? Palette.action : Palette.border, lineWidth: 1.5))
-                    Button("Add") { addVideo() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(urlInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button { Haptics.tap(); addVideo() } label: {
+                        Text("Add")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Brandmark.ink)
+                            .padding(.horizontal, 14).padding(.vertical, 10)
+                            .background(Palette.action, in: Capsule())
+                    }
+                    .fluidPressable()
+                    .disabled(urlInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .opacity(urlInput.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
                 }
 
                 if let err = addError {
@@ -57,7 +63,6 @@ struct WatchLogCard: View {
                 } else {
                     ForEach(todayVideos) { item in videoRow(item) }
                 }
-            }
         }
     }
 
@@ -91,7 +96,7 @@ struct WatchLogCard: View {
                 Spacer(minLength: 0)
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable(scale: 0.99)
     }
 
     private func addVideo() {

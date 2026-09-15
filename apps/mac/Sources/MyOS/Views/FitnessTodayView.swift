@@ -625,14 +625,7 @@ struct MealLogEditorSheet: View {
         }
     }
 
-    private var mealTint: Color {
-        switch meal {
-        case .breakfast: return Palette.attention
-        case .lunch:     return Palette.attention
-        case .dinner:    return Palette.information
-        case .snacks:    return Palette.attention
-        }
-    }
+    private var mealTint: Color { Palette.action }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -648,12 +641,16 @@ struct MealLogEditorSheet: View {
                             }
                         }
                     }
-                    Button { adding = true } label: {
+                    Button { Haptics.tap(); adding = true } label: {
                         Label("Add food", systemImage: "plus")
                             .font(.callout.weight(.semibold))
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .foregroundStyle(Palette.text)
+                            .background(Palette.surfaceElevated, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Palette.border, lineWidth: 1))
                     }
-                    .buttonStyle(.bordered).controlSize(.large).frame(maxWidth: .infinity)
+                    .fluidPressable()
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)

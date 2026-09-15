@@ -41,36 +41,43 @@ struct ActivityIntelligenceCard: View {
                                                     device: state.currentFocusDevice,
                                                     todos: state.todayPriorities, now: Date())
 
-        // Plain, not accent: on Today the intake hero owns the one accent
-        // rule. This card's meaning still reads from its SectionLabel.
-        Card(accent: .activity) {
-            VStack(alignment: .leading, spacing: Gap.row) {
-                if let focus = read.focusNow {
-                    FocusNowHeader(focus: focus)
-                    Text(focus.insight)
-                        .font(.myBody)
-                        .foregroundStyle(Palette.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    idleHeader
-                }
+        intelligenceBody(read: read, summary: summary)
+    }
 
-                if summary.isEmpty && !tracking {
-                    offState
-                } else {
-                    Divider().overlay(Palette.divider)
-                    ScreenTimeBreakdown(summary: summary,
-                                        appLimit: Self.appLimit,
-                                        chartHeight: Self.chartHeight,
-                                        trailing: detailsButton,
-                                        emptyLine: emptyLine)
-                }
+    @ViewBuilder
+    private func intelligenceBody(read: DayIntelligence,
+                                  summary: ActivitySummary) -> some View {
+        let block = VStack(alignment: .leading, spacing: Gap.row) {
+            if let focus = read.focusNow {
+                FocusNowHeader(focus: focus)
+                Text(focus.insight)
+                    .font(.myBody)
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                idleHeader
+            }
 
-                if let action = read.action {
-                    ActionCallout(action: action)
-                }
+            if summary.isEmpty && !tracking {
+                offState
+            } else {
+                Divider().overlay(Palette.divider)
+                ScreenTimeBreakdown(summary: summary,
+                                    appLimit: Self.appLimit,
+                                    chartHeight: Self.chartHeight,
+                                    trailing: detailsButton,
+                                    emptyLine: emptyLine)
+            }
+
+            if let action = read.action {
+                ActionCallout(action: action)
             }
         }
+        #if os(iOS)
+        block
+        #else
+        Card(accent: .activity) { block }
+        #endif
     }
 
     /// Today is a page of sections, not a dashboard — on the phone this card

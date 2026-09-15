@@ -62,6 +62,7 @@ struct RootView: View {
         .task {
             #if os(iOS)
             SoundPlayer.open()   // cold launch — scenePhase is already .active by now
+            Haptics.prepare()    // first tap must not wait for the Taptic Engine
             #endif
             // The sensor starts BEFORE the vault is unlocked, and deliberately.
             // The Mac asks for the passphrase every launch, so a sensor that

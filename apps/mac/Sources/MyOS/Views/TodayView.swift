@@ -6,10 +6,6 @@ import AppKit
 struct TodayView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var order = TodaySection.OrderSignal.shared
-    /// News + suggestions fetch state — observed by those two cards only, so a
-    /// refresh or a chat reply never rebuilds the whole page.
-    @ObservedObject private var newsUI = NewsUIStore.shared
-    @ObservedObject private var suggestUI = SuggestUIStore.shared
     @ObservedObject private var signals = UISignals.shared
     @Environment(\.openURL) private var openURL
     var go: (NavTab) -> Void
@@ -22,7 +18,6 @@ struct TodayView: View {
     /// every day lined up on the same section. Off on Mac, which has one page.
     var sectionAnchors = false
 
-    @State private var expandedNews: Set<String> = []
     @State private var editingMeal: MealKey?
     @State private var showStreakCal = false
     /// The day this page is showing when nobody outside is driving it.
@@ -95,7 +90,7 @@ struct TodayView: View {
             lastKnownToday = t
         }
         .task {
-            if newsUI.result == nil { await state.fetchNews() }
+            if NewsUIStore.shared.result == nil { await state.fetchNews() }
         }
         .sheet(item: $editingMeal) { meal in
             MealLogEditorSheet(date: selectedDate, meal: meal,
@@ -149,12 +144,7 @@ struct TodayView: View {
         case .focus:
             FocusCard(day: selectedDate, showsCalendar: false)
         case .news:
-            NewsSectionView(
-                result: newsUI.result, busy: newsUI.busy, error: newsUI.error,
-                expanded: expandedNews,
-                onToggle: { id in
-                    if expandedNews.contains(id) { expandedNews.remove(id) } else { expandedNews.insert(id) }
-                },
+            NewsSectionHost(
                 onRefresh: { Task { await state.fetchNews() } },
                 onAsk: askAboutNews,
                 onOpenLink: { openURL($0) }
@@ -190,117 +180,10 @@ struct TodayView: View {
         }
     }
 
-    // MARK: - Tech + finance news (two columns, tap a story to expand)
-
-    private let techCats: Set<String> = ["tech", "ai"]
-    private let financeCats: Set<String> = ["markets", "india", "finance", "crypto"]
-
     private func askAboutNews(_ item: NewsResult.Item) {
         var p = "Explain this news and what it means for me and my finance content: \(item.title). \(item.summary)"
         if let d = item.detail, !d.isEmpty { p += " \(d)" }
         state.askMentor(p)
-    }
-
-    // MARK: - AI "what to do now"
-
-    private var suggestionsCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles").font(.footnote.weight(.bold))
-                        .foregroundStyle(Palette.action)
-                    SectionTitle(text: "What to do now")
-                    Spacer()
-                    Button { Task { await state.fetchSuggestions() } } label: {
-                        HStack(spacing: 5) {
-                            if suggestUI.busy { ProgressView().controlSize(.small) }
-                            Image(systemName: "arrow.clockwise").font(.caption2.weight(.bold))
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(suggestUI.busy)
-                    .help("Refresh suggestions")
-                }
-
-                if let s = suggestUI.result {
-                    if !s.headline.isEmpty {
-                        Text(s.headline).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    ForEach(Array(s.suggestions.enumerated()), id: \.element.id) { i, item in
-                        suggestionRow(index: i + 1, item: item)
-                    }
-                } else if suggestUI.busy {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("Reading your day…").font(.footnote).foregroundStyle(Palette.muted)
-                    }
-                    .padding(.vertical, 6)
-                } else if let err = suggestUI.error {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label(err, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundStyle(Palette.attention)
-                        Button("Try again") { Task { await state.fetchSuggestions() } }
-                            .buttonStyle(.bordered)
-                    }
-                } else {
-                    Button { Task { await state.fetchSuggestions() } } label: {
-                        Label("Get today's read", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-        }
-    }
-
-    private func suggestionRow(index: Int, item: SuggestResult.Item) -> some View {
-        HStack(alignment: .top, spacing: 11) {
-            Image(systemName: areaIcon(item.area))
-                .font(.footnote.weight(.bold)).foregroundStyle(areaColor(item.area))
-                .frame(width: 30, height: 30)
-                .background(areaColor(item.area).opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 7) {
-                    Text(item.title).font(.footnote.weight(.semibold)).foregroundStyle(Palette.text)
-                        .fixedSize(horizontal: false, vertical: true)
-                    impactTag(item.impact)
-                }
-                Text(item.why).font(.caption).foregroundStyle(Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 3)
-    }
-
-    private func impactTag(_ impact: String) -> some View {
-        let color: Color = impact == "high" ? Palette.warning : (impact == "medium" ? Palette.muted : Palette.faint)
-        return Text(impact.uppercased())
-            .font(.caption2.weight(.heavy)).tracking(0.5)
-            .foregroundStyle(color)
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(color.opacity(0.15), in: Capsule())
-    }
-
-    private func areaIcon(_ area: String) -> String {
-        switch area {
-        case "money": return "indianrupeesign.circle.fill"
-        case "fitness": return "figure.run"
-        case "content": return "play.rectangle.fill"
-        case "career": return "briefcase.fill"
-        case "mind": return "brain.head.profile"
-        default: return "sparkles"
-        }
-    }
-    private func areaColor(_ area: String) -> Color {
-        switch area {
-        case "money": return Palette.green
-        case "fitness": return Palette.blue
-        case "content": return Palette.information
-        case "career": return Palette.attention
-        case "mind": return Palette.information
-        default: return Palette.action
-        }
     }
 
     /// Weekday of the page's date — "Friday", or "Today"/"Yesterday" nearby.
@@ -418,15 +301,14 @@ struct TodayView: View {
     /// grouped settings link reads.
     private var iosSettingsRow: some View {
         Button { UISignals.shared.openSettings = true } label: {
-            Card {
-                HStack(spacing: 10) {
-                    Image(systemName: "gearshape.fill").foregroundStyle(Palette.muted)
-                    Text("Settings").font(.myBody).foregroundStyle(Palette.text)
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.myCaption.weight(.semibold))
-                        .foregroundStyle(Palette.faint)
-                }
+            HStack(spacing: 10) {
+                Text("Settings").font(.myBody).foregroundStyle(Palette.muted)
+                Spacer()
+                Image(systemName: "chevron.right").font(.myCaption.weight(.semibold))
+                    .foregroundStyle(Palette.faint)
             }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
         .fluidPressable(scale: 0.99)
     }
@@ -630,8 +512,9 @@ struct ComingUpView: View, Equatable {
             HStack {
                 SectionTitle(text: "Coming up")
                 Spacer()
-                Button { onOpen() } label: { Label("All events", systemImage: "calendar") }
+                Button { Haptics.tap(); onOpen() } label: { Label("All events", systemImage: "calendar") }
                     .buttonStyle(.borderless)
+                    .fluidPressable(scale: 0.99)
             }
             if rows.isEmpty {
                 Text("Nothing coming up. Tap All events to add one.")
@@ -670,6 +553,28 @@ private struct ComingUpRowView: View {
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
+    }
+}
+
+/// Owns the news store so a refresh rebuilds this section, not the whole Today page.
+private struct NewsSectionHost: View {
+    @ObservedObject private var newsUI = NewsUIStore.shared
+    @State private var expanded: Set<String> = []
+    let onRefresh: () -> Void
+    let onAsk: (NewsResult.Item) -> Void
+    let onOpenLink: (URL) -> Void
+
+    var body: some View {
+        NewsSectionView(
+            result: newsUI.result, busy: newsUI.busy, error: newsUI.error,
+            expanded: expanded,
+            onToggle: { id in
+                if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
+            },
+            onRefresh: onRefresh,
+            onAsk: onAsk,
+            onOpenLink: onOpenLink
+        )
     }
 }
 

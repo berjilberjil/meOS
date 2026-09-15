@@ -58,15 +58,16 @@ struct LoginView: View {
         .onSubmit { Task { await submit() } }
     }
 
-    /// Name and promise, on black — the one place the green stops.
+    /// Name and promise. Palette tokens, not hardcoded white — light mode
+    /// is a white canvas, and white type on it is invisible.
     private var wordmark: some View {
         VStack(spacing: 3) {
             Text("MyOS")
                 .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Palette.text)
             Text("Your second brain. Money · Body · Mind.")
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.white.opacity(0.88))
+                .foregroundStyle(Palette.muted)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 26).padding(.vertical, 14)
@@ -99,6 +100,7 @@ struct LoginView: View {
                 .background(Palette.action, in: Capsule())
             }
             .buttonStyle(.plain)
+            .fluidPressable()
             .disabled(state.isWorking)
             .padding(.top, 4)
 
@@ -107,9 +109,10 @@ struct LoginView: View {
             } label: {
                 Text(isRegister ? "Have an account? Log in" : "New here? Create your account")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(Palette.muted)
             }
             .buttonStyle(.plain)
+            .fluidPressable(scale: 0.99)
             .padding(.top, 2)
         }
         .padding(.horizontal, 4)
@@ -128,18 +131,18 @@ struct LoginView: View {
     // they take the elevated surface and a hairline — a near-black pill on a
     // black screen would be invisible.
     private func field(_ placeholder: String, text: Binding<String>, field: Field) -> some View {
-        TextField("", text: text, prompt: Text(placeholder).foregroundColor(.white.opacity(0.42)))
+        TextField("", text: text, prompt: Text(placeholder).foregroundColor(Palette.faint))
             .textFieldStyle(.plain)
             .autocorrectionDisabled()
-            .foregroundStyle(.white)
+            .foregroundStyle(Palette.text)
             .focused($focus, equals: field)
             .modifier(BrandField(focused: focus == field))
     }
 
     private func secureField(_ placeholder: String, text: Binding<String>) -> some View {
-        SecureField("", text: text, prompt: Text(placeholder).foregroundColor(.white.opacity(0.42)))
+        SecureField("", text: text, prompt: Text(placeholder).foregroundColor(Palette.faint))
             .textFieldStyle(.plain)
-            .foregroundStyle(.white)
+            .foregroundStyle(Palette.text)
             .focused($focus, equals: .password)
             .modifier(BrandField(focused: focus == .password))
     }
