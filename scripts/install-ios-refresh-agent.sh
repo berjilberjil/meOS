@@ -8,9 +8,13 @@
 set -euo pipefail
 
 LABEL="com.berjil.myos.iosrefresh"
-SRC="$(cd "$(dirname "$0")" && pwd)/${LABEL}.plist"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+SRC="$HERE/${LABEL}.plist"
 DEST="$HOME/Library/LaunchAgents/${LABEL}.plist"
 DOMAIN="gui/$(id -u)"
+# launchd's /bin/zsh cannot open ~/Documents (TCC "can't open input file",
+# exit 127). Keep the runnable copy where LaunchAgents are allowed to read.
+SUPPORT="$HOME/Library/Application Support/MyOS"
 
 if [[ "${1:-}" == "--remove" ]]; then
   launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
@@ -19,8 +23,25 @@ if [[ "${1:-}" == "--remove" ]]; then
   exit 0
 fi
 
-mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/MyOS"
-cp "$SRC" "$DEST"
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/MyOS" "$SUPPORT/lib"
+cp "$HERE/refresh-ios.sh" "$SUPPORT/refresh-ios.sh"
+cp "$HERE/lib/ios-device.sh" "$SUPPORT/lib/ios-device.sh"
+chmod 755 "$SUPPORT/refresh-ios.sh"
+
+# Rewrite the template so ProgramArguments and MYOS_ROOT match this Mac.
+# The checked-in plist still documents the job; the installed one is what
+# launchd actually runs.
+python3 - "$SRC" "$DEST" "$SUPPORT/refresh-ios.sh" "$HERE/.." <<'PY'
+import pathlib, plistlib, sys
+src, dest, script, root = sys.argv[1:]
+data = plistlib.loads(pathlib.Path(src).read_bytes())
+data["ProgramArguments"] = ["/bin/zsh", script]
+data["WorkingDirectory"] = str(pathlib.Path(root).resolve())
+env = data.setdefault("EnvironmentVariables", {})
+env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+env["MYOS_ROOT"] = str(pathlib.Path(root).resolve())
+pathlib.Path(dest).write_bytes(plistlib.dumps(data))
+PY
 
 launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
 launchctl bootstrap "$DOMAIN" "$DEST"

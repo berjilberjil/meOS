@@ -8,10 +8,12 @@
     <!-- Re-sign and reinstall MyOS on the iPhone so the free-team 7-day
          provisioning profile never lapses. The script decides whether a
          refresh is actually needed and exits in a second when it is not. -->
+    <!-- install-ios-refresh-agent.sh rewrites ProgramArguments + MYOS_ROOT
+         on install. launchd cannot exec the copy under ~/Documents (TCC). -->
     <key>ProgramArguments</key>
     <array>
         <string>/bin/zsh</string>
-        <string>/Users/berjilskcript/Documents/Personal/MyOS/scripts/refresh-ios.sh</string>
+        <string>/Users/berjilskcript/Library/Application Support/MyOS/refresh-ios.sh</string>
     </array>
 
     <key>WorkingDirectory</key>
@@ -35,6 +37,8 @@
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>MYOS_ROOT</key>
+        <string>/Users/berjilskcript/Documents/Personal/MyOS</string>
     </dict>
 
     <!-- The job waits up to two hours for the phone to be on the Wi-Fi, so it

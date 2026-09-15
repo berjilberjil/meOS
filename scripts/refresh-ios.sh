@@ -25,8 +25,16 @@
 set -uo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-ROOT="${0:A:h:h}"
-source "$ROOT/scripts/lib/ios-device.sh"
+# Launchd cannot open files under ~/Documents (TCC). The agent therefore
+# runs a copy of this script from ~/Library/Application Support/MyOS, and
+# MYOS_ROOT points back at the git checkout so xcodebuild still hits the
+# real tree. Interactive runs from the repo keep the old ${0:A:h:h} root.
+ROOT="${MYOS_ROOT:-${0:A:h:h}}"
+if [[ -f "${0:A:h}/lib/ios-device.sh" ]]; then
+  source "${0:A:h}/lib/ios-device.sh"
+else
+  source "$ROOT/scripts/lib/ios-device.sh"
+fi
 
 # Refresh whenever the profile has this many days or fewer left. 6.0 with a
 # 7-day profile means "every night", while still skipping a second run on a
