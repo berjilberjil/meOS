@@ -1,4 +1,4 @@
-[mcp_servers.myos-diet]
+[mcp_servers.meos-diet]
 command = "bun"
 # The diet MCP server lives in its own repo now (it is not part of the web app
 # build). Keep this path in sync with .mcp.json.
@@ -6,9 +6,9 @@ args = ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/diet/src/index.
 startup_timeout_sec = 30
 enabled = true
 
-[mcp_servers.myos-stuff]
+[mcp_servers.meos-stuff]
 command = "bun"
-# Purchases / spending. Needs native MyOS open and unlocked — the ROI maths and
+# Purchases / spending. Needs native MeOS open and unlocked — the ROI maths and
 # the bill downscaling live in Swift, so there is no remote fallback here.
 # Keep this path in sync with .mcp.json.
 args = ["run", "/Users/berjilskcript/Documents/Personal/MyOS/mcp/stuff/src/index.ts"]

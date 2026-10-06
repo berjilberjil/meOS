@@ -5,7 +5,7 @@ import { resolveModel } from '$lib/server/ai';
 import { mentorChatSystem } from '$lib/mentor';
 
 /**
- * MyOS chat — the floating mentor. The client sends the conversation plus a
+ * MeOS chat — the floating mentor. The client sends the conversation plus a
  * human-readable snapshot of the user's current data (fitness / journal /
  * profile). The model answers as their blunt mentor, grounded in that snapshot.
  * Read-only: it never touches the database.
@@ -27,7 +27,7 @@ interface ToolDecl {
 /**
  * Tools are declared by the CLIENT, not here.
  *
- * MyOS state is end-to-end encrypted, so this server cannot read a note even if
+ * MeOS state is end-to-end encrypted, so this server cannot read a note even if
  * it wanted to — every tool has to run on the device that holds the key. Letting
  * the client ship the declarations alongside the request means the two halves
  * can never drift apart, and the tool set can change without a redeploy.

@@ -1,4 +1,4 @@
--- MyOS backend schema, D1 / SQLite.
+-- MeOS backend schema, D1 / SQLite.
 -- Ported from db/schema.sql (Postgres). Single-user personal app, modelled
 -- multi-user so nothing has to change if a second account ever appears.
 --

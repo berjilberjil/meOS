@@ -7,12 +7,15 @@ import { sql, nowISO } from '$lib/server/db';
  * key ids + model names), so it rides in app_state and syncs across devices like the
  * rest of the user's state. Shape: { default?: {keyId,model}, features?: {chat?: …} }.
  */
-const KEY = 'myos.ai.routes';
+const KEY = 'meos.ai.routes';
+const LEGACY_KEY = 'myos.ai.routes';
 
 export const GET: RequestHandler = async ({ locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
   const rows = await sql`select value from app_state where user_id = ${locals.user.id} and key = ${KEY}`;
-  return json(rows.length ? rows[0].value : {});
+  if (rows.length) return json(rows[0].value);
+  const legacy = await sql`select value from app_state where user_id = ${locals.user.id} and key = ${LEGACY_KEY}`;
+  return json(legacy.length ? legacy[0].value : {});
 };
 
 export const PUT: RequestHandler = async ({ request, locals }) => {

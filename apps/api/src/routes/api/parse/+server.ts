@@ -5,7 +5,7 @@ import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 
 /**
- * MyOS quick-log AI. The user types (or dictates) ONE line about their day and
+ * MeOS quick-log AI. The user types (or dictates) ONE line about their day and
  * Gemini splits it into structured entries the native app files into the right
  * key: fitness, journal, notes. The server only structures meaning —
  * it never touches the database; the client applies the result.
@@ -37,7 +37,7 @@ const ParseSchema = z.object({
 
 function buildPrompt(text: string): string {
   return [
-    `You convert ONE line of a personal daily log into structured entries for MyOS,`,
+    `You convert ONE line of a personal daily log into structured entries for MeOS,`,
     `the user's personal operating system. They said:`,
     ``,
     `"${text}"`,

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * MyOS Stuff MCP — log what you buy, from a receipt.
+ * MeOS Stuff MCP — log what you buy, from a receipt.
  *
  * Point it at an Amazon (or any) order screenshot and it records the product
  * link, title, category, purchase date, price and the payback window, keeping
@@ -19,7 +19,7 @@ function json(data: unknown) {
 }
 function fail(err: unknown) {
 	const message = err instanceof Error ? err.message : JSON.stringify(err);
-	console.error(`[myos-stuff] ${message}`);
+	console.error(`[meos-stuff] ${message}`);
 	return { content: [{ type: 'text' as const, text: `Error: ${message}` }], isError: true as const };
 }
 
@@ -32,7 +32,7 @@ const Bill = {
 };
 
 async function main() {
-	const server = new McpServer({ name: 'myos-stuff', version: '1.0.0' });
+	const server = new McpServer({ name: 'meos-stuff', version: '1.0.0' });
 
 	server.registerTool(
 		'get_spending',
@@ -195,13 +195,13 @@ async function main() {
 	await server.connect(transport);
 	try {
 		await store.health();
-		console.error('[myos-stuff] ready (mac-local)');
+		console.error('[meos-stuff] ready (mac-local)');
 	} catch {
-		console.error('[myos-stuff] ready — native MyOS is closed, tools will error until it is open');
+		console.error('[meos-stuff] ready — native MeOS is closed, tools will error until it is open');
 	}
 }
 
 main().catch((err) => {
-	console.error(`[myos-stuff] ${err instanceof Error ? err.message : err}`);
+	console.error(`[meos-stuff] ${err instanceof Error ? err.message : err}`);
 	process.exit(1);
 });

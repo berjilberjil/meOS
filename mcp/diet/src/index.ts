@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Native MyOS diet MCP. Talks to the unlocked Mac app on 127.0.0.1:17881
+ * Native MeOS diet MCP. Talks to the unlocked Mac app on 127.0.0.1:17881
  * (same encrypted store Mac + iPhone already sync). Falls back to the
  * production API + vault passphrase if the Mac app is closed.
  */
@@ -14,12 +14,12 @@ function json(data: unknown) {
 }
 function fail(err: unknown) {
 	const message = err instanceof Error ? err.message : JSON.stringify(err);
-	console.error(`[myos-diet] ${message}`);
+	console.error(`[meos-diet] ${message}`);
 	return { content: [{ type: 'text' as const, text: `Error: ${message}` }], isError: true as const };
 }
 
 const Meal = z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'snacks']);
-const Weekday = z.number().int().min(0).max(6).describe('0=Sun … 6=Sat (native MyOS)');
+const Weekday = z.number().int().min(0).max(6).describe('0=Sun … 6=Sat (native MeOS)');
 const SlotFood = z.object({
 	food_id: z.string().describe('seed-food-N or a custom food id'),
 	quantity: z.number().positive()
@@ -27,7 +27,7 @@ const SlotFood = z.object({
 
 async function main() {
 	const store = await createStore();
-	const server = new McpServer({ name: 'myos-diet', version: '1.0.0' });
+	const server = new McpServer({ name: 'meos-diet', version: '1.0.0' });
 
 	server.registerTool('get_context', { description: 'Native profile, goals, today totals vs plan. Start here.' }, async () => {
 		try {
@@ -40,7 +40,7 @@ async function main() {
 	server.registerTool(
 		'get_week_plan',
 		{
-			description: 'Read Sun–Sat meal plan from native MyOS (syncs to iPhone). weekday 0=Sun.',
+			description: 'Read Sun–Sat meal plan from native MeOS (syncs to iPhone). weekday 0=Sun.',
 			inputSchema: { week_start: z.string().optional(), date: z.string().optional() }
 		},
 		async () => {
@@ -262,10 +262,10 @@ async function main() {
 	const transport = new StdioServerTransport();
 	await server.connect(transport);
 	const ping = await store.ping();
-	console.error(`[myos-diet] ready native (${ping.bridge})`);
+	console.error(`[meos-diet] ready native (${ping.bridge})`);
 }
 
 main().catch((err) => {
-	console.error(`[myos-diet] ${err instanceof Error ? err.message : err}`);
+	console.error(`[meos-diet] ${err instanceof Error ? err.message : err}`);
 	process.exit(1);
 });
