@@ -142,7 +142,7 @@ struct TodayView: View {
             #if os(iOS)
             BodyPhotosCard()
             #else
-            ProgressPhotosCard()
+            BodyPhotosCard()
             #endif
         case .watchLog:
             WatchLogCard(day: selectedDate)
