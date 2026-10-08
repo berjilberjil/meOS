@@ -3,6 +3,11 @@ on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+
+# Creating the release + uploading meOS.app.zip needs write access.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-26
