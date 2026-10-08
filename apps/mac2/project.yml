@@ -35,6 +35,7 @@ targets:
           - "NotesView.swift"     # old notes          -> Sources/NotesView.swift
           - "SplashView.swift"    # old launch screen  -> gone
           - "MenuBarView.swift"   # old menu-bar extra -> gone (v2)
+          - "RootView.swift"      # old root/splash gate -> new MyOSApp hosts MainView
       - path: ../mac/Sources/MyOS/Resources/drop.wav
         buildPhase: resources
       - path: ../mac/Sources/MyOS/Resources/Sounds

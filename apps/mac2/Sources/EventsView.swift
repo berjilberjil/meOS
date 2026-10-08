@@ -18,6 +18,13 @@ struct EventsLogView: View {
     @State private var viewingAll: [EventMedia] = []
 
     /// The day an event next happens, or nil if it is behind us for good.
+    private var editorField: some View { Palette.background }
+
+    private var editorBorder: some View {
+        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            .strokeBorder(Palette.border, lineWidth: 1)
+    }
+
     private func nextDay(_ e: EventItem) -> String? {
         EventRecurrence.next(e, onOrAfter: state.todayKey)
     }
@@ -210,10 +217,12 @@ private struct EventEditorSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         KFieldLabel(text: "Note")
                         TextEditor(text: $note)
-                            .frame(height: 96).scrollContentBackground(.hidden)
-                            .padding(8).foregroundStyle(Palette.text)
-                            .background(Palette.background, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: Radius.md, style: .continuous).strokeBorder(Palette.border, lineWidth: 1))
+                            .frame(height: 96)
+                            .scrollContentBackground(.hidden)
+                            .padding(8)
+                            .foregroundStyle(Palette.text)
+                            .background(editorField)
+                            .overlay(editorBorder)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
