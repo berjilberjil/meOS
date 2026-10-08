@@ -23,7 +23,7 @@ jobs:
       - name: Zip the app
         run: |
           APP_DIR=$(xcodebuild -project apps/mac2/meOS.xcodeproj -scheme meOS -configuration Release -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/{print $2; exit}')
-          ditto -c -k --sequesterDir --keepParent "$APP_DIR/meOS.app" meOS.app.zip
+          ditto -c -k --keepParent "$APP_DIR/meOS.app" meOS.app.zip
           ls -lh meOS.app.zip
 
       - name: Attach to release
