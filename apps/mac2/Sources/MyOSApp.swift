@@ -2,12 +2,12 @@ import SwiftUI
 import AppKit
 import UserNotifications
 
-/// The rebuilt Mac app. Same spine as the old entry: shared `RootView` gates
-/// login + biometrics and hosts the shell; the appearance preference rides
-/// `ThemeStore` (light/dark) and the synced `AppearanceStore` (palette).
+/// The rebuilt Mac app. Hosts the new white shell directly; the old RootView
+/// (splash + old sidebar) is not part of this target. The login gate lands in
+/// v2: on this Mac the shared session from the old app is already warm.
 ///
-/// The one change: first launch pins Light, because the rebuilt look is
-/// balanced white — see `WhiteTheme.installDefaults()`.
+/// First launch pins Light, because the rebuilt look is balanced white —
+/// see `WhiteTheme.installDefaults()`.
 @main
 struct MyOSApp: App {
     @StateObject private var state = AppState()
@@ -20,7 +20,7 @@ struct MyOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            MainView()
                 .environmentObject(state)
                 .frame(minWidth: 980, minHeight: 640)
                 .preferredColorScheme(themeStore.theme.colorScheme)

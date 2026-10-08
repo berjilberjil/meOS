@@ -57,7 +57,7 @@ struct NotesView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.inset)
         .scrollContentBackground(.hidden)
         .background(Palette.background)
         .searchable(text: $query, prompt: "Search notes")

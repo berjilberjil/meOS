@@ -6,7 +6,7 @@ import PhotosUI
 /// Image-first: an event has a date, a tag, a note and photos (video is
 /// Mac-only for now). Upcoming events sit on top, then past. Backed by the
 /// shared `myos.events` store, so it syncs with the phone's Events segment.
-struct EventsView: View {
+struct EventsLogView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var signals = UISignals.shared
     @ObservedObject private var mediaStore = EventMediaStore.shared
@@ -230,10 +230,9 @@ private struct EventEditorSheet: View {
                                 HStack(spacing: 8) {
                                     ForEach(media) { m in
                                         ZStack(alignment: .topTrailing) {
-                                            EventThumb(media: m, width: 72, height: 72) {
-                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                    .fill(Palette.surfaceElevated)
-                                            }
+                                            let bg = RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(Palette.surfaceElevated)
+                                            EventThumb(media: m, width: 72, height: 72) { bg }
                                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                             Button { media.removeAll { $0.id == m.id } } label: {
                                                 Image(systemName: "xmark.circle.fill").font(.callout)

@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// The logo's own colors, carried over from the excluded SplashView so the
+/// shared LoginView and macro screens keep compiling unchanged.
+enum Brandmark {
+    static let green = Color(hex: 0x56BB06)
+    static let ink = Color(hex: 0x0B0B0B)
+    static let inkSoft = Color(hex: 0x1A1A1A)
+}
+
 /// The rebuilt Mac look, in one place: balanced white, minimal, one accent.
 ///
 /// The palette itself stays `Palette` (DesignSystem.swift), because the shared

@@ -133,7 +133,7 @@ struct MainView: View {
             }
 
         case .events:
-            NavigationStack { screen { EventsView() } }
+            NavigationStack { screen { EventsLogView() } }
 
         default:
             NavigationStack { screen { TodayPager(go: select) } }

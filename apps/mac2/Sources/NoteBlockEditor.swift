@@ -565,18 +565,4 @@ struct NoteImagePreview: View {
         }
     }
 
-    /// Downscale before storing: note content is synced as JSON, so a full
-    /// camera frame in base64 is several megabytes on every save.
-    static func encode(_ image: NSImage, maxDimension: CGFloat = 1400) -> String? {
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        let pxW = rep.pixelsWide, pxH = rep.pixelsHigh
-        guard pxW > 0, pxH > 0 else { return nil }
-        let scale = min(1, maxDimension / max(CGFloat(pxW), CGFloat(pxH)))
-        let w = max(1, Int((CGFloat(pxW) * scale).rounded()))
-        let h = max(1, Int((CGFloat(pxH) * scale).rounded()))
-        guard let resized = rep.resizing(toWidth: w, height: h) else { return nil }
-        return resized.representation(using: .jpeg, properties: [.compressionFactor: 0.7])?
-            .base64EncodedString()
-    }
 }
