@@ -7,14 +7,14 @@
 #   ./scripts/install-ios-refresh-agent.sh --remove   uninstall
 set -euo pipefail
 
-LABEL="com.berjil.myos.iosrefresh"
+LABEL="com.berjil.meos.iosrefresh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SRC="$HERE/${LABEL}.plist"
 DEST="$HOME/Library/LaunchAgents/${LABEL}.plist"
 DOMAIN="gui/$(id -u)"
 # launchd's /bin/zsh cannot open ~/Documents (TCC "can't open input file",
 # exit 127). Keep the runnable copy where LaunchAgents are allowed to read.
-SUPPORT="$HOME/Library/Application Support/MyOS"
+SUPPORT="$HOME/Library/Application Support/MeOS"
 
 if [[ "${1:-}" == "--remove" ]]; then
   launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
@@ -23,12 +23,12 @@ if [[ "${1:-}" == "--remove" ]]; then
   exit 0
 fi
 
-mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/MyOS" "$SUPPORT/lib"
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/MeOS" "$SUPPORT/lib"
 cp "$HERE/refresh-ios.sh" "$SUPPORT/refresh-ios.sh"
 cp "$HERE/lib/ios-device.sh" "$SUPPORT/lib/ios-device.sh"
 chmod 755 "$SUPPORT/refresh-ios.sh"
 
-# Rewrite the template so ProgramArguments and MYOS_ROOT match this Mac.
+# Rewrite the template so ProgramArguments and MEOS_ROOT match this Mac.
 # The checked-in plist still documents the job; the installed one is what
 # launchd actually runs.
 python3 - "$SRC" "$DEST" "$SUPPORT/refresh-ios.sh" "$HERE/.." <<'PY'
@@ -39,7 +39,7 @@ data["ProgramArguments"] = ["/bin/zsh", script]
 data["WorkingDirectory"] = str(pathlib.Path(root).resolve())
 env = data.setdefault("EnvironmentVariables", {})
 env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-env["MYOS_ROOT"] = str(pathlib.Path(root).resolve())
+env["MEOS_ROOT"] = str(pathlib.Path(root).resolve())
 pathlib.Path(dest).write_bytes(plistlib.dumps(data))
 PY
 
@@ -51,8 +51,8 @@ launchctl print "$DOMAIN/$LABEL" | grep -E "state|runs|last exit" || true
 cat <<'TXT'
 
   Check status any time:   ./scripts/refresh-ios.sh --status
-  Run it right now:        launchctl kickstart -k gui/$(id -u)/com.berjil.myos.iosrefresh
-  Watch it work:           tail -f ~/Library/Logs/MyOS/ios-refresh.log
+  Run it right now:        launchctl kickstart -k gui/$(id -u)/com.berjil.meos.iosrefresh
+  Watch it work:           tail -f ~/Library/Logs/MeOS/ios-refresh.log
 
   The phone needs to be on the same Wi-Fi as this Mac. If it is not, the job
   waits up to two hours for it before giving up and telling you.

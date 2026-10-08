@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.berjil.meos.iosrefresh</string>
+
+    <!-- Re-sign and reinstall MyOS on the iPhone so the free-team 7-day
+         provisioning profile never lapses. The script decides whether a
+         refresh is actually needed and exits in a second when it is not. -->
+    <!-- install-ios-refresh-agent.sh rewrites ProgramArguments + MEOS_ROOT
+         on install. launchd cannot exec the copy under ~/Documents (TCC). -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>/Users/berjilskcript/Library/Application Support/MeOS/refresh-ios.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/berjilskcript/Documents/Personal/MyOS</string>
+
+    <!-- 22:00 every day. If the Mac is asleep or off at 22:00, launchd runs
+         the job as soon as it wakes — a missed calendar job is not skipped. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>22</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- Do NOT run at load: installing the agent should not kick off a build. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>MEOS_ROOT</key>
+        <string>/Users/berjilskcript/Documents/Personal/MyOS</string>
+    </dict>
+
+    <!-- The job waits up to two hours for the phone to be on the Wi-Fi, so it
+         must not be killed for taking its time. -->
+    <key>ExitTimeOut</key>
+    <integer>0</integer>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+
+    <!-- The script keeps its own readable log; these two only catch the things
+         that go wrong before it gets that far. -->
+    <key>StandardOutPath</key>
+    <string>/Users/berjilskcript/Library/Logs/MeOS/ios-refresh-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/berjilskcript/Library/Logs/MeOS/ios-refresh-launchd.log</string>
+</dict>
+</plist>

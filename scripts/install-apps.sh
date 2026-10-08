@@ -33,23 +33,24 @@ banner() { print -P "\n%F{cyan}==> $1%f"; }
 
 install_mac() {
   banner "Mac: build"
-  cd "$ROOT/apps/mac"
+  cd "$ROOT/apps/apple"
   xcodegen generate >/dev/null
-  xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Release \
-             -derivedDataPath build build >/dev/null
+  xcodebuild -project MeOS.xcodeproj -scheme MeOS-macOS -configuration Release \
+             -derivedDataPath build/mac build >/dev/null
 
   banner "Mac: install"
-  osascript -e 'quit app "meOS"' 2>/dev/null || true
-  for _ in {1..25}; do pgrep -f "/Applications/meOS.app/Contents/MacOS/meOS" >/dev/null || break; sleep 0.2; done
-  ditto build/Build/Products/Release/meOS.app /Applications/meOS.app
+  osascript -e 'quit app "MeOS"' 2>/dev/null || true
+  for _ in {1..25}; do pgrep -f "/Applications/MeOS.app/Contents/MacOS/MeOS" >/dev/null || break; sleep 0.2; done
+  rm -rf /Applications/MeOS.app
+  ditto build/mac/Build/Products/Release/MeOS.app /Applications/MeOS.app
 
   # ditto preserves the bundle's directory mtime, so the folder date looks stale
   # even on a fresh install. Compare the executable instead.
   local a b
-  a=$(shasum -a 256 build/Build/Products/Release/meOS.app/Contents/MacOS/meOS | cut -c1-16)
-  b=$(shasum -a 256 /Applications/meOS.app/Contents/MacOS/meOS | cut -c1-16)
+  a=$(shasum -a 256 build/mac/Build/Products/Release/MeOS.app/Contents/MacOS/MeOS | cut -c1-16)
+  b=$(shasum -a 256 /Applications/MeOS.app/Contents/MacOS/meOS | cut -c1-16)
   [[ "$a" == "$b" ]] && print "    verified $a" || { print "    HASH MISMATCH"; return 1; }
-  open -a /Applications/meOS.app
+  open -a /Applications/MeOS.app
 }
 
 install_ios() {
@@ -57,7 +58,7 @@ install_ios() {
   ios_reachability
 
   banner "iPhone: build"
-  cd "$ROOT/apps/ios"
+  cd "$ROOT/apps/apple"
   xcodegen generate >/dev/null
   # Build AT the device whenever it is reachable. Targeting the real device is
   # what lets automatic signing register it and settle the trust handshake;
@@ -74,12 +75,12 @@ install_ios() {
       print "    building generic — the app WILL need a manual Verify on the phone"
     }
   fi
-  xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Release \
+  xcodebuild -project MeOS.xcodeproj -scheme MeOS -configuration Release \
              -destination "$dest" -derivedDataPath build \
              -allowProvisioningUpdates build >/dev/null
 
   banner "iPhone: install"
-  local app="build/Build/Products/Release-iphoneos/meOS.app"
+  local app="build/Build/Products/Release-iphoneos/MeOS.app"
   ios_install_waiting "$app" "$WAIT_MINS" \
     || print "    rerun: ./scripts/install-apps.sh ios"
 

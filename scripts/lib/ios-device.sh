@@ -1,13 +1,12 @@
-# Shared iPhone plumbing. Sourced by install-apps.sh (interactive) and
-# refresh-ios.sh (the nightly LaunchAgent). Keep the device knowledge here so
-# the two callers can never drift apart.
+# Shared iPhone plumbing. Sourced by refresh-ios.sh (the nightly LaunchAgent).
+# Keep the device knowledge here so callers never drift apart.
 #
 # Everything prints to stdout with a four-space indent; the nightly job just
 # redirects stdout into its log file.
 
-IOS_DEVICE_ID="2224632C-57C6-555C-8280-459061A2883F"   # iPhone 15
+IOS_DEVICE_ID="00008120-000E0D580C000032"   # Berjil's iPhone 15 (UDID)
 IOS_DEVICE_HOST="Berjil-Jacob.coredevice.local"
-IOS_BUNDLE_ID="com.berjil.myos"
+IOS_BUNDLE_ID="com.berjil.meos"
 
 # "unavailable" contains "available", so matching the word is not enough — this
 # check claimed the phone was there every time it was not, and the build then

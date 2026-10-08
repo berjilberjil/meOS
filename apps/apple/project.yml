@@ -1,0 +1,79 @@
+name: MeOS
+options:
+  bundleIdPrefix: com.berjil
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+targets:
+  MeOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: MeOS
+        excludes: ["Resources/**", "MacApp.swift", "MacShell.swift", "MacInfo.plist"]
+      - path: MeOS/Resources/drop.wav
+        buildPhase: resources
+      - path: MeOS/Resources/Sounds
+        buildPhase: resources
+    info:
+      path: MeOS/Info.plist
+      properties:
+        CFBundleDisplayName: MeOS
+        CFBundleShortVersionString: "1.0"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [audio, fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.berjil.meos.steps.refresh]
+        NSAppTransportSecurity: {NSAllowsArbitraryLoads: true}
+        NSMicrophoneUsageDescription: So you can talk to Catherine instead of typing.
+        NSSpeechRecognitionUsageDescription: Your speech is transcribed on this device and never uploaded.
+        NSFaceIDUsageDescription: MeOS uses Face ID to unlock your data.
+        NSCameraUsageDescription: MeOS uses the camera to scan food, labels and things.
+        NSPhotoLibraryUsageDescription: MeOS reads photos you pick and the ones you heart in Favorites for body photos.
+        NSPhotoLibraryAddUsageDescription: MeOS saves a progress photo when you tap Save.
+        NSMotionUsageDescription: MeOS reads today's steps from your iPhone.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.berjil.meos
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        DEVELOPMENT_TEAM: ACDQ327MPR
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: MeOS.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  MeOS-macOS:
+    type: application
+    platform: macOS
+    sources:
+      # The Mac app is the iPhone app's design, not a separate skin: the same
+      # Design.swift and Me* screens, hosted in a Mac sidebar shell.
+      - path: MeOS
+        excludes:
+          - "App.swift"
+          - "CoreiOS/**"
+          - "Info.plist"
+          - "Resources/**"
+      - path: MeOS/Resources/drop.wav
+        buildPhase: resources
+      - path: MeOS/Resources/Sounds
+        buildPhase: resources
+    info:
+      path: MeOS/MacInfo.plist
+      properties:
+        CFBundleDisplayName: MeOS
+        CFBundleShortVersionString: "1.0"
+        LSApplicationCategoryType: public.app-category.lifestyle
+        NSAppTransportSecurity: {NSAllowsArbitraryLoads: true}
+        NSMicrophoneUsageDescription: So you can talk to Catherine instead of typing.
+        NSSpeechRecognitionUsageDescription: Your speech is transcribed on this device and never uploaded.
+        NSCameraUsageDescription: MeOS uses the camera to scan food, labels and things.
+        NSPhotoLibraryUsageDescription: MeOS reads photos you pick for body photos.
+    settings:
+      base:
+        PRODUCT_NAME: MeOS
+        PRODUCT_BUNDLE_IDENTIFIER: com.berjil.meos.macos
+        SWIFT_VERSION: "5.9"
+        DEVELOPMENT_TEAM: ACDQ327MPR
+        CODE_SIGN_STYLE: Automatic
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
