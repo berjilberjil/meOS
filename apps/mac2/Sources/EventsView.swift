@@ -18,13 +18,6 @@ struct EventsLogView: View {
     @State private var viewingAll: [EventMedia] = []
 
     /// The day an event next happens, or nil if it is behind us for good.
-    private var editorField: some View { Palette.background }
-
-    private var editorBorder: some View {
-        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-            .strokeBorder(Palette.border, lineWidth: 1)
-    }
-
     private func nextDay(_ e: EventItem) -> String? {
         EventRecurrence.next(e, onOrAfter: state.todayKey)
     }
@@ -170,6 +163,14 @@ struct EventsLogView: View {
 
 /// Add / edit one event. Image-first via PhotosPicker.
 private struct EventEditorSheet: View {
+    private var editorField: some View { Palette.background }
+
+    private var editorBorder: some View {
+        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            .strokeBorder(Palette.border, lineWidth: 1)
+    }
+
+
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
     let event: EventItem?
