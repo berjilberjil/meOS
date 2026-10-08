@@ -1,0 +1,34 @@
+name: Build Mac app
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate project
+        working-directory: apps/mac2
+        run: xcodegen generate
+
+      - name: Build (ad-hoc signed, no certs on CI)
+        working-directory: apps/mac2
+        run: xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Release build CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual
+
+      - name: Zip the app
+        run: |
+          APP_DIR=$(xcodebuild -project apps/mac2/MyOS.xcodeproj -scheme MyOS -configuration Release -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/{print $2; exit}')
+          ditto -c -k --sequesterDir --keepParent "$APP_DIR/MyOS.app" MyOS.app.zip
+          ls -lh MyOS.app.zip
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mac-build-${{ github.run_number }}
+          name: MyOS mac build ${{ github.run_number }}
+          files: MyOS.app.zip
