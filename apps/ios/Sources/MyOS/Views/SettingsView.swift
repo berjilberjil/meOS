@@ -188,7 +188,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .fluidPressable(scale: 0.99)
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
@@ -214,7 +214,7 @@ struct SettingsView: View {
             .padding(.horizontal, 12).padding(.vertical, 13)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .fluidPressable(scale: 0.99)
     }
 
     private var lockRow: some View {

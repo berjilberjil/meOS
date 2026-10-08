@@ -4,7 +4,7 @@ import { eventMediaKey, mediaRoomFor, signObjects, uploadObject } from '$lib/ser
 
 const ID_RE = /^[A-Za-z0-9._-]{1,200}$/;
 
-// Event photos/videos live in R2 instead of inside the encrypted `myos.events`
+// Event photos/videos live in R2 instead of inside the encrypted `meos.events`
 // blob, which was 2 MB of base64 re-synced on every poll. SvelteKit only allows
 // GET/POST/... exports from a +server.ts, so the key helper lives in $lib.
 

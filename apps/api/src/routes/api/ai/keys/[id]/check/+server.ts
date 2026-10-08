@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
   try {
     apiKey = decryptSecret(rows[0].secret as string);
   } catch {
-    throw error(500, 'Could not decrypt this key — MYOS_SECRETS_KEY may have changed. Re-enter it.');
+    throw error(500, 'Could not decrypt this key — MEOS_SECRETS_KEY may have changed. Re-enter it.');
   }
 
   const res = await listModels(rows[0].provider as ProviderId, apiKey);

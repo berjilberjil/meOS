@@ -108,12 +108,16 @@ struct MainView: View {
         }
         .preferredColorScheme(themeStore.theme.colorScheme)
         .overlay(alignment: .bottomTrailing) {
-            // This overlay covers the whole TabView, tab bar included, so it has
-            // to clear the bar itself.
+            // Sized to the launcher so the overlay cannot eat taps on the
+            // rest of the tab. Feedback is press-down on the button itself.
             ChatWidget()
+                .fixedSize()
                 .padding(.trailing, ChatWidget.edgeInset)
                 .padding(.bottom, ChatWidget.edgeInset + 52)
         }
+        // Tab switch is not an arrival. Entrance fades here read as the
+        // 1–2s "the tap did nothing" delay.
+        .environment(\.knEntrances, false)
         .sheet(isPresented: $showSettings) { SettingsView() }
         // Settings is the last row of the Today page now, not a toolbar gear.
         .onChange(of: signals.openSettings) { _, on in

@@ -2,7 +2,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { sql } from './db';
 
 const DAY = 1000 * 60 * 60 * 24;
-export const SESSION_COOKIE = 'myos_session';
+export const SESSION_COOKIE = 'meos_session';
 export const SESSION_DAYS = 60;
 
 export function hashPassword(pw: string): string {
@@ -25,7 +25,7 @@ export function verifyPassword(pw: string, stored: string): boolean {
  * `verifyPassword` is one scrypt at Node defaults — roughly 50 ms — and Workers
  * fan out, so an unthrottled login endpoint exhausts a short password in minutes
  * from concurrent clients. The account is worth taking: it holds every synced
- * module and `myos.crypto`, whose salts and wrapped DEKs enable an offline
+ * module and `meos.crypto`, whose salts and wrapped DEKs enable an offline
  * attack on the passphrase itself.
  *
  * Counted per username AND per IP, because either alone is trivially sidestepped.

@@ -1,11 +1,11 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
 import UIKit
 
 /// iOS Events — the memory log Berjil adds to most. Image-first: an event has a
-/// date, a tag, a note and photos (video is Mac-only for now). Upcoming events sit
-/// on top, then past. Backed by the shared `myos.events` store, so it syncs with the
-/// Mac Events tab.
+/// date, a tag, a note and photos/videos. Upcoming events sit on top, then past.
+/// Backed by the shared `myos.events` store, so it syncs with the Mac Events tab.
 struct EventsView: View {
     @EnvironmentObject var state: AppState
     @ObservedObject private var signals = UISignals.shared
@@ -173,7 +173,8 @@ struct EventsView: View {
     }
 }
 
-/// Add / edit one event (iOS). Image-first via PhotosPicker.
+/// Add / edit one event (iOS). Image-first via a UIKit Photos picker —
+/// SwiftUI `PhotosPicker` inside this sheet remounted on every AppState tick.
 private struct EventEditorSheet: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
@@ -191,7 +192,9 @@ private struct EventEditorSheet: View {
     @State private var recurrence: Recurrence = .none
     @State private var reminders: [ReminderLead] = []
     @State private var media: [EventMedia] = []
-    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var showPicker = false
+    @State private var importing = 0
+    @State private var mediaError: String?
     @State private var loaded = false
     @State private var showDelete = false
 
@@ -230,11 +233,24 @@ private struct EventEditorSheet: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            KFieldLabel(text: "Photos")
+                            KFieldLabel(text: "Photos & videos")
                             Spacer()
-                            PhotosPicker(selection: $pickerItems, maxSelectionCount: 8, matching: .images) {
+                            Button {
+                                showPicker = true
+                            } label: {
                                 Label("Add", systemImage: "photo.badge.plus")
                                     .font(.caption.weight(.semibold)).foregroundStyle(Palette.action)
+                            }
+                            .disabled(media.count >= EventMediaImport.maxSelection || importing > 0)
+                        }
+                        if let mediaError {
+                            Text(mediaError).font(.caption2).foregroundStyle(Palette.warning)
+                        }
+                        if importing > 0 {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.mini)
+                                Text(importing == 1 ? "Adding media…" : "Adding \(importing)…")
+                                    .font(.caption).foregroundStyle(Palette.muted)
                             }
                         }
                         if !media.isEmpty {
@@ -242,9 +258,14 @@ private struct EventEditorSheet: View {
                                 HStack(spacing: 8) {
                                     ForEach(media) { m in
                                         ZStack(alignment: .topTrailing) {
-                                            EventThumb(media: m, width: 72, height: 72) {
-                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                    .fill(Palette.surfaceElevated)
+                                            ZStack {
+                                                EventThumb(media: m, width: 72, height: 72) {
+                                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                        .fill(Palette.surfaceElevated)
+                                                }
+                                                if m.kind == .video {
+                                                    Image(systemName: "play.circle.fill").font(.body).foregroundStyle(.white)
+                                                }
                                             }
                                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                             Button { media.removeAll { $0.id == m.id } } label: {
@@ -272,7 +293,8 @@ private struct EventEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Save") { save() }
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || importing > 0)
                 }
                 if event != nil {
                     ToolbarItem(placement: .destructiveAction) {
@@ -288,7 +310,17 @@ private struct EventEditorSheet: View {
                     }
                 }
             }
-            .onChange(of: pickerItems) { _, items in Task { await loadPicked(items) } }
+            .sheet(isPresented: $showPicker) {
+                EventMediaPicker(
+                    selectionLimit: max(1, EventMediaImport.maxSelection - media.count),
+                    onPick: { results in
+                        showPicker = false
+                        Task { await loadPicked(results) }
+                    },
+                    onCancel: { showPicker = false }
+                )
+                .ignoresSafeArea()
+            }
             .onAppear {
                 guard !loaded else { return }
                 loaded = true
@@ -319,16 +351,71 @@ private struct EventEditorSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func loadPicked(_ items: [PhotosPickerItem]) async {
-        for item in items {
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let ui = UIImage(data: data),
-               let jpeg = ui.jpegData(compressionQuality: 0.7) {
-                let b64 = jpeg.base64EncodedString()
-                await MainActor.run { media.append(EventMedia(kind: .image, data: b64)) }
+    private func loadPicked(_ results: [PHPickerResult]) async {
+        await MainActor.run {
+            mediaError = nil
+            importing = results.count
+        }
+        for result in results {
+            let provider = result.itemProvider
+            if isVideo(provider) {
+                await loadVideo(provider)
+            } else {
+                await loadImage(provider)
+            }
+            await MainActor.run { importing = max(0, importing - 1) }
+        }
+    }
+
+    private func isVideo(_ provider: NSItemProvider) -> Bool {
+        provider.registeredTypeIdentifiers.contains { EventMediaImport.kind(typeIdentifier: $0) == .video }
+            || provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier)
+            || provider.hasItemConformingToTypeIdentifier(UTType.video.identifier)
+    }
+
+    private func loadImage(_ provider: NSItemProvider) async {
+        let data: Data? = await withCheckedContinuation { cont in
+            provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                cont.resume(returning: data)
             }
         }
-        await MainActor.run { pickerItems = [] }
+        guard let data, let ui = UIImage(data: data),
+              let jpeg = ui.jpegData(compressionQuality: 0.7) else {
+            await MainActor.run { mediaError = "Couldn't read that photo." }
+            return
+        }
+        let item = EventMedia(kind: .image, data: jpeg.base64EncodedString())
+        await MainActor.run { media.append(item) }
+    }
+
+    private func loadVideo(_ provider: NSItemProvider) async {
+        let type = videoTypeIdentifier(provider)
+        let url: URL? = await withCheckedContinuation { cont in
+            provider.loadFileRepresentation(forTypeIdentifier: type) { url, _ in
+                guard let url else { cont.resume(returning: nil); return }
+                let ext = url.pathExtension.isEmpty ? "mp4" : url.pathExtension
+                let dest = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
+                try? FileManager.default.copyItem(at: url, to: dest)
+                cont.resume(returning: FileManager.default.fileExists(atPath: dest.path) ? dest : nil)
+            }
+        }
+        guard let url else {
+            await MainActor.run { mediaError = "Couldn't read that video." }
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            let item = try await VideoMedia.encode(from: url)
+            await MainActor.run { media.append(item) }
+        } catch {
+            await MainActor.run { mediaError = error.localizedDescription }
+        }
+    }
+
+    private func videoTypeIdentifier(_ provider: NSItemProvider) -> String {
+        provider.registeredTypeIdentifiers.first { EventMediaImport.kind(typeIdentifier: $0) == .video }
+            ?? UTType.movie.identifier
     }
 
     private func save() {

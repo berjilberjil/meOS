@@ -1,8 +1,8 @@
-# Native meOS diet MCP
+# Native MeOS diet MCP
 
 Talks to the **Swift** Mac app (and through it, iPhone). Not the Tauri/SvelteKit project.
 
-1. Keep native meOS open and unlocked on this Mac.
+1. Keep native MeOS open and unlocked on this Mac.
 2. The app listens on `127.0.0.1:17881`.
 3. Grok loads `meos-diet` from `.mcp.json` / `~/.grok/config.toml`.
 

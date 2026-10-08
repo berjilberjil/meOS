@@ -5,7 +5,8 @@ import { env } from '$env/dynamic/private';
  * Symmetric encryption for user-added AI provider keys, so they can live in the DB
  * (and sync across devices) without being readable from a database dump alone.
  *
- * AES-256-GCM (authenticated). The master key comes from MYOS_SECRETS_KEY:
+ * AES-256-GCM (authenticated). The master key comes from MEOS_SECRETS_KEY
+ * (legacy MYOS_SECRETS_KEY still works as a fallback):
  *   - a base64 string that decodes to exactly 32 bytes is used directly, or
  *   - any other string is sha256'd into 32 bytes (so a plain passphrase works too).
  *
@@ -17,8 +18,8 @@ import { env } from '$env/dynamic/private';
  */
 
 function masterKey(): Buffer {
-  const raw = env.MYOS_SECRETS_KEY;
-  if (!raw) throw new Error('MYOS_SECRETS_KEY is not set on the server');
+  const raw = env.MEOS_SECRETS_KEY || env.MYOS_SECRETS_KEY;
+  if (!raw) throw new Error('MEOS_SECRETS_KEY is not set on the server');
   const decoded = Buffer.from(raw, 'base64');
   if (decoded.length === 32) return decoded;
   return createHash('sha256').update(raw, 'utf8').digest();

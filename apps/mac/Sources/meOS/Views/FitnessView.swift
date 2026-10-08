@@ -56,7 +56,6 @@ struct FitnessView: View {
                 case .body:    BodyView()
                 }
             }
-            .id(sub)
         }
     }
 
@@ -69,7 +68,6 @@ struct FitnessView: View {
                 case .history:  WorkoutHistoryView()
                 }
             }
-            .id(trainSub)
         }
     }
 

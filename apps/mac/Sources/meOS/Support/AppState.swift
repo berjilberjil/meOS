@@ -199,6 +199,16 @@ final class AppState: ObservableObject {
         // `objectWillChange` even for an identical value, so an unconditional
         // fan-out here rebuilt the tree twenty times on every hydrate — same
         // rule `applyRemote` already follows per key.
+        //
+        // Animations stay off: a live-sync apply that also animated every
+        // bound view is why a tap sat there for a second before the press
+        // landed. Motion belongs to the gesture, not to the dump arriving.
+        var txn = Transaction()
+        txn.disablesAnimations = true
+        withTransaction(txn) { applyValues(s) }
+    }
+
+    private func applyValues(_ s: AppStatePayload) {
         if let v = s.fitness, v != fitness { fitness = v }
         if let v = s.fitnessProfile, v != fitnessProfile { fitnessProfile = v }
         if let v = s.journal, v != journal { journal = v }
@@ -827,6 +837,9 @@ final class AppState: ObservableObject {
             return held
         }
 
+        var txn = Transaction()
+        txn.disablesAnimations = true
+        withTransaction(txn) {
         // Fitness and training carry the same risk as nutrition — a poll issued
         // before a local write can return after the push completed, so
         // `hasPendingPush` is already false and the remote copy silently reverts
@@ -883,6 +896,7 @@ final class AppState: ObservableObject {
             }
         }
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }
+        }
         return !deferred
     }
 

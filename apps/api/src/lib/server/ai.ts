@@ -4,15 +4,16 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { reserveAICall } from './aiBudget';
-import { sql } from './db';
+import { sql, nowISO } from './db';
 import { decryptSecret } from './secrets';
 import type { ProviderId } from './modelCatalog';
 
 /**
  * Resolves which model an AI route should use for the logged-in user. Routing lives
- * in app_state (myos.ai.routes) as a per-feature map of {keyId, model}; the secret
- * is decrypted from ai_credentials. Anything unrouted — or any failure — falls back
- * to the server's env Gemini config, so the app keeps working with zero setup.
+ * in app_state (meos.ai.routes, formerly myos.ai.routes) as a per-feature map of
+ * {keyId, model}; the secret is decrypted from ai_credentials. Anything unrouted —
+ * or any failure — falls back to the server's env Gemini config, so the app keeps
+ * working with zero setup.
  */
 
 export type Feature = 'chat' | 'vision' | 'parse' | 'suggest' | 'plan' | 'news';
@@ -63,8 +64,15 @@ export async function ensureAiTable(): Promise<void> {
 }
 
 async function loadRouting(userId: number): Promise<Routing> {
-  const rows = await sql`select value from app_state where user_id = ${userId} and key = 'myos.ai.routes'`;
-  return rows.length ? (rows[0].value as Routing) : {};
+  const rows = await sql`select value from app_state where user_id = ${userId} and key = 'meos.ai.routes'`;
+  if (rows.length) return rows[0].value as Routing;
+  // Legacy MyOS key — read once, copy forward, keep serving.
+  const legacy = await sql`select value from app_state where user_id = ${userId} and key = 'myos.ai.routes'`;
+  if (!legacy.length) return {};
+  await sql`insert into app_state (user_id, key, value, updated_at)
+    values (${userId}, 'meos.ai.routes', ${legacy[0].value}, ${nowISO()})
+    on conflict (user_id, key) do nothing`;
+  return legacy[0].value as Routing;
 }
 
 /** Google retired the Gemini 1.x and 2.0 families — map any of them (from env or a

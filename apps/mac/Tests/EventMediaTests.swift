@@ -54,6 +54,48 @@ final class EventMediaCodingTests: XCTestCase {
     }
 }
 
+/// The iOS event editor used SwiftUI `PhotosPicker` inside a sheet that
+/// observes `AppState`. A 1.5s live-sync tick remounted the picker, the
+/// library reloaded, and whatever you had tapped vanished. Import kind is
+/// the part we can pin in a test: photos AND videos, never a PDF.
+final class EventMediaImportTests: XCTestCase {
+    func testJPEGIsAnImage() {
+        XCTAssertEqual(EventMediaImport.kind(typeIdentifier: "public.jpeg"), .image)
+    }
+
+    func testHEICIsAnImage() {
+        XCTAssertEqual(EventMediaImport.kind(typeIdentifier: "public.heic"), .image)
+    }
+
+    func testPNGIsAnImage() {
+        XCTAssertEqual(EventMediaImport.kind(typeIdentifier: "public.png"), .image)
+    }
+
+    func testMPEG4IsAVideo() {
+        XCTAssertEqual(EventMediaImport.kind(typeIdentifier: "public.mpeg-4"), .video)
+    }
+
+    func testQuickTimeIsAVideo() {
+        XCTAssertEqual(EventMediaImport.kind(typeIdentifier: "com.apple.quicktime-movie"), .video)
+    }
+
+    func testGenericMovieIsAVideo() {
+        XCTAssertEqual(EventMediaImport.kind(typeIdentifier: "public.movie"), .video)
+    }
+
+    func testPDFIsRejected() {
+        XCTAssertNil(EventMediaImport.kind(typeIdentifier: "com.adobe.pdf"))
+    }
+
+    func testGarbageTypeIsRejected() {
+        XCTAssertNil(EventMediaImport.kind(typeIdentifier: "not.a.real.type"))
+    }
+
+    func testAtMostEightItems() {
+        XCTAssertEqual(EventMediaImport.maxSelection, 8)
+    }
+}
+
 /// Every API call goes through one URL join. `appendingPathComponent` treats the
 /// whole string as a path component, so it percent-escapes a `?` — which silently
 /// turned the one call that carries a query, `signEventMedia`, into a request for

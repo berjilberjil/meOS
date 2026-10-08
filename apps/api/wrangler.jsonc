@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "myos-api",
+  "name": "meos-api",
   "main": ".svelte-kit/cloudflare/_worker.js",
   "assets": { "directory": ".svelte-kit/cloudflare", "binding": "ASSETS" },
   // >= 2026-08-04 turns on nodejs_compat by default, which node:crypto
@@ -10,14 +10,14 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "myos",
-      "database_id": "514deebc-99ed-421c-ad13-1900d06ffead"
+      "database_name": "meos",
+      "database_id": "9774f0f2-3d95-4a7b-8f73-24cc41c194bc"
     }
   ],
   "r2_buckets": [
     {
       "binding": "MEDIA",
-      "bucket_name": "myos-media"
+      "bucket_name": "meos-media"
     }
   ],
   // Deepgram Aura synthesises Catrine's voice. Free within the 10,000

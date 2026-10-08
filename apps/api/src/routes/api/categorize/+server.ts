@@ -5,7 +5,7 @@ import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 
 /**
- * Classify a YouTube video (from its title + channel) into one of the meOS
+ * Classify a YouTube video (from its title + channel) into one of the MeOS
  * Productivity categories. Uses the same resolved model as quick-log parsing —
  * cheap/free is fine.
  */

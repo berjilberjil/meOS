@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Native meOS diet MCP. Talks to the unlocked Mac app on 127.0.0.1:17881
+ * Native MeOS diet MCP. Talks to the unlocked Mac app on 127.0.0.1:17881
  * (same encrypted store Mac + iPhone already sync). Falls back to the
  * production API + vault passphrase if the Mac app is closed.
  */
@@ -19,7 +19,7 @@ function fail(err: unknown) {
 }
 
 const Meal = z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'snacks']);
-const Weekday = z.number().int().min(0).max(6).describe('0=Sun … 6=Sat (native meOS)');
+const Weekday = z.number().int().min(0).max(6).describe('0=Sun … 6=Sat (native MeOS)');
 const SlotFood = z.object({
 	food_id: z.string().describe('seed-food-N or a custom food id'),
 	quantity: z.number().positive()
@@ -40,7 +40,7 @@ async function main() {
 	server.registerTool(
 		'get_week_plan',
 		{
-			description: 'Read Sun–Sat meal plan from native meOS (syncs to iPhone). weekday 0=Sun.',
+			description: 'Read Sun–Sat meal plan from native MeOS (syncs to iPhone). weekday 0=Sun.',
 			inputSchema: { week_start: z.string().optional(), date: z.string().optional() }
 		},
 		async () => {
