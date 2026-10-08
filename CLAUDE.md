@@ -9,8 +9,7 @@ Owner: **Berjil** — personal project. Commit + push as `berjilberjil <berjilja
 ```
 meOS/
 ├── apps/
-│   ├── mac/       # Native Swift/SwiftUI Mac app (Xcode project)
-│   ├── ios/       # Native Swift/SwiftUI iOS app (Xcode project)
+│   ├── apple/     # MeOS for iPhone + Mac: one SwiftUI codebase, black/white design (xcodegen)
 │   └── api/       # Headless SvelteKit backend API (deployed to Netlify) — no web UI
 ├── supabase/      # Postgres migrations (0001–0014)
 ├── mcp/           # MCP servers (diet/)
@@ -34,11 +33,15 @@ bun run dev              # http://localhost:5173
 ```
 Or install the LaunchAgent: `scripts/install-backend-agent.sh`
 
-### Mac app (apps/mac)
-Open `apps/mac/meOS.xcodeproj` in Xcode, or use the command-line build.
-
-### iOS app (apps/ios)
-Open the Xcode project, or use `xcodebuild`.
+### iPhone + Mac app (apps/apple)
+```bash
+cd apps/apple && xcodegen generate     # targets: MeOS (iOS), MeOS-macOS
+./scripts/install-apps.sh              # build + install both (mac | ios)
+```
+One set of screens (`Me*.swift`, `Design.swift`) runs on both. The Mac hosts them
+in `MeMacShell` (sidebar, no window toolbar); `MacCompat.swift` is the only place
+iPhone-only API is translated for macOS. Shared logic lives in `MeOS/Core`,
+iPhone-only logic (HealthKit, Photos favorites) in `MeOS/CoreiOS`.
 
 ### Diet MCP
 ```bash
@@ -59,8 +62,8 @@ Signing in on another device pulls the owner's data down.
 # Backend API tests
 cd apps/api && bun run test
 
-# Mac app tests
-cd apps/mac && xcodebuild test
+# Apps: build both targets
+cd apps/apple && xcodegen generate && xcodebuild -scheme MeOS-macOS build
 ```
 
 ## Conventions

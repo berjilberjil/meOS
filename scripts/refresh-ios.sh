@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Nightly re-sign + reinstall of meOS on the iPhone, so the free-team 7-day
+# Nightly re-sign + reinstall of MeOS on the iPhone, so the free-team 7-day
 # profile never gets a chance to lapse.
 #
 #   ./scripts/refresh-ios.sh            what the LaunchAgent runs at 22:00
@@ -11,8 +11,8 @@
 # provisioning profile embedded in the app, not in the install. Xcode happily
 # reuses a cached profile, so a plain rebuild can hand you the same expiry it
 # had yesterday. So this script does three things in order:
-#   1. deletes the cached meOS profile, so automatic signing has to mint a new
-#      one with a new 7-day window (work/skcript profiles are never touched),
+#   1. deletes the cached MeOS profile, so automatic signing has to mint a new
+#      one with a new 7-day window,
 #   2. deletes the built .app, so the link+codesign step actually re-runs and
 #      the new profile gets embedded,
 #   3. proves it worked by reading the expiry back out of the signed bundle.
@@ -26,10 +26,10 @@ set -uo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 # Launchd cannot open files under ~/Documents (TCC). The agent therefore
-# runs a copy of this script from ~/Library/Application Support/MyOS, and
-# MYOS_ROOT points back at the git checkout so xcodebuild still hits the
+# runs a copy of this script from ~/Library/Application Support/MeOS, and
+# MEOS_ROOT points back at the checkout so xcodebuild still hits the
 # real tree. Interactive runs from the repo keep the old ${0:A:h:h} root.
-ROOT="${MYOS_ROOT:-${0:A:h:h}}"
+ROOT="${MEOS_ROOT:-${0:A:h:h}}"
 if [[ -f "${0:A:h}/lib/ios-device.sh" ]]; then
   source "${0:A:h}/lib/ios-device.sh"
 else
@@ -43,7 +43,7 @@ REFRESH_BELOW="${MEOS_REFRESH_BELOW:-6.0}"
 # The phone is usually in the room at 22:00, but not always. Wait, don't fail.
 WAIT_MINS="${MEOS_WAIT_MINS:-120}"
 
-LOG_DIR="$HOME/Library/Logs/meOS"
+LOG_DIR="$HOME/Library/Logs/MeOS"
 LOG="$LOG_DIR/ios-refresh.log"
 BUILD_LOG="$LOG_DIR/ios-refresh-build.log"
 # The build deletes the signed .app before rebuilding, so a failed run leaves
@@ -52,7 +52,7 @@ BUILD_LOG="$LOG_DIR/ios-refresh-build.log"
 # successful run.
 STATE="$LOG_DIR/last-signed.epoch"
 LOCK="/tmp/meos-ios-refresh.lock"
-APP="$ROOT/apps/ios/build/Build/Products/Release-iphoneos/meOS.app"
+APP="$ROOT/apps/apple/build/Build/Products/Release-iphoneos/MeOS.app"
 
 FORCE=0; STATUS_ONLY=0
 for arg in "$@"; do
@@ -65,18 +65,18 @@ done
 
 mkdir -p "$LOG_DIR"
 log()  { print "$(date '+%Y-%m-%d %H:%M:%S')  $*" }
-note() { osascript -e "display notification \"$1\" with title \"meOS\"" >/dev/null 2>&1 || true }
+note() { osascript -e "display notification \"$1\" with title \"MeOS\"" >/dev/null 2>&1 || true }
 fail() {
   log "FAILED: $1"
   # Loud on purpose: a silent failure here means a dead app in seven days.
-  osascript -e "display notification \"$1\" with title \"meOS refresh FAILED\" sound name \"Basso\"" >/dev/null 2>&1 || true
+  osascript -e "display notification \"$1\" with title \"MeOS refresh FAILED\" sound name \"Basso\"" >/dev/null 2>&1 || true
   exit 1
 }
 
 # --status short-circuits everything, including the log and the lock.
 if (( STATUS_ONLY )); then
   if left=$(ios_profile_days_left "$APP"); then
-    print "meOS iOS build signed until $(ios_profile_expiry_human "$APP")  (${left} days left)"
+    print "MeOS iOS build signed until $(ios_profile_expiry_human "$APP")  (${left} days left)"
   elif [[ -s "$STATE" ]]; then
     e=$(<"$STATE")
     print "last signed build expires $(date -r $e '+%a %d %b %Y, %H:%M')  ($(printf '%.1f' $(( (e - $(date +%s)) / 86400.0 ))) days left)"
@@ -128,8 +128,6 @@ else
 fi
 
 # ------------------------------------------------- force a brand-new profile ---
-# Only ours. The skcript work profiles in the same directory are load-bearing
-# for the day job and must survive this untouched.
 PROFILE_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 pruned=0
 if [[ -d "$PROFILE_DIR" ]]; then
@@ -143,10 +141,10 @@ if [[ -d "$PROFILE_DIR" ]]; then
     fi
   done
 fi
-log "pruned $pruned cached meOS profile(s) — automatic signing will mint a new one"
+log "pruned $pruned cached MeOS profile(s) — automatic signing will mint a new one"
 
 # --------------------------------------------------------------- build ---
-cd "$ROOT/apps/ios" || fail "cannot enter apps/ios"
+cd "$ROOT/apps/apple" || fail "cannot enter $ROOT/apps/apple"
 
 ios_reachability
 dest="id=$IOS_DEVICE_ID"
@@ -167,8 +165,8 @@ xcodegen generate >/dev/null || fail "xcodegen failed"
 rm -rf build/Build/Products/Release-iphoneos
 
 log "building..."
-if ! xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Release \
-                -destination "$dest" -derivedDataPath build \
+if ! xcodebuild -project MeOS.xcodeproj -scheme MeOS -configuration Release \
+                -destination "id=$IOS_DEVICE_ID" -derivedDataPath build \
                 -allowProvisioningUpdates build >"$BUILD_LOG" 2>&1; then
   log "build log tail:"
   tail -n 30 "$BUILD_LOG"
@@ -194,7 +192,7 @@ print "$NEW_EPOCH" > "$STATE"
 
 # -------------------------------------------------------------- install ---
 if ! ios_install_waiting "$APP" "$WAIT_MINS"; then
-  fail "built a fresh profile but could not install — run: ./scripts/install-apps.sh ios"
+  fail "built a fresh profile but could not install — phone never came back"
 fi
 
 log "done — good for ${NEW_LEFT} more days"

@@ -1,0 +1,420 @@
+import Foundation
+
+// Aggregation. Pure functions over `[ActivityEvent]` — no AppState, no clock of
+// its own, nothing platform-specific — so every number the three screens show
+// can be pinned by a test.
+
+/// One category's share of a period. The legend under the timeline reads in
+/// categories rather than app names, because "an hour of content creation" is a
+/// fact about the day and "an hour of CapCut" is a fact about a tool.
+struct CategoryUsage: Identifiable, Hashable {
+    var category: ActivityCategory
+    var seconds: Int
+    /// What the majority of the time in this category was worth.
+    var productivity: ProductivityType
+    var id: String { category.rawValue }
+}
+
+/// One place's share of a period — an app, or a site inside a browser.
+///
+/// A browser is a room rather than an activity, so where Accessibility could
+/// read the address bar the row *is* the domain and the browser is reduced to
+/// the icon beside it. Everything above this layer reads a row the same way
+/// whether it came from an app or a site.
+struct AppUsage: Identifiable, Hashable {
+    /// `com.apple.dt.Xcode`, or `web.github.com`.
+    var appId: String
+    var appName: String
+    var category: ActivityCategory
+    var productivity: ProductivityType
+    var seconds: Int
+    /// The bundle id whose icon marks this row — for a site, the browser it was
+    /// open in.
+    var iconId: String = ""
+    /// Set when this row is a site.
+    var site: String?
+    /// What the window titles said, biggest first. The second level of the
+    /// breakdown: which repository, which video, which file.
+    var details: [DetailUsage] = []
+    var id: String { appId }
+}
+
+/// One window title's share of a row.
+struct DetailUsage: Identifiable, Hashable {
+    var title: String
+    var seconds: Int
+    var id: String { title }
+}
+
+/// One hour of the day, split by worth. The timeline strip is a stacked bar over
+/// these — the same question Apple's Screen Time answers, asked in MeOS's terms.
+struct TimelineHour: Identifiable, Hashable {
+    var hour: Int
+    var productive: Int = 0
+    var neutral: Int = 0
+    var distracting: Int = 0
+    var id: Int { hour }
+    var total: Int { productive + neutral + distracting }
+    func seconds(_ p: ProductivityType) -> Int {
+        switch p {
+        case .productive: return productive
+        case .neutral: return neutral
+        case .distracting: return distracting
+        }
+    }
+}
+
+/// An uninterrupted run of productive work.
+struct FocusBlock: Identifiable, Hashable {
+    /// Stands in when the block came from a compacted day, which keeps the
+    /// duration but not which app it was spent in. Both consumers interpolate
+    /// `appName` straight into a sentence, so it must never be empty.
+    static let unknownApp = "one app"
+
+    var id: String { startedAt }
+    var startedAt: String
+    var endedAt: String
+    var seconds: Int
+    /// The app the block spent most of its time in.
+    var appName: String
+}
+
+/// Everything the UI needs about one day, computed once.
+struct ActivitySummary: Hashable {
+    var day: String
+    var totalSeconds: Int = 0
+    var byProductivity: [ProductivityType: Int] = [:]
+    var apps: [AppUsage] = []
+    var categories: [CategoryUsage] = []
+    var timeline: [TimelineHour] = []
+    var switches: Int = 0
+    var switchesInWorkHours: Int = 0
+    var focusBlocks: [FocusBlock] = []
+    var sessionCount: Int = 0
+
+    var isEmpty: Bool { totalSeconds == 0 }
+    func seconds(_ p: ProductivityType) -> Int { byProductivity[p] ?? 0 }
+    var longestFocus: FocusBlock? { focusBlocks.max { $0.seconds < $1.seconds } }
+
+    /// Share of *tracked* time, not of the day. A number out of 24 hours would
+    /// be dishonest — MeOS only sees what it is watching.
+    func share(_ p: ProductivityType) -> Double {
+        totalSeconds > 0 ? Double(seconds(p)) / Double(totalSeconds) : 0
+    }
+    var productiveShare: Double { share(.productive) }
+}
+
+/// A week, and how it moved.
+struct ActivityWeekSummary: Hashable {
+    var days: [String] = []
+    var totalSeconds: Int = 0
+    var byProductivity: [ProductivityType: Int] = [:]
+    var apps: [AppUsage] = []
+    var categories: [CategoryUsage] = []
+    var dailyTotals: [String: Int] = [:]
+    var dailyProductive: [String: Int] = [:]
+    var longestFocus: FocusBlock?
+    var switches: Int = 0
+    /// Hour of day where productive time concentrates, as a two-hour window.
+    var bestFocusHour: Int?
+    var daysTracked: Int = 0
+
+    var isEmpty: Bool { totalSeconds == 0 }
+    func seconds(_ p: ProductivityType) -> Int { byProductivity[p] ?? 0 }
+    func share(_ p: ProductivityType) -> Double {
+        totalSeconds > 0 ? Double(seconds(p)) / Double(totalSeconds) : 0
+    }
+    var bestFocusWindow: String? {
+        guard let h = bestFocusHour else { return nil }
+        return "\(ActivityTime.hourLabel(h)) – \(ActivityTime.hourLabel(h + 2))"
+    }
+}
+
+enum ActivityEngine {
+
+    /// Work hours, for the "you switched apps N times during work hours" line.
+    /// Context switching at 9pm on a Saturday is not the same finding.
+    static let workHours = 9..<19
+
+    /// A gap this long or shorter does not end a focus block — reaching for a
+    /// terminal or a doc mid-task is part of the task.
+    static let focusGapTolerance = 180
+
+    /// A non-productive interruption shorter than this is absorbed into the
+    /// block around it, for the same reason.
+    static let focusInterruptionTolerance = 60
+
+    // MARK: - Day
+
+    static func sessions(_ events: [ActivityEvent], on day: String) -> [ActivityEvent] {
+        events.filter { $0.day == day }.sorted { $0.startedAt < $1.startedAt }
+    }
+
+    static func summary(_ events: [ActivityEvent], day: String) -> ActivitySummary {
+        let sessions = sessions(events, on: day)
+        var out = ActivitySummary(day: day)
+        out.sessionCount = sessions.count
+        guard !sessions.isEmpty else { return out }
+
+        var apps: [String: AppUsage] = [:]
+        var details: [String: [String: Int]] = [:]
+        var hours = (0..<24).map { TimelineHour(hour: $0) }
+
+        for s in sessions {
+            out.totalSeconds += s.duration
+            out.byProductivity[s.productivity, default: 0] += s.duration
+
+            let key = s.groupId
+            if var existing = apps[key] {
+                existing.seconds += s.duration
+                apps[key] = existing
+            } else {
+                apps[key] = AppUsage(appId: key, appName: s.groupName,
+                                     category: s.category, productivity: s.productivity,
+                                     seconds: s.duration, iconId: s.iconId, site: s.site)
+            }
+            if let title = s.title { details[key, default: [:]][title, default: 0] += s.duration }
+
+            spread(session: s, into: &hours)
+        }
+
+        out.apps = apps.values
+            .map { row in
+                var row = row
+                row.details = (details[row.appId] ?? [:])
+                    .map { DetailUsage(title: $0.key, seconds: $0.value) }
+                    .sorted { $0.seconds > $1.seconds }
+                return row
+            }
+            .sorted { $0.seconds > $1.seconds }
+        out.categories = categories(from: out.apps)
+        out.timeline = hours
+        out.switches = countSwitches(sessions)
+        out.switchesInWorkHours = countSwitches(sessions.filter { inWorkHours($0) })
+        out.focusBlocks = focusBlocks(sessions)
+        return out
+    }
+
+    /// Roll apps up into categories, keeping the worth the majority of the
+    /// time in each one carried — so a category that is mostly wasted reads as
+    /// wasted even when one productive app sits inside it.
+    static func categories(from apps: [AppUsage]) -> [CategoryUsage] {
+        var seconds: [ActivityCategory: Int] = [:]
+        var worth: [ActivityCategory: [ProductivityType: Int]] = [:]
+        for a in apps {
+            seconds[a.category, default: 0] += a.seconds
+            worth[a.category, default: [:]][a.productivity, default: 0] += a.seconds
+        }
+        return seconds.map { category, total in
+            let dominant = worth[category]?.max { $0.value < $1.value }?.key
+                ?? category.defaultProductivity
+            return CategoryUsage(category: category, seconds: total, productivity: dominant)
+        }
+        .sorted { $0.seconds > $1.seconds }
+    }
+
+    /// A session can straddle midnight-adjacent hours; its time is credited to
+    /// each hour it actually occupied rather than all of it to the hour it
+    /// started in, or a two-hour block would draw as a spike.
+    private static func spread(session s: ActivityEvent, into hours: inout [TimelineHour]) {
+        guard let start = ActivityTime.date(s.startedAt) else { return }
+        var remaining = s.duration
+        var cursor = ActivityTime.secondsIntoDay(start)
+        while remaining > 0 && cursor < 24 * 3600 {
+            let hour = cursor / 3600
+            let untilNextHour = (hour + 1) * 3600 - cursor
+            let chunk = min(remaining, untilNextHour)
+            switch s.productivity {
+            case .productive:  hours[hour].productive += chunk
+            case .neutral:     hours[hour].neutral += chunk
+            case .distracting: hours[hour].distracting += chunk
+            }
+            remaining -= chunk
+            cursor += chunk
+        }
+    }
+
+    private static func inWorkHours(_ s: ActivityEvent) -> Bool {
+        guard let start = ActivityTime.date(s.startedAt) else { return false }
+        return workHours.contains(ActivityTime.secondsIntoDay(start) / 3600)
+    }
+
+    /// Consecutive sessions in different apps. Re-entering the same app after a
+    /// gap is not a switch — it is the same thread of work resumed.
+    static func countSwitches(_ sessions: [ActivityEvent]) -> Int {
+        var count = 0
+        var previous: String?
+        for s in sessions {
+            if let previous, previous != s.groupId { count += 1 }
+            previous = s.groupId
+        }
+        return count
+    }
+
+    /// Runs of productive work, tolerating short gaps and short interruptions.
+    static func focusBlocks(_ sessions: [ActivityEvent], minimumSeconds: Int = 600) -> [FocusBlock] {
+        var blocks: [FocusBlock] = []
+        var current: (start: String, end: String, seconds: Int, byApp: [String: Int])?
+
+        func close() {
+            guard let c = current, c.seconds >= minimumSeconds else { current = nil; return }
+            let app = c.byApp.max { $0.value < $1.value }?.key ?? ""
+            blocks.append(FocusBlock(startedAt: c.start, endedAt: c.end, seconds: c.seconds, appName: app))
+            current = nil
+        }
+
+        for s in sessions {
+            let productive = s.productivity == .productive
+            let absorbable = !productive && s.duration <= focusInterruptionTolerance
+
+            if productive || (absorbable && current != nil) {
+                if var c = current {
+                    let gap = secondsBetween(c.end, s.startedAt)
+                    if gap > focusGapTolerance {
+                        close()
+                        current = (s.startedAt, s.endedAt, s.duration, [s.groupName: s.duration])
+                    } else {
+                        c.end = s.endedAt
+                        c.seconds += s.duration
+                        if productive { c.byApp[s.groupName, default: 0] += s.duration }
+                        current = c
+                    }
+                } else if productive {
+                    current = (s.startedAt, s.endedAt, s.duration, [s.groupName: s.duration])
+                }
+            } else {
+                close()
+            }
+        }
+        close()
+        return blocks
+    }
+
+    private static func secondsBetween(_ a: String, _ b: String) -> Int {
+        guard let da = ActivityTime.date(a), let db = ActivityTime.date(b) else { return 0 }
+        return max(0, Int(db.timeIntervalSince(da)))
+    }
+
+    // MARK: - Week
+
+    /// Summarise a set of days, reading raw sessions where they are still held
+    /// and the compacted rollups where they are not.
+    static func weekSummary(doc: ActivityDoc, days: [String]) -> ActivityWeekSummary {
+        var out = ActivityWeekSummary(days: days)
+        var apps: [String: AppUsage] = [:]
+        var productiveByHour = [Int](repeating: 0, count: 24)
+
+        for day in days {
+            let daySessions = sessions(doc.events, on: day)
+            if !daySessions.isEmpty {
+                let s = summary(doc.events, day: day)
+                guard s.totalSeconds > 0 else { continue }
+                out.daysTracked += 1
+                out.totalSeconds += s.totalSeconds
+                out.dailyTotals[day] = s.totalSeconds
+                out.dailyProductive[day] = s.seconds(.productive)
+                out.switches += s.switches
+                for (p, v) in s.byProductivity { out.byProductivity[p, default: 0] += v }
+                for a in s.apps {
+                    if var e = apps[a.appId] { e.seconds += a.seconds; apps[a.appId] = e }
+                    else { apps[a.appId] = a }
+                }
+                for h in s.timeline { productiveByHour[h.hour] += h.productive }
+                if let longest = s.longestFocus,
+                   longest.seconds > (out.longestFocus?.seconds ?? 0) { out.longestFocus = longest }
+            } else if let rollup = doc.days[day], rollup.totalSeconds > 0 {
+                // Compacted history: day totals survive, per-hour detail does
+                // not. A rollup's app rows kept only a display name, so a site
+                // row comes back as the site's name and is re-classified from
+                // it rather than being dropped.
+                out.daysTracked += 1
+                out.totalSeconds += rollup.totalSeconds
+                out.dailyTotals[day] = rollup.totalSeconds
+                out.dailyProductive[day] = rollup.seconds(.productive)
+                out.switches += rollup.switches
+                for (k, v) in rollup.byProductivity {
+                    if let p = ProductivityType(rawValue: k) { out.byProductivity[p, default: 0] += v }
+                }
+                for (name, v) in rollup.byApp {
+                    let site = name.contains(".") && !name.contains(" ") ? name : nil
+                    let id = site.map { "web." + $0 } ?? ActivityCatalog.slug(name)
+                    if var e = apps[id] { e.seconds += v; apps[id] = e }
+                    else {
+                        let c = ActivityCatalog.classify(appId: id, appName: name,
+                                                         site: site, rules: doc.rules)
+                        apps[id] = AppUsage(appId: id, appName: name, category: c.category,
+                                            productivity: c.productivity, seconds: v, site: site)
+                    }
+                }
+                // A compacted day's longest block still counts. `rollup()` has
+                // always written this and nothing ever read it, so on any window
+                // reaching past the 14-day retention — Month, in particular —
+                // "longest focus" was the best of the last fortnight only, and a
+                // two-hour block on day 22 was invisible. It also feeds
+                // `verdict()`, so a month that earned .excellent could be denied
+                // it on a number that was simply missing.
+                if rollup.longestFocusSeconds > (out.longestFocus?.seconds ?? 0) {
+                    // A rollup keeps the duration but not which app it was in,
+                    // and both consumers interpolate `appName` straight into a
+                    // sentence — an empty one reads "2h 14m in ."
+                    out.longestFocus = FocusBlock(startedAt: day, endedAt: day,
+                                                  seconds: rollup.longestFocusSeconds,
+                                                  appName: FocusBlock.unknownApp)
+                }
+            }
+        }
+
+        out.apps = apps.values.sorted { $0.seconds > $1.seconds }
+        out.categories = categories(from: out.apps)
+        // The best window is the two-hour pair with the most productive time.
+        if out.totalSeconds > 0 {
+            var best = (hour: 0, seconds: -1)
+            for h in 0..<23 {
+                let pair = productiveByHour[h] + productiveByHour[h + 1]
+                if pair > best.seconds { best = (h, pair) }
+            }
+            out.bestFocusHour = best.seconds > 0 ? best.hour : nil
+        }
+        return out
+    }
+
+    // MARK: - Retention
+
+    /// Compact anything older than the retention window into a day rollup and
+    /// drop its raw sessions. MeOS state is one synced blob; a year of raw
+    /// sessions would dominate every sync.
+    static func compact(_ doc: inout ActivityDoc, today: String) {
+        guard let todayDate = CalMath.date(fromKey: today),
+              let cutoffDate = Calendar.current.date(byAdding: .day,
+                                                     value: -ActivityDoc.retentionDays,
+                                                     to: todayDate) else { return }
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: cutoffDate)
+        let cutoff = CalMath.key(c.year ?? 0, c.month ?? 1, c.day ?? 1)
+
+        let stale = Set(doc.events.filter { $0.day < cutoff }.map(\.day))
+        guard !stale.isEmpty else { return }
+        for day in stale {
+            // Keep the larger total, the same rule `ActivityDoc.merged` applies.
+        // Recomputing unconditionally from whatever raw events happen to be
+        // present let a partial set — one the other device had merged back in
+        // after this one already compacted the day — overwrite a complete
+        // rollup, and hours went missing from every week and month total.
+        let fresh = rollup(doc.events, day: day)
+        if fresh.totalSeconds > (doc.days[day]?.totalSeconds ?? 0) { doc.days[day] = fresh }
+        }
+        doc.events.removeAll { $0.day < cutoff }
+    }
+
+    static func rollup(_ events: [ActivityEvent], day: String) -> ActivityDayRollup {
+        let s = summary(events, day: day)
+        var out = ActivityDayRollup(day: day)
+        out.totalSeconds = s.totalSeconds
+        out.switches = s.switches
+        out.longestFocusSeconds = s.longestFocus?.seconds ?? 0
+        out.byDevice = [DeviceType.mac.rawValue: s.totalSeconds]
+        for (p, v) in s.byProductivity { out.byProductivity[p.rawValue] = v }
+        // Only the apps worth remembering — a rollup is a summary, not an archive.
+        for a in s.apps.prefix(12) { out.byApp[a.appName] = a.seconds }
+        return out
+    }
+}
