@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * meOS Stuff MCP — log what you buy, from a receipt.
+ * MeOS Stuff MCP — log what you buy, from a receipt.
  *
  * Point it at an Amazon (or any) order screenshot and it records the product
  * link, title, category, purchase date, price and the payback window, keeping
@@ -197,7 +197,7 @@ async function main() {
 		await store.health();
 		console.error('[meos-stuff] ready (mac-local)');
 	} catch {
-		console.error('[meos-stuff] ready — native meOS is closed, tools will error until it is open');
+		console.error('[meos-stuff] ready — native MeOS is closed, tools will error until it is open');
 	}
 }
 

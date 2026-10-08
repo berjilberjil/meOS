@@ -1,10 +1,14 @@
 import AVFoundation
-import AppKit
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 
 /// Compress + encode a video for inline storage on an `EventItem`. Because the whole
 /// app state is one zero-knowledge-encrypted, fully-synced blob, video must stay small:
 /// we transcode to ≤540p H.264 and hard-cap the encoded bytes. A first-frame poster is
 /// grabbed for the grid so we never decode the whole clip just to show a thumbnail.
+///
+/// ImageIO for the poster, not AppKit — the iOS event editor encodes clips too.
 enum VideoMedia {
     /// Hard cap on the encoded video, in bytes (25 MB per clip).
     static let maxBytes = 25 * 1024 * 1024
@@ -63,7 +67,16 @@ enum VideoMedia {
         gen.maximumSize = CGSize(width: 900, height: 900)
         let t = CMTime(seconds: 0.1, preferredTimescale: 600)
         guard let cg = try? gen.copyCGImage(at: t, actualTime: nil) else { return nil }
-        let ns = NSImage(cgImage: cg, size: .zero)
-        return NoteImage.encode(ns, maxDimension: 900, quality: 0.6)
+        return jpegBase64(cg, quality: 0.6)
+    }
+
+    private static func jpegBase64(_ image: CGImage, quality: CGFloat) -> String? {
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return data.base64EncodedString()
     }
 }

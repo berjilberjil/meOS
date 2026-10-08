@@ -36,8 +36,8 @@ struct NotesView: View {
                 }
             } else {
                 ForEach(filtered) { note in
-                    Button { openID = note.id } label: { noteRow(note) }
-                        .buttonStyle(.plain)
+                    Button { Haptics.tap(); openID = note.id } label: { noteRow(note) }
+                        .fluidPressable(scale: 0.99)
                         .listRowBackground(Palette.surface)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) { pendingDelete = note } label: {

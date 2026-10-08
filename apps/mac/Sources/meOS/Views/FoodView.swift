@@ -148,9 +148,9 @@ struct FoodPickerSheet: View {
             .knField(focused: searchFocused).padding(.horizontal, 16)
             Divider().overlay(Palette.border).padding(.top, 12)
             ScrollView {
-                VStack(spacing: 6) {
+                LazyVStack(spacing: 6) {
                     ForEach(results) { f in
-                        Button { add(f, 1); dismiss() } label: {
+                        Button { Haptics.tap(); add(f, 1); dismiss() } label: {
                             HStack(spacing: 10) {
                                 FoodIcon(category: f.category, name: f.name, size: 30)
                                 VStack(alignment: .leading, spacing: 1) {
@@ -167,7 +167,7 @@ struct FoodPickerSheet: View {
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .fluidPressable(scale: 0.99)
                         .onHover { h in cursor(h) }
                     }
                 }

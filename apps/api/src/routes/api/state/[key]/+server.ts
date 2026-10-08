@@ -23,6 +23,11 @@ async function bumpStateVersion(userId: number): Promise<void> {
  * The keys a client is allowed to write, mirroring `StateKey` in the app plus
  * the vault's own metadata row.
  *
+ * `meos.*` is the current namespace (renamed from `myos.*`). The legacy
+ * `myos.*` names stay allowlisted so older app builds keep syncing while the
+ * migration runs; new writes use `meos.*`. Remove the legacy names once no
+ * client still writes them.
+ *
  * The route used to take any key name at all, with no cap on the body either.
  * One authenticated account could loop `PUT /api/state/<random-uuid>` with a
  * large payload and consume the shared D1 database and the account-wide
@@ -30,6 +35,12 @@ async function bumpStateVersion(userId: number): Promise<void> {
  * allowlist is also the cheaper guard: it rejects before touching the database.
  */
 const KEYS = new Set([
+  'meos.fitness', 'meos.fitnessProfile', 'meos.journal', 'meos.journalPresets',
+  'meos.notes', 'meos.days', 'meos.profile', 'meos.chat', 'meos.nutrition',
+  'meos.training', 'meos.events', 'meos.eventTags', 'meos.watch',
+  'meos.belongings', 'meos.fold', 'meos.memory', 'meos.scans', 'meos.taskMode',
+  'meos.weekly', 'meos.activity', 'meos.appearance', 'meos.crypto',
+  // Legacy MyOS namespace — accepted while clients migrate. See above.
   'myos.fitness', 'myos.fitnessProfile', 'myos.journal', 'myos.journalPresets',
   'myos.notes', 'myos.days', 'myos.profile', 'myos.chat', 'myos.nutrition',
   'myos.training', 'myos.events', 'myos.eventTags', 'myos.watch',

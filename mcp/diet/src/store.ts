@@ -36,6 +36,19 @@ function env(name: string, fallback = ''): string {
 	return (process.env[name] ?? fallback).trim();
 }
 
+/** Prefer the `MEOS_*` env name, fall back to the legacy `MYOS_*` one. */
+function menv(name: string, fallback = ''): string {
+	return env('MEOS_' + name, '') || env('MYOS_' + name, fallback);
+}
+
+/** New wire key first, legacy key second — openValue is AAD-bound, so the key
+ *  used must be the one the envelope was sealed under. */
+function decodeKeyBoth(raw: Record<string, unknown>, dek: Buffer, key: string): unknown {
+	const legacy = key.replace(/^meos\./, 'myos.');
+	if (raw[key] !== undefined) return decodeKey(raw, dek, key);
+	return decodeKey(raw, dek, legacy);
+}
+
 function loadDotenv() {
 	const path = new URL('../.env', import.meta.url);
 	try {
@@ -54,10 +67,17 @@ function loadDotenv() {
 }
 
 function mcpToken(): string {
-	const fromEnv = env('MEOS_MCP_TOKEN');
+	const fromEnv = env('MEOS_MCP_TOKEN') || env('MYOS_MCP_TOKEN');
 	if (fromEnv) return fromEnv;
-	const r = spawnSync('defaults', ['read', 'com.berjil.myos', 'myos.mcp.token'], { encoding: 'utf8' });
-	return (r.stdout ?? '').trim();
+	for (const [domain, key] of [
+		['com.berjil.meos.macos', 'meos.mcp.token'],
+		['com.berjil.myos', 'myos.mcp.token'],
+	] as const) {
+		const r = spawnSync('defaults', ['read', domain, key], { encoding: 'utf8' });
+		const t = (r.stdout ?? '').trim();
+		if (t) return t;
+	}
+	return '';
 }
 
 async function local<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -107,12 +127,12 @@ async function localUp(): Promise<boolean> {
 type Remote = { base: string; cookie: string; dek: Buffer };
 
 async function connectRemote(): Promise<Remote> {
-	const base = env('MEOS_BASE_URL', 'https://meos-berjil.netlify.app').replace(/\/$/, '');
-	const user = env('MEOS_USERNAME', 'berjil');
-	const pass = env('MEOS_PASSWORD');
-	const phrase = env('MEOS_VAULT_PASSPHRASE');
-	const recovery = env('MEOS_VAULT_RECOVERY');
-	if (!pass) throw new Error('Mac app is not running. Set MEOS_PASSWORD + MEOS_VAULT_PASSPHRASE in mcp/diet/.env, or open native meOS on this Mac.');
+	const base = menv('BASE_URL', 'https://meos-api.berjiljacob.workers.dev').replace(/\/$/, '');
+	const user = menv('USERNAME', 'berjil');
+	const pass = menv('PASSWORD');
+	const phrase = menv('VAULT_PASSPHRASE');
+	const recovery = menv('VAULT_RECOVERY');
+	if (!pass) throw new Error('Mac app is not running. Set MEOS_PASSWORD + MEOS_VAULT_PASSPHRASE in mcp/diet/.env, or open native MeOS on this Mac.');
 	const login = await fetch(base + '/api/auth/login', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -121,7 +141,7 @@ async function connectRemote(): Promise<Remote> {
 	if (!login.ok) throw new Error(`login failed (${login.status})`);
 	const cookie = login.headers.getSetCookie?.().join('; ') ?? login.headers.get('set-cookie') ?? '';
 	const raw = await (await fetch(base + '/api/state', { headers: { Accept: 'application/json', Cookie: cookie } })).json();
-	const meta = raw['myos.crypto'] as CryptoMeta | undefined;
+	const meta = (raw['meos.crypto'] ?? raw['myos.crypto']) as CryptoMeta | undefined;
 	if (!meta) throw new Error('no vault on this account');
 	const dek = phrase
 		? await unlockDek(meta, phrase)
@@ -142,7 +162,7 @@ function decodeKey(raw: Record<string, unknown>, dek: Buffer, key: string): unkn
 async function remoteNutrition(r: Remote): Promise<{ raw: Record<string, unknown>; nutrition: NutritionState }> {
 	const res = await fetch(r.base + '/api/state', { headers: { Accept: 'application/json', Cookie: r.cookie } });
 	const raw = (await res.json()) as Record<string, unknown>;
-	const n = (decodeKey(raw, r.dek, 'myos.nutrition') as NutritionState) ?? emptyNutrition();
+	const n = (decodeKeyBoth(raw, r.dek, 'meos.nutrition') as NutritionState) ?? emptyNutrition();
 	n.customFoods ??= [];
 	n.log ??= {};
 	n.mealPlan ??= {};
@@ -150,8 +170,8 @@ async function remoteNutrition(r: Remote): Promise<{ raw: Record<string, unknown
 }
 
 async function putNutrition(r: Remote, n: NutritionState): Promise<void> {
-	const envl = sealValue(Buffer.from(JSON.stringify(n)), r.dek, 'myos.nutrition');
-	const res = await fetch(r.base + '/api/state/myos.nutrition', {
+	const envl = sealValue(Buffer.from(JSON.stringify(n)), r.dek, 'meos.nutrition');
+	const res = await fetch(r.base + '/api/state/meos.nutrition', {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json', Cookie: r.cookie },
 		body: JSON.stringify(envl)
@@ -169,8 +189,8 @@ export async function createStore() {
 			if (await useLocal()) return local('/context', 'GET');
 			const r = await connectRemote();
 			const { raw, nutrition } = await remoteNutrition(r);
-			const profile = decodeKey(raw, r.dek, 'myos.profile') as Record<string, unknown> | null;
-			const fp = decodeKey(raw, r.dek, 'myos.fitnessProfile') as Record<string, unknown> | null;
+			const profile = decodeKeyBoth(raw, r.dek, 'meos.profile') as Record<string, unknown> | null;
+			const fp = decodeKeyBoth(raw, r.dek, 'meos.fitnessProfile') as Record<string, unknown> | null;
 			const date = todayIso();
 			const wd = weekdayFromDate(date);
 			const todayItems = ['breakfast', 'lunch', 'dinner', 'snacks'].flatMap((m) =>
@@ -360,14 +380,14 @@ export async function createStore() {
 			fiber_g?: number;
 		}) {
 			if (await useLocal()) return local('/food', 'POST', input);
-			throw new Error('upsert_food needs the Mac app running (open native meOS)');
+			throw new Error('upsert_food needs the Mac app running (open native MeOS)');
 		},
 		async setGoals(input: { energy_kcal?: number | null; protein_g?: number | null }) {
 			if (await useLocal()) {
 				await local('/goals', 'POST', input);
 				return { ok: true };
 			}
-			throw new Error('set_goals needs the Mac app running (open native meOS)');
+			throw new Error('set_goals needs the Mac app running (open native MeOS)');
 		},
 		async ping() {
 			const localOk = await useLocal();

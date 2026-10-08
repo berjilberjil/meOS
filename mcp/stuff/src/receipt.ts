@@ -1,5 +1,5 @@
 /**
- * Pure helpers for turning what's on a receipt into what meOS stores.
+ * Pure helpers for turning what's on a receipt into what MeOS stores.
  *
  * All of this is string wrangling with no I/O, which is exactly the part worth
  * testing: an assistant reading an Amazon screenshot will hand over prices as

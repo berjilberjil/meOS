@@ -1,4 +1,4 @@
-# meOS Stuff MCP
+# MeOS Stuff MCP
 
 Log what you buy, straight from a receipt screenshot.
 
@@ -10,7 +10,7 @@ iPhone on its own.
 
 ## Requirements
 
-Native meOS must be **open and unlocked on this Mac**. The MCP talks to the app's
+Native MeOS must be **open and unlocked on this Mac**. The MCP talks to the app's
 loopback bridge on `127.0.0.1:17881`.
 
 Unlike `mcp/diet`, there is no remote/vault fallback: the ROI maths, the category

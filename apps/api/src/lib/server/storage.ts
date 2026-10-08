@@ -12,7 +12,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 //   R2_ACCOUNT_ID          Cloudflare account id
 //   R2_ACCESS_KEY_ID       R2 API token's S3 access key id
 //   R2_SECRET_ACCESS_KEY   R2 API token's S3 secret access key
-//   R2_BUCKET              bucket name, e.g. "myos-media"
+//   R2_BUCKET              bucket name, e.g. "meos-media"
 
 /// Minimal structural view of the R2 binding we use.
 export interface R2Bucket {

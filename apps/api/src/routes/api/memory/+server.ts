@@ -65,7 +65,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         ``,
         `REMEMBER (examples):`,
         `- "From now on I use PostgreSQL for my projects" → preference`,
-        `- "My main project is meOS, a second brain" → project`,
+        `- "My main project is MeOS, a second brain" → project`,
         `- "I'm training for a half marathon in December" → goal`,
         `- "I decided to drop the Tauri shell and go native Swift" → decision`,
         `- "Ravi is my co-founder" → relationship`,
