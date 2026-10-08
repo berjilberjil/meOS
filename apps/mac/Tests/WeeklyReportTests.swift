@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The Friday report: when it runs, which two weeks it compares, and what the
 /// model is actually told.

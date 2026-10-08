@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The launch sequence. The point of testing choreography is the one promise it
 /// has to keep: the splash is never what makes the app feel slow.

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Event media moved out of the `myos.events` blob into R2. Both shapes — old
 /// rows with inline base64, new rows with R2 keys — must survive a round trip,

@@ -1,7 +1,7 @@
 import UIKit
 import UniformTypeIdentifiers
 
-/// "Share → MyOS", from the YouTube app or anywhere else that shares a link.
+/// "Share → meOS", from the YouTube app or anywhere else that shares a link.
 ///
 /// There is nothing to fill in. It reads the link, checks it really is a
 /// YouTube video, queues it for the Productivity log and dismisses itself.
@@ -45,7 +45,7 @@ final class ShareViewController: UIViewController {
         icon.tintColor = Self.green
         icon.translatesAutoresizingMaskIntoConstraints = false
 
-        label.text = "Saving to MyOS…"
+        label.text = "Saving to meOS…"
         label.textColor = .white
         label.font = .systemFont(ofSize: 15, weight: .semibold)
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -79,7 +79,7 @@ final class ShareViewController: UIViewController {
             return await finish(ok: false, message: "Not a YouTube link")
         }
         let saved = ShareInbox.add(videoId: id, url: link)
-        await finish(ok: saved, message: saved ? "Saved to MyOS" : "Couldn’t save")
+        await finish(ok: saved, message: saved ? "Saved to meOS" : "Couldn’t save")
     }
 
     /// What the host handed over, URLs first.

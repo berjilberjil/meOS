@@ -18,17 +18,17 @@ jobs:
 
       - name: Build (ad-hoc signed, no certs on CI)
         working-directory: apps/mac2
-        run: xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Release build CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual
+        run: xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Release build CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual
 
       - name: Zip the app
         run: |
-          APP_DIR=$(xcodebuild -project apps/mac2/MyOS.xcodeproj -scheme MyOS -configuration Release -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/{print $2; exit}')
-          ditto -c -k --sequesterDir --keepParent "$APP_DIR/MyOS.app" MyOS.app.zip
-          ls -lh MyOS.app.zip
+          APP_DIR=$(xcodebuild -project apps/mac2/meOS.xcodeproj -scheme meOS -configuration Release -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/{print $2; exit}')
+          ditto -c -k --sequesterDir --keepParent "$APP_DIR/meOS.app" meOS.app.zip
+          ls -lh meOS.app.zip
 
       - name: Attach to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: mac-build-${{ github.run_number }}
-          name: MyOS mac build ${{ github.run_number }}
-          files: MyOS.app.zip
+          name: meOS mac build ${{ github.run_number }}
+          files: meOS.app.zip

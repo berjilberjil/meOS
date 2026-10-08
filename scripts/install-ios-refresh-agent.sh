@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Install (or reinstall) the nightly iOS refresh LaunchAgent: 22:00 daily,
-# re-signs MyOS with a new 7-day profile and reinstalls it on the iPhone.
+# re-signs meOS with a new 7-day profile and reinstalls it on the iPhone.
 # Re-run any time the plist changes.
 #
 #   ./scripts/install-ios-refresh-agent.sh            install / reinstall
@@ -19,7 +19,7 @@ if [[ "${1:-}" == "--remove" ]]; then
   exit 0
 fi
 
-mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/MyOS"
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs/meOS"
 cp "$SRC" "$DEST"
 
 launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
@@ -31,7 +31,7 @@ cat <<'TXT'
 
   Check status any time:   ./scripts/refresh-ios.sh --status
   Run it right now:        launchctl kickstart -k gui/$(id -u)/com.berjil.myos.iosrefresh
-  Watch it work:           tail -f ~/Library/Logs/MyOS/ios-refresh.log
+  Watch it work:           tail -f ~/Library/Logs/meOS/ios-refresh.log
 
   The phone needs to be on the same Wi-Fi as this Mac. If it is not, the job
   waits up to two hours for it before giving up and telling you.

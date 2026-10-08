@@ -1,6 +1,6 @@
 import XCTest
 import CryptoKit
-@testable import MyOS
+@testable import meOS
 
 /// The Mac app is ad-hoc signed, so every data-protection Keychain write returns
 /// -34018 and the Fold tokens vanished the moment the login sheet closed — which

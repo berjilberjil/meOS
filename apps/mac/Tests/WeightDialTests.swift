@@ -1,9 +1,9 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The weight dial's maths.
 ///
-/// The dial is the one control in MyOS you use by *feel* — thumb on the glass,
+/// The dial is the one control in meOS you use by *feel* — thumb on the glass,
 /// eyes on the number, one tick of haptics per 50 g. Everything that decides
 /// what a turn is worth lives here rather than in the view, because a dial that
 /// counts a full reverse revolution when your thumb crosses nine o'clock is not

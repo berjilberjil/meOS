@@ -54,7 +54,7 @@ function loadDotenv() {
 }
 
 function mcpToken(): string {
-	const fromEnv = env('MYOS_MCP_TOKEN');
+	const fromEnv = env('MEOS_MCP_TOKEN');
 	if (fromEnv) return fromEnv;
 	const r = spawnSync('defaults', ['read', 'com.berjil.myos', 'myos.mcp.token'], { encoding: 'utf8' });
 	return (r.stdout ?? '').trim();
@@ -107,12 +107,12 @@ async function localUp(): Promise<boolean> {
 type Remote = { base: string; cookie: string; dek: Buffer };
 
 async function connectRemote(): Promise<Remote> {
-	const base = env('MYOS_BASE_URL', 'https://myos-berjil.netlify.app').replace(/\/$/, '');
-	const user = env('MYOS_USERNAME', 'berjil');
-	const pass = env('MYOS_PASSWORD');
-	const phrase = env('MYOS_VAULT_PASSPHRASE');
-	const recovery = env('MYOS_VAULT_RECOVERY');
-	if (!pass) throw new Error('Mac app is not running. Set MYOS_PASSWORD + MYOS_VAULT_PASSPHRASE in mcp/diet/.env, or open native MyOS on this Mac.');
+	const base = env('MEOS_BASE_URL', 'https://meos-berjil.netlify.app').replace(/\/$/, '');
+	const user = env('MEOS_USERNAME', 'berjil');
+	const pass = env('MEOS_PASSWORD');
+	const phrase = env('MEOS_VAULT_PASSPHRASE');
+	const recovery = env('MEOS_VAULT_RECOVERY');
+	if (!pass) throw new Error('Mac app is not running. Set MEOS_PASSWORD + MEOS_VAULT_PASSPHRASE in mcp/diet/.env, or open native meOS on this Mac.');
 	const login = await fetch(base + '/api/auth/login', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -128,7 +128,7 @@ async function connectRemote(): Promise<Remote> {
 		: recovery
 			? await unlockDekWithRecovery(meta, recovery)
 			: (() => {
-					throw new Error('Set MYOS_VAULT_PASSPHRASE (or MYOS_VAULT_RECOVERY)');
+					throw new Error('Set MEOS_VAULT_PASSPHRASE (or MEOS_VAULT_RECOVERY)');
 				})();
 	return { base, cookie, dek };
 }
@@ -360,14 +360,14 @@ export async function createStore() {
 			fiber_g?: number;
 		}) {
 			if (await useLocal()) return local('/food', 'POST', input);
-			throw new Error('upsert_food needs the Mac app running (open native MyOS)');
+			throw new Error('upsert_food needs the Mac app running (open native meOS)');
 		},
 		async setGoals(input: { energy_kcal?: number | null; protein_g?: number | null }) {
 			if (await useLocal()) {
 				await local('/goals', 'POST', input);
 				return { ok: true };
 			}
-			throw new Error('set_goals needs the Mac app running (open native MyOS)');
+			throw new Error('set_goals needs the Mac app running (open native meOS)');
 		},
 		async ping() {
 			const localOk = await useLocal();

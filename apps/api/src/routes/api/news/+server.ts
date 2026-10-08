@@ -5,7 +5,7 @@ import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 
 /**
- * MyOS Today news — real, recent tech + finance headlines for the user (India
+ * meOS Today news — real, recent tech + finance headlines for the user (India
  * focus). Uses Gemini with Google Search grounding so the news is actually current
  * (not the model's stale memory), then structures it.
  */

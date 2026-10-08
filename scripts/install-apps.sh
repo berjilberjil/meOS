@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Build + install MyOS. No arguments installs both.
+# Build + install meOS. No arguments installs both.
 #
 #   ./scripts/install-apps.sh              mac + iphone
 #   ./scripts/install-apps.sh mac
@@ -35,21 +35,21 @@ install_mac() {
   banner "Mac: build"
   cd "$ROOT/apps/mac"
   xcodegen generate >/dev/null
-  xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Release \
+  xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Release \
              -derivedDataPath build build >/dev/null
 
   banner "Mac: install"
-  osascript -e 'quit app "MyOS"' 2>/dev/null || true
-  for _ in {1..25}; do pgrep -f "/Applications/MyOS.app/Contents/MacOS/MyOS" >/dev/null || break; sleep 0.2; done
-  ditto build/Build/Products/Release/MyOS.app /Applications/MyOS.app
+  osascript -e 'quit app "meOS"' 2>/dev/null || true
+  for _ in {1..25}; do pgrep -f "/Applications/meOS.app/Contents/MacOS/meOS" >/dev/null || break; sleep 0.2; done
+  ditto build/Build/Products/Release/meOS.app /Applications/meOS.app
 
   # ditto preserves the bundle's directory mtime, so the folder date looks stale
   # even on a fresh install. Compare the executable instead.
   local a b
-  a=$(shasum -a 256 build/Build/Products/Release/MyOS.app/Contents/MacOS/MyOS | cut -c1-16)
-  b=$(shasum -a 256 /Applications/MyOS.app/Contents/MacOS/MyOS | cut -c1-16)
+  a=$(shasum -a 256 build/Build/Products/Release/meOS.app/Contents/MacOS/meOS | cut -c1-16)
+  b=$(shasum -a 256 /Applications/meOS.app/Contents/MacOS/meOS | cut -c1-16)
   [[ "$a" == "$b" ]] && print "    verified $a" || { print "    HASH MISMATCH"; return 1; }
-  open -a /Applications/MyOS.app
+  open -a /Applications/meOS.app
 }
 
 install_ios() {
@@ -74,12 +74,12 @@ install_ios() {
       print "    building generic — the app WILL need a manual Verify on the phone"
     }
   fi
-  xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Release \
+  xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Release \
              -destination "$dest" -derivedDataPath build \
              -allowProvisioningUpdates build >/dev/null
 
   banner "iPhone: install"
-  local app="build/Build/Products/Release-iphoneos/MyOS.app"
+  local app="build/Build/Products/Release-iphoneos/meOS.app"
   ios_install_waiting "$app" "$WAIT_MINS" \
     || print "    rerun: ./scripts/install-apps.sh ios"
 

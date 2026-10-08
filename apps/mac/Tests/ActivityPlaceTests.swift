@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The Accessibility pass, and what it changes about a day.
 ///
@@ -34,7 +34,7 @@ final class ActivityPlaceTests: XCTestCase {
 
     func testAddressBarBecomesABareHost() {
         XCTAssertEqual(WindowSense.host(fromAddressBar: "youtube.com/watch?v=abc"), "youtube.com")
-        XCTAssertEqual(WindowSense.host(fromAddressBar: "https://www.github.com/berjilberjil/MyOS"), "github.com")
+        XCTAssertEqual(WindowSense.host(fromAddressBar: "https://www.github.com/berjilberjil/meOS"), "github.com")
         XCTAssertEqual(WindowSense.host(fromAddressBar: "HTTPS://Mail.Google.com/mail/u/0"), "mail.google.com")
         XCTAssertEqual(WindowSense.host(fromAddressBar: "localhost:5173/app"), nil)
     }
@@ -55,14 +55,14 @@ final class ActivityPlaceTests: XCTestCase {
                                               appName: "Google Chrome"), "Revamp Finance Page")
         XCTAssertEqual(WindowSense.cleanTitle("Inbox (3) — Mail", appName: "Mail"), "Inbox (3)")
         // A title that is only the app's name says nothing the row does not.
-        XCTAssertNil(WindowSense.cleanTitle("MyOS", appName: "MyOS"))
+        XCTAssertNil(WindowSense.cleanTitle("meOS", appName: "meOS"))
         XCTAssertNil(WindowSense.cleanTitle("   ", appName: "Finder"))
     }
 
     /// Typing a search into the address bar must not read as leaving the site.
     func testTypingInTheAddressBarHoldsTheSiteRatherThanClearingIt() {
-        let onSite = WindowContext(title: "berjilberjil/MyOS", site: "github.com")
-        let typing = WindowContext(title: "berjilberjil/MyOS", site: nil)
+        let onSite = WindowContext(title: "berjilberjil/meOS", site: "github.com")
+        let typing = WindowContext(title: "berjilberjil/meOS", site: nil)
 
         let held = WindowSense.settling(typing, after: onSite, isBrowser: true)
         XCTAssertEqual(held.site, "github.com")
@@ -121,7 +121,7 @@ final class ActivityPlaceTests: XCTestCase {
 
     func testBrowserTimeSplitsIntoSitesNotOneChromeBlock() {
         let events = [
-            event("Google Chrome", site: "github.com", title: "berjilberjil/MyOS", at: 10, minutes: 60),
+            event("Google Chrome", site: "github.com", title: "berjilberjil/meOS", at: 10, minutes: 60),
             event("Google Chrome", site: "youtube.com", title: "some reel", at: 11, minutes: 40),
             event("Xcode", id: "com.apple.dt.Xcode", title: "ActivityEngine.swift", at: 12, minutes: 30),
         ]
@@ -137,14 +137,14 @@ final class ActivityPlaceTests: XCTestCase {
 
     func testRowsCarryTheBrowsersIconAndTheirWindowTitles() {
         let events = [
-            event("Google Chrome", site: "github.com", title: "berjilberjil/MyOS", at: 10, minutes: 40),
+            event("Google Chrome", site: "github.com", title: "berjilberjil/meOS", at: 10, minutes: 40),
             event("Google Chrome", site: "github.com", title: "anthropics/claude", at: 11, minutes: 20),
         ]
         let row = ActivityEngine.summary(events, day: day).apps.first
         XCTAssertEqual(row?.appId, "web.github.com")
         XCTAssertEqual(row?.iconId, "com.google.Chrome")
         XCTAssertEqual(row?.seconds, 60 * 60)
-        XCTAssertEqual(row?.details.map(\.title), ["berjilberjil/MyOS", "anthropics/claude"])
+        XCTAssertEqual(row?.details.map(\.title), ["berjilberjil/meOS", "anthropics/claude"])
         XCTAssertEqual(row?.details.first?.seconds, 40 * 60)
     }
 
@@ -165,7 +165,7 @@ final class ActivityPlaceTests: XCTestCase {
         var doc = ActivityDoc()
         doc.events = [
             event("Xcode", id: "com.apple.dt.Xcode", at: 10, minutes: 60),
-            event("MyOS", id: "com.berjil.myos", at: 11, minutes: 16, device: .iphone),
+            event("meOS", id: "com.berjil.myos", at: 11, minutes: 16, device: .iphone),
         ]
         doc.devices["p1"] = ActivityDevice(deviceId: "p1", deviceType: .iphone,
                                            name: "iPhone", lastSeen: stamp(11, 0))

@@ -8,7 +8,7 @@ import CoreMotion
 enum HealthSteps {
     private static let pedometer = CMPedometer()
 
-    /// True once a read was refused because Motion & Fitness is off for MyOS.
+    /// True once a read was refused because Motion & Fitness is off for meOS.
     /// The Steps card reads this so a refusal never renders as a zero.
     @MainActor private(set) static var accessDenied = false
 

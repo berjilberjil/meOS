@@ -1,6 +1,6 @@
-<!-- MyOS is a headless backend. This page only exists so the site root isn't a 404. -->
+<!-- meOS is a headless backend. This page only exists so the site root isn't a 404. -->
 <main>
-  <h1>MyOS</h1>
+  <h1>meOS</h1>
   <p>Personal operating system — backend API. Nothing to see here; the app is native.</p>
 </main>
 

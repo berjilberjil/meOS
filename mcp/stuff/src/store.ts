@@ -7,17 +7,17 @@ import { readFileSync } from 'node:fs';
  * Unlike the diet MCP there is no remote/vault fallback here on purpose: the ROI
  * maths, the category guesser and the bill downscaling all live in Swift, and a
  * second implementation in TypeScript would be a second thing to keep correct.
- * So this needs native MyOS open and unlocked, and says so plainly when it isn't.
+ * So this needs native meOS open and unlocked, and says so plainly when it isn't.
  */
 
 const LOCALS = ['http://127.0.0.1:17881', 'http://[::1]:17881'];
 let base = LOCALS[0]!;
 
 const CLOSED =
-	'Native MyOS is not running (or is locked). Open MyOS on this Mac and unlock it, then try again.';
+	'Native meOS is not running (or is locked). Open meOS on this Mac and unlock it, then try again.';
 
 function token(): string {
-	const fromEnv = (process.env.MYOS_MCP_TOKEN ?? '').trim();
+	const fromEnv = (process.env.MEOS_MCP_TOKEN ?? '').trim();
 	if (fromEnv) return fromEnv;
 	const r = spawnSync('defaults', ['read', 'com.berjil.myos', 'myos.mcp.token'], { encoding: 'utf8' });
 	return (r.stdout ?? '').trim();

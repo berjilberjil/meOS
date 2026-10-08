@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Regressions from the pre-ship logic audit. Each test here stands for a bug
 /// that was live, not a hypothetical — the comment says what used to happen.

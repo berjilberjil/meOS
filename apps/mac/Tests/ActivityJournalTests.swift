@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The journal is what makes tracking survive a locked vault, a quit, a crash
 /// and an offline day, so its two rules — merge the tail, union by id keeping

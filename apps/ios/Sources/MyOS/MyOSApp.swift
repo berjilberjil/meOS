@@ -3,7 +3,7 @@ import UIKit
 import UserNotifications
 
 @main
-struct MyOSApp: App {
+struct meOSApp: App {
     @StateObject private var state = AppState()
     @ObservedObject private var themeStore = ThemeStore.shared
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate

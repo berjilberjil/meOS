@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Records what it was asked to say, and can be told to refuse.
 private final class FakeSynth: SpeechSynth, @unchecked Sendable {

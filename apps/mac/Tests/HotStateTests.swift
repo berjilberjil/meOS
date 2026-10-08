@@ -1,6 +1,6 @@
 import XCTest
 import Combine
-@testable import MyOS
+@testable import meOS
 
 /// Phase 1 of the native-smoothness pass: high-frequency UI state must not
 /// broadcast through `AppState.objectWillChange`.

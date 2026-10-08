@@ -95,7 +95,7 @@ enum FavoritesBodyImporter {
     }
 }
 
-/// Reloads body photos whenever Favorites change while MyOS is open.
+/// Reloads body photos whenever Favorites change while meOS is open.
 final class FavoritesWatcher: NSObject, PHPhotoLibraryChangeObserver {
     static let shared = FavoritesWatcher()
     private var started = false

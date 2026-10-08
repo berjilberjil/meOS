@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Pure parsing of a Gemini scan payload — food vs object. No network.
 final class ScanInsightTests: XCTestCase {

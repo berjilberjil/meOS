@@ -15,7 +15,7 @@
 
     <!-- Run from apps/api so vite finds the project and loads .env. -->
     <key>WorkingDirectory</key>
-    <string>/Users/berjilskcript/Documents/Personal/MyOS/apps/api</string>
+    <string>/Users/berjilskcript/Documents/Personal/meOS/apps/api</string>
 
     <key>EnvironmentVariables</key>
     <dict>
@@ -31,8 +31,8 @@
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>/Users/berjilskcript/Library/Logs/myos-backend.log</string>
+    <string>/Users/berjilskcript/Library/Logs/meos-backend.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/berjilskcript/Library/Logs/myos-backend.log</string>
+    <string>/Users/berjilskcript/Library/Logs/meos-backend.log</string>
 </dict>
 </plist>

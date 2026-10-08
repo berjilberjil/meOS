@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 final class ProfileInitialsTests: XCTestCase {
     private func profile(named name: String) -> Profile {
@@ -113,10 +113,10 @@ final class ProfileCodableTests: XCTestCase {
         profile.website = "https://berjil.com"
         profile.instagram = "@berjil"
         profile.github = "berjil"
-        profile.goalsShort = ["Ship MyOS 1.0"]
+        profile.goalsShort = ["Ship meOS 1.0"]
         profile.goalsMid = ["Marathon"]
         profile.goalsLong = ["Be healthy at 60"]
-        profile.achievements = [Milestone(year: "2026", title: "Shipped MyOS", note: "v1.0")]
+        profile.achievements = [Milestone(year: "2026", title: "Shipped meOS", note: "v1.0")]
         profile.healthNotes = "No known allergies."
         profile.about = "Tech founder, night owl."
         profile.habits = ["Gym", "Read"]

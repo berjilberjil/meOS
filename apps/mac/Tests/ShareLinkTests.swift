@@ -1,7 +1,7 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
-/// What "Share → MyOS" accepts. The share sheet is a much noisier input than
+/// What "Share → meOS" accepts. The share sheet is a much noisier input than
 /// the paste field, so `sharedLink` is deliberately stricter than `videoID`.
 final class ShareLinkTests: XCTestCase {
 

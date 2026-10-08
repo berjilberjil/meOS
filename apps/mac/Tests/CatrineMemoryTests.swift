@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// What Catherine is allowed to remember, and what she pulls back out.
 ///
@@ -23,7 +23,7 @@ final class CatrineMemoryTests: XCTestCase {
 
     func testDurableFactsAreKept() {
         for fact in ["From now on I use PostgreSQL for my projects",
-                     "My main project is MyOS, a second brain",
+                     "My main project is meOS, a second brain",
                      "I always train in the morning before work",
                      "I decided to drop Tauri and go native Swift"] {
             XCTAssertNil(MemoryBank.judge(mem(fact), against: []), fact)
@@ -83,7 +83,7 @@ final class CatrineMemoryTests: XCTestCase {
 
     func testExtractionOnlyRunsWhenSomethingLooksDurable() {
         XCTAssertTrue(MemoryBank.mightContainMemory("From now on I use Postgres"))
-        XCTAssertTrue(MemoryBank.mightContainMemory("remember that my main project is MyOS"))
+        XCTAssertTrue(MemoryBank.mightContainMemory("remember that my main project is meOS"))
         XCTAssertTrue(MemoryBank.mightContainMemory("I'm building a second brain app"))
 
         XCTAssertFalse(MemoryBank.mightContainMemory("thanks"))
@@ -100,12 +100,12 @@ final class CatrineMemoryTests: XCTestCase {
 
     func testRecallFindsTheRelevantMemory() {
         let bank = [
-            mem("Main project is MyOS, a personal second brain", .project),
+            mem("Main project is meOS, a personal second brain", .project),
             mem("Trains for a half marathon in December", .goal),
             mem("Deploys to Netlify", .workflow)
         ]
-        let hits = MemoryBank.recall(bank, for: "how is the MyOS project going?")
-        XCTAssertEqual(hits.first?.content, "Main project is MyOS, a personal second brain")
+        let hits = MemoryBank.recall(bank, for: "how is the meOS project going?")
+        XCTAssertEqual(hits.first?.content, "Main project is meOS, a personal second brain")
     }
 
     /// The whole point of ranking: an unrelated question must not drag the whole
@@ -142,7 +142,7 @@ final class CatrineMemoryTests: XCTestCase {
     func testUnconfirmedMemoriesAreHedgedInThePrompt() {
         let lines = MemoryBank.promptLines([
             mem("Probably prefers Flutter", .preference, confidence: 0.7),
-            mem("Main project is MyOS", .project, source: .stated)
+            mem("Main project is meOS", .project, source: .stated)
         ])
         XCTAssertTrue(lines[0].contains("(unconfirmed)"))
         XCTAssertFalse(lines[1].contains("(unconfirmed)"))

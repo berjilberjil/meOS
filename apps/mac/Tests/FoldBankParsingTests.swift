@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Fold answers `bank_accounts` with 200 and 1531 bytes of accounts nested under
 /// `data.added` / `data.subscribed`, and the old flat `{name, balance}` matcher

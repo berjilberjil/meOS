@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The engine is the only thing standing between raw sessions and three screens
 /// that all claim to describe the same day, so its arithmetic is pinned here.
@@ -47,7 +47,7 @@ final class ActivityEngineTests: XCTestCase {
         XCTAssertEqual(s.share(.productive), 2.0 / 3.0, accuracy: 0.001)
     }
 
-    /// Shares are of *tracked* time, never of the 24-hour day — MyOS only sees
+    /// Shares are of *tracked* time, never of the 24-hour day — meOS only sees
     /// what it is watching, and dividing by the day would understate everything.
     func testSharesAreOfTrackedTimeOnly() {
         let s = ActivityEngine.summary([event("Xcode", 10, 0, minutes: 30)], day: day)

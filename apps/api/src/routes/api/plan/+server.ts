@@ -5,7 +5,7 @@ import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 
 /**
- * MyOS weekly plan generator. Given the user's goal + calorie/macro targets and the
+ * meOS weekly plan generator. Given the user's goal + calorie/macro targets and the
  * foods/exercises actually in their library, draft a 7-day workout split and a
  * macro-hitting meal plan. The client maps names back to library ids and lets them
  * edit. Picks ONLY from the provided lists so everything resolves.

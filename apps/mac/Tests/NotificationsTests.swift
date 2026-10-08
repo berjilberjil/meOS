@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 final class NotificationsTests: XCTestCase {
     func testDefaultsHaveTheFiveReminders() {
@@ -27,7 +27,7 @@ final class NotificationsTests: XCTestCase {
 
     // MARK: - Where a tap lands
 
-    /// Every reminder MyOS sends knows where it goes. Before this, none of them
+    /// Every reminder meOS sends knows where it goes. Before this, none of them
     /// carried a route at all and the router dropped anything that was not the
     /// Friday report — so five notifications a day opened the app on whatever
     /// screen it happened to be left on.

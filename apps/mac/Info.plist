@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>MyOS</string>
+	<string>meOS</string>
 	<key>CFBundleDisplayName</key>
-	<string>MyOS</string>
+	<string>meOS</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleExecutable</key>
@@ -21,11 +21,11 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>MyOS uses Touch ID to unlock your life data.</string>
+	<string>meOS uses Touch ID to unlock your life data.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<!-- Dev convenience: reach the localhost backend + your future HTTPS domain.
-	     Tighten this to specific domains before you ever ship MyOS to anyone else. -->
+	     Tighten this to specific domains before you ever ship meOS to anyone else. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

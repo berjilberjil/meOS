@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Scan history: what a saved scan keeps, how the list is capped, and which R2
 /// objects a delete leaves behind.

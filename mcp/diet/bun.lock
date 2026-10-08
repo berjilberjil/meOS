@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "myos-native-diet-mcp",
+      "name": "meos-native-diet-mcp",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
         "zod": "^3.25.0",

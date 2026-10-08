@@ -276,7 +276,7 @@ private struct ProgressGallery: View {
         }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.jpeg]
-        panel.nameFieldStringValue = "MyOS-\(p.date).jpg"
+        panel.nameFieldStringValue = "meOS-\(p.date).jpg"
         panel.begin { response in
             guard response == .OK, let url = panel.url,
                   let data = try? Data(contentsOf: p.url) else { return }

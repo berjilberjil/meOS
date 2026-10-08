@@ -14,7 +14,7 @@
 
 - **This must never cost money.** Two independent stops: Cloudflare's 10,000 neuron/day free allocation, and a Worker-side hard cap of **7,000 characters per UTC day** per user.
 - Deployment targets stay **iOS 17.0 / macOS 14.0**. Newer APIs are reached with `#available`, never a target bump.
-- Shared code goes in `apps/mac/Sources/MyOS/Support/` — that whole directory is compiled into the iOS target too. iOS-only views go in `apps/ios/Sources/MyOS/Views/`.
+- Shared code goes in `apps/mac/Sources/meOS/Support/` — that whole directory is compiled into the iOS target too. iOS-only views go in `apps/ios/Sources/meOS/Views/`.
 - All server timestamps come from `nowISO()` in `src/lib/server/db.ts`. **Never** SQLite `current_timestamp` — `YYYY-MM-DD HH:MM:SS` does not sort against `YYYY-MM-DDTHH:MM:SS.sssZ`.
 - Design language: `ScreenTitle`, `Gap.screen` (18) / `Gap.row` (12) / `Gap.tight` (8), `.knRise(i)` (opacity only), `knPop` (critically damped). Nothing moves after it lands.
 - The call UI is a `fullScreenCover`. **Never** put voice work on the Today page — `TodayPager` keeps three pages alive and forbids work in `.task`/`.onAppear`.
@@ -30,7 +30,7 @@
 - [ ] **Step 1: Create the branch**
 
 ```bash
-cd /Users/berjilskcript/Documents/Personal/MyOS
+cd /Users/berjilskcript/Documents/Personal/meOS
 git checkout main && git pull --ff-only
 git checkout -b feat/catrine-voice
 ```
@@ -402,7 +402,7 @@ git commit -m "feat(voice): /api/voice/speak backed by Deepgram Aura on Workers 
 Pure string logic, so it gets real tests. This is what stops her going silent for five seconds before speaking.
 
 **Files:**
-- Create: `apps/mac/Sources/MyOS/Support/Voice/VoiceText.swift`
+- Create: `apps/mac/Sources/meOS/Support/Voice/VoiceText.swift`
 - Test: `apps/mac/Tests/VoiceTextTests.swift`
 
 **Interfaces:**
@@ -415,7 +415,7 @@ Create `apps/mac/Tests/VoiceTextTests.swift`:
 
 ```swift
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 final class VoiceTextTests: XCTestCase {
     func testSplitsOnSentenceEnders() {
@@ -467,12 +467,12 @@ final class VoiceTextTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test -only-testing:MyOSTests/VoiceTextTests 2>&1 | tail -20`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test -only-testing:meOSTests/VoiceTextTests 2>&1 | tail -20`
 Expected: FAIL — `cannot find 'VoiceText' in scope`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `apps/mac/Sources/MyOS/Support/Voice/VoiceText.swift`:
+Create `apps/mac/Sources/meOS/Support/Voice/VoiceText.swift`:
 
 ```swift
 import Foundation
@@ -559,13 +559,13 @@ enum VoiceText {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test -only-testing:MyOSTests/VoiceTextTests 2>&1 | tail -20`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test -only-testing:meOSTests/VoiceTextTests 2>&1 | tail -20`
 Expected: PASS, 9 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mac/Sources/MyOS/Support/Voice/VoiceText.swift apps/mac/Tests/VoiceTextTests.swift
+git add apps/mac/Sources/meOS/Support/Voice/VoiceText.swift apps/mac/Tests/VoiceTextTests.swift
 git commit -m "feat(voice): sentence chunker so Catrine starts speaking immediately"
 ```
 
@@ -574,7 +574,7 @@ git commit -m "feat(voice): sentence chunker so Catrine starts speaking immediat
 ### Task 5: Audio session helper
 
 **Files:**
-- Create: `apps/mac/Sources/MyOS/Support/Voice/VoiceAudioSession.swift`
+- Create: `apps/mac/Sources/meOS/Support/Voice/VoiceAudioSession.swift`
 - Test: `apps/mac/Tests/VoiceAudioSessionTests.swift`
 
 **Interfaces:**
@@ -589,7 +589,7 @@ Create `apps/mac/Tests/VoiceAudioSessionTests.swift`:
 
 ```swift
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 final class VoiceAudioSessionTests: XCTestCase {
     func testFirstEnterActivatesAndLastExitRestores() {
@@ -626,12 +626,12 @@ final class VoiceAudioSessionTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test -only-testing:MyOSTests/VoiceAudioSessionTests 2>&1 | tail -20`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test -only-testing:meOSTests/VoiceAudioSessionTests 2>&1 | tail -20`
 Expected: FAIL — `cannot find 'AudioSessionState' in scope`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `apps/mac/Sources/MyOS/Support/Voice/VoiceAudioSession.swift`:
+Create `apps/mac/Sources/meOS/Support/Voice/VoiceAudioSession.swift`:
 
 ```swift
 import Foundation
@@ -708,13 +708,13 @@ enum VoiceAudioSession {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test -only-testing:MyOSTests/VoiceAudioSessionTests 2>&1 | tail -20`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test -only-testing:meOSTests/VoiceAudioSessionTests 2>&1 | tail -20`
 Expected: PASS, 4 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/mac/Sources/MyOS/Support/Voice/VoiceAudioSession.swift apps/mac/Tests/VoiceAudioSessionTests.swift
+git add apps/mac/Sources/meOS/Support/Voice/VoiceAudioSession.swift apps/mac/Tests/VoiceAudioSessionTests.swift
 git commit -m "feat(voice): call-mode audio session that always restores"
 ```
 
@@ -723,9 +723,9 @@ git commit -m "feat(voice): call-mode audio session that always restores"
 ### Task 6: The voice router — Aura with Apple fallback
 
 **Files:**
-- Create: `apps/mac/Sources/MyOS/Support/Voice/CatrineVoice.swift`
+- Create: `apps/mac/Sources/meOS/Support/Voice/CatrineVoice.swift`
 - Test: `apps/mac/Tests/CatrineVoiceTests.swift`
-- Modify: `apps/mac/Sources/MyOS/Support/APIClient.swift` (append one method)
+- Modify: `apps/mac/Sources/meOS/Support/APIClient.swift` (append one method)
 
 **Interfaces:**
 - Consumes: `VoiceText.sentences` (Task 4), `VoiceAudioSession` (Task 5)
@@ -740,7 +740,7 @@ Create `apps/mac/Tests/CatrineVoiceTests.swift`:
 
 ```swift
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Records what it was asked to say, and can be told to refuse.
 private final class FakeSynth: SpeechSynth, @unchecked Sendable {
@@ -822,12 +822,12 @@ final class CatrineVoiceTests: XCTestCase {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test -only-testing:MyOSTests/CatrineVoiceTests 2>&1 | tail -20`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test -only-testing:meOSTests/CatrineVoiceTests 2>&1 | tail -20`
 Expected: FAIL — `cannot find type 'SpeechSynth' in scope`
 
 - [ ] **Step 3: Add the API method**
 
-Append to `apps/mac/Sources/MyOS/Support/APIClient.swift`, inside the same type as `chat(...)` (after it):
+Append to `apps/mac/Sources/meOS/Support/APIClient.swift`, inside the same type as `chat(...)` (after it):
 
 ```swift
     // MARK: - Voice
@@ -843,7 +843,7 @@ Append to `apps/mac/Sources/MyOS/Support/APIClient.swift`, inside the same type 
 
 - [ ] **Step 4: Write the router and both synths**
 
-Create `apps/mac/Sources/MyOS/Support/Voice/CatrineVoice.swift`:
+Create `apps/mac/Sources/meOS/Support/Voice/CatrineVoice.swift`:
 
 ```swift
 import Foundation
@@ -997,13 +997,13 @@ final class VoiceRouter: @unchecked Sendable {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test -only-testing:MyOSTests/CatrineVoiceTests 2>&1 | tail -20`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test -only-testing:meOSTests/CatrineVoiceTests 2>&1 | tail -20`
 Expected: PASS, 7 tests
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/mac/Sources/MyOS/Support/Voice/CatrineVoice.swift apps/mac/Tests/CatrineVoiceTests.swift apps/mac/Sources/MyOS/Support/APIClient.swift
+git add apps/mac/Sources/meOS/Support/Voice/CatrineVoice.swift apps/mac/Tests/CatrineVoiceTests.swift apps/mac/Sources/meOS/Support/APIClient.swift
 git commit -m "feat(voice): Aura voice with automatic on-device fallback"
 ```
 
@@ -1012,7 +1012,7 @@ git commit -m "feat(voice): Aura voice with automatic on-device fallback"
 ### Task 7: On-device listening
 
 **Files:**
-- Create: `apps/mac/Sources/MyOS/Support/Voice/SpeechListener.swift`
+- Create: `apps/mac/Sources/meOS/Support/Voice/SpeechListener.swift`
 
 **Interfaces:**
 - Consumes: nothing
@@ -1022,7 +1022,7 @@ No unit test: this is a thin shell over `SFSpeechRecognizer`/`AVAudioEngine` wit
 
 - [ ] **Step 1: Write the listener**
 
-Create `apps/mac/Sources/MyOS/Support/Voice/SpeechListener.swift`:
+Create `apps/mac/Sources/meOS/Support/Voice/SpeechListener.swift`:
 
 ```swift
 import Foundation
@@ -1148,16 +1148,16 @@ final class SpeechListener: ObservableObject {
 
 - [ ] **Step 2: Verify both targets still compile**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build build 2>&1 | tail -5`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build build 2>&1 | tail -5`
 Expected: `** BUILD SUCCEEDED **`
 
-Run: `cd apps/ios && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build build 2>&1 | tail -5`
+Run: `cd apps/ios && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build build 2>&1 | tail -5`
 Expected: `** BUILD SUCCEEDED **`
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add apps/mac/Sources/MyOS/Support/Voice/SpeechListener.swift
+git add apps/mac/Sources/meOS/Support/Voice/SpeechListener.swift
 git commit -m "feat(voice): on-device speech recognition, audio never leaves the phone"
 ```
 
@@ -1166,9 +1166,9 @@ git commit -m "feat(voice): on-device speech recognition, audio never leaves the
 ### Task 8: The call screen
 
 **Files:**
-- Create: `apps/ios/Sources/MyOS/Views/VoiceCallView.swift`
+- Create: `apps/ios/Sources/meOS/Views/VoiceCallView.swift`
 - Modify: `apps/ios/Info.plist`
-- Modify: `apps/mac/Sources/MyOS/Views/ChatWidget.swift`
+- Modify: `apps/mac/Sources/meOS/Views/ChatWidget.swift`
 
 **Interfaces:**
 - Consumes: `SpeechListener` (7), `VoiceRouter` / `AuraSynth` / `SystemSynth` (6), `VoiceAudioSession` (5), `AppState.runCatrineTurn(query:turns:agent:)`, `APIClient.AgentInfo`, `APIClient.ChatTurn`, `AgentConfig.shared`
@@ -1191,7 +1191,7 @@ In `apps/ios/Info.plist`, alongside the existing `NSFaceIDUsageDescription` entr
 
 - [ ] **Step 2: Write the call screen**
 
-Create `apps/ios/Sources/MyOS/Views/VoiceCallView.swift`:
+Create `apps/ios/Sources/meOS/Views/VoiceCallView.swift`:
 
 ```swift
 import SwiftUI
@@ -1293,7 +1293,7 @@ struct VoiceCallView: View {
 
     private var displayText: String {
         if phase == .blocked {
-            return "Turn on Microphone and Speech Recognition for MyOS in Settings."
+            return "Turn on Microphone and Speech Recognition for meOS in Settings."
         }
         if phase == .speaking { return said }
         if !listener.partial.isEmpty { return listener.partial }
@@ -1379,7 +1379,7 @@ struct VoiceCallView: View {
 
 - [ ] **Step 3: Add the two AppState helpers the view calls**
 
-Append to `apps/mac/Sources/MyOS/Support/AppState.swift`, in the same extension area as the chat code:
+Append to `apps/mac/Sources/meOS/Support/AppState.swift`, in the same extension area as the chat code:
 
 ```swift
 extension AppState {
@@ -1408,14 +1408,14 @@ extension AppState {
 Before writing this, confirm the active-thread property name:
 
 ```bash
-grep -n "activeID\|var active\|selectChat" apps/mac/Sources/MyOS/Support/AppState.swift | head
+grep -n "activeID\|var active\|selectChat" apps/mac/Sources/meOS/Support/AppState.swift | head
 ```
 
 If it is not `chat.activeID`, use whatever `selectChat` assigns and adjust both helpers.
 
 - [ ] **Step 4: Add the call button to the chat widget**
 
-In `apps/mac/Sources/MyOS/Views/ChatWidget.swift`, in the icon-button row near line 136 (next to History / New chat), add — wrapped for iOS only, since the Mac cannot open the microphone yet:
+In `apps/mac/Sources/meOS/Views/ChatWidget.swift`, in the icon-button row near line 136 (next to History / New chat), add — wrapped for iOS only, since the Mac cannot open the microphone yet:
 
 ```swift
             #if os(iOS)
@@ -1443,21 +1443,21 @@ And attach the cover next to the existing `.fullScreenCover` around line 54:
 
 - [ ] **Step 5: Build both targets**
 
-Run: `cd apps/mac && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build build 2>&1 | tail -5`
+Run: `cd apps/mac && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build build 2>&1 | tail -5`
 Expected: `** BUILD SUCCEEDED **`
 
-Run: `cd apps/ios && xcodegen generate && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build build 2>&1 | tail -5`
+Run: `cd apps/ios && xcodegen generate && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build build 2>&1 | tail -5`
 Expected: `** BUILD SUCCEEDED **`
 
 - [ ] **Step 6: Run the whole Swift suite**
 
-Run: `cd apps/mac && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test 2>&1 | tail -12`
+Run: `cd apps/mac && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test 2>&1 | tail -12`
 Expected: all tests pass — 304 existing + 20 new
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/ios/Sources/MyOS/Views/VoiceCallView.swift apps/ios/Info.plist apps/mac/Sources/MyOS/Views/ChatWidget.swift apps/mac/Sources/MyOS/Support/AppState.swift
+git add apps/ios/Sources/meOS/Views/VoiceCallView.swift apps/ios/Info.plist apps/mac/Sources/meOS/Views/ChatWidget.swift apps/mac/Sources/meOS/Support/AppState.swift
 git commit -m "feat(voice): call screen, barge-in, and a phone button in the chat widget"
 ```
 
@@ -1470,8 +1470,8 @@ git commit -m "feat(voice): call screen, barge-in, and a phone button in the cha
 - [ ] **Step 1: Full verification**
 
 ```bash
-cd /Users/berjilskcript/Documents/Personal/MyOS/apps/api && bunx vitest run && bun run check && bun run build
-cd ../mac && xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Debug -derivedDataPath build test 2>&1 | tail -8
+cd /Users/berjilskcript/Documents/Personal/meOS/apps/api && bunx vitest run && bun run check && bun run build
+cd ../mac && xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Debug -derivedDataPath build test 2>&1 | tail -8
 ```
 Expected: vitest passes, 0 svelte-check errors, build succeeds, Swift suite green.
 
@@ -1480,7 +1480,7 @@ Expected: vitest passes, 0 svelte-check errors, build succeeds, Swift suite gree
 The `AI` binding is new, so this deploy is what makes `/api/voice/speak` exist.
 
 ```bash
-cd /Users/berjilskcript/Documents/Personal/MyOS/apps/api && bunx wrangler deploy
+cd /Users/berjilskcript/Documents/Personal/meOS/apps/api && bunx wrangler deploy
 ```
 
 Then confirm the route answers rather than 404s:
@@ -1495,7 +1495,7 @@ Expected: `401` (not logged in) — which proves the route is deployed and auth-
 - [ ] **Step 3: Merge and push**
 
 ```bash
-cd /Users/berjilskcript/Documents/Personal/MyOS
+cd /Users/berjilskcript/Documents/Personal/meOS
 git checkout main && git merge --ff-only feat/catrine-voice && git push origin main
 ```
 

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The streak moved from journaling to steps, and gained a second goal.
 ///

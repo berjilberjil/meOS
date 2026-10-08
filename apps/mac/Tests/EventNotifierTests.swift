@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Which reminders end up pending, and which get left out when there is not
 /// room for all of them.

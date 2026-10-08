@@ -1,6 +1,6 @@
 import XCTest
 import SwiftUI
-@testable import MyOS
+@testable import meOS
 
 /// The appearance system re-skins the whole app from one screen. The thing that
 /// must not break while it does is meaning: a warning has to keep looking like a

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Apple's fluid-interface maths, as pure functions in `Fluid` /
 /// `FluidRubberband` / `VelocityTracker` / `SlideConfirmState`. These pin the

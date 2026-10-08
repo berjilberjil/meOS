@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Fold's access token dies after ~15 minutes (200 at 13:59, 401 at 14:04 on the
 /// same session). Renewal lives at `/v2/auth/tokens/refresh` — the v1 path the app

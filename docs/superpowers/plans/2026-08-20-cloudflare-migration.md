@@ -54,7 +54,7 @@ workaround can be reverted.
 ## Cutover is reversible
 
 `APIClient.baseURL` reads UserDefaults `myos.baseURL` before falling back to
-`https://myos-berjil.netlify.app` (`APIClient.swift:18`). So point one device at the
+`https://meos-berjil.netlify.app` (`APIClient.swift:18`). So point one device at the
 Workers URL with `defaults write`, verify, and roll back instantly. No rebuild.
 
 ## Known gotchas

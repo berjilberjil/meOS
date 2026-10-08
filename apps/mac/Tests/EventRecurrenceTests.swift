@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Recurrence is arithmetic that looks right until the one month it does not.
 /// February and the 31st are where every naive implementation goes wrong, so

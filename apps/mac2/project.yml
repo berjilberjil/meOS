@@ -1,4 +1,4 @@
-name: MyOS
+name: meOS
 options:
   bundleIdPrefix: com.berjil
   deploymentTarget:
@@ -10,12 +10,12 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
 schemes:
-  MyOS:
+  meOS:
     build:
       targets:
-        MyOS: all
+        meOS: all
 targets:
-  MyOS:
+  meOS:
     type: application
     platform: macOS
     sources:
@@ -24,23 +24,23 @@ targets:
       - path: Sources
       # The shared logic layer — the exact same files the iOS app compiles.
       # One source of truth, untouched by this rebuild.
-      - path: ../mac/Sources/MyOS/Support
+      - path: ../mac/Sources/meOS/Support
       # The shared views — the ones the iOS app compiles. The four old Mac
       # screens this rebuild replaces are excluded by name (they collide with
       # the new files); everything else compiles exactly as iOS sees it.
-      - path: ../mac/Sources/MyOS/Views
+      - path: ../mac/Sources/meOS/Views
         excludes:
           - "MainView.swift"      # old sidebar shell  -> Sources/MainView.swift
           - "SettingsView.swift"  # old settings       -> Sources/SettingsView.swift
           - "NotesView.swift"     # old notes          -> Sources/NotesView.swift
           - "SplashView.swift"    # old launch screen  -> gone
           - "MenuBarView.swift"   # old menu-bar extra -> gone (v2)
-          - "RootView.swift"      # old root/splash gate -> new MyOSApp hosts MainView
-      - path: ../mac/Sources/MyOS/Resources/drop.wav
+          - "RootView.swift"      # old root/splash gate -> new meOSApp hosts MainView
+      - path: ../mac/Sources/meOS/Resources/drop.wav
         buildPhase: resources
-      - path: ../mac/Sources/MyOS/Resources/Sounds
+      - path: ../mac/Sources/meOS/Resources/Sounds
         buildPhase: resources
-      - path: ../mac/Sources/MyOS/Resources/Assets.xcassets
+      - path: ../mac/Sources/meOS/Resources/Assets.xcassets
         buildPhase: resources
     settings:
       base:

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 // The program layer's rules, tested without an AppState: which muscle group an
 // exercise files under, which day runs on a date, what a session expands to,

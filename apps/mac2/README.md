@@ -1,13 +1,13 @@
-# MyOS for Mac — the rebuild
+# meOS for Mac — the rebuild
 
 The old Mac app (`apps/mac`) had a shell and a skin from an earlier era. This
 target is the whole Mac app rewritten for the redesign the iOS app shipped:
 balanced white canvas, one accent, hairlines instead of shadows, springs over
 eases, screens that arrive by fading.
 
-Nothing in `apps/mac/Sources/MyOS/Support` was touched — that logic layer is
+Nothing in `apps/mac/Sources/meOS/Support` was touched — that logic layer is
 compiled by the iOS app too. The old Mac UI files still sit in
-`apps/mac/Sources/MyOS/Views`; this target simply does not compile them. Delete
+`apps/mac/Sources/meOS/Views`; this target simply does not compile them. Delete
 them in a cleanup pass once this app is your daily driver.
 
 ## Build
@@ -15,12 +15,12 @@ them in a cleanup pass once this app is your daily driver.
 ```sh
 cd apps/mac2
 xcodegen generate
-open MyOS.xcodeproj    # scheme: MyOS
+open meOS.xcodeproj    # scheme: meOS
 ```
 
 ## What is in Sources/
 
-- `MyOSApp.swift` — app entry. First launch pins Light (balanced white).
+- `meOSApp.swift` — app entry. First launch pins Light (balanced white).
 - `WhiteTheme.swift` — the new Mac chrome: tab set, launch defaults.
 - `MainView.swift` — the new shell: sidebar + per-tab NavigationStacks, the
   chat widget, notification routes, sync hooks. Same wiring as the iOS shell.

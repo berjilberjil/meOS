@@ -1,6 +1,6 @@
 import XCTest
 import SwiftUI
-@testable import MyOS
+@testable import meOS
 
 /// The palette has been rewritten four times, in both directions, and each time
 /// the regression was the same: colour creeping back in as decoration. These

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 final class MealLogStateTests: XCTestCase {
     func testEmptyIsUnconfirmed() { XCTAssertEqual(MealLog().state(.lunch), .unconfirmed) }

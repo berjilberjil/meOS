@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// A pull that reaches Fold and comes back with nothing used to report success and
 /// quietly re-save last week's snapshot — the dashboard then said "Live Fold ·

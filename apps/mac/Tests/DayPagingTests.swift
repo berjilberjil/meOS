@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The Today page pages by day on swipe. The gesture itself needs hands on a
 /// device, but the date arithmetic and clamping are pure and testable.

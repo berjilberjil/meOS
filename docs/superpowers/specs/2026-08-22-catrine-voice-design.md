@@ -1,4 +1,4 @@
-# Catrine, out loud — free live voice for the MyOS assistant
+# Catrine, out loud — free live voice for the meOS assistant
 
 **Date:** 2026-08-22
 **Status:** design, awaiting approval to plan
@@ -47,7 +47,7 @@ Three properties worth stating plainly:
 
 1. **Audio never leaves the device.** Only her reply *text* goes up, to be
    spoken. That is a smaller data footprint than the text chat already has.
-2. **No new vendor.** Cloudflare already runs `myos-api`, D1 `myos` and R2
+2. **No new vendor.** Cloudflare already runs `myos-api`, D1 `meos` and R2
    `myos-media`. The Deepgram models are Cloudflare-hosted on that same account.
 3. **Her brain is untouched.** `AgentLoop`'s ceilings (3 rounds / 6 tool calls /
    55s, final round tools-off), `Retrieval`, `ContextBuilder`, `MemoryExtraction`
@@ -178,7 +178,7 @@ is the Apple fallback voice tolerable enough to live with daily.
 2. **iOS 26 availability on the phone.** If it is older, `SFSpeechRecognizer`
    carries it — worse transcription, same architecture.
 3. **Mac cannot open the mic.** `apps/mac/project.yml` sets
-   `ENABLE_HARDENED_RUNTIME: YES` with an empty `MyOS.entitlements`, so any mic
+   `ENABLE_HARDENED_RUNTIME: YES` with an empty `meOS.entitlements`, so any mic
    request is denied. Fix is `com.apple.security.device.audio-input` +
    `NSMicrophoneUsageDescription`. Unlike the data-protection Keychain
    entitlement (`-34018`), this one works ad-hoc signed. Phase 2.

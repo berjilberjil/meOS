@@ -1,6 +1,6 @@
 import XCTest
 import CryptoKit
-@testable import MyOS
+@testable import meOS
 
 /// Zero-knowledge vault: proves data is unreadable without the passphrase, that a
 /// fresh device can unlock from the server metadata alone, and that recovery and
@@ -116,11 +116,11 @@ final class VaultTests: XCTestCase {
     }
 
     func testKDFDeterministicAndSalted() throws {
-        let salt1 = MyOSCrypto.newSalt()
-        let salt2 = MyOSCrypto.newSalt()
-        let k1 = try MyOSCrypto.deriveKey(from: "abc", salt: salt1, iterations: 10_000)
-        let k1b = try MyOSCrypto.deriveKey(from: "abc", salt: salt1, iterations: 10_000)
-        let k2 = try MyOSCrypto.deriveKey(from: "abc", salt: salt2, iterations: 10_000)
+        let salt1 = meOSCrypto.newSalt()
+        let salt2 = meOSCrypto.newSalt()
+        let k1 = try meOSCrypto.deriveKey(from: "abc", salt: salt1, iterations: 10_000)
+        let k1b = try meOSCrypto.deriveKey(from: "abc", salt: salt1, iterations: 10_000)
+        let k2 = try meOSCrypto.deriveKey(from: "abc", salt: salt2, iterations: 10_000)
         XCTAssertEqual(k1.withUnsafeBytes { Data($0) }, k1b.withUnsafeBytes { Data($0) })
         XCTAssertNotEqual(k1.withUnsafeBytes { Data($0) }, k2.withUnsafeBytes { Data($0) })
     }

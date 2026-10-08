@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The bin's two jobs are giving a thing back exactly as it was, and letting go
 /// of it on the right day. Both are the kind of wrong you only find out about

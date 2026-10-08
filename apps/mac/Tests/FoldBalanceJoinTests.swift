@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Fold splits an account across two routes: `bank_accounts` carries the identity
 /// (uuid, masked number, fip name) with **no** money on it, and

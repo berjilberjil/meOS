@@ -118,7 +118,7 @@ struct VoiceCallView: View {
 
     private var displayText: String {
         if phase == .blocked {
-            return "Allow Microphone and Speech Recognition for MyOS in System Settings."
+            return "Allow Microphone and Speech Recognition for meOS in System Settings."
         }
         if phase == .failed { return lastError }
         if phase == .speaking { return said }

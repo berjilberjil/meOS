@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>MyOS</string>
+	<string>meOS</string>
 	<key>CFBundleDisplayName</key>
-	<string>MyOS</string>
+	<string>meOS</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleExecutable</key>
@@ -33,9 +33,9 @@
 	     ${applicationName} token, so the token has to be something Siri actually
 	     transcribes.
 
-	     "MyOS" is not. Spoken aloud it is a homophone of "iOS" — one of the
+	     "meOS" is not. Spoken aloud it is a homophone of "iOS" — one of the
 	     strongest tokens in Apple's speech model — and Siri reliably transcribes it
-	     that way, then web-searches. Sound-alike alternatives ("My OS", "Mios") all
+	     that way, then web-searches. Sound-alike alternatives ("Me OS", "Mios") all
 	     collapsed into "iOS" too, so they were removed rather than kept as noise.
 
 	     "Catherine" is a proper name: phonetically distant from anything Apple
@@ -85,21 +85,21 @@
 		<string>com.berjil.myos.steps.refresh</string>
 	</array>
 	<key>NSFaceIDUsageDescription</key>
-	<string>MyOS uses Face ID to unlock your life data.</string>
+	<string>meOS uses Face ID to unlock your life data.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>MyOS uses your camera to scan receipts, food labels, and portfolio screens straight into your data.</string>
+	<string>meOS uses your camera to scan receipts, food labels, and portfolio screens straight into your data.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MyOS reads photos you pick and the ones you heart in Favorites so today’s body shot lands in Fitness automatically.</string>
+	<string>meOS reads photos you pick and the ones you heart in Favorites so today’s body shot lands in Fitness automatically.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>MyOS saves a progress photo to your library when you tap Save.</string>
+	<string>meOS saves a progress photo to your library when you tap Save.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>MyOS reads today’s step count from Apple Health so Fitness stays in sync without typing.</string>
+	<string>meOS reads today’s step count from Apple Health so Fitness stays in sync without typing.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>MyOS reads today’s steps from your iPhone so the Fitness tab stays current.</string>
+	<string>meOS reads today’s steps from your iPhone so the Fitness tab stays current.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<!-- Dev convenience: reach the localhost backend + your future HTTPS domain.
-	     Tighten this to specific domains before you ever ship MyOS to anyone else. -->
+	     Tighten this to specific domains before you ever ship meOS to anyone else. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

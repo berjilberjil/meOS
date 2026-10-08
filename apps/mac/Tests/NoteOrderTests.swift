@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Two rules stand between the notes list and the "notes come and go randomly
 /// on click" bug: a save that changes nothing must write nothing, and the list

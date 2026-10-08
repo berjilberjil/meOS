@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The rules engine is the product, so what it is allowed to say is pinned.
 /// Two properties matter more than any single sentence: it never speaks without

@@ -1,4 +1,4 @@
-# MyOS
+# meOS
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/f8a8366c-c47f-40a0-ab5f-91022224ed0d/deploy-status)](https://app.netlify.com/projects/idyllic-naiad-5c5acd/deploys)
 
@@ -19,7 +19,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-npx sv@0.16.1 create --template minimal --types ts --no-install /private/tmp/claude-501/-Users-berjilskcript-Documents/5808e230-383b-449c-a376-0f550b5df9fe/scratchpad/myos-scaffold
+npx sv@0.16.1 create --template minimal --types ts --no-install /private/tmp/claude-501/-Users-berjilskcript-Documents/5808e230-383b-449c-a376-0f550b5df9fe/scratchpad/meos-scaffold
 ```
 
 ## Developing

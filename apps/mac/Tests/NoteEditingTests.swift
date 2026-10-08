@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The rules the phone's note editor follows when you press Return, tick a box,
 /// or change a line's type.

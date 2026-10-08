@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The gallery is a join across four stores that agree on nothing — different
 /// date fields, different storage, different ideas of what a title is. These

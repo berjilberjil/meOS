@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// `dateKey` / `addDays` / `date(fromKey:)` stopped building a `DateFormatter`
 /// per call and now parse `yyyy-MM-dd` by hand — these run in view bodies and

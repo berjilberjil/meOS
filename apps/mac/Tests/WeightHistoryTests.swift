@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The weight chart draws something plausible from almost any input, so
 /// the window and the scale are pinned here rather than eyeballed.

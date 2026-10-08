@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Macro Intelligence's display rules — the ones that decide whether a number is
 /// read correctly at a glance.

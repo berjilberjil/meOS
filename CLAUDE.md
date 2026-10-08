@@ -1,13 +1,13 @@
-# MyOS — Personal Life Operating System
+# meOS — Personal Life Operating System
 
 Private, daily-driver "operating system for my life": finance, journal, health, fitness, to-dos, goals, notes, and a mindmap dashboard that visualizes how everything connects. Single-user, privacy-first.
 
-Owner: **Berjil** — personal project. Commit + push as `berjilberjil <berjiljacob@gmail.com>`, GitHub `berjilberjil/MyOS` via the `github-personal` SSH remote (`git@github-personal:berjilberjil/MyOS.git`). **Never** commit as the work/`@skcript.com` identity here.
+Owner: **Berjil** — personal project. Commit + push as `berjilberjil <berjiljacob@gmail.com>`, GitHub `berjilberjil/meOS` via the `github-personal` SSH remote (`git@github-personal:berjilberjil/meOS.git`). **Never** commit as the work/`@skcript.com` identity here.
 
 ## Repo structure
 
 ```
-MyOS/
+meOS/
 ├── apps/
 │   ├── mac/       # Native Swift/SwiftUI Mac app (Xcode project)
 │   ├── ios/       # Native Swift/SwiftUI iOS app (Xcode project)
@@ -35,7 +35,7 @@ bun run dev              # http://localhost:5173
 Or install the LaunchAgent: `scripts/install-backend-agent.sh`
 
 ### Mac app (apps/mac)
-Open `apps/mac/MyOS.xcodeproj` in Xcode, or use the command-line build.
+Open `apps/mac/meOS.xcodeproj` in Xcode, or use the command-line build.
 
 ### iOS app (apps/ios)
 Open the Xcode project, or use `xcodebuild`.

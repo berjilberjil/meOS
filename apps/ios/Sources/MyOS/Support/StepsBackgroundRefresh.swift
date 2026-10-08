@@ -4,10 +4,10 @@ import BackgroundTasks
 
 /// Get the day's steps to the server without anyone opening anything.
 ///
-/// The iPhone is the only device in MyOS with a pedometer, so every step
+/// The iPhone is the only device in meOS with a pedometer, so every step
 /// count the Mac shows arrived over sync. But the only thing that ever
 /// read the pedometer was a foreground screen — so the sequence to see
-/// today's steps on the Mac was: unlock the phone, open MyOS, wait for
+/// today's steps on the Mac was: unlock the phone, open meOS, wait for
 /// the push, then go to the Mac and let it poll. Berjil's report was
 /// exactly that, in those words. Steps that nobody looked at simply did
 /// not exist anywhere but on the phone.

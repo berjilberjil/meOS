@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Today's focus: how a day is judged, how the streak counts back, and that day
 /// plans written before the timer existed still decode.

@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import MyOS
+@testable import meOS
 
 /// Evidence for two reported Notes bugs: new notes vanishing, and images
 /// disappearing. These tests characterize the CURRENT behaviour — a failure

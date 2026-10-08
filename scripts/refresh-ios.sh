@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Nightly re-sign + reinstall of MyOS on the iPhone, so the free-team 7-day
+# Nightly re-sign + reinstall of meOS on the iPhone, so the free-team 7-day
 # profile never gets a chance to lapse.
 #
 #   ./scripts/refresh-ios.sh            what the LaunchAgent runs at 22:00
@@ -11,7 +11,7 @@
 # provisioning profile embedded in the app, not in the install. Xcode happily
 # reuses a cached profile, so a plain rebuild can hand you the same expiry it
 # had yesterday. So this script does three things in order:
-#   1. deletes the cached MyOS profile, so automatic signing has to mint a new
+#   1. deletes the cached meOS profile, so automatic signing has to mint a new
 #      one with a new 7-day window (work/skcript profiles are never touched),
 #   2. deletes the built .app, so the link+codesign step actually re-runs and
 #      the new profile gets embedded,
@@ -31,11 +31,11 @@ source "$ROOT/scripts/lib/ios-device.sh"
 # Refresh whenever the profile has this many days or fewer left. 6.0 with a
 # 7-day profile means "every night", while still skipping a second run on a
 # night we already refreshed. Lower it if you want fewer trips to Apple.
-REFRESH_BELOW="${MYOS_REFRESH_BELOW:-6.0}"
+REFRESH_BELOW="${MEOS_REFRESH_BELOW:-6.0}"
 # The phone is usually in the room at 22:00, but not always. Wait, don't fail.
-WAIT_MINS="${MYOS_WAIT_MINS:-120}"
+WAIT_MINS="${MEOS_WAIT_MINS:-120}"
 
-LOG_DIR="$HOME/Library/Logs/MyOS"
+LOG_DIR="$HOME/Library/Logs/meOS"
 LOG="$LOG_DIR/ios-refresh.log"
 BUILD_LOG="$LOG_DIR/ios-refresh-build.log"
 # The build deletes the signed .app before rebuilding, so a failed run leaves
@@ -43,8 +43,8 @@ BUILD_LOG="$LOG_DIR/ios-refresh-build.log"
 # is what --status falls back to, and what proves the clock moved on the next
 # successful run.
 STATE="$LOG_DIR/last-signed.epoch"
-LOCK="/tmp/myos-ios-refresh.lock"
-APP="$ROOT/apps/ios/build/Build/Products/Release-iphoneos/MyOS.app"
+LOCK="/tmp/meos-ios-refresh.lock"
+APP="$ROOT/apps/ios/build/Build/Products/Release-iphoneos/meOS.app"
 
 FORCE=0; STATUS_ONLY=0
 for arg in "$@"; do
@@ -57,18 +57,18 @@ done
 
 mkdir -p "$LOG_DIR"
 log()  { print "$(date '+%Y-%m-%d %H:%M:%S')  $*" }
-note() { osascript -e "display notification \"$1\" with title \"MyOS\"" >/dev/null 2>&1 || true }
+note() { osascript -e "display notification \"$1\" with title \"meOS\"" >/dev/null 2>&1 || true }
 fail() {
   log "FAILED: $1"
   # Loud on purpose: a silent failure here means a dead app in seven days.
-  osascript -e "display notification \"$1\" with title \"MyOS refresh FAILED\" sound name \"Basso\"" >/dev/null 2>&1 || true
+  osascript -e "display notification \"$1\" with title \"meOS refresh FAILED\" sound name \"Basso\"" >/dev/null 2>&1 || true
   exit 1
 }
 
 # --status short-circuits everything, including the log and the lock.
 if (( STATUS_ONLY )); then
   if left=$(ios_profile_days_left "$APP"); then
-    print "MyOS iOS build signed until $(ios_profile_expiry_human "$APP")  (${left} days left)"
+    print "meOS iOS build signed until $(ios_profile_expiry_human "$APP")  (${left} days left)"
   elif [[ -s "$STATE" ]]; then
     e=$(<"$STATE")
     print "last signed build expires $(date -r $e '+%a %d %b %Y, %H:%M')  ($(printf '%.1f' $(( (e - $(date +%s)) / 86400.0 ))) days left)"
@@ -135,7 +135,7 @@ if [[ -d "$PROFILE_DIR" ]]; then
     fi
   done
 fi
-log "pruned $pruned cached MyOS profile(s) — automatic signing will mint a new one"
+log "pruned $pruned cached meOS profile(s) — automatic signing will mint a new one"
 
 # --------------------------------------------------------------- build ---
 cd "$ROOT/apps/ios" || fail "cannot enter apps/ios"
@@ -159,7 +159,7 @@ xcodegen generate >/dev/null || fail "xcodegen failed"
 rm -rf build/Build/Products/Release-iphoneos
 
 log "building..."
-if ! xcodebuild -project MyOS.xcodeproj -scheme MyOS -configuration Release \
+if ! xcodebuild -project meOS.xcodeproj -scheme meOS -configuration Release \
                 -destination "$dest" -derivedDataPath build \
                 -allowProvisioningUpdates build >"$BUILD_LOG" 2>&1; then
   log "build log tail:"

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Searching the second brain, and packing the result into a bounded prompt.
 ///
@@ -113,10 +113,10 @@ final class CatrineRetrievalTests: XCTestCase {
     }
 
     /// Product and project names must survive intact — mangling them is how a
-    /// search for "MyOS" stops finding MyOS.
+    /// search for "meOS" stops finding meOS.
     func testProperNounsSurvive() {
-        XCTAssertTrue(TextIndex.terms("MyOS and PartApp").contains("myo") == false)
-        XCTAssertEqual(TextIndex.terms("MyOS PartApp"), ["myos", "partapp"])
+        XCTAssertTrue(TextIndex.terms("meOS and PartApp").contains("myo") == false)
+        XCTAssertEqual(TextIndex.terms("meOS PartApp"), ["meos", "partapp"])
     }
 
     // MARK: - Context assembly

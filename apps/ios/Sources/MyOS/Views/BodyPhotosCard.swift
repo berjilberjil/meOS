@@ -4,7 +4,7 @@ import PhotosUI
 import Photos
 
 /// Daily body photos on iPhone. New shots you heart in Photos → Favorites
-/// land here automatically the next time MyOS is open, or add one yourself.
+/// land here automatically the next time meOS is open, or add one yourself.
 /// Everything also syncs to the shared "media" storage so it shows up on Mac.
 struct BodyPhotosCard: View {
     @EnvironmentObject var state: AppState

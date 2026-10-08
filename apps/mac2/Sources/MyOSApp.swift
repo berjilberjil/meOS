@@ -9,7 +9,7 @@ import UserNotifications
 /// First launch pins Light, because the rebuilt look is balanced white —
 /// see `WhiteTheme.installDefaults()`.
 @main
-struct MyOSApp: App {
+struct meOSApp: App {
     @StateObject private var state = AppState()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var themeStore = ThemeStore.shared

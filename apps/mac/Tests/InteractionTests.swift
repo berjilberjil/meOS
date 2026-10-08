@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 final class InteractionTests: XCTestCase {
     func testDragClampsProgressBetweenZeroAndOne() {

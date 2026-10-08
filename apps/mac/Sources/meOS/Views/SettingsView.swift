@@ -1,0 +1,184 @@
+import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
+
+/// One place to edit everything and manage the data. Every editor here writes the
+/// same state the feature tabs do, so a change in Settings shows up there and vice
+/// versa. Destructive actions are guarded by a three-step confirm (see DangerConfirm).
+struct SettingsView: View {
+    @EnvironmentObject var state: AppState
+    @ObservedObject private var themeStore = ThemeStore.shared
+
+    // Change-passphrase form
+    @State private var currentPass = ""
+    @State private var newPass = ""
+    @State private var newPassConfirm = ""
+    @State private var passMsg: String?
+    @State private var passOK = false
+    @State private var exportMsg: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Gap.screen) {
+            ScreenTitle(text: "Settings")
+                .knRise(0)
+
+            accountCard.knRise(1)
+            // The single calendar. Today pages by swipe for nearby days; this is
+            // where you jump somewhere far away and see the whole day at once —
+            // replacing the four per-card month grids that used to clutter Today.
+            DayDetailView().knRise(1)
+            AppearanceCard().knRise(2)
+            GeneralSettingsCard().knRise(2)
+            WeeklyReportCard().knRise(3)
+            MacroEntryCard().knRise(3)
+            NotificationsCard().knRise(3)
+            AgentSettingsCard().knRise(3)
+            MemoryCard().knRise(3)
+            AIProvidersCard().knRise(3)
+            ActivitySettingsCard().knRise(3)
+            // Above the red, deliberately: the bin is where data comes BACK
+            // from, and it is the first thing to reach for before anything on
+            // the two cards below it.
+            TrashView().knRise(4)
+            // Both of these can lose you data. They are the only red on the page.
+            securityCard.knRise(4)
+            DataManagementCard().knRise(5)
+        }
+        .animation(.knTheme, value: themeStore.theme.id)
+    }
+
+    // MARK: - Account
+
+    private var accountCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle(text: "Account")
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.title2).foregroundStyle(Palette.blue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(state.username.isEmpty ? "Signed in" : "@\(state.username)")
+                            .font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
+                        Text("Signed in. Changes sync to iPhone.")
+                            .font(.footnote).foregroundStyle(Palette.faint)
+                    }
+                    Spacer()
+                    Button { Task { await state.refresh() } } label: { Text("Refresh") }
+                        .buttonStyle(.bordered)
+                    Button { Task { await state.logout() } } label: { Text("Log out") }
+                        .buttonStyle(.borderless).tint(Palette.faint)
+                }
+                if let err = state.lastSyncError ?? state.lastHydrateError {
+                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(Palette.warning)
+                }
+            }
+        }
+    }
+
+    // MARK: - Security & encryption
+
+    private var securityCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle(text: "Security & encryption")
+                Text("Encrypted on this Mac. The server only stores ciphertext.")
+                    .font(.footnote).foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Export (plaintext backup / escape hatch)
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Export my data").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                        Text("A decrypted JSON backup. Keep it somewhere safe.")
+                            .font(.footnote).foregroundStyle(Palette.faint)
+                    }
+                    Spacer()
+                    Button { exportData() } label: { Text("Export…") }
+                        .buttonStyle(.bordered)
+                }
+                if let m = exportMsg {
+                    Text(m).font(.caption2).foregroundStyle(Palette.green)
+                }
+
+                Divider().overlay(Palette.action)
+
+                // New recovery code
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Recovery code").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                        Text("A new code replaces the old one.")
+                            .font(.footnote).foregroundStyle(Palette.faint)
+                    }
+                    Spacer()
+                    Button { Task { await state.regenerateRecoveryCode() } } label: { Text("New code") }
+                        .buttonStyle(.bordered)
+                }
+
+                // A failed regeneration used to be indistinguishable from doing
+                // nothing: the only failure channel is `vaultError`, and this
+                // card never rendered it — no overlay appears, because the code
+                // is shown only after the upload succeeds. People tapped again,
+                // or walked away believing they had a new code.
+                if let err = state.vaultError, !err.isEmpty {
+                    Text(err)
+                        .font(.footnote).foregroundStyle(Palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Divider().overlay(Palette.action)
+
+                // Change passphrase
+                Text("Change passphrase").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.text)
+                // The current one first. Rotating is as destructive as a wipe —
+                // which already re-authenticates — and without it anyone at an
+                // unlocked Mac could lock the owner out.
+                SecureField("", text: $currentPass,
+                            prompt: Text("Current passphrase").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
+                SecureField("", text: $newPass, prompt: Text("New passphrase").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
+                SecureField("", text: $newPassConfirm, prompt: Text("Confirm new passphrase").foregroundColor(Palette.faint))
+                    .textFieldStyle(.plain).foregroundStyle(Palette.text).knField()
+                if let m = passMsg {
+                    Text(m).font(.caption).foregroundStyle(passOK ? Palette.green : Palette.warning)
+                }
+                Button { Task { await changePass() } } label: { Text("Update passphrase") }
+                    .buttonStyle(.bordered)
+                    .disabled(state.vaultBusy)
+            }
+        }
+    }
+
+    private func changePass() async {
+        passMsg = nil; passOK = false
+        guard newPass.count >= 8 else { passMsg = "Use at least 8 characters."; return }
+        guard newPass == newPassConfirm else { passMsg = "The two passphrases don’t match."; return }
+        guard !currentPass.isEmpty else { passMsg = "Enter your current passphrase."; return }
+        if await state.changePassphrase(current: currentPass, to: newPass) {
+            passOK = true; passMsg = "Passphrase updated."
+            currentPass = ""; newPass = ""; newPassConfirm = ""
+        } else {
+            passMsg = state.vaultError ?? "Couldn’t update the passphrase."
+        }
+    }
+
+    private func exportData() {
+        exportMsg = nil
+        // Say so. Clearing the message on failure made a broken export look
+        // exactly like never having pressed the button.
+        guard let data = state.exportJSON() else {
+            exportMsg = "Couldn't build the export."
+            return
+        }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "meos-export.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            do { try data.write(to: url); exportMsg = "Saved to \(url.lastPathComponent)." }
+            catch { exportMsg = "Couldn’t save the file." }
+        }
+    }
+
+}

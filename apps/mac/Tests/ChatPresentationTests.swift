@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The chat widget shows the panel or the voice call — never both, and never
 /// via two stacked presentations.

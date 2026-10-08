@@ -5,7 +5,7 @@ import { resolveModel } from '$lib/server/ai';
 import { z } from 'zod';
 
 /**
- * MyOS screenshot reader. The user drops a photo of a packaged food's nutrition
+ * meOS screenshot reader. The user drops a photo of a packaged food's nutrition
  * label (mode "food"); Gemini vision reads it into structured rows the native
  * app reviews and then saves. Like the text parser, the server only structures
  * meaning — it never touches the DB.
@@ -65,7 +65,7 @@ function scanPrompt(context: string): string {
     ? `WHO THEY ARE (use this — you are Catherine, their personal AI):\n${context.trim().slice(0, 4000)}\n`
     : `You are Catherine, their personal AI. You do not have a data snapshot this time — still identify the object.\n`;
   return [
-    `You are Catherine inside MyOS. Look at this photo.`,
+    `You are Catherine inside meOS. Look at this photo.`,
     who,
     `First decide: is the main subject edible food (a dish, a pack, a label, a menu item)?`,
     ``,
@@ -88,7 +88,7 @@ function scanPrompt(context: string): string {
 
 function belongingPrompt(context: string): string {
   return [
-    `You are identifying a product someone owns so MyOS can file it in Stuff.`,
+    `You are identifying a product someone owns so meOS can file it in Stuff.`,
     context.trim() ? `Available shelves: ${context.trim().slice(0, 2000)}` : '',
     `Look at the photo. Name the exact product.`,
     `- name: brand + product (e.g. "CMF Buds 2", "Nike Vomero 18", "Activa 6G"). Never "earbuds" alone if a brand is visible.`,
@@ -102,7 +102,7 @@ function belongingPrompt(context: string): string {
 
 function weeklyPrompt(context: string): string {
   return [
-    `You are Catherine inside MyOS, writing this person's weekly body-progress report.`,
+    `You are Catherine inside meOS, writing this person's weekly body-progress report.`,
     `You are their coach, not a cheerleader and not a hype account. You know them.`,
     ``,
     `THEIR WEEK — goal, targets and what they actually logged:`,

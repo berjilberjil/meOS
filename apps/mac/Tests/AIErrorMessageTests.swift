@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The AI keys screen used to print "The data couldn't be read because it isn't
 /// in the correct format." into the middle of its setup flow — Foundation's
@@ -52,7 +52,7 @@ final class AIErrorMessageTests: XCTestCase {
         XCTAssertEqual(AISettingsStore.msg(URLError(.timedOut), .loading),
                        "The server didn't respond. Try again.")
         XCTAssertEqual(AISettingsStore.msg(URLError(.cannotFindHost), .loading),
-                       "Couldn't reach MyOS. Check your connection.")
+                       "Couldn't reach meOS. Check your connection.")
     }
 
     /// Anything we have not thought of still has to produce a usable sentence.

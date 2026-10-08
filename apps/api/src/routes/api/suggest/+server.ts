@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { mentorSystem } from '$lib/mentor';
 
 /**
- * MyOS "what to do now" — the Today screen's mentor nudge. Given a snapshot of
+ * meOS "what to do now" — the Today screen's mentor nudge. Given a snapshot of
  * the user's data, return a few concrete, prioritised actions to fix their life
  * right now, most important first. Grounded in their real numbers and the money
  * principles.

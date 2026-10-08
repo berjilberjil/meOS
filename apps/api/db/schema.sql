@@ -1,4 +1,4 @@
--- MyOS backend schema (Postgres / Supabase)
+-- meOS backend schema (Postgres / Supabase)
 -- Single-user personal app, but modelled multi-user so a future iPhone/iPad
 -- client (or a second account) works with zero changes.
 

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Install (or reinstall) the MyOS backend LaunchAgent so the SvelteKit backend
+# Install (or reinstall) the meOS backend LaunchAgent so the SvelteKit backend
 # starts on login and stays alive. Re-run any time the plist changes.
 set -euo pipefail
 
@@ -16,4 +16,4 @@ launchctl bootstrap "gui/$(id -u)" "$DEST"
 launchctl kickstart "gui/$(id -u)/${LABEL}"
 
 echo "Installed ${LABEL}. Backend will be on http://localhost:5173"
-echo "Logs: ~/Library/Logs/myos-backend.log"
+echo "Logs: ~/Library/Logs/meos-backend.log"

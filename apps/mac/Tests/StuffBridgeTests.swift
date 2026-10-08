@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// The purchase-logging contract the Stuff MCP depends on: how a payback window
 /// in months maps to what the app stores, and that an item saved before product

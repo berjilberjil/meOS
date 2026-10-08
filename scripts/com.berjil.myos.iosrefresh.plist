@@ -5,17 +5,17 @@
     <key>Label</key>
     <string>com.berjil.myos.iosrefresh</string>
 
-    <!-- Re-sign and reinstall MyOS on the iPhone so the free-team 7-day
+    <!-- Re-sign and reinstall meOS on the iPhone so the free-team 7-day
          provisioning profile never lapses. The script decides whether a
          refresh is actually needed and exits in a second when it is not. -->
     <key>ProgramArguments</key>
     <array>
         <string>/bin/zsh</string>
-        <string>/Users/berjilskcript/Documents/Personal/MyOS/scripts/refresh-ios.sh</string>
+        <string>/Users/berjilskcript/Documents/Personal/meOS/scripts/refresh-ios.sh</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/berjilskcript/Documents/Personal/MyOS</string>
+    <string>/Users/berjilskcript/Documents/Personal/meOS</string>
 
     <!-- 22:00 every day. If the Mac is asleep or off at 22:00, launchd runs
          the job as soon as it wakes — a missed calendar job is not skipped. -->
@@ -49,8 +49,8 @@
     <!-- The script keeps its own readable log; these two only catch the things
          that go wrong before it gets that far. -->
     <key>StandardOutPath</key>
-    <string>/Users/berjilskcript/Library/Logs/MyOS/ios-refresh-launchd.log</string>
+    <string>/Users/berjilskcript/Library/Logs/meOS/ios-refresh-launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/berjilskcript/Library/Logs/MyOS/ios-refresh-launchd.log</string>
+    <string>/Users/berjilskcript/Library/Logs/meOS/ios-refresh-launchd.log</string>
 </dict>
 </plist>

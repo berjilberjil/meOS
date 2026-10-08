@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 final class FavoriteBodySyncTests: XCTestCase {
     private func shot(_ id: String, _ day: String) -> FavoriteShot {

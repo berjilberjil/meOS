@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Regressions for the UI-audit pass: bugs that were visible on screen but are
 /// really data/logic rules. Kept together so the rule, not the pixel, is pinned.

@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Pure-logic tests for what Siri says about events. No network, no vault — the
 /// selection + phrasing is deliberately separated from `EventIntentStore` so it

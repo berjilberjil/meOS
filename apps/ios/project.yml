@@ -1,4 +1,4 @@
-name: MyOS
+name: meOS
 options:
   bundleIdPrefix: com.berjil
   deploymentTarget:
@@ -10,100 +10,100 @@ settings:
     CURRENT_PROJECT_VERSION: "10"
     SWIFT_VERSION: "5.9"
 schemes:
-  MyOS:
+  meOS:
     build:
       targets:
-        MyOS: all
+        meOS: all
 targets:
-  MyOS:
+  meOS:
     type: application
     platform: iOS
     sources:
       # iOS-only: app entry + the tab shell + a lightweight Settings screen.
       - path: Sources
         excludes:
-          # Belongs to the MyOSShare target, not the app.
+          # Belongs to the meOSShare target, not the app.
           - "Share/**"
       # Shared with apps/mac — the whole logic layer (AppState, APIClient,
       # models, crypto) plus every view that has no AppKit dependency. Kept as
       # ONE source of truth in apps/mac/Sources; nothing here is a copy.
-      - path: ../mac/Sources/MyOS/Support
+      - path: ../mac/Sources/meOS/Support
         excludes:
           - "VideoMedia.swift"   # AVFoundation compression, macOS-only for now — Events tab isn't ported yet
-      - path: ../mac/Sources/MyOS/Views/RootView.swift
-      - path: ../mac/Sources/MyOS/Views/VaultViews.swift
-      - path: ../mac/Sources/MyOS/Views/LoginView.swift
-      - path: ../mac/Sources/MyOS/Views/TodayView.swift
-      - path: ../mac/Sources/MyOS/Views/ScanView.swift
-      - path: ../mac/Sources/MyOS/Views/FoldView.swift
-      - path: ../mac/Sources/MyOS/Views/FitnessView.swift
-      - path: ../mac/Sources/MyOS/Views/FitnessTodayView.swift
-      - path: ../mac/Sources/MyOS/Views/WeeklyPlannerView.swift
-      - path: ../mac/Sources/MyOS/Views/FitnessLibraryView.swift
-      - path: ../mac/Sources/MyOS/Views/FoodView.swift
-      - path: ../mac/Sources/MyOS/Views/WorkoutView.swift
-      - path: ../mac/Sources/MyOS/Views/ProgramsView.swift
-      - path: ../mac/Sources/MyOS/Views/ProgramDayView.swift
-      - path: ../mac/Sources/MyOS/Views/WorkoutSessionView.swift
-      - path: ../mac/Sources/MyOS/Views/WorkoutHistoryView.swift
-      - path: ../mac/Sources/MyOS/Views/GIFView.swift
-      - path: ../mac/Sources/MyOS/Views/BodyView.swift
-      - path: ../mac/Sources/MyOS/Views/JournalView.swift
-      - path: ../mac/Sources/MyOS/Views/ChatWidget.swift
-      - path: ../mac/Sources/MyOS/Views/AIProvidersCard.swift
-      - path: ../mac/Sources/MyOS/Views/AgentSettingsCard.swift
-      - path: ../mac/Sources/MyOS/Views/MemoryCard.swift
-      - path: ../mac/Sources/MyOS/Views/AppearanceCard.swift
-      - path: ../mac/Sources/MyOS/Views/GeneralSettingsCard.swift
-      - path: ../mac/Sources/MyOS/Views/NotificationsCard.swift
+      - path: ../mac/Sources/meOS/Views/RootView.swift
+      - path: ../mac/Sources/meOS/Views/VaultViews.swift
+      - path: ../mac/Sources/meOS/Views/LoginView.swift
+      - path: ../mac/Sources/meOS/Views/TodayView.swift
+      - path: ../mac/Sources/meOS/Views/ScanView.swift
+      - path: ../mac/Sources/meOS/Views/FoldView.swift
+      - path: ../mac/Sources/meOS/Views/FitnessView.swift
+      - path: ../mac/Sources/meOS/Views/FitnessTodayView.swift
+      - path: ../mac/Sources/meOS/Views/WeeklyPlannerView.swift
+      - path: ../mac/Sources/meOS/Views/FitnessLibraryView.swift
+      - path: ../mac/Sources/meOS/Views/FoodView.swift
+      - path: ../mac/Sources/meOS/Views/WorkoutView.swift
+      - path: ../mac/Sources/meOS/Views/ProgramsView.swift
+      - path: ../mac/Sources/meOS/Views/ProgramDayView.swift
+      - path: ../mac/Sources/meOS/Views/WorkoutSessionView.swift
+      - path: ../mac/Sources/meOS/Views/WorkoutHistoryView.swift
+      - path: ../mac/Sources/meOS/Views/GIFView.swift
+      - path: ../mac/Sources/meOS/Views/BodyView.swift
+      - path: ../mac/Sources/meOS/Views/JournalView.swift
+      - path: ../mac/Sources/meOS/Views/ChatWidget.swift
+      - path: ../mac/Sources/meOS/Views/AIProvidersCard.swift
+      - path: ../mac/Sources/meOS/Views/AgentSettingsCard.swift
+      - path: ../mac/Sources/meOS/Views/MemoryCard.swift
+      - path: ../mac/Sources/meOS/Views/AppearanceCard.swift
+      - path: ../mac/Sources/meOS/Views/GeneralSettingsCard.swift
+      - path: ../mac/Sources/meOS/Views/NotificationsCard.swift
       # Activity intelligence — the Today card, the Productivity analytics, the
       # weekly report section and the settings/setup screens. All platform-neutral.
-      - path: ../mac/Sources/MyOS/Views/Activity
-      - path: ../mac/Sources/MyOS/Views/Editors.swift
-      - path: ../mac/Sources/MyOS/Views/CalendarComponents.swift
-      - path: ../mac/Sources/MyOS/Views/DayPager.swift
-      - path: ../mac/Sources/MyOS/Views/DayDetailView.swift
-      - path: ../mac/Sources/MyOS/Views/ProgressPhotoCalendar.swift
-      - path: ../mac/Sources/MyOS/Views/FocusView.swift
-      - path: ../mac/Sources/MyOS/Views/TaskModeView.swift
-      - path: ../mac/Sources/MyOS/Views/SlideToComplete.swift
-      - path: ../mac/Sources/MyOS/Views/ScanHistory.swift
+      - path: ../mac/Sources/meOS/Views/Activity
+      - path: ../mac/Sources/meOS/Views/Editors.swift
+      - path: ../mac/Sources/meOS/Views/CalendarComponents.swift
+      - path: ../mac/Sources/meOS/Views/DayPager.swift
+      - path: ../mac/Sources/meOS/Views/DayDetailView.swift
+      - path: ../mac/Sources/meOS/Views/ProgressPhotoCalendar.swift
+      - path: ../mac/Sources/meOS/Views/FocusView.swift
+      - path: ../mac/Sources/meOS/Views/TaskModeView.swift
+      - path: ../mac/Sources/meOS/Views/SlideToComplete.swift
+      - path: ../mac/Sources/meOS/Views/ScanHistory.swift
       # One grid for every picture and video the app holds — no AppKit in it.
-      - path: ../mac/Sources/MyOS/Views/GalleryView.swift
-      - path: ../mac/Sources/MyOS/Views/ActivitySheet.swift
+      - path: ../mac/Sources/meOS/Views/GalleryView.swift
+      - path: ../mac/Sources/meOS/Views/ActivitySheet.swift
       # The streak (steps, not journaling) and the goal celebration. Both are
       # platform-neutral; the photo comparison beside them is Mac-only on purpose.
       # The weight dial — Today and Fitness both show it; the maths beside it
       # in Support/ comes along with the whole directory.
-      - path: ../mac/Sources/MyOS/Views/WeightDial.swift
+      - path: ../mac/Sources/meOS/Views/WeightDial.swift
       # The weight trend chart — Charts only, no AppKit.
-      - path: ../mac/Sources/MyOS/Views/WeightHistoryCard.swift
-      - path: ../mac/Sources/MyOS/Views/StepStreak.swift
-      - path: ../mac/Sources/MyOS/Views/StepCelebration.swift
-      - path: ../mac/Sources/MyOS/Views/MacroPulseView.swift
-      - path: ../mac/Sources/MyOS/Views/MacroMetricDetail.swift
-      - path: ../mac/Sources/MyOS/Views/MacroMethodSheet.swift
-      - path: ../mac/Sources/MyOS/Views/WeeklyReportCard.swift
-      - path: ../mac/Sources/MyOS/Views/DangerConfirm.swift
+      - path: ../mac/Sources/meOS/Views/WeightHistoryCard.swift
+      - path: ../mac/Sources/meOS/Views/StepStreak.swift
+      - path: ../mac/Sources/meOS/Views/StepCelebration.swift
+      - path: ../mac/Sources/meOS/Views/MacroPulseView.swift
+      - path: ../mac/Sources/meOS/Views/MacroMetricDetail.swift
+      - path: ../mac/Sources/meOS/Views/MacroMethodSheet.swift
+      - path: ../mac/Sources/meOS/Views/WeeklyReportCard.swift
+      - path: ../mac/Sources/meOS/Views/DangerConfirm.swift
       # The recycle bin — one screen, both platforms.
-      - path: ../mac/Sources/MyOS/Views/TrashView.swift
+      - path: ../mac/Sources/meOS/Views/TrashView.swift
       # Time / repeat / reminders — the same rule editor on both platforms, so a
       # yearly event means the same thing wherever it was created.
-      - path: ../mac/Sources/MyOS/Views/EventScheduleEditor.swift
-      - path: ../mac/Sources/MyOS/Views/Icons.swift
-      - path: ../mac/Sources/MyOS/Views/SettingsKit.swift
-      - path: ../mac/Sources/MyOS/Views/SharedComponents.swift
-      - path: ../mac/Sources/MyOS/Views/ImageDropZone.swift
-      - path: ../mac/Sources/MyOS/Views/WatchLogCard.swift
-      - path: ../mac/Sources/MyOS/Views/SplashView.swift
-      - path: ../mac/Sources/MyOS/Views/BelongingsView.swift
-      - path: ../mac/Sources/MyOS/Views/ProductivityView.swift
-      - path: ../mac/Sources/MyOS/Resources/drop.wav
+      - path: ../mac/Sources/meOS/Views/EventScheduleEditor.swift
+      - path: ../mac/Sources/meOS/Views/Icons.swift
+      - path: ../mac/Sources/meOS/Views/SettingsKit.swift
+      - path: ../mac/Sources/meOS/Views/SharedComponents.swift
+      - path: ../mac/Sources/meOS/Views/ImageDropZone.swift
+      - path: ../mac/Sources/meOS/Views/WatchLogCard.swift
+      - path: ../mac/Sources/meOS/Views/SplashView.swift
+      - path: ../mac/Sources/meOS/Views/BelongingsView.swift
+      - path: ../mac/Sources/meOS/Views/ProductivityView.swift
+      - path: ../mac/Sources/meOS/Resources/drop.wav
         buildPhase: resources
       # Every reminder sound, as a file. iOS resolves a named notification sound
       # only against the bundle, so without these the phone could offer three
       # sounds while the Mac offered sixteen.
-      - path: ../mac/Sources/MyOS/Resources/Sounds
+      - path: ../mac/Sources/meOS/Resources/Sounds
         buildPhase: resources
     settings:
       base:
@@ -114,24 +114,24 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ACDQ327MPR
         TARGETED_DEVICE_FAMILY: "1,2"
-        # App Group only. NOT MyOS.entitlements — that one also asks for
+        # App Group only. NOT meOS.entitlements — that one also asks for
         # HealthKit, which isn't on the App ID yet and would fail to provision.
         CODE_SIGN_ENTITLEMENTS: AppGroup.entitlements
     dependencies:
-      - target: MyOSShare
+      - target: meOSShare
         embed: true
 
-  # "Share → MyOS" from YouTube. Queues the link into the App Group container;
+  # "Share → meOS" from YouTube. Queues the link into the App Group container;
   # the app turns it into a Productivity entry when it next comes to the front.
-  MyOSShare:
+  meOSShare:
     type: app-extension
     platform: iOS
     sources:
       - path: Sources/Share
       # One source of truth, same convention as the app target — the link parser
       # and the App Group hand-off come straight from apps/mac/Sources.
-      - path: ../mac/Sources/MyOS/Support/YouTubeClient.swift
-      - path: ../mac/Sources/MyOS/Support/ShareInbox.swift
+      - path: ../mac/Sources/meOS/Support/YouTubeClient.swift
+      - path: ../mac/Sources/meOS/Support/ShareInbox.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.berjil.myos.Share

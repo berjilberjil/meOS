@@ -1,5 +1,5 @@
 import XCTest
-@testable import MyOS
+@testable import meOS
 
 /// Task Mode's rules: which block runs next, what the menu bar says, and that a
 /// payload written before the mode existed still decodes.
