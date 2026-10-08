@@ -179,7 +179,7 @@ private struct ProgressGallery: View {
     let start: ProgressPhoto
     let onClose: () -> Void
 
-    @State private var page: String
+    @State private var page: String?
     @State private var live: [ProgressPhoto]
     @State private var saveStatus = ""
     @State private var confirmingDelete = false
@@ -217,12 +217,17 @@ private struct ProgressGallery: View {
             }
             .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 8)
 
-            TabView(selection: $page) {
-                ForEach(live) { p in
-                    GalleryPage(photo: p).tag(p.id)
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(live) { p in
+                        GalleryPage(photo: p)
+                            .containerRelativeFrame(.horizontal)
+                    }
                 }
+                .scrollTargetLayout()
             }
-            .tabViewStyle(.page(indexDisplayMode: .automatic))
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $page)
             .onChange(of: page) { _, _ in saveStatus = "" }
 
             if !saveStatus.isEmpty {

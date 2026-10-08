@@ -23,13 +23,11 @@ extension AppState {
 
         if kinds.contains(.journal) {
             for (day, e) in journal {
-                let parts = [
-                    e.morning, e.night,
-                    e.wins.isEmpty ? "" : "Wins: " + e.wins.joined(separator: "; "),
-                    e.mistakes.isEmpty ? "" : "Mistakes: " + e.mistakes.joined(separator: "; "),
-                    e.lessons.isEmpty ? "" : "Lessons: " + e.lessons.joined(separator: "; "),
-                    e.gratitude.isEmpty ? "" : "Grateful for: " + e.gratitude.joined(separator: "; ")
-                ].filter { !$0.isEmpty }
+                var parts: [String] = [e.morning, e.night]
+                if !e.wins.isEmpty { parts.append("Wins: " + e.wins.joined(separator: "; ")) }
+                if !e.mistakes.isEmpty { parts.append("Mistakes: " + e.mistakes.joined(separator: "; ")) }
+                if !e.lessons.isEmpty { parts.append("Lessons: " + e.lessons.joined(separator: "; ")) }
+                if !e.gratitude.isEmpty { parts.append("Grateful for: " + e.gratitude.joined(separator: "; ")) }
                 guard !parts.isEmpty else { continue }
                 docs.append(RetrievalDoc(id: "journal:\(day)", kind: .journal,
                                          title: "Journal \(day)", body: parts.joined(separator: "\n"),

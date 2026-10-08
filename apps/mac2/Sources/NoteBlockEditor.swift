@@ -130,7 +130,7 @@ struct NoteBlockEditor: View {
                 .padding(.vertical, 10)
                 .contextMenu { deleteBlockButton(block) }
         case .image:
-            NoteImage(src: block.src ?? "", key: block.id)
+            NoteImagePreview(src: block.src ?? "", key: block.id)
                 .contextMenu { deleteBlockButton(block) }
         case .linkCard:
             linkCard(block)
@@ -526,7 +526,7 @@ struct NoteBlockEditor: View {
 // MARK: - Inline photo
 
 /// A picture inside a note. Decoded off the main thread and cached by block id.
-struct NoteImage: View {
+struct NoteImagePreview: View {
     let src: String
     let key: String
 

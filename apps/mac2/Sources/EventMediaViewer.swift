@@ -14,7 +14,7 @@ struct EventMediaViewer: View {
     let startID: String
     let onClose: () -> Void
 
-    @State private var page: String
+    @State private var page: String?
 
     init(media: [EventMedia], start: EventMedia, onClose: @escaping () -> Void) {
         self.media = media
@@ -43,19 +43,23 @@ struct EventMediaViewer: View {
                 }
                 .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 8)
 
-                TabView(selection: $page) {
-                    ForEach(media) { m in
-                        Group {
-                            if m.kind == .video {
-                                VideoPage(media: m, isActive: page == m.id)
-                            } else {
-                                EventZoomImage(media: m)
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(media) { m in
+                            Group {
+                                if m.kind == .video {
+                                    VideoPage(media: m, isActive: page == m.id)
+                                } else {
+                                    EventZoomImage(media: m)
+                                }
                             }
+                            .containerRelativeFrame(.horizontal)
                         }
-                        .tag(m.id)
                     }
+                    .scrollTargetLayout()
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $page)
             }
         }
     }
