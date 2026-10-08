@@ -90,7 +90,7 @@ struct FitnessView: View {
             #if os(iOS)
             BodyPhotosCard().knRise(5)
             #else
-            ProgressPhotosCard().knRise(5)
+            BodyPhotosCard().knRise(5)
             #endif
             settingsDisclosure.knRise(6)
         }
