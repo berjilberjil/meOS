@@ -144,7 +144,7 @@ export async function resolveModel(feature: Feature, userId: number): Promise<Re
       const grounded = feature === 'news' && provider !== 'gemini';
       if (!grounded) {
         try {
-          const apiKey = decryptSecret(rows[0].secret as string);
+          const apiKey = await decryptSecret(rows[0].secret as string);
           return buildModel(provider, apiKey, ref.model);
         } catch {
           /* decrypt failed (master key changed?) — fall through to env */

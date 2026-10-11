@@ -32,9 +32,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const res = await listModels(provider, key);
   if (!res.ok) throw error(400, `Key check failed: ${res.error ?? 'invalid key'}`);
 
+  const enc = await encryptSecret(key);
   const rows = await sql`
     insert into ai_credentials (user_id, provider, label, secret, masked, models)
-    values (${locals.user.id}, ${provider}, ${label}, ${encryptSecret(key)}, ${maskKey(key)}, ${sql.json(res.models)})
+    values (${locals.user.id}, ${provider}, ${label}, ${enc}, ${maskKey(key)}, ${sql.json(res.models)})
     returning id, provider, label, masked, enabled, models`;
   return json({ key: rows[0], models: res.models });
 };

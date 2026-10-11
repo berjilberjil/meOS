@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 
   let apiKey: string;
   try {
-    apiKey = decryptSecret(rows[0].secret as string);
+    apiKey = await decryptSecret(rows[0].secret as string);
   } catch {
     throw error(500, 'Could not decrypt this key — MEOS_SECRETS_KEY may have changed. Re-enter it.');
   }
