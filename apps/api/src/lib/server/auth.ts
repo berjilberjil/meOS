@@ -30,11 +30,11 @@ function toHex(bytes: Uint8Array): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function fromHex(hex: string): Uint8Array {
+function fromHex(hex: string): Uint8Array<ArrayBuffer> {
   return new Uint8Array((hex.match(/.{2}/g) ?? []).map((h) => parseInt(h, 16)));
 }
 
-async function pbkdf2(pw: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+async function pbkdf2(pw: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<Uint8Array<ArrayBuffer>> {
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(pw),
@@ -130,7 +130,7 @@ export async function createSession(userId: number): Promise<string> {
   // and accumulated for the life of the account in a database whose free-tier
   // storage is shared by every user.
   await sql`delete from sessions where user_id = ${userId} and expires_at <= ${new Date().toISOString()}`;
-  const token = randomBytes(32).toString('hex');
+  const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
   const expires = new Date(Date.now() + SESSION_DAYS * DAY);
   await sql`insert into sessions (token, user_id, expires_at) values (${token}, ${userId}, ${expires})`;
   return token;

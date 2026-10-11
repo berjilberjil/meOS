@@ -36,8 +36,13 @@ async function masterKey(): Promise<CryptoKey> {
   if (cachedKeyPromise && cachedRaw === raw) return cachedKeyPromise;
   cachedRaw = raw;
   cachedKeyPromise = (async () => {
-    let keyBytes = Buffer.from(raw, 'base64');
-    if (keyBytes.length !== 32) {
+    const decoded = Buffer.from(raw, 'base64');
+    // typed Uint8Array<ArrayBuffer>, not Buffer: crypto.subtle's BufferSource
+    // rejects Buffer's ArrayBufferLike (SharedArrayBuffer can sneak in)
+    let keyBytes: Uint8Array<ArrayBuffer>;
+    if (decoded.length === 32) {
+      keyBytes = new Uint8Array(decoded); // copies into a fresh ArrayBuffer
+    } else {
       keyBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)));
     }
     return crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
