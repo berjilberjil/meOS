@@ -18,9 +18,10 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
   const existing = await sql`select id from users where username = ${name}`;
   if (existing.length) throw error(409, 'That username is taken');
 
+  const passwordHash = await hashPassword(password);
   const [user] = await sql`
     insert into users (username, password_hash)
-    values (${name}, ${hashPassword(password)})
+    values (${name}, ${passwordHash})
     returning id, username`;
 
   const token = await createSession(user.id);

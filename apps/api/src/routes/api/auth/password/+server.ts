@@ -29,12 +29,13 @@ export const POST: RequestHandler = async ({ request, cookies, locals, getClient
   }
 
   const rows = await sql`select password_hash from users where id = ${user.id}`;
-  if (!rows[0] || !verifyPassword(current, rows[0].password_hash)) {
+  if (!rows[0] || !(await verifyPassword(current, rows[0].password_hash))) {
     await recordFailedLogin(user.username, ip);
     throw error(403, 'Current password is wrong.');
   }
 
-  await sql`update users set password_hash = ${hashPassword(next)} where id = ${user.id}`;
+  const nextHash = await hashPassword(next);
+  await sql`update users set password_hash = ${nextHash} where id = ${user.id}`;
   // Sign out every other device; keep this one.
   const token = cookies.get(SESSION_COOKIE) ?? '';
   await sql`delete from sessions where user_id = ${user.id} and token <> ${token}`;

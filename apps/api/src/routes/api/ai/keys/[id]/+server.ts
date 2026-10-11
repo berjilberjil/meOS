@@ -28,8 +28,9 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
     const k = body.key.trim();
     const res = await listModels(provider, k);
     if (!res.ok) throw error(400, `Key check failed: ${res.error ?? 'invalid key'}`);
+    const enc = await encryptSecret(k);
     await sql`update ai_credentials
-              set secret = ${encryptSecret(k)}, masked = ${maskKey(k)}, models = ${sql.json(res.models)}, updated_at = ${nowISO()}
+              set secret = ${enc}, masked = ${maskKey(k)}, models = ${sql.json(res.models)}, updated_at = ${nowISO()}
               where id = ${id} and user_id = ${locals.user.id}`;
   }
 

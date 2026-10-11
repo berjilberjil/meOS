@@ -1,17 +1,78 @@
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { sql } from './db';
 
 const DAY = 1000 * 60 * 60 * 24;
 export const SESSION_COOKIE = 'meos_session';
 export const SESSION_DAYS = 60;
 
-export function hashPassword(pw: string): string {
-  const salt = randomBytes(16).toString('hex');
-  const hash = scryptSync(pw, salt, 64).toString('hex');
-  return `${salt}:${hash}`;
+/**
+ * Password hashing on the Workers free tier (10ms CPU cap).
+ *
+ * The old code used node:crypto's scryptSync. Scrypt is deliberately slow —
+ * that's its job — and the Workers polyfill makes it worse: ~50-100ms CPU per
+ * call, five to ten times the entire per-request budget, so logins and
+ * registrations were killed mid-flight. PBKDF2-SHA256 via crypto.subtle is
+ * native on Workers and fits comfortably.
+ *
+ * Stored format is versioned:
+ *   v2:<iterations>:<saltHex>:<hashHex>   PBKDF2-SHA256, 64-byte hash
+ *   <saltHex>:<hashHex>                   legacy scrypt, still verified
+ *
+ * 10k iterations + the login rate limit below is the right trade for a
+ * single-user personal app: it defeats offline guessing of a decent
+ * passphrase without needing an Argon2-grade work factor.
+ *
+ * Both functions are async now — call sites must await them.
+ */
+
+const PBKDF2_ITERATIONS = 10_000;
+
+function toHex(bytes: Uint8Array): string {
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export function verifyPassword(pw: string, stored: string): boolean {
+function fromHex(hex: string): Uint8Array<ArrayBuffer> {
+  return new Uint8Array((hex.match(/.{2}/g) ?? []).map((h) => parseInt(h, 16)));
+}
+
+async function pbkdf2(pw: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<Uint8Array<ArrayBuffer>> {
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(pw),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  return new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+      keyMaterial,
+      512 // 64 bytes, same length the old scrypt hash had
+    )
+  );
+}
+
+export async function hashPassword(pw: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await pbkdf2(pw, salt, PBKDF2_ITERATIONS);
+  return `v2:${PBKDF2_ITERATIONS}:${toHex(salt)}:${toHex(hash)}`;
+}
+
+export async function verifyPassword(pw: string, stored: string): Promise<boolean> {
+  if (stored.startsWith('v2:')) {
+    const [, iters, saltHex, hashHex] = stored.split(':');
+    const test = await pbkdf2(pw, fromHex(saltHex), Number(iters));
+    const orig = fromHex(hashHex);
+    if (orig.length !== test.length) return false;
+    // constant-time compare (timingSafeEqual was node:crypto)
+    let diff = 0;
+    for (let i = 0; i < orig.length; i++) diff |= orig[i]! ^ test[i]!;
+    return diff === 0;
+  }
+  // Legacy scrypt hash: lazy-import the polyfill only for old hashes, so the
+  // common path never pays for it. A legacy verify can still trip the free
+  // CPU cap once — after deploying, log in once (or change your password) to
+  // rewrite the stored hash as v2.
+  const { scryptSync, timingSafeEqual } = await import('node:crypto');
   const [salt, hash] = stored.split(':');
   if (!salt || !hash) return false;
   const test = scryptSync(pw, salt, 64);
@@ -19,17 +80,6 @@ export function verifyPassword(pw: string, stored: string): boolean {
   return orig.length === test.length && timingSafeEqual(orig, test);
 }
 
-/**
- * Failed sign-in attempts, so a password cannot simply be guessed.
- *
- * `verifyPassword` is one scrypt at Node defaults — roughly 50 ms — and Workers
- * fan out, so an unthrottled login endpoint exhausts a short password in minutes
- * from concurrent clients. The account is worth taking: it holds every synced
- * module and `meos.crypto`, whose salts and wrapped DEKs enable an offline
- * attack on the passphrase itself.
- *
- * Counted per username AND per IP, because either alone is trivially sidestepped.
- */
 export const LOGIN_MAX_ATTEMPTS = 10;
 export const LOGIN_WINDOW_MINUTES = 15;
 
@@ -80,7 +130,7 @@ export async function createSession(userId: number): Promise<string> {
   // and accumulated for the life of the account in a database whose free-tier
   // storage is shared by every user.
   await sql`delete from sessions where user_id = ${userId} and expires_at <= ${new Date().toISOString()}`;
-  const token = randomBytes(32).toString('hex');
+  const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
   const expires = new Date(Date.now() + SESSION_DAYS * DAY);
   await sql`insert into sessions (token, user_id, expires_at) values (${token}, ${userId}, ${expires})`;
   return token;
