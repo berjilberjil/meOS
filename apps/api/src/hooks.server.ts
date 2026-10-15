@@ -3,8 +3,25 @@ import { sql, nowISO, withDB, type D1Database } from '$lib/server/db';
 import { withMedia, type R2Bucket } from '$lib/server/storage';
 import { SESSION_COOKIE } from '$lib/server/auth';
 
+// Bot waves (rotating datacenter IPs probing a public *.workers.dev URL)
+// were ~2/3 of all invocations on bad days and pushed nearly every request
+// over the free tier's 10ms CPU cap. Anything these patterns match is a
+// probe no part of this app ever serves, so answering 404 here costs
+// microseconds instead of the D1 round-trip plus SvelteKit routing that
+// `resolve` pays. Kept deliberately narrow: a false positive here would
+// block the app itself, so no broad "weird path" heuristics.
+const JUNK_RE = /(?:^|\/)(?:wp-(?:admin|login|content|includes)|phpmyadmin|xmlrpc\.php|\.git(?:\/|$)|\.env(?:$|\.)|\.aws|\.ssh|\.DS_Store|cgi-bin|\.aspx?$)/i;
+const JUNK_SUFFIX_RE = /\.(?:php|asp|aspx|jsp|cgi|bak|sql)$/i;
+
+function isScannerJunk(pathname: string): boolean {
+  return JUNK_RE.test(pathname) || JUNK_SUFFIX_RE.test(pathname);
+}
+
 // Resolve the session cookie into event.locals.user for every request.
 export const handle: Handle = async ({ event, resolve }) => {
+  if (isScannerJunk(new URL(event.request.url).pathname)) {
+    return new Response('Not found', { status: 404 });
+  }
   // D1 arrives per-request on platform.env, so every request runs inside a
   // context that carries the binding down to `sql` (see lib/server/db.ts).
   const env = (event.platform as { env?: { DB?: D1Database; MEDIA?: R2Bucket } } | undefined)?.env;

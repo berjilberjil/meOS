@@ -1,7 +1,12 @@
 import { env } from '$env/dynamic/private';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+// The AWS SDK stays only for what the R2 binding cannot do: presigned GET
+// URLs. It is imported dynamically inside signObjects() so Vite splits it
+// into its own chunk that the runtime parses on first media use, not on
+// every isolate cold start. Bundle weight was measurable CPU: a 2.8MB
+// worker parses to ~17ms per request against the free tier's 10ms cap.
+type S3Client = import('@aws-sdk/client-s3').S3Client;
 
 // Cloudflare R2 (S3-compatible) client for all private media — progress
 // photos today, journal/belongings media later. The bucket isn't
@@ -14,7 +19,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 //   R2_SECRET_ACCESS_KEY   R2 API token's S3 secret access key
 //   R2_BUCKET              bucket name, e.g. "meos-media"
 
-/// Minimal structural view of the R2 binding we use.
+/// Minimal structural view of the R2 binding we use. `put` is used instead
+/// of the SDK's PutObjectCommand for uploads: the binding is a plain RPC
+/// with no SigV4 signing, which is less CPU and one less moving part.
 export interface R2Bucket {
   list(options?: { prefix?: string; cursor?: string }): Promise<{
     objects: { key: string; uploaded?: Date; size?: number }[];
@@ -22,6 +29,11 @@ export interface R2Bucket {
     cursor?: string;
   }>;
   delete(keys: string | string[]): Promise<void>;
+  put(
+    key: string,
+    value: ArrayBuffer | Uint8Array | ReadableStream | string,
+    options?: { httpMetadata?: { contentType?: string } }
+  ): Promise<unknown>;
 }
 
 /// The R2 binding arrives per-request on `platform.env`, exactly like D1, so it
@@ -54,7 +66,7 @@ function bucket(): string {
   return name;
 }
 
-function client(): S3Client {
+async function client(): Promise<S3Client> {
   if (cachedClient) return cachedClient;
   const accountId = env.R2_ACCOUNT_ID;
   const accessKeyId = env.R2_ACCESS_KEY_ID;
@@ -62,6 +74,7 @@ function client(): S3Client {
   if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error('R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY are not set on the server');
   }
+  const { S3Client } = await import('@aws-sdk/client-s3');
   cachedClient = new S3Client({
     region: 'auto',
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
@@ -95,9 +108,7 @@ export async function mediaRoomFor(prefix: string, incoming: number): Promise<bo
 }
 
 export async function uploadObject(key: string, bytes: Uint8Array, contentType: string): Promise<void> {
-  await client().send(
-    new PutObjectCommand({ Bucket: bucket(), Key: key, Body: bytes, ContentType: contentType })
-  );
+  await media().put(key, bytes, { httpMetadata: { contentType } });
 }
 
 /// Objects under `prefix`, with `name` relative to it (mirrors how callers
@@ -123,9 +134,14 @@ export async function listObjects(prefix: string): Promise<{ name: string; updat
 /// One signed GET URL per full object key, valid for `expiresIn` seconds.
 export async function signObjects(keys: string[], expiresIn = 3600): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
+  const [{ GetObjectCommand }, { getSignedUrl }] = await Promise.all([
+    import('@aws-sdk/client-s3'),
+    import('@aws-sdk/s3-request-presigner')
+  ]);
+  const s3 = await client();
   await Promise.all(
     keys.map(async (key) => {
-      out[key] = await getSignedUrl(client(), new GetObjectCommand({ Bucket: bucket(), Key: key }), {
+      out[key] = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket(), Key: key }), {
         expiresIn
       });
     })
