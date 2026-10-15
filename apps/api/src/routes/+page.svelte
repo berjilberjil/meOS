@@ -1,3 +1,10 @@
+<script lang="ts">
+	// Static landing for a headless backend. Prerendering it keeps the root
+	// request (which every scanner hits first) out of the worker entirely:
+	// the platform serves it as a plain asset for zero CPU.
+	export const prerender = true;
+</script>
+
 <!-- MeOS is a headless backend. This page only exists so the site root isn't a 404. -->
 <main>
   <h1>MeOS</h1>

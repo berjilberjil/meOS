@@ -106,10 +106,35 @@ export function parseFredCsv(text: string): Point[] {
   return out;
 }
 
+// `cf.cacheTtl` above looks like a cache but is a no-op here: *.workers.dev
+// has no edge cache, so it never applies. Every /api/macro request was
+// therefore downloading and re-parsing years of CSV per series, which is
+// where the median 16.6ms request CPU (against the free tier's 10ms cap)
+// came from. These series move daily at most, so the parsed points live in
+// the isolate for 6h, concurrent loads share one in-flight fetch, and a
+// failed refetch serves the last good points rather than an empty series.
+const SERIES_TTL_MS = 6 * 60 * 60 * 1000;
+
+const seriesCache = new Map<string, { points: Point[]; at: number; pending?: Promise<Point[]> }>();
+
 async function fetchSeries(spec: SeriesSpec): Promise<Point[]> {
-  const res = await fetch(FRED_CSV + spec.fred, { cf: { cacheTtl: 3600 } } as RequestInit);
-  if (!res.ok) return [];
-  return parseFredCsv(await res.text());
+  const hit = seriesCache.get(spec.fred);
+  if (hit && Date.now() - hit.at < SERIES_TTL_MS) return hit.points;
+  if (hit?.pending) return hit.pending;
+  const pending = (async () => {
+    try {
+      const res = await fetch(FRED_CSV + spec.fred, { cf: { cacheTtl: 3600 } } as RequestInit);
+      if (!res.ok) throw new Error(`FRED ${res.status} for ${spec.fred}`);
+      const points = parseFredCsv(await res.text());
+      seriesCache.set(spec.fred, { points, at: Date.now() });
+      return points;
+    } catch {
+      if (hit) return hit.points;
+      return [];
+    }
+  })();
+  if (hit) hit.pending = pending;
+  return pending;
 }
 
 // ---------------------------------------------------------------- maths
