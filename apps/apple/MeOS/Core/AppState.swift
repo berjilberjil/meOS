@@ -393,6 +393,7 @@ final class AppState: ObservableObject {
         EventMediaStore.shared.purgeCache()
         FoldData.deleteFromDisk()
         AISettingsStore.shared.reset()
+        MCPConnectionsStore.shared.reset()
         // The activity write-ahead log is a plain file, not account-scoped, and
         // it holds three days of app names, site domains and window titles —
         // written even while logged out, because tracking starts before auth. On

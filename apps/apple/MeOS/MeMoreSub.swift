@@ -943,6 +943,69 @@ struct MeModelMenu<L: View>: View {
     }
 }
 
+/// Connect an online AI app (Wajo, Claude, ChatGPT…) to your notes over MCP.
+/// Read-only; locked notes are never shared. Each app gets its own token,
+/// revocable here.
+struct MeConnections: View {
+    @EnvironmentObject var state: AppState
+    @ObservedObject private var store = MCPConnectionsStore.shared
+    @State private var name = ""
+
+    var body: some View {
+        Screen(title: "AI connections", sub: "Let an AI app read your notes") {
+            MCard {
+                Text("Read-only. Your AI can list, search and read notes — never change or delete them. Locked notes are never shared.")
+                    .font(.subheadline).foregroundStyle(Color.dim)
+            }
+            if let fresh = store.fresh {
+                MCard(inverted: true) {
+                    Text("“\(fresh.name)” is connected").font(.headline)
+                    Text("Copy the token now — it won't be shown again. Anyone with it can read your notes until you remove the connection.")
+                        .font(.subheadline)
+                    copyRow("Server URL", store.endpoint)
+                    copyRow("Token (Bearer)", fresh.token)
+                    copyRow("URL only (if the app has no token field)", "\(store.endpoint)/\(fresh.token)")
+                    Button("Done") { store.fresh = nil }.font(.headline)
+                }
+            }
+            MLabel("Connected apps")
+            if store.loaded && store.connections.isEmpty { Text("None yet.").foregroundStyle(Color.dim) }
+            ForEach(store.connections) { c in
+                MCard {
+                    Text(c.name).font(.headline)
+                    Text("Added \(c.createdAt.prefix(10)) · " + (c.lastUsedAt.map { "last used \($0.prefix(10))" } ?? "never used"))
+                        .font(.subheadline).foregroundStyle(Color.dim)
+                }
+                .contextMenu { Button("Remove", role: .destructive) { Task { await store.revoke(c) } } }
+            }
+            if !store.connections.isEmpty {
+                Text("Touch and hold a connection to remove it.").font(.footnote).foregroundStyle(Color.dim)
+            }
+            MCard {
+                Text("New connection").font(.headline)
+                TextField("App name, e.g. Wajo", text: $name)
+                Button(store.busy ? "Creating…" : "Create") {
+                    Task { await store.create(name: name, dek: state.vault.dek); if store.fresh != nil { name = "" } }
+                }
+                .font(.headline).disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || store.busy)
+                if let e = store.error { Text(e).font(.subheadline) }
+            }
+        }
+        .task { await store.loadIfNeeded() }
+    }
+
+    private func copyRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.footnote.weight(.semibold))
+                Text(value).font(.footnote.monospaced()).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer()
+            Button { UIPasteboard.general.string = value } label: { Chip(text: "Copy") }.buttonStyle(.press)
+        }
+    }
+}
+
 struct MeMemory: View {
     @EnvironmentObject var state: AppState
     @State private var query = ""

@@ -88,3 +88,17 @@ create table if not exists state_version (
   version integer not null default 0,
   at      text not null
 );
+
+-- Remote MCP connections (Settings → AI connections). Only sha256(token) and
+-- the vault DEK sealed under an HKDF key derived from the token are stored, so
+-- this table alone opens nothing. Deleting a row revokes that token. Also
+-- created lazily by src/lib/server/mcpServer.ts.
+create table if not exists mcp_connections (
+  id           integer primary key autoincrement,
+  user_id      integer not null references users(id) on delete cascade,
+  name         text not null,
+  token_hash   text not null unique,
+  wrapped_dek  text not null,
+  created_at   text not null,
+  last_used_at text
+);

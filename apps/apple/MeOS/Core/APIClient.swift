@@ -676,6 +676,31 @@ final class APIClient {
         _ = try await request("PUT", "api/ai/routes", body: routing)
     }
 
+    // MARK: - MCP connections (Settings → AI connections)
+
+    struct MCPConnectionDTO: Codable, Identifiable, Hashable {
+        let id: Int
+        let name: String
+        let createdAt: String
+        let lastUsedAt: String?
+    }
+
+    func mcpConnections() async throws -> [MCPConnectionDTO] {
+        struct R: Decodable { let connections: [MCPConnectionDTO] }
+        return try decoder.decode(R.self, from: try await request("GET", "api/mcp/connections")).connections
+    }
+
+    /// Only the token's hash and the DEK sealed under it leave the device.
+    func mcpCreateConnection(name: String, tokenHash: String, wrappedDek: String) async throws -> MCPConnectionDTO {
+        struct R: Decodable { let connection: MCPConnectionDTO }
+        let body = ["name": name, "tokenHash": tokenHash, "wrappedDek": wrappedDek]
+        return try decoder.decode(R.self, from: try await request("POST", "api/mcp/connections", body: body)).connection
+    }
+
+    func mcpDeleteConnection(id: Int) async throws {
+        _ = try await request("DELETE", "api/mcp/connections/\(id)")
+    }
+
     private struct AddKeyRequest: Encodable { let provider: String; let label: String; let key: String }
     private struct PatchKeyRequest: Encodable { let label: String?; let enabled: Bool?; let key: String? }
 

@@ -329,6 +329,7 @@ struct MeSettings: View {
             }
             group("Profile", "person.crop.circle") { MeProfile() }
             group("AI & keys", "key") { MeAI() }
+            group("AI connections (MCP)", "link") { MeConnections() }
             group("Memory", "brain") { MeMemory() }
             group("Reminders", "bell") { MeReminders() }
             group("Change password", "key.viewfinder") { MeChangePassword() }
