@@ -1,12 +1,10 @@
 import { env } from '$env/dynamic/private';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { presignGet, type PresignConfig } from './presign';
 
-// The AWS SDK stays only for what the R2 binding cannot do: presigned GET
-// URLs. It is imported dynamically inside signObjects() so Vite splits it
-// into its own chunk that the runtime parses on first media use, not on
-// every isolate cold start. Bundle weight was measurable CPU: a 2.8MB
-// worker parses to ~17ms per request against the free tier's 10ms cap.
-type S3Client = import('@aws-sdk/client-s3').S3Client;
+// Presigned GET URLs are built by ./presign.ts on crypto.subtle. The AWS SDK
+// used to do it, but its JavaScript SHA-256 cost 30-110ms CPU per photo
+// listing against the free tier's 10ms cap.
 
 // Cloudflare R2 (S3-compatible) client for all private media — progress
 // photos today, journal/belongings media later. The bucket isn't
@@ -58,29 +56,16 @@ function media(): R2Bucket {
   return b;
 }
 
-let cachedClient: S3Client | null = null;
-
-function bucket(): string {
-  const name = env.R2_BUCKET;
-  if (!name) throw new Error('R2_BUCKET is not set on the server');
-  return name;
-}
-
-async function client(): Promise<S3Client> {
-  if (cachedClient) return cachedClient;
+function presignConfig(): PresignConfig {
   const accountId = env.R2_ACCOUNT_ID;
   const accessKeyId = env.R2_ACCESS_KEY_ID;
   const secretAccessKey = env.R2_SECRET_ACCESS_KEY;
+  const bucket = env.R2_BUCKET;
+  if (!bucket) throw new Error('R2_BUCKET is not set on the server');
   if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error('R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY are not set on the server');
   }
-  const { S3Client } = await import('@aws-sdk/client-s3');
-  cachedClient = new S3Client({
-    region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId, secretAccessKey }
-  });
-  return cachedClient;
+  return { accountId, accessKeyId, secretAccessKey, bucket };
 }
 
 /**
@@ -133,20 +118,10 @@ export async function listObjects(prefix: string): Promise<{ name: string; updat
 
 /// One signed GET URL per full object key, valid for `expiresIn` seconds.
 export async function signObjects(keys: string[], expiresIn = 3600): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
-  const [{ GetObjectCommand }, { getSignedUrl }] = await Promise.all([
-    import('@aws-sdk/client-s3'),
-    import('@aws-sdk/s3-request-presigner')
-  ]);
-  const s3 = await client();
-  await Promise.all(
-    keys.map(async (key) => {
-      out[key] = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket(), Key: key }), {
-        expiresIn
-      });
-    })
-  );
-  return out;
+  const cfg = presignConfig();
+  const now = new Date();
+  const urls = await Promise.all(keys.map((key) => presignGet(cfg, key, expiresIn, now)));
+  return Object.fromEntries(keys.map((key, i) => [key, urls[i]]));
 }
 
 export async function removeObjects(keys: string[]): Promise<void> {
