@@ -64,13 +64,12 @@ enum TextIndex {
 // MARK: - What can be searched
 
 enum DocKind: String, Codable, CaseIterable, Hashable {
-    case note, journal, event, todo, stuff, video, memory
+    case note, event, todo, stuff, video, memory
 
     /// How it is introduced in the prompt, so the model can cite it honestly.
     var label: String {
         switch self {
         case .note:    return "Note"
-        case .journal: return "Journal"
         case .event:   return "Event"
         case .todo:    return "To-do"
         case .stuff:   return "Purchase"

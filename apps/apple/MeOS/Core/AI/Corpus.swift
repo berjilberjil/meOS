@@ -3,7 +3,7 @@ import Foundation
 /// Flattens the modules into one searchable pile.
 ///
 /// This is the whole second brain as far as Catherine is concerned: notes,
-/// journal, events, focus lists, purchases and the video log. Built on demand
+/// events, focus lists, purchases and the video log. Built on demand
 /// from state that is already decrypted and in memory — nothing is cached to
 /// disk, so there is no second copy of your life to keep in sync or secure.
 extension AppState {
@@ -18,22 +18,6 @@ extension AppState {
                 docs.append(RetrievalDoc(id: "note:\(n.id)", kind: .note, title: n.title,
                                          body: n.body, date: String(n.updatedAt.prefix(10)),
                                          pinned: n.pinned))
-            }
-        }
-
-        if kinds.contains(.journal) {
-            for (day, e) in journal {
-                let parts = [
-                    e.morning, e.night,
-                    e.wins.isEmpty ? "" : "Wins: " + e.wins.joined(separator: "; "),
-                    e.mistakes.isEmpty ? "" : "Mistakes: " + e.mistakes.joined(separator: "; "),
-                    e.lessons.isEmpty ? "" : "Lessons: " + e.lessons.joined(separator: "; "),
-                    e.gratitude.isEmpty ? "" : "Grateful for: " + e.gratitude.joined(separator: "; ")
-                ].filter { !$0.isEmpty }
-                guard !parts.isEmpty else { continue }
-                docs.append(RetrievalDoc(id: "journal:\(day)", kind: .journal,
-                                         title: "Journal \(day)", body: parts.joined(separator: "\n"),
-                                         date: day))
             }
         }
 

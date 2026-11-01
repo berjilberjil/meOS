@@ -167,10 +167,8 @@ extension AppState {
             l.append("Focus list: \(todos.filter(\.done).count)/\(todos.count) done — " +
                      todos.prefix(5).map(\.text).joined(separator: "; ") + ".")
         }
-        let e = journalEntry(todayKey)
-        if let mood = e.mood { l.append("Mood today \(mood)/5.") }
-        // The streak is steps now — a journal streak measured whether the day
-        // was written down, not whether it was worked.
+        // The streak is steps now — it measures whether the day was worked,
+        // not whether it was written down.
         l.append("Steps today \(steps(on: todayKey).formatted()) of \(stepGoals.daily.formatted()); \(stepStreak)-day streak.")
         return l
     }

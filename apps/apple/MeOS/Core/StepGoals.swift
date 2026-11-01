@@ -69,8 +69,8 @@ enum StepDay: Equatable {
 /// The streak, counted on steps.
 ///
 /// Deliberately unforgiving: there is no freeze day. A single day under the
-/// mandatory goal ends the run. Berjil chose this over the journal's
-/// Duolingo-style freeze — on a cut, a day under 8,000 is a day under 8,000,
+/// mandatory goal ends the run. Berjil chose this over a Duolingo-style
+/// freeze — on a cut, a day under 8,000 is a day under 8,000,
 /// and a streak that survives it is telling you something that isn't true.
 ///
 /// Today is the one exception, and it is not a kindness: a day that has not

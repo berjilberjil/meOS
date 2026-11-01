@@ -39,13 +39,10 @@ enum CatrineToolbox {
     static let all: [CatrineTool] = [
         // MARK: Reads
         CatrineTool("search_brain",
-                    "Search everything in MeOS at once — notes, journal, events, focus lists, purchases, videos. Use this when you don't know which module holds the answer.",
+                    "Search everything in MeOS at once — notes, events, focus lists, purchases, videos. Use this when you don't know which module holds the answer.",
                     ["query": query, "limit": limit], required: ["query"]),
         CatrineTool("search_notes",
                     "Search the user's notes. Use for anything they wrote down: ideas, decisions, specs, drafts. Locked notes are never returned.",
-                    ["query": query, "limit": limit], required: ["query"]),
-        CatrineTool("search_journal",
-                    "Search journal entries — how a day went, wins, mistakes, lessons, gratitude, mood.",
                     ["query": query, "limit": limit], required: ["query"]),
         CatrineTool("search_events",
                     "Search logged life events (trips, milestones) by title or note.",
@@ -132,7 +129,6 @@ extension AppState {
         switch name {
         case "search_brain":     return found(searchBrain(str("query"), limit: cap))
         case "search_notes":     return found(searchBrain(str("query"), kinds: [.note], limit: cap))
-        case "search_journal":   return found(searchBrain(str("query"), kinds: [.journal], limit: cap))
         case "search_events":    return found(searchBrain(str("query"), kinds: [.event], limit: cap))
         case "search_purchases": return found(searchBrain(str("query"), kinds: [.stuff], limit: cap))
 

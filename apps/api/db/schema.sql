@@ -16,7 +16,7 @@ create table if not exists sessions (
 );
 create index if not exists sessions_user_idx on sessions(user_id);
 
--- Per-user app state. One JSONB document per key (myos.finance, myos.journal, …).
+-- Per-user app state. One JSONB document per key (myos.fitness, myos.notes, …).
 -- The whole product is built on this table.
 create table if not exists app_state (
   user_id    integer not null references users(id) on delete cascade,

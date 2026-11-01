@@ -147,7 +147,7 @@ enum ReminderDefaults {
     static func all() -> [Reminder] {
         [
             Reminder(id: "wake", label: "Start the day",
-                     body: "Log your weight, journal, and check MeOS.", hour: 6, minute: 0, enabled: true,
+                     body: "Log your weight and check MeOS.", hour: 6, minute: 0, enabled: true,
                      sound: .standard),
             Reminder(id: "breakfast", label: "Breakfast",
                      body: "Time to eat — log your breakfast.", hour: 8, minute: 0, enabled: true),

@@ -51,6 +51,44 @@ struct MCard<Content: View>: View {
     }
 }
 
+/// An editable list on a card — items, a text field, and optional quick-add chips.
+struct MeListCard: View {
+    let icon: String
+    let title: String
+    let items: [String]
+    var presets: [String] = []
+    let save: ([String]) -> Void
+    @State private var draft = ""
+
+    var body: some View {
+        MCard {
+            HStack {
+                Label(title, systemImage: icon).font(.title3.bold())
+                Spacer()
+                Text("\(items.count)").font(.title3.bold()).contentTransition(.numericText())
+            }
+            ForEach(items, id: \.self) { item in
+                HStack {
+                    Text(item).font(.title3)
+                    Spacer()
+                    Button { withAnimation(DS.spring) { save(items.filter { $0 != item }) } } label: { Image(systemName: "xmark").foregroundStyle(Color.dim) }
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            TextField("Add…", text: $draft).font(.title3).submitLabel(.done).onSubmit { add(draft); draft = "" }
+            ScrollView(.horizontal) {
+                HStack { ForEach(presets.filter { !items.contains($0) }, id: \.self) { p in Button { add(p) } label: { Chip(text: p) }.buttonStyle(.press) } }
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+    private func add(_ s: String) {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, !items.contains(t) else { return }
+        withAnimation(DS.spring) { save(items + [t]) }
+    }
+}
+
 struct BigIcon: View {
     let name: String
     var size: CGFloat = 26

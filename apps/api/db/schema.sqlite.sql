@@ -21,7 +21,7 @@ create table if not exists sessions (
 );
 create index if not exists sessions_user_idx on sessions(user_id);
 
--- Per-user app state. One JSON document per key (myos.journal, myos.events, …).
+-- Per-user app state. One JSON document per key (myos.notes, myos.events, …).
 -- The whole product is built on this table. Values are ciphertext envelopes —
 -- the server cannot read them.
 create table if not exists app_state (
