@@ -11,17 +11,16 @@ struct MeMacShell: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     enum Space: String, CaseIterable, Identifiable {
-        case today, journal, fitness, notes
+        case today, fitness, notes
         case catherine, events, watch, scan, productivity, stuff, money, macro, gallery, bin, settings
         var id: String { rawValue }
 
-        static let main: [Space] = [.today, .journal, .fitness, .notes]
+        static let main: [Space] = [.today, .fitness, .notes]
         static let more: [Space] = [.catherine, .events, .watch, .scan, .productivity, .stuff, .money, .macro, .gallery, .bin, .settings]
 
         var title: String {
             switch self {
             case .today: "Today"
-            case .journal: "Journal"
             case .fitness: "Fitness"
             case .notes: "Notes"
             case .catherine: AgentConfig.shared.name
@@ -41,7 +40,6 @@ struct MeMacShell: View {
         var icon: String {
             switch self {
             case .today: "sun.max"
-            case .journal: "book.closed"
             case .fitness: "figure.run"
             case .notes: "note.text"
             case .catherine: "sparkles"
@@ -61,7 +59,6 @@ struct MeMacShell: View {
         @MainActor @ViewBuilder var screen: some View {
             switch self {
             case .today: MeToday()
-            case .journal: MeJournal()
             case .fitness: MeFitness()
             case .notes: MeNotes()
             case .catherine: MeAssistant()

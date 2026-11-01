@@ -7,7 +7,7 @@ import { presignGet, type PresignConfig } from './presign';
 // listing against the free tier's 10ms cap.
 
 // Cloudflare R2 (S3-compatible) client for all private media — progress
-// photos today, journal/belongings media later. The bucket isn't
+// photos today, belongings media later. The bucket isn't
 // auto-created: create it once via the Cloudflare dashboard or
 // `wrangler r2 bucket create <name>`.
 //

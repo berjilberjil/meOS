@@ -105,8 +105,8 @@ struct TrashEntry: Codable, Identifiable, Hashable, Sendable {
     var deletedAt: String
     /// JSON of the original object.
     var payload: String
-    /// The day key a to-do or a journal entry belonged to. Without it there is
-    /// nothing to put a restored to-do back *into*.
+    /// The day key a to-do belonged to. Without it there is nothing to put a
+    /// restored to-do back *into*.
     var context: String?
     /// R2 objects this entry is keeping alive. Deleting an event used to drop its
     /// photos from the bucket immediately, which made a restore a restore of the

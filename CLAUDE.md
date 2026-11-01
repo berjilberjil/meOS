@@ -1,6 +1,6 @@
 # meOS — Personal Life Operating System
 
-Private, daily-driver "operating system for my life": finance, journal, health, fitness, to-dos, goals, notes, and a mindmap dashboard that visualizes how everything connects. Single-user, privacy-first.
+Private, daily-driver "operating system for my life": finance, health, fitness, to-dos, goals, notes, and a mindmap dashboard that visualizes how everything connects. Single-user, privacy-first.
 
 Owner: **Berjil** — personal project. Commit + push as `berjilberjil <berjiljacob@gmail.com>`, GitHub `berjilberjil/meOS` via the `github-personal` SSH remote (`git@github-personal:berjilberjil/meOS.git`). **Never** commit as the work/`@skcript.com` identity here.
 
@@ -97,7 +97,7 @@ cd apps/apple && xcodegen generate && xcodebuild -scheme MeOS-macOS build
 
 1. ✅ **Foundation** (Supabase+auth+RLS, data layer, app shell)
 2. ✅ **Finance** (accounts, transactions, categories+budgets, recurring, goals, investments)
-3. ✅ **Journal** (rich-text + media pipeline, mood/date)
+3. ✅ ~~Journal~~ (removed — daily journaling is not part of MeOS)
 4. ✅ **To-dos + Goals** (priority/due todos, life goals lifecycle)
 5. ✅ **Health + Fitness** (daily metrics + workouts)
 6. ✅ **Notes** (rich-text notes + pin)

@@ -7,7 +7,7 @@
 /**
  * The analytical mentor system prompt (Today card + plan generation). `context`
  * is a client-built, human-readable snapshot of the user's current data (fitness /
- * journal / profile) — the AI grounds every answer in it and addresses
+ * profile) — the AI grounds every answer in it and addresses
  * the user by the name that appears there.
  */
 export function mentorSystem(context: string): string {
@@ -80,7 +80,7 @@ const REASONING_RULES = [
 /** Tool guidance, only included when the client actually offers tools. */
 const TOOL_RULES = [
   `TOOLS — you can read and write their MeOS:`,
-  `- When a question depends on something they stored (a note, a past decision, a journal entry, what`,
+  `- When a question depends on something they stored (a note, a past decision, what`,
   `  they own, what is on today's list), CALL A TOOL. Do not answer from memory and do not guess.`,
   `- search_brain is the right first move when you don't know which module holds the answer.`,
   `- If a search returns nothing, that IS the answer: tell them it isn't in MeOS. Do not fill the gap.`,

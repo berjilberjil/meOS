@@ -35,13 +35,13 @@ async function bumpStateVersion(userId: number): Promise<void> {
  * allowlist is also the cheaper guard: it rejects before touching the database.
  */
 const KEYS = new Set([
-  'meos.fitness', 'meos.fitnessProfile', 'meos.journal', 'meos.journalPresets',
+  'meos.fitness', 'meos.fitnessProfile',
   'meos.notes', 'meos.days', 'meos.profile', 'meos.chat', 'meos.nutrition',
   'meos.training', 'meos.events', 'meos.eventTags', 'meos.watch',
   'meos.belongings', 'meos.fold', 'meos.memory', 'meos.scans', 'meos.taskMode',
   'meos.weekly', 'meos.activity', 'meos.appearance', 'meos.crypto',
   // Legacy MyOS namespace — accepted while clients migrate. See above.
-  'myos.fitness', 'myos.fitnessProfile', 'myos.journal', 'myos.journalPresets',
+  'myos.fitness', 'myos.fitnessProfile',
   'myos.notes', 'myos.days', 'myos.profile', 'myos.chat', 'myos.nutrition',
   'myos.training', 'myos.events', 'myos.eventTags', 'myos.watch',
   'myos.belongings', 'myos.fold', 'myos.memory', 'myos.scans', 'myos.taskMode',

@@ -124,85 +124,6 @@ struct FitnessProfile: Codable, Hashable {
     }
 }
 
-// MARK: - Journal  (key: meos.journal — [date: JournalEntry])
-
-struct JournalEntry: Codable, Hashable {
-    var morning: String = ""
-    var night: String = ""
-    var wins: [String] = []
-    var mistakes: [String] = []
-    var lessons: [String] = []
-    var gratitude: [String] = []
-    var mood: Int? = nil        // 1...5
-
-    init() {}
-
-    enum CodingKeys: String, CodingKey {
-        case morning, night, wins, mistakes, lessons, gratitude, mood
-    }
-
-    // Lenient: older entries missing newer fields (e.g. gratitude) still load.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        morning   = try c.decodeIfPresent(String.self, forKey: .morning) ?? ""
-        night     = try c.decodeIfPresent(String.self, forKey: .night) ?? ""
-        wins      = try c.decodeIfPresent([String].self, forKey: .wins) ?? []
-        mistakes  = try c.decodeIfPresent([String].self, forKey: .mistakes) ?? []
-        lessons   = try c.decodeIfPresent([String].self, forKey: .lessons) ?? []
-        gratitude = try c.decodeIfPresent([String].self, forKey: .gratitude) ?? []
-        mood      = try c.decodeIfPresent(Int.self, forKey: .mood)
-    }
-}
-
-// MARK: - Journal presets  (key: meos.journalPresets)
-
-/// Tappable quick-add chips for the journal, editable in Settings. Lists (wins /
-/// mistakes / lessons / gratitude) append a chip; reflections insert its text.
-struct JournalPresets: Codable, Hashable {
-    var morning: [String]
-    var night: [String]
-    var wins: [String]
-    var mistakes: [String]
-    var lessons: [String]
-    var gratitude: [String]
-
-    init(morning: [String] = Seed.morning, night: [String] = Seed.night,
-         wins: [String] = Seed.wins, mistakes: [String] = Seed.mistakes,
-         lessons: [String] = Seed.lessons, gratitude: [String] = Seed.gratitude) {
-        self.morning = morning; self.night = night
-        self.wins = wins; self.mistakes = mistakes
-        self.lessons = lessons; self.gratitude = gratitude
-    }
-
-    /// Starter chips — generic, disciplined defaults. No emojis.
-    enum Seed {
-        static let morning   = ["Feeling grateful", "Locked in", "Slept well", "Bit tired but going"]
-        static let night     = ["Productive day", "Stayed disciplined", "Could've done better", "Wasted some time"]
-        static let wins      = ["Posted content", "Hit the gym", "Ate a clean meal", "Deep work done", "Learned something", "Saved money"]
-        static let mistakes  = ["Ate junk", "Skipped gym", "Slept late", "Wasted time on phone", "Overspent", "Procrastinated"]
-        static let lessons   = ["Consistency beats intensity", "Show up daily", "Spend less than I earn", "Protect the mornings"]
-        static let gratitude = ["Family", "Health", "The job", "Roof and food", "This journey", "Learning daily"]
-    }
-
-    enum CodingKeys: String, CodingKey { case morning, night, wins, mistakes, lessons, gratitude }
-
-    // Lenient: a set saved before a section existed falls back to that seed.
-    // Reword a few outdated starter chips so existing installs pick up the fix.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        morning   = try c.decodeIfPresent([String].self, forKey: .morning) ?? Seed.morning
-        night     = try c.decodeIfPresent([String].self, forKey: .night) ?? Seed.night
-        wins      = Self.rewritten(try c.decodeIfPresent([String].self, forKey: .wins) ?? Seed.wins)
-        mistakes  = try c.decodeIfPresent([String].self, forKey: .mistakes) ?? Seed.mistakes
-        lessons   = try c.decodeIfPresent([String].self, forKey: .lessons) ?? Seed.lessons
-        gratitude = try c.decodeIfPresent([String].self, forKey: .gratitude) ?? Seed.gratitude
-    }
-
-    private static func rewritten(_ wins: [String]) -> [String] {
-        wins.map { $0 == "Ate clean" || $0 == "ate" ? "Ate a clean meal" : $0 }
-    }
-}
-
 // MARK: - Notes  (key: meos.notes — [Note])
 
 struct Note: Codable, Identifiable, Hashable {
@@ -965,8 +886,6 @@ struct WatchItem: Codable, Identifiable, Hashable {
 struct AppStatePayload: Codable {
     var fitness: [String: FitnessDay]?
     var fitnessProfile: FitnessProfile?
-    var journal: [String: JournalEntry]?
-    var journalPresets: JournalPresets?
     var notes: [Note]?
     var days: [String: DayPlan]?
     var profile: Profile?
@@ -991,8 +910,6 @@ struct AppStatePayload: Codable {
     enum CodingKeys: String, CodingKey {
         case fitness        = "meos.fitness"
         case fitnessProfile = "meos.fitnessProfile"
-        case journal        = "meos.journal"
-        case journalPresets = "meos.journalPresets"
         case notes          = "meos.notes"
         case days           = "meos.days"
         case profile        = "meos.profile"
@@ -1020,8 +937,6 @@ struct AppStatePayload: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         fitness        = try? c.decodeIfPresent([String: FitnessDay].self, forKey: .fitness)
         fitnessProfile = try? c.decodeIfPresent(FitnessProfile.self, forKey: .fitnessProfile)
-        journal        = try? c.decodeIfPresent([String: JournalEntry].self, forKey: .journal)
-        journalPresets = try? c.decodeIfPresent(JournalPresets.self, forKey: .journalPresets)
         notes          = try? c.decodeIfPresent([Note].self, forKey: .notes)
         days           = try? c.decodeIfPresent([String: DayPlan].self, forKey: .days)
         profile        = try? c.decodeIfPresent(Profile.self, forKey: .profile)
@@ -1052,21 +967,12 @@ struct ParseResult: Codable {
         let waterMl: Double?
         let note: String?
     }
-    struct Jrn: Codable {
-        let note: String?
-        let mood: Int?
-        let wins: [String]
-        let mistakes: [String]
-        let lessons: [String]
-        let gratitude: [String]
-    }
     struct Nte: Codable {
         let title: String
         let body: String
     }
     let summary: String
     let fitness: Fit?
-    let journal: Jrn?
     let notes: [Nte]
 }
 
@@ -1111,8 +1017,6 @@ struct ImageParseResult: Codable {
 enum StateKey {
     static let fitness        = "meos.fitness"
     static let fitnessProfile = "meos.fitnessProfile"
-    static let journal        = "meos.journal"
-    static let journalPresets = "meos.journalPresets"
     static let notes          = "meos.notes"
     static let days           = "meos.days"
     static let profile        = "meos.profile"
@@ -1146,7 +1050,7 @@ enum StateKey {
 
     /// Every synced key, for the one-time `myos.*` → `meos.*` migration.
     static let allNewKeys: [String] = [
-        fitness, fitnessProfile, journal, journalPresets, notes, days, profile,
+        fitness, fitnessProfile, notes, days, profile,
         chat, nutrition, training, events, eventTags, watch, belongings,
         fold, memory, scans, taskMode, weekly, activity, appearance, trash,
     ]

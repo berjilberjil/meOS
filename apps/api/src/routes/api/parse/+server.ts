@@ -7,7 +7,7 @@ import { z } from 'zod';
 /**
  * MeOS quick-log AI. The user types (or dictates) ONE line about their day and
  * Gemini splits it into structured entries the native app files into the right
- * key: fitness, journal, notes. The server only structures meaning —
+ * key: fitness, notes. The server only structures meaning —
  * it never touches the database; the client applies the result.
  */
 const ParseSchema = z.object({
@@ -22,16 +22,6 @@ const ParseSchema = z.object({
       note: z.string().nullable()
     })
     .nullable(),
-  journal: z
-    .object({
-      note: z.string().nullable(),
-      mood: z.number().int().min(1).max(5).nullable(),
-      wins: z.array(z.string()),
-      mistakes: z.array(z.string()),
-      lessons: z.array(z.string()),
-      gratitude: z.array(z.string())
-    })
-    .nullable(),
   notes: z.array(z.object({ title: z.string(), body: z.string() }))
 });
 
@@ -42,16 +32,13 @@ function buildPrompt(text: string): string {
     ``,
     `"${text}"`,
     ``,
-    `Split it across three areas. Only fill what they actually said — leave the rest empty/null.`,
+    `Split it across two areas. Only fill what they actually said — leave the rest empty/null.`,
     ``,
     `FITNESS — body/nutrition numbers. weightKg, calories, proteinG (grams), waterMl (millilitres; "2 litres" → 2000). null each if not mentioned. note optional.`,
     ``,
-    `JOURNAL — reflection/feeling. mood is 1(awful)–5(great) if a feeling is expressed, else null.`,
-    `Put clear achievements in wins, regrets/errors in mistakes, takeaways in lessons, thanks in gratitude. Free reflection goes in note.`,
-    ``,
     `NOTES — only genuine "note this down"/idea/reminder content → title + body. Usually empty.`,
     ``,
-    `summary: one short sentence, e.g. "Logged 40g protein and a low mood."`
+    `summary: one short sentence, e.g. "Logged 40g protein and 2L water."`
   ].join('\n');
 }
 

@@ -33,8 +33,6 @@ final class AppState: ObservableObject {
     // Module data (each maps to one meos.* key)
     @Published var fitness: [String: FitnessDay] = [:]
     @Published var fitnessProfile = FitnessProfile()
-    @Published var journal: [String: JournalEntry] = [:]
-    @Published var journalPresets = JournalPresets()
     @Published var notes: [Note] = []
     @Published var days: [String: DayPlan] = [:]
     @Published var profile = Profile()
@@ -211,8 +209,6 @@ final class AppState: ObservableObject {
     private func applyValues(_ s: AppStatePayload) {
         if let v = s.fitness, v != fitness { fitness = v }
         if let v = s.fitnessProfile, v != fitnessProfile { fitnessProfile = v }
-        if let v = s.journal, v != journal { journal = v }
-        if let v = s.journalPresets, v != journalPresets { journalPresets = v }
         if let v = s.notes, v != notes { notes = v }
         if let v = s.days, v != days { days = v }
         if let v = s.profile, v != profile { profile = v }
@@ -404,9 +400,9 @@ final class AppState: ObservableObject {
         api.clearCache()
         vault.forget(username: username)
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
-        fitness = [:]; journal = [:]
+        fitness = [:]
         notes = []; days = [:]; profile = Profile()
-        fitnessProfile = FitnessProfile(); journalPresets = JournalPresets()
+        fitnessProfile = FitnessProfile()
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
         events = []; eventTags = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
@@ -480,7 +476,6 @@ final class AppState: ObservableObject {
     private func migrateEncryptExisting(raw: [String: Any]) async {
         let jobs: [(String, Encodable)] = [
             (StateKey.fitness, fitness), (StateKey.fitnessProfile, fitnessProfile),
-            (StateKey.journal, journal), (StateKey.journalPresets, journalPresets),
             (StateKey.notes, notes), (StateKey.days, days), (StateKey.profile, profile),
             (StateKey.chat, chat), (StateKey.nutrition, nutrition), (StateKey.training, training),
             (StateKey.events, events), (StateKey.eventTags, eventTags),
@@ -631,7 +626,6 @@ final class AppState: ObservableObject {
         }
         add("profile", profile)
         add("fitness", fitness); add("fitnessProfile", fitnessProfile)
-        add("journal", journal); add("journalPresets", journalPresets)
         add("notes", notes); add("days", days); add("chat", chat)
         add("nutrition", nutrition); add("training", training)
         add("events", events); add("eventTags", eventTags)
@@ -868,13 +862,10 @@ final class AppState: ObservableObject {
         if let v = s.fitness, v != fitness, !blocked(StateKey.fitness, grace: 20) { fitness = v }
         if let v = s.fitnessProfile, v != fitnessProfile,
            !blocked(StateKey.fitnessProfile) { fitnessProfile = v }
-        // Notes and journal get a grace window on top of the in-flight check.
+        // Notes get a grace window on top of the in-flight check.
         // A push is only "pending" for the 80ms debounce plus its request, and
         // at a 1.5s poll that leaves gaps between keystrokes wide enough for a
         // remote snapshot to land on text being typed right now.
-        if let v = s.journal, v != journal, !blocked(StateKey.journal, grace: 5) { journal = v }
-        if let v = s.journalPresets, v != journalPresets,
-           !blocked(StateKey.journalPresets) { journalPresets = v }
         if let v = s.notes, v != notes, !blocked(StateKey.notes, grace: 5) { notes = v }
         if let v = s.days, v != days, !blocked(StateKey.days) { days = v }
         if let v = s.profile, v != profile, !blocked(StateKey.profile) { profile = v }
@@ -1186,7 +1177,7 @@ final class AppState: ObservableObject {
     /// Every one of these helpers used to build a fresh `DateFormatter`, which
     /// is one of the more expensive objects in Foundation. They are called from
     /// view bodies — the Today pager alone derives 128 day keys per render, and
-    /// a journal streak walks a key per day — so the formatters were being
+    /// the streak calendar walks a key per day — so the formatters were being
     /// allocated in their thousands while a finger was on the screen.
     /// `yyyy-MM-dd` is a fixed machine format; parsed by hand it is arithmetic.
     private static var cachedCalendar = Calendar(identifier: .gregorian)
@@ -1811,36 +1802,6 @@ final class AppState: ObservableObject {
         if !newMeals.isEmpty { nutrition.mealPlan = newMeals; push(StateKey.nutrition, nutrition) }
     }
 
-    // MARK: - Journal
-
-    func journalEntry(_ date: String) -> JournalEntry { journal[date] ?? JournalEntry() }
-    func updateJournal(_ date: String, _ transform: (inout JournalEntry) -> Void) {
-        var e = journal[date] ?? JournalEntry()
-        transform(&e)
-        journal[date] = e
-        push(StateKey.journal, journal)
-    }
-
-    // MARK: - Journal presets (editable quick-add chips)
-
-    func updateJournalPresets(_ transform: (inout JournalPresets) -> Void) {
-        var p = journalPresets
-        transform(&p)
-        journalPresets = p
-        push(StateKey.journalPresets, journalPresets)
-    }
-    /// The streak's "has content" test — any reflection, win, or mood.
-    func journalHasContent(_ date: String) -> Bool {
-        guard let e = journal[date] else { return false }
-        // All six fields, not three. A day where you only wrote gratitude — or
-        // only lessons, or only mistakes — drew no dot in the month grid, so it
-        // read as never journalled and there was no way to find it again.
-        return !(e.morning.isEmpty && e.night.isEmpty && e.wins.isEmpty
-                 && e.mistakes.isEmpty && e.lessons.isEmpty && e.gratitude.isEmpty
-                 && e.mood == nil)
-    }
-    func journalMood(_ date: String) -> Int? { journal[date]?.mood }
-
     // MARK: - Notes
 
     @discardableResult
@@ -2119,22 +2080,6 @@ final class AppState: ObservableObject {
                 if let note = fit.note, !note.isEmpty { d.note = note }
             }
         }
-        if let j = r.journal {
-            let hasContent = j.note != nil || j.mood != nil || !j.wins.isEmpty
-                || !j.mistakes.isEmpty || !j.lessons.isEmpty || !j.gratitude.isEmpty
-            if hasContent {
-                updateJournal(todayKey) { e in
-                    e.wins += j.wins
-                    e.mistakes += j.mistakes
-                    e.lessons += j.lessons
-                    e.gratitude += j.gratitude
-                    if let m = j.mood { e.mood = m }
-                    if let note = j.note, !note.isEmpty {
-                        e.night = e.night.isEmpty ? note : e.night + "\n" + note
-                    }
-                }
-            }
-        }
         for n in r.notes where !(n.title.isEmpty && n.body.isEmpty) {
             _ = addNote(title: n.title.isEmpty ? "Note" : n.title, body: n.body)
         }
@@ -2216,11 +2161,7 @@ final class AppState: ObservableObject {
         let td = consumed(todayKey)
         l.append("TODAY INTAKE: \(Int(td.calories)) kcal, \(Int(td.protein))g protein, \(Fmt.trimKg((fitnessDay(todayKey).waterMl ?? 0)/1000))L water.")
 
-        let e = journalEntry(todayKey)
-        l.append("JOURNAL: " + (e.mood.map { "mood today \($0)/5" } ?? "no entry today yet") + ".")
         l.append("STEPS: \(steps(on: todayKey).formatted()) today, goal \(stepGoals.daily.formatted()), \(stepStreak)-day streak.")
-        if !e.wins.isEmpty { l.append("TODAY WINS: \(e.wins.joined(separator: "; ")).") }
-        if !e.mistakes.isEmpty { l.append("TODAY MISTAKES: \(e.mistakes.joined(separator: "; ")).") }
 
         let pretty = {
             let f = DateFormatter()
@@ -2767,7 +2708,6 @@ final class AppState: ObservableObject {
 
     // MARK: - Data management (reset)  — all guarded behind hold-to-confirm in the UI
 
-    func resetJournal()   { journal = [:];              push(StateKey.journal, journal) }
     func resetNotes()     { notes = [];                 push(StateKey.notes, notes) }
     func resetFitness()   {
         fitness = [:];                 push(StateKey.fitness, fitness)
@@ -2776,10 +2716,8 @@ final class AppState: ObservableObject {
         training = TrainingState();    push(StateKey.training, training)
     }
 
-    /// Wipe every accumulated-data module. Keeps the person's `profile` identity
-    /// and the journal preset chips — those are configuration, not data.
+    /// Wipe every accumulated-data module. Keeps the person's `profile` identity.
     func resetEverything() {
-        journal = [:];                 push(StateKey.journal, journal)
         notes = [];                    push(StateKey.notes, notes)
         fitness = [:];                 push(StateKey.fitness, fitness)
         fitnessProfile = FitnessProfile(); push(StateKey.fitnessProfile, fitnessProfile)

@@ -132,7 +132,7 @@ enum MemoryBank {
     }
 
     /// Phrases that mark something as true *now* rather than true in general.
-    /// "I ate dosa today" is a diary line; the journal already holds those.
+    /// "I ate dosa today" is a diary line, not a durable fact.
     private static let ephemeralMarkers = [
         "today", "tonight", "this morning", "this evening", "right now",
         "just now", "yesterday", "tomorrow", "this week", "at the moment",
