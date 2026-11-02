@@ -17,6 +17,9 @@ final class UISignals: ObservableObject {
     @Published var revealHiddenNotes = false
     /// Tapped the Friday report notification — open Settings on the report.
     @Published var openWeeklyReport = false
+    /// A Home Screen widget tap — open the Six-Pack tracker. Parked like
+    /// `pendingRoute` so it survives a cold launch that stops at the vault lock.
+    @Published var openSixPack = false
 
     /// A tapped notification's destination, waiting for a screen to take it.
     ///
