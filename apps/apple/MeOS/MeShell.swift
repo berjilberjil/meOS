@@ -43,6 +43,12 @@ struct MeRoot: View {
         .animation(DS.spring, value: state.taskMode.on)
         .animation(DS.spring, value: state.recoveryCodeToShow)
         .tint(.primary)
+        .onOpenURL { url in
+            // Six-Pack Home Screen widget. The scheme is declared in project.yml;
+            // the signal is parked until the vault is open and the tab shell exists.
+            guard url.scheme?.lowercased() == "meos", url.host?.lowercased() == "sixpack" else { return }
+            UISignals.shared.openSixPack = true
+        }
         .task {
             SoundPlayer.open()
             Haptics.prepare()
@@ -78,6 +84,7 @@ struct MeRoot: View {
 
 struct MeTabs: View {
     @EnvironmentObject var state: AppState
+    @ObservedObject private var signals = UISignals.shared
 
     var body: some View {
         TabView {
@@ -87,6 +94,10 @@ struct MeTabs: View {
             Tab("More", systemImage: "square.grid.2x2") { NavigationStack { MeMore() } }
         }
         .task { await Self.refreshFeeds(into: state) }
+        .sheet(isPresented: $signals.openSixPack) {
+            SixPackChallengeDetail()
+                .environmentObject(state)
+        }
     }
 
     /// Photos, steps and anything shared in from outside, in feed order.

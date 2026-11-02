@@ -139,6 +139,7 @@ struct SixPackChallengeDetail: View {
 
     @State private var weightDraft = ""
     @State private var showSaved = false
+    @State private var showWidgetHelp = false
 
     private var today: String { state.todayKey }
     private var challenge: SixPackState { state.sixPack }
@@ -495,6 +496,21 @@ struct SixPackChallengeDetail: View {
                 .font(.myCaption)
                 .foregroundStyle(Palette.faint)
                 .multilineTextAlignment(.center)
+
+            #if os(iOS)
+            Button { showWidgetHelp = true } label: {
+                Label("Add to Home Screen", systemImage: "plus.rectangle.on.rectangle")
+                    .font(.myCaption.weight(.semibold))
+                    .foregroundStyle(Palette.orange)
+            }
+            .buttonStyle(.press)
+            .padding(.top, Space.sm)
+            .alert("Add the Six-Pack widget", isPresented: $showWidgetHelp) {
+                Button("Got it", role: .cancel) {}
+            } message: {
+                Text("Touch and hold the Home Screen, tap Edit → Add Widget, then choose MeOS and Six-Pack Challenge.")
+            }
+            #endif
         }
         .frame(maxWidth: .infinity)
         .padding(.top, Space.xs)

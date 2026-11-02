@@ -44,7 +44,13 @@ final class AppState: ObservableObject {
     @Published var training = TrainingState()
     /// The 60-day six-pack challenge: config, daily records, weigh-ins.
     /// One synced module (`meos.sixPack`) like every other.
-    @Published var sixPack = SixPackState()
+    ///
+    /// Every change is mirrored into the App Group for the Home Screen widget.
+    /// The widget process cannot decrypt the synced blob, so this is the only
+    /// copy it can read.
+    @Published var sixPack = SixPackState() {
+        didSet { SixPackWidgetStore.save(sixPack) }
+    }
     @Published var events: [EventItem] = []
     @Published var eventTags: [EventTag] = []
     @Published var watch: [WatchItem] = []
@@ -340,6 +346,11 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            // The server may have no sixPack key yet (first login), in which
+            // case `applyValues` leaves the unchanged default in place and its
+            // `didSet` never fires. Seed the widget from the value actually on
+            // screen so the gallery is useful before the first tap.
+            SixPackWidgetStore.save(sixPack)
             applyPendingMealPlanClear()
             healFoldSnapshot()
             // Let go of anything past its thirty days, and make this device's
@@ -410,6 +421,7 @@ final class AppState: ObservableObject {
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
         sixPack = SixPackState()
+        SixPackWidgetStore.clear()
         events = []; eventTags = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
         scans = []; taskMode = TaskModeState(); weekly = []
         // Retrieved passages and recalled memories from the last answer. Debug
@@ -472,6 +484,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            SixPackWidgetStore.save(sixPack)
         } catch {
             vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -543,6 +556,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            SixPackWidgetStore.save(sixPack)
             applyPendingMealPlanClear()
             healFoldSnapshot()
             startLiveSync()

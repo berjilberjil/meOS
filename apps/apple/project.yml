@@ -11,15 +11,22 @@ targets:
     sources:
       - path: MeOS
         excludes: ["Resources/**", "MacApp.swift", "MacShell.swift", "MacInfo.plist"]
+      - path: Shared
       - path: MeOS/Resources/drop.wav
         buildPhase: resources
       - path: MeOS/Resources/Sounds
         buildPhase: resources
+    dependencies:
+      - target: MeOSWidgets
+        embed: true
     info:
       path: MeOS/Info.plist
       properties:
         CFBundleDisplayName: MeOS
         CFBundleShortVersionString: "1.0"
+        CFBundleURLTypes:
+          - CFBundleURLName: com.berjil.meos
+            CFBundleURLSchemes: [meos]
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [audio, fetch]
@@ -41,6 +48,30 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: MeOS.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  MeOSWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MeOSWidgets
+        excludes: ["Info.plist", "MeOSWidgets.entitlements"]
+      - path: Shared
+      - path: MeOS/Core/SixPackChallengeModels.swift
+    info:
+      path: MeOSWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: MeOS
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.berjil.meos.widgets
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        DEVELOPMENT_TEAM: ACDQ327MPR
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: MeOSWidgets/MeOSWidgets.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
   MeOS-macOS:
     type: application
     platform: macOS
@@ -53,6 +84,7 @@ targets:
           - "CoreiOS/**"
           - "Info.plist"
           - "Resources/**"
+      - path: Shared
       - path: MeOS/Resources/drop.wav
         buildPhase: resources
       - path: MeOS/Resources/Sounds
