@@ -88,3 +88,23 @@ create table if not exists state_version (
   version integer not null default 0,
   at      text not null
 );
+
+-- Every app install signed into an account. `id` is generated once on the
+-- device and kept in UserDefaults, so two Macs never collapse into one row.
+-- `name` is what the person typed; `system_name` is the machine name a
+-- heartbeat refreshes, kept separately so a rename is never overwritten.
+-- Plaintext on purpose: this is account metadata, not vault data, and a
+-- device that has not unlocked yet still has to appear in the list.
+create table if not exists devices (
+  user_id     integer not null references users(id) on delete cascade,
+  id          text not null,
+  name        text not null,
+  system_name text not null,
+  platform    text not null,
+  kind        text not null,          -- 'mac' or 'iphone'
+  app_version text not null default '',
+  created_at  text not null,
+  last_seen   text not null,
+  primary key (user_id, id)
+);
+create index if not exists devices_user_seen_idx on devices(user_id, last_seen);

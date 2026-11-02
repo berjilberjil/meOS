@@ -57,6 +57,7 @@ struct MeRoot: View {
             if state.phase == .loggedIn {
                 DietBridge.shared.start(state: state)
                 ActivityCoordinator.shared.configure(state: state)
+                Task { await state.registerCurrentDevice(force: true) }
                 await state.generateWeeklyReportIfDue()
             }
         }
@@ -71,6 +72,7 @@ struct MeRoot: View {
             if new == .active {
                 if old == .background { SoundPlayer.open() }
                 Task {
+                    await state.registerCurrentDevice()
                     await state.syncNow()
                     state.sweepTrash()
                     state.rescheduleEventReminders()

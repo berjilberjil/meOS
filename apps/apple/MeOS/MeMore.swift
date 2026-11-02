@@ -327,6 +327,7 @@ struct MeSettings: View {
                 }
                 if let err = state.lastSyncError { Text(err).font(.subheadline).foregroundStyle(Color.dim) }
             }
+            group("Devices", "laptopcomputer.and.iphone") { MeDevices() }
             group("Profile", "person.crop.circle") { MeProfile() }
             group("AI & keys", "key") { MeAI() }
             group("Memory", "brain") { MeMemory() }

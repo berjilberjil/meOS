@@ -1,11 +1,36 @@
 import Foundation
 
 // All MeOS data. Each top-level model maps to one `meos.*` JSON key in the
-// backend's per-user state store. Add a module → add a model + a key here.
+// backend's per-user state store — except AccountDevice, which is server
+// account metadata rather than a synced module. Add a module → add a model +
+// a key here.
 
 struct AuthUser: Codable, Hashable {
     let id: Int
     let username: String
+}
+
+// MARK: - Devices  (server registry, not a synced module)
+
+/// One app install signed into this account.
+///
+/// This is server metadata rather than part of the encrypted state blob: a
+/// device sitting at the vault-lock screen still has to appear in the list, and
+/// "last active" must advance without every device rewriting one shared
+/// document. `name` is what the person typed; `systemName` is the machine's own
+/// name, shown underneath after a rename so a forgotten label can be traced
+/// back to the right Mac.
+struct AccountDevice: Codable, Identifiable, Hashable {
+    let id: String
+    var name: String
+    var systemName: String
+    var platform: String
+    var kind: String
+    var appVersion: String
+    var createdAt: String
+    var lastSeen: String
+
+    var type: DeviceType { DeviceType(rawValue: kind) ?? .mac }
 }
 
 // MARK: - Fitness  (key: meos.fitness — [date: FitnessDay])
