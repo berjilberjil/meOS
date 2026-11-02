@@ -304,6 +304,12 @@ final class AppState: ObservableObject {
             return
         }
         await loadAndGate(hadCache: hadCache)
+        // The session is valid even when this device still has to unlock or
+        // create its vault. Register that case too: the device list is about
+        // being signed in, not about having decrypted anything yet.
+        if phase == .locked || phase == .setup {
+            Task { await self.registerCurrentDevice(force: true) }
+        }
     }
 
     func login(username u: String, password p: String) async {
@@ -346,6 +352,9 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            // Register in the background: the sheet should not wait on a
+            // heartbeat, and a failure only means this row is a launch late.
+            Task { await self.registerCurrentDevice(force: true) }
             // The server may have no sixPack key yet (first login), in which
             // case `applyValues` leaves the unchanged default in place and its
             // `didSet` never fires. Seed the widget from the value actually on
@@ -484,6 +493,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            Task { await self.registerCurrentDevice(force: true) }
             SixPackWidgetStore.save(sixPack)
         } catch {
             vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -556,6 +566,7 @@ final class AppState: ObservableObject {
             pendingRaw = nil
             lastSyncError = nil; lastHydrateError = nil
             phase = .loggedIn
+            Task { await self.registerCurrentDevice(force: true) }
             SixPackWidgetStore.save(sixPack)
             applyPendingMealPlanClear()
             healFoldSnapshot()
@@ -1010,6 +1021,10 @@ final class AppState: ObservableObject {
     var isForeground = true
 
     private var lastMediaSync = Date.distantPast
+    /// Last time this install announced itself to the device registry.
+    private var lastDeviceRegistration: Date?
+    /// One heartbeat at a time; a launch and a foreground event can overlap.
+    private var isRegisteringDevice = false
 
     /// Move any still-inline event photos/videos into R2, sealed. Runs once per
     /// launch after unlock. Each asset is uploaded before the blob is rewritten,
@@ -1082,6 +1097,9 @@ final class AppState: ObservableObject {
                 try? await Task.sleep(nanoseconds: wait)
                 guard !Task.isCancelled else { return }
                 await self?.pullRemote()
+                // Throttled internally; this keeps "last active" honest for a
+                // device that has been left open, not just one being launched.
+                await self?.registerCurrentDevice()
                 await self?.syncMediaIfDue()
                 await self?.easeOffPolling()
             }
@@ -1131,6 +1149,44 @@ final class AppState: ObservableObject {
         liveSyncTask?.cancel()
         liveSyncTask = nil
         stopFoldWatch()
+    }
+
+    /// How often returning to the app refreshes this device's "last active".
+    /// Login and unlock bypass it; a foreground after a real absence is picked
+    /// up by the next tick of this interval.
+    static let deviceHeartbeatInterval: TimeInterval = 300
+
+    /// Announce this install to the server's device registry, which is what
+    /// Settings → Devices lists.
+    ///
+    /// Throttled because iOS reports `.active` for a Control Centre dismiss just
+    /// as readily as for a real return, and every beat is a D1 write. Login,
+    /// unlock and opening the screen pass `force: true` so the row appears
+    /// immediately. Failures are silent: a stale row in a device list is not
+    /// worth an error banner over data that did load.
+    func registerCurrentDevice(force: Bool = false) async {
+        // Signed in is enough: a Mac parked on the unlock screen is still one
+        // of this account's devices, and should be visible from the others.
+        guard phase == .loggedIn || phase == .locked || phase == .setup,
+              !Self.isRunningTests else { return }
+        guard !isRegisteringDevice else { return }
+        if !force, let last = lastDeviceRegistration,
+           Date().timeIntervalSince(last) < Self.deviceHeartbeatInterval { return }
+
+        isRegisteringDevice = true
+        defer { isRegisteringDevice = false }
+        do {
+            try await api.registerDevice(
+                id: ActivityDeviceIdentity.deviceId,
+                systemName: ActivityDeviceIdentity.deviceName,
+                platform: ActivityDeviceIdentity.platform,
+                kind: ActivityDeviceIdentity.deviceType.rawValue,
+                appVersion: ActivityDeviceIdentity.appVersion
+            )
+            lastDeviceRegistration = Date()
+        } catch {
+            Log.sync.error("device heartbeat failed: \(String(describing: error), privacy: .public)")
+        }
     }
 
     /// Pick up `fold.json` from disk.

@@ -139,6 +139,41 @@ final class APIClient {
         _ = try await request("POST", "api/auth/password", body: ["current": current, "next": next])
     }
 
+    // MARK: - Devices
+
+    /// Announce this install, or refresh its last-seen. Safe to call repeatedly:
+    /// the id is stable and the server upserts one row per install.
+    @discardableResult
+    func registerDevice(id: String, systemName: String, platform: String,
+                        kind: String, appVersion: String) async throws -> AccountDevice {
+        struct Body: Encodable {
+            let id: String
+            let systemName: String
+            let platform: String
+            let kind: String
+            let appVersion: String
+        }
+        struct R: Decodable { let device: AccountDevice }
+        let body = Body(id: id, systemName: systemName, platform: platform,
+                        kind: kind, appVersion: appVersion)
+        return try decoder.decode(R.self, from: try await request("POST", "api/devices", body: body)).device
+    }
+
+    /// Every device signed into this account, most recently active first.
+    func devices() async throws -> [AccountDevice] {
+        struct R: Decodable { let devices: [AccountDevice] }
+        return try decoder.decode(R.self, from: try await request("GET", "api/devices")).devices
+    }
+
+    /// Rename this account's device. Only the display name changes; heartbeats
+    /// keep refreshing the system name and never touch this one.
+    func renameDevice(id: String, to name: String) async throws -> AccountDevice {
+        struct Body: Encodable { let name: String }
+        struct R: Decodable { let device: AccountDevice }
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        return try decoder.decode(R.self, from: try await request("PATCH", "api/devices/\(encoded)", body: Body(name: name))).device
+    }
+
     // MARK: - State (zero-knowledge)
 
     /// Error thrown when encrypted data is present but the vault isn't unlocked —

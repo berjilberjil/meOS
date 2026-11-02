@@ -42,6 +42,13 @@ enum ActivityDeviceIdentity {
         return "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
         #endif
     }
+
+    /// "1.0 (1)" — enough to tell which build a device in the list is running.
+    static var appVersion: String {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "\(short) (\(build))"
+    }
 }
 
 #if os(macOS)
