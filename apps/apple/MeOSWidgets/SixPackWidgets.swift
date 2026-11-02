@@ -46,16 +46,24 @@ struct SixPackProvider: TimelineProvider {
 struct MeOSWidgets: Widget {
     private let kind = "SixPackChallengeWidget"
 
+    /// Lock Screen families only exist on iPhone; the Mac gets the three
+    /// desktop sizes.
+    private static var families: [WidgetFamily] {
+        #if os(macOS)
+        [.systemSmall, .systemMedium, .systemLarge]
+        #else
+        [.systemSmall, .systemMedium, .systemLarge,
+         .accessoryCircular, .accessoryRectangular, .accessoryInline]
+        #endif
+    }
+
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: SixPackProvider()) { entry in
             SixPackWidgetView(entry: entry)
         }
         .configurationDisplayName("Six-Pack Challenge")
         .description("Your day, today's checklist and weight for the 60-day challenge.")
-        .supportedFamilies([
-            .systemSmall, .systemMedium, .systemLarge,
-            .accessoryCircular, .accessoryRectangular, .accessoryInline
-        ])
+        .supportedFamilies(Self.families)
     }
 }
 
@@ -89,7 +97,10 @@ struct SixPackWidgetView: View {
                 empty
             }
         }
+        #if os(iOS)
+        // The Mac shell has no URL handler; a plain tap there just opens the app.
         .widgetURL(URL(string: "meos://sixpack"))
+        #endif
         .containerBackground(for: .widget) { palette.background }
     }
 

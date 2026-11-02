@@ -53,7 +53,7 @@ targets:
     platform: iOS
     sources:
       - path: MeOSWidgets
-        excludes: ["Info.plist", "MeOSWidgets.entitlements"]
+        excludes: ["Info.plist", "Info-macOS.plist", "MeOSWidgets.entitlements", "MeOSWidgets-macOS.entitlements"]
       - path: Shared
       - path: MeOS/Core/SixPackChallengeModels.swift
     info:
@@ -70,6 +70,32 @@ targets:
         DEVELOPMENT_TEAM: ACDQ327MPR
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: MeOSWidgets/MeOSWidgets.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+  # Same widget source as the iPhone one, built for macOS so it can sit on the
+  # desktop / Notification Center. A Mac widget extension must be sandboxed.
+  MeOSWidgets-macOS:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: MeOSWidgets
+        excludes: ["Info.plist", "Info-macOS.plist", "MeOSWidgets.entitlements", "MeOSWidgets-macOS.entitlements"]
+      - path: Shared
+      - path: MeOS/Core/SixPackChallengeModels.swift
+    info:
+      path: MeOSWidgets/Info-macOS.plist
+      properties:
+        CFBundleDisplayName: MeOS
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.berjil.meos.macos.widgets
+        SWIFT_VERSION: "5.9"
+        DEVELOPMENT_TEAM: ACDQ327MPR
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: MeOSWidgets/MeOSWidgets-macOS.entitlements
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
   MeOS-macOS:
@@ -89,6 +115,9 @@ targets:
         buildPhase: resources
       - path: MeOS/Resources/Sounds
         buildPhase: resources
+    dependencies:
+      - target: MeOSWidgets-macOS
+        embed: true
     info:
       path: MeOS/MacInfo.plist
       properties:
@@ -107,5 +136,6 @@ targets:
         SWIFT_VERSION: "5.9"
         DEVELOPMENT_TEAM: ACDQ327MPR
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: MeOS-macOS.entitlements
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
