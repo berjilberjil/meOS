@@ -35,6 +35,9 @@ struct MeToday: View {
             dayBar.appear(0)
             MioCompanionCard().appear(1)
 
+            SixPackChallengeCard()
+                .appear(2)
+
             NavigationLink { MeSteps().zoomFrom("steps", in: ns) } label: {
                 MCard(inverted: true) {
                     HStack {

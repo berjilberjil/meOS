@@ -42,6 +42,9 @@ final class AppState: ObservableObject {
     @Published var pendingNewNote = false
     @Published var nutrition = NutritionState()
     @Published var training = TrainingState()
+    /// The 60-day six-pack challenge: config, daily records, weigh-ins.
+    /// One synced module (`meos.sixPack`) like every other.
+    @Published var sixPack = SixPackState()
     @Published var events: [EventItem] = []
     @Published var eventTags: [EventTag] = []
     @Published var watch: [WatchItem] = []
@@ -215,6 +218,7 @@ final class AppState: ObservableObject {
         if let v = s.chat, v != chat { chat = v }
         if let v = s.nutrition, v != nutrition { nutrition = v }
         if let v = s.training, v != training { training = v }
+        if let v = s.sixPack, v != sixPack { sixPack = v }
         if let v = s.events, v != events { events = v }
         if let v = s.eventTags, v != eventTags { eventTags = v }
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
@@ -405,6 +409,7 @@ final class AppState: ObservableObject {
         fitnessProfile = FitnessProfile()
         chat = ChatState(); suggestions = nil
         nutrition = NutritionState(); training = TrainingState()
+        sixPack = SixPackState()
         events = []; eventTags = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
         scans = []; taskMode = TaskModeState(); weekly = []
         // Retrieved passages and recalled memories from the last answer. Debug
@@ -482,7 +487,8 @@ final class AppState: ObservableObject {
             (StateKey.watch, watch), (StateKey.belongings, belongings),
             (StateKey.memory, memory), (StateKey.scans, scans),
             (StateKey.taskMode, taskMode), (StateKey.weekly, weekly),
-            (StateKey.activity, activity), (StateKey.trash, trash)
+            (StateKey.activity, activity), (StateKey.trash, trash),
+            (StateKey.sixPack, sixPack)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -635,6 +641,7 @@ final class AppState: ObservableObject {
         add("scans", scans); add("taskMode", taskMode); add("weekly", weekly)
         add("activity", activity)
         add("trash", trash)
+        add("sixPack", sixPack)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -875,6 +882,7 @@ final class AppState: ObservableObject {
         if let v = s.nutrition, v != nutrition,
            !blocked(StateKey.nutrition, grace: 20) { nutrition = v }
         if let v = s.training, v != training, !blocked(StateKey.training, grace: 20) { training = v }
+        if let v = s.sixPack, v != sixPack, !blocked(StateKey.sixPack, grace: 20) { sixPack = v }
         if let v = s.events, v != events, !blocked(StateKey.events) { events = v }
         if let v = s.eventTags, v != eventTags, !blocked(StateKey.eventTags) { eventTags = v }
         if let v = s.watch, v != watch, !blocked(StateKey.watch) { watch = v }
@@ -2714,6 +2722,7 @@ final class AppState: ObservableObject {
         fitnessProfile = FitnessProfile(); push(StateKey.fitnessProfile, fitnessProfile)
         nutrition = NutritionState();  push(StateKey.nutrition, nutrition)
         training = TrainingState();    push(StateKey.training, training)
+        sixPack = SixPackState();      push(StateKey.sixPack, sixPack)
     }
 
     /// Wipe every accumulated-data module. Keeps the person's `profile` identity.
@@ -2723,6 +2732,7 @@ final class AppState: ObservableObject {
         fitnessProfile = FitnessProfile(); push(StateKey.fitnessProfile, fitnessProfile)
         nutrition = NutritionState();  push(StateKey.nutrition, nutrition)
         training = TrainingState();    push(StateKey.training, training)
+        sixPack = SixPackState();      push(StateKey.sixPack, sixPack)
         days = [:];                    push(StateKey.days, days)
         events = [];                   push(StateKey.events, events)
         watch = [];                    push(StateKey.watch, watch)
