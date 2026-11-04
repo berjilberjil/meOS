@@ -344,6 +344,35 @@ struct SixPackState: Codable, Hashable {
     }
 }
 
+// MARK: - One-time backfill
+
+extension SixPackState {
+    /// Complete every elapsed day of the challenge. Used once to fill the days
+    /// that passed before this build existed; today is deliberately left open.
+    /// Only days with no ticks are touched, so a real record is never rewritten.
+    @discardableResult
+    mutating func backfillCompletedDays(before today: String, sleepHours: Double = 8) -> Bool {
+        var changed = false
+        var key = config.startDateKey
+        while key < today {
+            if (records[key]?.completedCount ?? 0) == 0 {
+                updateRecord(on: key) { record in
+                    record.proteinHit = true
+                    record.caloriesWithinTarget = true
+                    record.workoutCompleted = true
+                    record.fastingFollowed = true
+                    record.sleepHours = sleepHours
+                }
+                changed = true
+            }
+            let next = SixPackDayMath.addDays(1, to: key)
+            guard next != key else { break }
+            key = next
+        }
+        return changed
+    }
+}
+
 // MARK: Day maths
 
 enum SixPackDayMath {

@@ -40,12 +40,14 @@ const KEYS = new Set([
   'meos.training', 'meos.events', 'meos.eventTags', 'meos.watch',
   'meos.belongings', 'meos.fold', 'meos.memory', 'meos.scans', 'meos.taskMode',
   'meos.weekly', 'meos.activity', 'meos.appearance', 'meos.crypto',
+  'meos.sixPack',
   // Legacy MyOS namespace — accepted while clients migrate. See above.
   'myos.fitness', 'myos.fitnessProfile',
   'myos.notes', 'myos.days', 'myos.profile', 'myos.chat', 'myos.nutrition',
   'myos.training', 'myos.events', 'myos.eventTags', 'myos.watch',
   'myos.belongings', 'myos.fold', 'myos.memory', 'myos.scans', 'myos.taskMode',
-  'myos.weekly', 'myos.activity', 'myos.appearance', 'myos.crypto'
+  'myos.weekly', 'myos.activity', 'myos.appearance', 'myos.crypto',
+  'myos.sixPack'
 ]);
 
 /** Well clear of the largest real blob, well under what would hurt the DB. */

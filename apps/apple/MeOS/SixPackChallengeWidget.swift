@@ -1,192 +1,59 @@
 import SwiftUI
 
-// MARK: - Dashboard widget
+// MARK: - Today card
 //
-// Compact enough to sit among the other Today cards: title + tagline, the day
-// counter as the focal point, an orange progress bar, weight, and today's
-// status. The whole card is one button, so tapping anywhere opens the tracker
-// and no inner control has to fight the tap.
+// The full tracker lives on Today now: the same hero, checklist, weigh-in and
+// 60-day grid that used to sit behind a sheet. Nothing here opens a sheet —
+// every row is its own control, so there is no outer button to fight a tap.
 
 struct SixPackChallengeCard: View {
-    @EnvironmentObject var state: AppState
-    @State private var showDetail = false
-
-    private var today: String { state.todayKey }
-    private var challenge: SixPackState { state.sixPack }
-    private var day: Int { challenge.dayNumber(on: today) }
-    private var progress: Double { challenge.progress(on: today) }
-    private var remaining: Int { challenge.daysRemaining(on: today) }
-    private var record: SixPackDayRecord { challenge.record(on: today) }
-
     var body: some View {
-        Button { showDetail = true } label: {
-            MCard {
-                // Title + day counter
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("SIX-PACK CHALLENGE")
-                            .font(.caption.weight(.bold))
-                            .tracking(1.3)
-                            .foregroundStyle(Palette.orange)
-                        Text("60 Days. One Mission. Earn Your Abs.")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Palette.text)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text("DAY")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1)
-                            .foregroundStyle(Palette.faint)
-                        Text("\(day)")
-                            .font(.system(size: 40, weight: .bold, design: .rounded))
-                            .tracking(-1)
-                            .foregroundStyle(Palette.text)
-                            .contentTransition(.numericText())
-                            .monospacedDigit()
-                        Text("/ \(challenge.config.durationDays)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Palette.muted)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Day \(day) of \(challenge.config.durationDays)")
-                }
-
-                // Progress
-                VStack(spacing: 6) {
-                    GeometryReader { g in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Palette.surfaceElevated)
-                            Capsule()
-                                .fill(Palette.orange)
-                                .frame(width: max(6, g.size.width * progress))
-                        }
-                    }
-                    .frame(height: 8)
-                    .animation(DS.spring, value: progress)
-
-                    HStack {
-                        Text(remaining == 0 ? "Final day" : "\(remaining) days remaining")
-                            .font(.myCaption)
-                            .foregroundStyle(Palette.faint)
-                        Spacer()
-                        Text("\(Int((progress * 100).rounded()))%")
-                            .font(.myCaption.weight(.semibold))
-                            .foregroundStyle(Palette.orange)
-                            .monospacedDigit()
-                    }
-                }
-
-                // Weight + today's status
-                HStack(spacing: 8) {
-                    Image(systemName: "scalemass")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Palette.muted)
-                    Text("\(Fmt.trimKg(challenge.currentWeightKg)) kg")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Palette.text)
-                        .monospacedDigit()
-                    if abs(challenge.weightDeltaKg) >= 0.05 {
-                        Text(deltaLabel)
-                            .font(.myCaption)
-                            .foregroundStyle(challenge.weightDeltaKg < 0 ? Palette.green : Palette.muted)
-                    }
-
-                    Spacer()
-
-                    statusPill
-                }
-            }
-        }
-        .buttonStyle(.press)
-        .accessibilityHint("Opens the six-pack challenge tracker")
-        .sheet(isPresented: $showDetail) {
-            SixPackChallengeDetail()
-                .environmentObject(state)
-        }
-    }
-
-    private var deltaLabel: String {
-        let d = challenge.weightDeltaKg
-        return "\(d < 0 ? "−" : "+")\(Fmt.trimKg(abs(d)))"
-    }
-
-    private var statusPill: some View {
-        let done = record.isComplete
-        let count = record.completedCount
-        return HStack(spacing: 5) {
-            Image(systemName: done ? "checkmark.circle.fill" : "circle.dashed")
-                .font(.caption.weight(.semibold))
-            Text(done ? "Complete" : "\(count) of 5")
-                .font(.myCaption.weight(.semibold))
-                .monospacedDigit()
-        }
-        .foregroundStyle(done ? Palette.green : Palette.muted)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background((done ? Palette.green : Palette.muted).opacity(0.12), in: .capsule)
-    }
-}
-
-// MARK: - Full tracker
-
-struct SixPackChallengeDetail: View {
-    @EnvironmentObject var state: AppState
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var weightDraft = ""
-    @State private var showSaved = false
-    @State private var showWidgetHelp = false
-
-    private var today: String { state.todayKey }
-    private var challenge: SixPackState { state.sixPack }
-    private var day: Int { challenge.dayNumber(on: today) }
-    private var progress: Double { challenge.progress(on: today) }
-    private var record: SixPackDayRecord { challenge.record(on: today) }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Space.lg) {
-                header
-                hero
-                checklist
-                weightCard
-                historyCard
-                footer
-            }
-            .padding(.horizontal, DS.pad)
-            .padding(.top, Space.sm)
-            .padding(.bottom, Space.screen)
-        }
-        .scrollIndicators(.hidden)
-        .background(Palette.background.ignoresSafeArea())
-        .onAppear {
-            weightDraft = Fmt.trimKg(challenge.currentWeightKg)
-        }
-        .sensoryFeedback(.success, trigger: showSaved) { _, now in now }
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        HStack(alignment: .top) {
+        VStack(alignment: .leading, spacing: Space.lg) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("SIX-PACK CHALLENGE")
                     .font(.caption.weight(.bold))
                     .tracking(1.6)
                     .foregroundStyle(Palette.orange)
                 Text("60 Days. One Mission. Earn Your Abs.")
-                    .font(.title3.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(Palette.text)
             }
-            Spacer()
-            Button { dismiss() } label: { BigIcon(name: "xmark", size: 15) }
-                .buttonStyle(.press)
+            .padding(.horizontal, Space.xs)
+
+            SixPackChallengeSections()
         }
-        .padding(.top, Space.sm)
+    }
+}
+
+// MARK: - Shared tracker body
+//
+// One implementation for both places the tracker appears: inline on Today and
+// in the sheet opened by the Home Screen widget's `meos://sixpack` link. The
+// two can never drift apart because they render the same sections.
+
+struct SixPackChallengeSections: View {
+    @EnvironmentObject var state: AppState
+
+    @State private var weightDraft = ""
+    @State private var showSaved = false
+
+    private var today: String { state.todayKey }
+    private var challenge: SixPackState { state.sixPack }
+    private var day: Int { challenge.dayNumber(on: today) }
+    private var progress: Double { challenge.progress(on: today) }
+    private var record: SixPackDayRecord { challenge.record(on: today) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.lg) {
+            hero
+            checklist
+            weightCard
+            historyCard
+        }
+        .onAppear {
+            weightDraft = Fmt.trimKg(challenge.currentWeightKg)
+        }
+        .sensoryFeedback(.success, trigger: showSaved) { _, now in now }
     }
 
     // MARK: Hero
@@ -483,6 +350,52 @@ struct SixPackChallengeDetail: View {
             RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
             Text(text).font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.faint)
         }
+    }
+}
+
+// MARK: - Full tracker (widget deep link)
+
+struct SixPackChallengeDetail: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showWidgetHelp = false
+
+    private var challenge: SixPackState { state.sixPack }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.lg) {
+                header
+                SixPackChallengeSections()
+                footer
+            }
+            .padding(.horizontal, DS.pad)
+            .padding(.top, Space.sm)
+            .padding(.bottom, Space.screen)
+        }
+        .scrollIndicators(.hidden)
+        .background(Palette.background.ignoresSafeArea())
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SIX-PACK CHALLENGE")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.6)
+                    .foregroundStyle(Palette.orange)
+                Text("60 Days. One Mission. Earn Your Abs.")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Palette.text)
+            }
+            Spacer()
+            Button { dismiss() } label: { BigIcon(name: "xmark", size: 15) }
+                .buttonStyle(.press)
+        }
+        .padding(.top, Space.sm)
     }
 
     // MARK: Footer

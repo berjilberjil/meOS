@@ -261,6 +261,37 @@ final class AppState: ObservableObject {
         clearMealPlan()
     }
 
+    /// One-shot backfill for the six-pack challenge's opening days. The
+    /// challenge shipped on 1 Nov, so the first three days existed only in the
+    /// calendar. This fills them once and pushes the synced module; today is
+    /// left open. The versioned key means a challenge reset can never re-seed.
+    private static let kSixPackBackfill = "meos.sixPack.backfill.v1"
+    private func backfillSixPackIfNeeded() {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: Self.kSixPackBackfill) else { return }
+        var next = sixPack
+        guard next.backfillCompletedDays(before: todayKey) else {
+            d.set(true, forKey: Self.kSixPackBackfill)
+            return
+        }
+        sixPack = next
+        let seeded = next
+        // Mark the write locally too, so a poll that started before the PUT
+        // cannot bounce the three days back to the empty server copy.
+        lastLocalWrite[StateKey.sixPack] = Date()
+        // Mark the backfill done only after the server has it. If the PUT
+        // fails, the next launch re-seeds from the server's copy instead of
+        // leaving the three days stranded on this device.
+        Task { [api] in
+            do {
+                try await api.putState(StateKey.sixPack, seeded)
+                d.set(true, forKey: Self.kSixPackBackfill)
+            } catch {
+                // Leave the mark off; the next launch retries.
+            }
+        }
+    }
+
     private static let kFinancePurged = "meos.finance.purged.v1"
     private func purgeRemovedFinanceKeys() async {
         let d = UserDefaults.standard
@@ -361,6 +392,7 @@ final class AppState: ObservableObject {
             // screen so the gallery is useful before the first tap.
             SixPackWidgetStore.save(sixPack)
             applyPendingMealPlanClear()
+            backfillSixPackIfNeeded()
             healFoldSnapshot()
             // Let go of anything past its thirty days, and make this device's
             // photo folder agree with a bin that may have been emptied on the
@@ -495,6 +527,7 @@ final class AppState: ObservableObject {
             phase = .loggedIn
             Task { await self.registerCurrentDevice(force: true) }
             SixPackWidgetStore.save(sixPack)
+            backfillSixPackIfNeeded()
         } catch {
             vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -569,6 +602,7 @@ final class AppState: ObservableObject {
             Task { await self.registerCurrentDevice(force: true) }
             SixPackWidgetStore.save(sixPack)
             applyPendingMealPlanClear()
+            backfillSixPackIfNeeded()
             healFoldSnapshot()
             startLiveSync()
             DietBridge.shared.start(state: self)
