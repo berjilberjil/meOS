@@ -38,8 +38,10 @@ export async function listModels(provider: ProviderId, apiKey: string): Promise<
 }
 
 async function gemini(key: string): Promise<CatalogResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`;
-  const res = await fetch(url);
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200';
+  // Header, not `?key=`: a URL can end up in provider/network logs and browser
+  // debugging tools; a header keeps the key out of the request line.
+  const res = await fetch(url, { headers: { 'x-goog-api-key': key } });
   if (!res.ok) return { ok: false, models: [], error: await errText(res) };
   const data: any = await res.json();
   const models = (data.models ?? [])

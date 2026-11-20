@@ -55,6 +55,7 @@ create table if not exists voice_budget (
   updated_at text not null,
   primary key (user_id, day)
 );
+create index if not exists voice_budget_day_idx on voice_budget(day);
 
 -- Calls made against the SERVER's own AI key, per user per UTC day. Users who
 -- configure their own key spend their own quota and never appear here. Two
@@ -68,11 +69,13 @@ create table if not exists ai_budget (
   updated_at text not null,
   primary key (user_id, day)
 );
+create index if not exists ai_budget_day_idx on ai_budget(day);
 
 -- Failed sign-in attempts, per username and per IP, inside a rolling window.
--- verifyPassword is one scrypt (~50ms) and Workers fan out, so without this a
--- short password falls in minutes — and the account holds myos.crypto, whose
--- salts and wrapped keys enable an offline attack on the passphrase itself.
+-- verifyPassword is one PBKDF2 derivation (legacy scrypt hashes are slower), and
+-- Workers fan out, so without this a short password falls in minutes — and the
+-- account holds meos.crypto, whose salts and wrapped keys enable an offline
+-- attack on the passphrase itself.
 create table if not exists login_attempts (
   scope text not null,          -- 'u:<username>' or 'i:<ip>'
   at    text not null           -- ISO-8601 UTC
@@ -108,3 +111,14 @@ create table if not exists devices (
   primary key (user_id, id)
 );
 create index if not exists devices_user_seen_idx on devices(user_id, last_seen);
+
+-- One condensed Macro Intelligence snapshot per user per UTC day. Written by
+-- the macro route at runtime (and pruned there to ~400 days), listed here so a
+-- fresh database matches the code.
+create table if not exists macro_day (
+  user_id    integer not null,
+  date       text not null,
+  payload    text not null,
+  created_at text not null,
+  primary key (user_id, date)
+);

@@ -7,9 +7,8 @@ on:
 
 # There is no root package.json — this is a monorepo of apps/api (SvelteKit on
 # Cloudflare Workers) plus two stdio MCP servers. Each job installs in its own
-# directory. The Swift apps are not built here: macOS runners bill at a much
-# higher rate on private repos, and `xcodebuild test` runs locally before every
-# commit anyway.
+# directory. Swift is built locally; the app has no test target, and macOS
+# runners bill at a much higher rate on private repos.
 jobs:
   api:
     name: API — type-check, test, build
@@ -29,11 +28,10 @@ jobs:
       - name: svelte-check
         run: bun run check
 
-      # apps/api has a vitest script but no test files yet (the real suite is
-      # the 292 Swift tests). --passWithNoTests keeps this green until there
-      # are some, instead of failing on an empty run.
+      # Pure-function suites: auth hashing, state-key allowlist, ETag matching,
+      # presigning against the AWS SDK oracle, budgets, device parsers, media ids.
       - name: Unit tests
-        run: bunx vitest run --passWithNoTests
+        run: bun run test
 
       # Catches what svelte-check cannot: SvelteKit rejects any export from a
       # +server.ts that is not a request handler, and only the build validates

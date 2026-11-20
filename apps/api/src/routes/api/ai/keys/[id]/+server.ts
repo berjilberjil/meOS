@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { sql, nowISO } from '$lib/server/db';
 import { encryptSecret, maskKey } from '$lib/server/secrets';
 import { listModels, type ProviderId } from '$lib/server/modelCatalog';
+import { readJsonBody } from '$lib/server/http';
 
 /** Update a key: rename, enable/disable, or replace the secret (re-validated). */
 export const PATCH: RequestHandler = async ({ params, request, locals }) => {
@@ -14,7 +15,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
   if (!owned.length) throw error(404, 'Key not found');
   const provider = owned[0].provider as ProviderId;
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 8_192)) as Record<string, unknown>;
 
   if (typeof body.label === 'string') {
     await sql`update ai_credentials set label = ${body.label.slice(0, 60)}, updated_at = ${nowISO()}
@@ -24,8 +25,12 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
     await sql`update ai_credentials set enabled = ${body.enabled}, updated_at = ${nowISO()}
               where id = ${id} and user_id = ${locals.user.id}`;
   }
-  if (typeof body.key === 'string' && body.key.trim().length >= 8) {
+  if (typeof body.key === 'string') {
     const k = body.key.trim();
+    // Silently ignoring a short replacement key made the dialog look saved
+    // while the old secret was still in use. Reject it instead.
+    if (k.length < 8) throw error(400, 'Enter a valid API key');
+    if (k.length > 4_096) throw error(400, 'That API key is too long');
     const res = await listModels(provider, k);
     if (!res.ok) throw error(400, `Key check failed: ${res.error ?? 'invalid key'}`);
     const enc = await encryptSecret(k);

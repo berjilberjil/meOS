@@ -1,3 +1,8 @@
+-- LEGACY — NOT USED BY THE RUNNING API.
+-- The backend moved to Cloudflare D1 (SQLite); the live schema is
+-- db/schema.sqlite.sql. This Postgres file is kept only as a historical
+-- reference for the pre-Workers backend. Do not add new tables here.
+--
 -- meOS backend schema (Postgres / Supabase)
 -- Single-user personal app, but modelled multi-user so a future iPhone/iPad
 -- client (or a second account) works with zero changes.

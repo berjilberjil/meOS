@@ -62,6 +62,11 @@ async function ensureTable(): Promise<void> {
       updated_at text not null,
       primary key (user_id, day)
     )`;
+  await sql`create index if not exists ai_budget_day_idx on ai_budget(day)`;
+  // The ledger only answers "today"; keep a little over a year for debugging
+  // and drop the rest so the free-tier row count does not grow forever.
+  const cutoff = utcDayKey(new Date(Date.now() - 400 * 86_400_000).toISOString());
+  await sql`delete from ai_budget where day < ${cutoff}`;
   ensured = true;
 }
 

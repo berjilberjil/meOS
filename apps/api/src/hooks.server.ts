@@ -61,5 +61,13 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   const response = await resolve(event);
   // Private personal backend — keep every response out of search engines.
   response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'no-referrer');
+  // Authenticated payloads must never land in a shared/browser cache. Anatomy
+  // is the one public, static route and sets its own long-lived cache header.
+  const path = new URL(event.request.url).pathname;
+  if (path.startsWith('/api/') && path !== '/api/anatomy') {
+    response.headers.set('Cache-Control', 'private, no-store');
+  }
   return response;
 };

@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateObject } from 'ai';
 import { resolveModel } from '$lib/server/ai';
+import { readJsonBody } from '$lib/server/http';
 import { z } from 'zod';
 
 const TAGS = ['travel', 'family', 'work', 'personal', 'milestone', 'reminder', 'other'] as const;
@@ -13,10 +14,10 @@ const Result = z.object({
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const body = await request.json().catch(() => ({}));
-  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const body = (await readJsonBody(request, 8_192)) as Record<string, unknown>;
+  const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
   if (!title) throw error(400, 'No event title');
-  const date = typeof body.date === 'string' ? body.date : '';
+  const date = typeof body.date === 'string' ? body.date.slice(0, 40) : '';
 
   let resolved;
   try {

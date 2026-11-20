@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { reserveVoiceChars } from '$lib/server/voiceBudget';
+import { reserveVoiceChars, refundVoiceChars } from '$lib/server/voiceBudget';
+import { readJsonBody } from '$lib/server/http';
 
 /**
  * Catrine's voice.
@@ -47,7 +48,7 @@ type WorkersAI = {
 export const POST: RequestHandler = async ({ request, locals, platform }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 8_192)) as Record<string, unknown>;
   const text = String(body.text ?? '').trim().slice(0, MAX_TEXT);
   if (!text) throw error(400, 'Nothing to say');
 
@@ -60,7 +61,10 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
   }
 
   const ai = (platform as { env?: { AI?: WorkersAI } } | undefined)?.env?.AI;
-  if (!ai) throw error(503, 'Voice is not configured on the server');
+  if (!ai) {
+    await refundVoiceChars(locals.user.id, text.length);
+    throw error(503, 'Voice is not configured on the server');
+  }
 
   try {
     const resp = await ai.run(
@@ -78,7 +82,9 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
     });
   } catch (e) {
     // Cloudflare's own neuron allowance ran out (3036) or capacity is short
-    // (3040). Either way the client should fall back, not show an error.
+    // (3040). Either way the client should fall back, not show an error — and
+    // a request that produced no audio must not spend the day's characters.
+    await refundVoiceChars(locals.user.id, text.length);
     return json({ code: 'voice_unavailable', detail: (e as Error)?.message ?? '' }, { status: 429 });
   }
 };

@@ -5,6 +5,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { reserveAICall } from './aiBudget';
 import { sql, nowISO } from './db';
+import { bumpStateVersion } from './stateVersion';
 import { decryptSecret } from './secrets';
 import type { ProviderId } from './modelCatalog';
 
@@ -72,6 +73,9 @@ async function loadRouting(userId: number): Promise<Routing> {
   await sql`insert into app_state (user_id, key, value, updated_at)
     values (${userId}, 'meos.ai.routes', ${legacy[0].value}, ${nowISO()})
     on conflict (user_id, key) do nothing`;
+  // The copy changes the row set that `/api/state` returns; move its version so
+  // another device holding the old ETag does not stay on a 304 forever.
+  await bumpStateVersion(userId);
   return legacy[0].value as Routing;
 }
 

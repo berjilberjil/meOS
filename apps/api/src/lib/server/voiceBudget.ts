@@ -94,6 +94,9 @@ async function ensureVoiceTable(): Promise<void> {
       updated_at text not null,
       primary key (user_id, day)
     )`;
+  await sql`create index if not exists voice_budget_day_idx on voice_budget(day)`;
+  const cutoff = utcDayKey(new Date(Date.now() - 400 * 86_400_000).toISOString());
+  await sql`delete from voice_budget where day < ${cutoff}`;
   ensured = true;
 }
 
@@ -132,4 +135,17 @@ export async function reserveVoiceChars(
     on conflict (user_id, day) do update set chars = excluded.chars, updated_at = excluded.updated_at`;
 
   return decision;
+}
+
+/**
+ * Give back characters reserved for a request that never reached the model
+ * (missing binding, provider error). Without this a failed synthesis still
+ * spends the day's allowance.
+ */
+export async function refundVoiceChars(userId: number, chars: number): Promise<void> {
+  await ensureVoiceTable();
+  await sql`
+    update voice_budget
+    set chars = max(0, chars - ${chars}), updated_at = ${nowISO()}
+    where user_id = ${userId} and day = ${utcDayKey(nowISO())}`;
 }

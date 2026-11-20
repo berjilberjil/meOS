@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateObject } from 'ai';
 import { resolveModel } from '$lib/server/ai';
+import { readJsonBody } from '$lib/server/http';
 import { z } from 'zod';
 import { mentorSystem } from '$lib/mentor';
 
@@ -30,7 +31,7 @@ const SuggestSchema = z.object({
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 64_000)) as Record<string, unknown>;
   // Capped like /api/chat does. Uncapped, the prompt billed to the provider was
   // bounded only by the request body — a 40 MB context became a 40 MB prompt.
   const context = String(body.context ?? '').slice(0, 8000);
