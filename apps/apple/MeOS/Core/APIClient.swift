@@ -382,6 +382,9 @@ final class APIClient {
     func migrateLegacyStateKeys(_ raw: [String: Any]) async {
         guard let vault, vault.isUnlocked else { return }
         var pairs = StateKey.allNewKeys.compactMap { newKey -> (String, String)? in
+            // Finance was removed and is being rebuilt from a new model. The
+            // old `myos.finance` document must never be copied forward into it.
+            guard !newKey.hasPrefix("meos.finance") else { return nil }
             guard let legacy = StateKey.legacyKey(for: newKey),
                   raw[legacy] != nil, raw[newKey] == nil else { return nil }
             return (newKey, legacy)

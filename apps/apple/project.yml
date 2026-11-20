@@ -10,7 +10,7 @@ targets:
     platform: iOS
     sources:
       - path: MeOS
-        excludes: ["Resources/**", "MacApp.swift", "MacShell.swift", "MacInfo.plist"]
+        excludes: ["Resources/**", "MacApp.swift", "MacInfo.plist"]
       - path: Shared
       - path: MeOS/Resources/drop.wav
         buildPhase: resources

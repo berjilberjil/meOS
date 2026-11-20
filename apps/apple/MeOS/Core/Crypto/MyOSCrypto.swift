@@ -62,6 +62,11 @@ enum MyOSCrypto {
     /// same passphrase typed on any device/keyboard derives the same key.
     static func deriveKey(from secret: String, salt: Data, iterations: Int = pbkdf2Iterations) throws -> SymmetricKey {
         let pw = Data(secret.precomposedStringWithCanonicalMapping.utf8)
+        // `withUnsafeBytes` hands back a nil base address for an empty buffer.
+        // The recovery-code normalizer can reduce a non-empty input to "", and
+        // the old code then force-unwrapped nil and crashed instead of showing
+        // "wrong code".
+        guard !pw.isEmpty, !salt.isEmpty else { throw MyOSCryptoError.kdfFailed }
         var derived = Data(count: dekBytes)
         let status: Int32 = derived.withUnsafeMutableBytes { dOut in
             salt.withUnsafeBytes { sIn in

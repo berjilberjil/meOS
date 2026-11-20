@@ -32,7 +32,7 @@ final class UISignals: ObservableObject {
     /// on appear *and* on change; whichever happens second finds it already nil.
     @Published var pendingRoute: NotifRoute?
 
-    /// Scroll the Today page to this section (a `TodaySection` raw value).
+    /// Scroll the Today page to a named section, when a screen needs to.
     @Published var todayAnchor: String?
 
     /// Open Today's editor for this meal.
