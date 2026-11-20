@@ -2,11 +2,11 @@
   "mcpServers": {
     "meos-diet": {
       "command": "bun",
-      "args": ["run", "/Users/berjilskcript/Documents/Personal/meOS/mcp/diet/src/index.ts"]
+      "args": ["run", "mcp/diet/src/index.ts"]
     },
     "meos-stuff": {
       "command": "bun",
-      "args": ["run", "/Users/berjilskcript/Documents/Personal/meOS/mcp/stuff/src/index.ts"]
+      "args": ["run", "mcp/stuff/src/index.ts"]
     }
   }
 }
