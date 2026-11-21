@@ -5,6 +5,10 @@ enum DS {
     static let radius: CGFloat = 28
     static let pad: CGFloat = 20
     static let gap: CGFloat = 14
+    /// Phone-width column for every auth surface on the Mac — sign-in, vault
+    /// setup, passphrase unlock and the biometric lock. Without it, a
+    /// `maxWidth: .infinity` primary button spans the whole window.
+    static let authWidth: CGFloat = 460
     /// Apple default: critically damped, no overshoot.
     static let spring = Animation.spring(response: 0.35, dampingFraction: 1)
     /// Only for momentum-driven moments (flicks, completions).

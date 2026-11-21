@@ -33,7 +33,7 @@ struct MeRoot: View {
             .transition(.opacity)
             #if os(macOS)
             // Sign-in screens are a phone-width column, not a full-window form.
-            .frame(maxWidth: state.phase == .loggedIn ? .infinity : 460)
+            .frame(maxWidth: state.phase == .loggedIn ? .infinity : DS.authWidth)
             #endif
             if let code = state.recoveryCodeToShow {
                 MeRecoveryOverlay(code: code).transition(.move(edge: .bottom).combined(with: .opacity))
@@ -261,6 +261,12 @@ struct MeFaceLock: View {
             Spacer()
         }
         .padding(DS.pad)
+        #if os(macOS)
+        // The lock is shown while `phase == .loggedIn`, so MeRoot's auth
+        // column does not apply. Keep the same phone-width column here or the
+        // full-width button stretches edge to edge.
+        .frame(maxWidth: DS.authWidth)
+        #endif
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
             await unlock()
