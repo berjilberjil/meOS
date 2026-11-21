@@ -4,11 +4,12 @@ import SwiftUI
 // tab bar (iOS MainView) plus TodayView's "go to tab" links. Kept in Support/
 // so every platform target sees the same enum.
 enum NavTab: String, CaseIterable, Identifiable {
-    case today, scan, events, fold, stuff, gallery, fitness, productivity, notes, profile, settings
+    case today, finance, scan, events, fold, stuff, gallery, fitness, productivity, notes, profile, settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .today: return "Today"
+        case .finance: return "Finance"
         case .scan: return "Scan"
         case .events: return "Events"
         case .fold: return "Fold"
@@ -24,6 +25,7 @@ enum NavTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .today: return "sun.max.fill"
+        case .finance: return "indianrupeesign.circle.fill"
         case .scan: return "viewfinder"
         case .events: return "calendar"
         case .fold: return "indianrupeesign.circle.fill"
@@ -44,7 +46,7 @@ enum NavTab: String, CaseIterable, Identifiable {
 
 extension NavTab {
     /// Tabs the iOS bottom bar can show (mac's sidebar shows every case).
-    static let iosTabs: [NavTab] = [.today, .productivity, .scan, .fitness, .notes]
+    static let iosTabs: [NavTab] = [.today, .finance, .productivity, .scan, .fitness, .notes]
 
     /// Resolve a persisted launch-tab raw value, clamped to `allowed`. Unknown
     /// or disallowed values fall back to `.today`.

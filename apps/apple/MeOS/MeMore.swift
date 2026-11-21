@@ -14,7 +14,7 @@ struct MeMore: View {
             .init(id: "Scan", icon: "camera.viewfinder", dest: AnyView(MeScan())),
             .init(id: "Productivity", icon: "chart.bar", dest: AnyView(MeProductivity())),
             .init(id: "Stuff", icon: "shippingbox", dest: AnyView(MeStuff())),
-            .init(id: "Money", icon: "indianrupeesign", dest: AnyView(MeMoney())),
+            .init(id: "Fold money", icon: "indianrupeesign", dest: AnyView(MeMoney())),
             .init(id: "Macro", icon: "chart.line.uptrend.xyaxis", dest: AnyView(MeMacro())),
             .init(id: "Gallery", icon: "photo.on.rectangle", dest: AnyView(MeGallery())),
             .init(id: "Recycle bin", icon: "trash", dest: AnyView(MeBin())),
