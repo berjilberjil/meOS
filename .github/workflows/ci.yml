@@ -7,8 +7,8 @@ on:
 
 # There is no root package.json — this is a monorepo of apps/api (SvelteKit on
 # Cloudflare Workers) plus three MCP servers (diet, stuff, meos). Each job
-# installs in its own directory. Swift is built locally; the app has no test
-# target, and macOS runners bill at a much higher rate on private repos.
+# installs in its own directory. CI does not build the full Swift app; the pure
+# finance domain has its own SwiftPM suite below.
 jobs:
   api:
     name: API — type-check, test, build
@@ -38,6 +38,19 @@ jobs:
       # the adapter and wrangler.jsonc.
       - name: Build (Cloudflare adapter)
         run: bun run build
+
+  finance-core:
+    name: Finance domain — Swift tests
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: apps/apple
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pure Foundation package: models, engine, demo. No app boot, no Xcode
+      # project, no signing. Fast enough to run on every PR.
+      - run: swift test
 
   mcp:
     name: MCP servers — tests

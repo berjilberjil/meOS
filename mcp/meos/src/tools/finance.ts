@@ -7,7 +7,6 @@ import { addDays, todayKey } from '../utils/dates.ts';
 import { newId } from '../utils/ids.ts';
 import type { ToolDefinition } from './registry.ts';
 import {
-  belongingSnapshot,
   cleanText,
   monthlyBurnPaise,
   purchaseForClient,

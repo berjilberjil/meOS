@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { STATE_KEYS } from '../schemas/models.ts';
 import {
-  defaultFinance,
   makeAccount,
   makeAudit,
   makeInvestment,

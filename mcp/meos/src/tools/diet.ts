@@ -345,8 +345,7 @@ export const dietTools: ToolDefinition[] = [
     inputSchema: { item_id: z.string().min(1) },
     scopes: ['write', 'health'],
     async handler(args, ctx) {
-      const nutrition = stateOrEmpty(await readObject<NutritionState>(ctx, STATE_KEYS.nutrition, emptyNutrition()));
-      const next = await mutateNutrition(ctx, (current) => removeSlotFood(current, args.item_id));
+      await mutateNutrition(ctx, (current) => removeSlotFood(current, args.item_id));
       return ok({ removed: true, item_id: args.item_id }, { written: STATE_KEYS.nutrition });
     }
   },
@@ -362,9 +361,8 @@ export const dietTools: ToolDefinition[] = [
     },
     scopes: ['write', 'health'],
     async handler(args, ctx) {
-      const nutrition = stateOrEmpty(await readObject<NutritionState>(ctx, STATE_KEYS.nutrition, emptyNutrition()));
       const wd = weekdayOrDate(args);
-      const next = await mutateNutrition(ctx, (current) => clearSlot(current, wd, mealKey(args.meal)));
+      await mutateNutrition(ctx, (current) => clearSlot(current, wd, mealKey(args.meal)));
       return ok({ cleared: true, weekday: Number(wd), meal: args.meal }, { written: STATE_KEYS.nutrition });
     }
   },
@@ -378,8 +376,7 @@ export const dietTools: ToolDefinition[] = [
     scopes: ['write', 'health', 'destructive'],
     destructive: true,
     async handler(_args, ctx) {
-      const nutrition = stateOrEmpty(await readObject<NutritionState>(ctx, STATE_KEYS.nutrition, emptyNutrition()));
-      const next = await mutateNutrition(ctx, (current) => clearWeek(current));
+      await mutateNutrition(ctx, (current) => clearWeek(current));
       return ok({ cleared: true }, { written: STATE_KEYS.nutrition, note: 'Meal logs were preserved.' });
     }
   },
@@ -447,7 +444,7 @@ export const dietTools: ToolDefinition[] = [
         Object.values(day.meals ?? {}).some((items) => items.some((i) => i.id === args.log_id))
       );
       if (!exists) throw errors.notFound('Meal log row');
-      const next = await mutateNutrition(ctx, (current) => deleteLogItem(current, args.log_id));
+      await mutateNutrition(ctx, (current) => deleteLogItem(current, args.log_id));
       return ok({ deleted: true, log_id: args.log_id }, { written: STATE_KEYS.nutrition });
     }
   },
@@ -495,7 +492,7 @@ export const dietTools: ToolDefinition[] = [
         vitamins: args.vitamins ?? existing?.vitamins,
         isDefault: false
       };
-      const next = await mutateNutrition(ctx, (current) => upsertCustomFood(current, food));
+      await mutateNutrition(ctx, (current) => upsertCustomFood(current, food));
       return ok({ id: food.id, name: food.name, serving: food.servingLabel, per_serving: food.perServing }, {
         written: STATE_KEYS.nutrition
       });

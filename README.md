@@ -15,6 +15,7 @@ apps/
 mcp/
   diet/      Meal-plan MCP (app bridge, falls back to the cloud vault)
   stuff/     Purchases / ROI MCP (local app bridge only)
+  meos/      Central MeOS MCP gateway (stdio + Streamable HTTP)
 supabase/    LEGACY pre-Workers schema. Not used by the running app.
 scripts/     Build, install and nightly iOS re-sign helpers
 docs/        Architecture notes and historical plans
@@ -43,6 +44,9 @@ production build:
 bun run check
 bun run test
 bun run build
+
+# Finance domain (pure Swift package, no app boot)
+cd ../apple && swift test
 ```
 
 Deployment is `bunx wrangler deploy` from `apps/api` after `bun run build`.
@@ -63,13 +67,34 @@ xcodebuild -scheme MeOS-macOS build
 `xcodegen generate` is required after adding or removing a Swift file — the
 `.xcodeproj` is generated and gitignored.
 
+## Run the MCP gateway
+
+The central gateway exposes MeOS to Claude, Cursor, Codex and other MCP clients.
+
+```bash
+cd mcp/meos
+npm ci
+cp .env.example .env
+chmod 600 .env
+# fill MEOS_USERNAME, MEOS_PASSWORD, MEOS_VAULT_PASSPHRASE
+npm run start:stdio
+```
+
+For ChatGPT or any remote client, run it in HTTP mode behind TLS. Full setup,
+scopes and client configs are in `mcp/meos/README.md`.
+
 ## Status
 
-Working modules: Today, Fitness/Health, Notes, Events, Assistant (Catherine),
-Scan, Stuff, Macro, Gallery, Devices, Recycle Bin, Six-Pack Challenge, Fold
-read-only banking dashboard, and the backend sync/AI/media stack.
+Working modules: Today, **Finance OS**, Fitness/Health, Notes, Events, Assistant
+(Catherine), Scan, Stuff, Macro, Gallery, Devices, Recycle Bin, Six-Pack
+Challenge, Fold read-only banking dashboard, the central MCP gateway, and the
+backend sync/AI/media stack.
 
-Finance tracking is **not** in the native app today. It was intentionally
-replaced by the read-only Fold dashboard; the old Supabase finance tables are
-legacy. The Personal Finance expansion is the next major phase — see
-`docs/finance-foundation.md`.
+Finance is a first-class native ledger: accounts, transactions, transfers,
+budgets, investments, liabilities, net worth, goals, recurring, reports, tax,
+reconciliation and audit history. It lives in the encrypted `meos.finance`
+document. Real statement imports and year-sharding are the next phase — see
+`docs/finance-architecture.md` and `docs/finance-foundation.md`.
+
+Fold remains a separate, read-only live banking snapshot. The old Supabase
+finance tables are legacy.

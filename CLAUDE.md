@@ -1,8 +1,8 @@
 # meOS — Personal Life Operating System
 
-Private, daily-driver "operating system for my life": finance (Fold today),
-health, fitness, to-dos, goals, notes, events, and a mindmap-ish assistant that
-remembers how everything connects. Single owner, privacy-first.
+Private, daily-driver "operating system for my life": finance (native ledger +
+Fold snapshot), health, fitness, to-dos, goals, notes, events, and a mindmap-ish
+assistant that remembers how everything connects. Single owner, privacy-first.
 
 Owner: **Berjil** — personal project. Commit + push as
 `berjilberjil <berjiljacob@gmail.com>`, GitHub `berjilberjil/meOS` via the
@@ -124,9 +124,10 @@ cd apps/apple && xcodegen generate \
   && xcodebuild -scheme MeOS-macOS build \
   && xcodebuild -scheme MeOS -sdk iphonesimulator build
 ```
-CI (`.github/workflows/ci.yml`) runs the API type-check, tests and build, plus
-both MCP test suites. It does not build Swift. `mac-release.yml` builds an
-ad-hoc-signed Mac app on a tag or manual dispatch.
+CI (`.github/workflows/ci.yml`) runs the API type-check, tests and build, both
+MCP test suites, and the Swift finance-domain tests. It does not build the full
+Apple app. `mac-release.yml` builds an ad-hoc-signed Mac app on a tag or manual
+dispatch.
 
 ## Conventions
 

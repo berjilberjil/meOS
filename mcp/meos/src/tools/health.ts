@@ -468,7 +468,7 @@ export const healthTools: ToolDefinition[] = [
       const weekly = [0, 1, 2, 3].map((i) => {
         const to = addDays(today, -i * 7);
         const from = addDays(to, -6);
-        const rows = Object.entries(training.dayLog ?? {}).filter(([d, l]) => d >= from && d <= to);
+        const rows = Object.entries(training.dayLog ?? {}).filter(([d]) => d >= from && d <= to);
         return {
           week_start: from,
           week_end: to,

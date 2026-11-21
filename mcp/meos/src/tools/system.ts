@@ -14,7 +14,6 @@ import { hasScope } from '../auth/scopes.ts';
 import { errors } from '../utils/errors.ts';
 import { ok } from '../utils/result.ts';
 import { paginate } from '../utils/pagination.ts';
-import { todayKey } from '../utils/dates.ts';
 import type { ToolDefinition, ToolContext } from './registry.ts';
 import {
   canReadLockedNotes,

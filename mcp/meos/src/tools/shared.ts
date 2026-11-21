@@ -123,7 +123,7 @@ export interface RecycleInput {
   mediaKeys?: string[];
 }
 
-export function trashEntry(input: RecycleInput, today = todayKey()): TrashEntry {
+export function trashEntry(input: RecycleInput): TrashEntry {
   return {
     id: newId(),
     itemID: input.itemID,

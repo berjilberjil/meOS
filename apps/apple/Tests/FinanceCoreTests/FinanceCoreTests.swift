@@ -419,7 +419,6 @@ final class FinanceCoreTests: XCTestCase {
     func testDemoDocumentRoundTripsAndFitsTheStateLimit() throws {
         let doc = FinanceDemo.build(today: today)
         let data = try JSONEncoder().encode(doc)
-        print("FINANCE_DOCUMENT_BYTES", data.count)
         XCTAssertLessThan(data.count, 1_900_000, "The synced module must stay under D1/API's 1.9 MB ceiling")
         let decoded = try JSONDecoder().decode(FinanceDocument.self, from: data)
         XCTAssertEqual(decoded.accounts.count, doc.accounts.count)
