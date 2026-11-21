@@ -53,6 +53,11 @@ final class AppState: ObservableObject {
     @Published var sixPack = SixPackState() {
         didSet { SixPackWidgetStore.save(sixPack) }
     }
+    /// MeOS Finance. The one synced financial document: accounts, transactions,
+    /// categories, investments, liabilities, budgets, goals, recurring items,
+    /// statements, audit history and snapshots. Every derived number is
+    /// calculated by `FinanceEngine`, never stored here as fact.
+    @Published var finance = FinanceDocument()
     @Published var events: [EventItem] = []
     @Published var eventTags: [EventTag] = []
     @Published var watch: [WatchItem] = []
@@ -227,6 +232,7 @@ final class AppState: ObservableObject {
         if let v = s.nutrition, v != nutrition { nutrition = v }
         if let v = s.training, v != training { training = v }
         if let v = s.sixPack, v != sixPack { sixPack = v }
+        if let v = s.finance, v != finance { finance = v }
         if let v = s.events, v != events { events = v }
         if let v = s.eventTags, v != eventTags { eventTags = v }
         if eventTags.isEmpty { eventTags = EventTag.seedDefaults }   // first run → the built-in seven
@@ -487,6 +493,7 @@ final class AppState: ObservableObject {
         nutrition = NutritionState(); training = TrainingState()
         sixPack = SixPackState()
         SixPackWidgetStore.clear()
+        finance = FinanceDocument()
         events = []; eventTags = []; watch = []; belongings = BelongingsState(); memory = MemoryState()
         scans = []; taskMode = TaskModeState(); weekly = []
         // Retrieved passages and recalled memories from the last answer. Debug
@@ -581,7 +588,7 @@ final class AppState: ObservableObject {
             (StateKey.memory, memory), (StateKey.scans, scans),
             (StateKey.taskMode, taskMode), (StateKey.weekly, weekly),
             (StateKey.activity, activity), (StateKey.trash, trash),
-            (StateKey.sixPack, sixPack),
+            (StateKey.sixPack, sixPack), (StateKey.finance, finance),
             (StateKey.appearance, AppearanceStore.shared.settings)
         ]
         for (key, value) in jobs where raw[key] != nil {
@@ -761,6 +768,7 @@ final class AppState: ObservableObject {
         add("activity", activity)
         add("trash", trash)
         add("sixPack", sixPack)
+        add("finance", finance)
         add("fold", fold)
         add("appearance", AppearanceStore.shared.settings)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
@@ -1017,6 +1025,7 @@ final class AppState: ObservableObject {
            !blocked(StateKey.nutrition, grace: 20) { nutrition = v }
         if let v = s.training, v != training, !blocked(StateKey.training, grace: 20) { training = v }
         if let v = s.sixPack, v != sixPack, !blocked(StateKey.sixPack, grace: 20) { sixPack = v }
+        if let v = s.finance, v != finance, !blocked(StateKey.finance, grace: 20) { finance = v }
         if let v = s.events, v != events, !blocked(StateKey.events) { events = v }
         if let v = s.eventTags, v != eventTags, !blocked(StateKey.eventTags) { eventTags = v }
         if let v = s.watch, v != watch, !blocked(StateKey.watch) { watch = v }

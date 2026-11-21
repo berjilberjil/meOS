@@ -213,6 +213,14 @@ enum Palette {
     static var information: Color { blue }
     static var events:      Color { blue }
 
+    /// A loss, debt, overspend or destructive financial movement. Kept separate
+    /// from `orange` (which means "needs attention") so a negative balance reads
+    /// as negative, not as a warning badge. Used only by Finance.
+    static var negative: Color {
+        .dynamic(lightColor: Color(hex: 0xB3261E), darkColor: Color(hex: 0xFF6B6B))
+    }
+    static var positive: Color { green }
+
     /// Neutral / uncategorised. Deliberately not a colour.
     static var neutral:     Color { muted }
 

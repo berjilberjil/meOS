@@ -121,6 +121,29 @@ extension AppState {
         if !about.isEmpty { who.append("In their words: \(about)") }
         sections.append(ContextSection(heading: "WHO THEY ARE", lines: who, priority: 1))
 
+        // Finance is a first-class module, so its position and limits belong in
+        // every prompt. These are aggregates only; exact rows come from a tool
+        // call, and missing data is stated as missing.
+        var money: [String] = []
+        if finance.isEmpty {
+            money.append("No financial records have been entered. Do not estimate income, spending, balances or net worth.")
+        } else {
+            let nw = FinanceEngine.netWorth(finance)
+            let month = FinanceEngine.monthTotals(finance, monthContaining: todayKey)
+            let portfolio = FinanceEngine.portfolio(finance)
+            money.append("Net worth \(FinanceFormat.inr(nw.paise)) (\(nw.certainty.rawValue)). Cash \(FinanceFormat.inr(FinanceEngine.liquidAssets(finance))). Investments \(FinanceFormat.inr(portfolio.value)) invested \(FinanceFormat.inr(portfolio.invested)). Liabilities \(FinanceFormat.inr(FinanceEngine.totalLiabilities(finance))).")
+            money.append("This month: income \(FinanceFormat.inr(month.incomePaise)), expenses \(FinanceFormat.inr(month.expensePaise)), net savings \(FinanceFormat.inr(month.netSavingsPaise)).")
+            money.append("Coverage: \(finance.transactions.count) transactions from \(finance.settings.trackingStartDate) to \(todayKey). Derived, not predicted.")
+            if finance.settings.demoMode {
+                money.append("DEMO DATA: every financial row is fictional. Say so in the answer.")
+            }
+            if finance.hasDemoRecords {
+                money.append("Some records are demo rows; distinguish them if relevant.")
+            }
+        }
+        sections.append(ContextSection(heading: "MONEY (recorded facts only — use finance tools for detail)",
+                                      lines: money, priority: 3))
+
         if !toolResults.isEmpty {
             sections.append(ContextSection(
                 heading: "TOOL RESULTS (you looked these up — quote them, don't embellish)",

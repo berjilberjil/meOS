@@ -328,6 +328,7 @@ export const STATE_KEYS = {
   activity: 'meos.activity',
   appearance: 'meos.appearance',
   sixPack: 'meos.sixPack',
+  finance: 'meos.finance',
   chat: 'meos.chat',
   crypto: 'meos.crypto'
 } as const;

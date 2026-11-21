@@ -94,6 +94,20 @@ const RESOURCES: ResourceSpec[] = [
     args: { limit: 20 }
   },
   {
+    name: 'finance-ledger-summary',
+    uri: 'meos://finance/ledger',
+    title: 'Finance ledger summary',
+    description: 'Net worth, assets, liabilities, cash, investments and this month from the encrypted ledger.',
+    tool: 'meos_finance_ledger_get_summary'
+  },
+  {
+    name: 'finance-ledger-spending',
+    uri: 'meos://finance/ledger/spending',
+    title: 'Finance ledger spending',
+    description: 'Category and payee spending for the current month from the encrypted ledger.',
+    tool: 'meos_finance_ledger_get_spending'
+  },
+  {
     name: 'devices',
     uri: 'meos://devices',
     title: 'Devices',

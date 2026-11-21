@@ -104,11 +104,21 @@ matrix, and why there is no transaction-ledger or note-tag tool.
   `stateKeys.test.ts`. The server rejects unknown keys.
 - The server never sees plaintext. `meos.crypto` holds the vault metadata; the
   DEK is wrapped on-device with PBKDF2 + AES-GCM.
+- **Finance is one encrypted `meos.finance` document for now.** D1/API cap a
+  value at ~1.9 MB, so `financeCommit` refuses a growing write above a plaintext
+  guard rather than pretending it synced. Year-sharding
+  (`meos.finance.tx.<yyyy>`, `.audit.<yyyy>`, `.import.<id>`) is the required
+  next step before the first real multi-year import. The prefix is already
+  allowlisted. See `docs/finance-foundation.md` and
+  `docs/finance-architecture.md`.
 
 ## Test / verify
 ```bash
 # Backend API
 cd apps/api && bun run check && bun run test && bun run build
+
+# Finance domain tests (pure Swift, same source files as the app)
+cd apps/apple && swift test
 
 # Apple: build both targets
 cd apps/apple && xcodegen generate \
@@ -167,10 +177,15 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
 6. ✅ Native Mac + iOS apps from one SwiftUI codebase
 7. ✅ Fold integration (read-only banking dashboard)
 8. ✅ Six-Pack Challenge + Home Screen widget
-9. ✅ Central MeOS MCP gateway (`mcp/meos`: scoped auth, vault, 97 tools,
+9. ✅ Central MeOS MCP gateway (`mcp/meos`: scoped auth, vault, 116 tools,
    resources, prompts, stdio + Streamable HTTP)
-10. ⏳ **Personal Finance expansion** — historical ledger, imports,
-   reconciliation, multi-year reports. See `docs/finance-foundation.md`.
+10. ✅ **Finance OS (single-document phase)** — 18-section Mac/iPhone module:
+    auditable ledger, accounts, transfers, income/expenses, budgets, goals,
+    recurring, investments, liabilities, net worth, timeline, statements,
+    reports, tax and reconciliation. Encrypted `meos.finance` document, demo
+    data, assistant finance tools, encrypted MCP ledger tools and 29 Swift domain
+    tests. Year-sharding and statement imports remain the next phase; see
+    `docs/finance-architecture.md`.
 11. Legacy to retire when safe: `supabase/`, `db/schema.sql` (Postgres),
     `scripts/install-backend-agent.sh` (pre-Workers local server).
 

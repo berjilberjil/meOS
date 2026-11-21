@@ -148,11 +148,13 @@ test('devices and safe settings are readable', async () => {
   }
 });
 
-test('capability inventory is explicit about absent finance features', async () => {
+test('capability inventory distinguishes the ledger from Fold and names deferred finance features', async () => {
   const h = await createHarness();
   try {
     const data = payload(await h.call(h.ctxFor('a', ['read']), 'meos_get_capabilities', {})).data;
-    assert.equal(data.modules.finance.unavailable.includes('transaction_ledger'), true);
+    assert.equal(data.modules.finance.available.includes('transaction_ledger (search, filter, detail, audit history)'), true);
+    assert.equal(data.modules.finance.unavailable.includes('statement_import_parser'), true);
+    assert.equal(data.modules.finance.unavailable.includes('year_sharded_finance_storage'), true);
     assert.equal(data.modules.notes.unavailable.includes('tags'), true);
     assert.equal(data.modules.events.unavailable.includes('standalone_reminder_records'), true);
     assert.equal(data.modules.removed.includes('journal'), true);

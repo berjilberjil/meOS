@@ -1,8 +1,14 @@
 # Personal Finance Expansion — Foundation Notes
 
-Status: **planning / foundation**. No statements have been imported. No
-production records were created. This document records what exists today, what
-is missing, and the recommended architecture for the next phase.
+Status: **shipped (single-document phase)**. No statements have been imported.
+No production records were created. The Finance OS UI, ledger engine, demo
+data, audit history and tests are implemented. The remaining architecture work
+is year-sharding before the first real multi-year import.
+
+> 2026-11-21: the in-progress foundation described below has landed as
+> `feat/finance-os`. It keeps the canonical model and storage boundary, adds the
+> size guard required before sharding, and does **not** add a server-side
+> relational finance table. See `docs/finance-architecture.md`.
 
 ## 1. What actually exists today
 
