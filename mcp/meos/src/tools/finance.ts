@@ -81,7 +81,7 @@ export const financeTools: ToolDefinition[] = [
     name: 'meos_finance_get_summary',
     title: 'Get finance summary',
     description:
-      'Read the linked banking snapshot MeOS already holds (Fold): net worth, liquid cash, investments, debt, this month\'s spend, and ownership burn from logged purchases. Use this before any financial analysis. MeOS has no transaction ledger, so this never sums individual transactions.',
+      'Read the separate Fold external banking snapshot: net worth, liquid cash, investments, debt, this month\'s spend, and ownership burn from logged purchases. For the owner\'s actual transaction ledger, call meos_finance_ledger_get_summary instead. This tool never sums ledger transactions and must not be mixed with them.',
     inputSchema: {},
     scopes: ['read'],
     async handler(_args, ctx) {
@@ -148,7 +148,7 @@ export const financeTools: ToolDefinition[] = [
     name: 'meos_finance_list_accounts',
     title: 'List linked bank accounts',
     description:
-      'List the bank accounts in the Fold snapshot with their masked last four digits and balances. Full account numbers are not stored in MeOS and are never returned.',
+      'List the bank accounts in the separate Fold snapshot with masked last four digits and balances. For owned ledger accounts, call meos_finance_ledger_list_accounts. Full account numbers are not stored and are never returned.',
     inputSchema: {},
     scopes: ['read'],
     async handler(_args, ctx) {
@@ -176,7 +176,7 @@ export const financeTools: ToolDefinition[] = [
     name: 'meos_finance_get_net_worth',
     title: 'Get net worth',
     description:
-      'Net worth exactly as Fold reports it, with the components MeOS stores (liquid, investments, debt) and the snapshot history. Values are not estimated or derived from a transaction ledger.',
+      'Net worth exactly as Fold reports it, with components and snapshot history. This is the external Fold view, not the owned ledger; use meos_finance_ledger_get_net_worth for derived net worth.',
     inputSchema: {},
     scopes: ['read'],
     async handler(_args, ctx) {
@@ -209,7 +209,7 @@ export const financeTools: ToolDefinition[] = [
     name: 'meos_finance_get_investments',
     title: 'Get investment summary',
     description:
-      'Investment totals from the Fold snapshot: total investments, stock value and mutual-fund value. Individual holdings are not available in this MeOS build.',
+      'Investment totals from the Fold snapshot only. Use meos_finance_ledger_get_investments for owned holdings, cost basis and dated valuations.',
     inputSchema: {},
     scopes: ['read'],
     async handler(_args, ctx) {
@@ -241,7 +241,7 @@ export const financeTools: ToolDefinition[] = [
     name: 'meos_finance_get_spending',
     title: 'Get spending',
     description:
-      'This month\'s spending by category from Fold, with refunds/returns/cashback/interest/dividends separated out rather than netted into spend. Also returns the Stuff ownership-burn picture.',
+      'This month\'s category spending from the separate Fold snapshot, with non-spend categories separated. Use meos_finance_ledger_get_spending for the owned transaction ledger. Also returns the Stuff ownership-burn picture.',
     inputSchema: {},
     scopes: ['read'],
     async handler(_args, ctx) {

@@ -170,14 +170,15 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
 6. ✅ Native Mac + iOS apps from one SwiftUI codebase
 7. ✅ Fold integration (read-only banking dashboard)
 8. ✅ Six-Pack Challenge + Home Screen widget
-9. ✅ Central MeOS MCP gateway (`mcp/meos`: scoped auth, vault, 97 tools,
+9. ✅ Central MeOS MCP gateway (`mcp/meos`: scoped auth, vault, 116 tools,
    resources, prompts, stdio + Streamable HTTP)
 10. ✅ **Finance OS (single-document phase)** — 18-section Mac/iPhone module:
     auditable ledger, accounts, transfers, income/expenses, budgets, goals,
     recurring, investments, liabilities, net worth, timeline, statements,
     reports, tax and reconciliation. Encrypted `meos.finance` document, demo
-    data, assistant finance tools and 29 Swift domain tests. Year-sharding and
-    statement imports remain the next phase; see `docs/finance-architecture.md`.
+    data, assistant finance tools, encrypted MCP ledger tools and 29 Swift domain
+    tests. Year-sharding and statement imports remain the next phase; see
+    `docs/finance-architecture.md`.
 11. Legacy to retire when safe: `supabase/`, `db/schema.sql` (Postgres),
     `scripts/install-backend-agent.sh` (pre-Workers local server).
 

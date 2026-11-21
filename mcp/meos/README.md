@@ -34,7 +34,7 @@ The repository has moved on from the Supabase/Postgres design described in some 
 
 | Module | Exposed | Deliberately not exposed (does not exist) |
 |---|---|---|
-| Finance | Fold snapshot: net worth, cash, investments, debt, category spend; Stuff ledger: purchases, ROI, monthly burn | Transaction ledger, account CRUD, budgets, transfers, savings goals, per-holding investments |
+| Finance | Encrypted transaction ledger, accounts, transfers, spending, budgets, goals, recurring, investments/valuations, liabilities, net worth history, timeline; separate Fold snapshot; Stuff purchases and ownership burn | Statement-import parser, live market prices, tax-liability calculation, year-sharded storage |
 | Health | Daily weight/calories/protein/water/steps/note, 7/30-day averages, BMI, targets | Medical records, labs, medication |
 | Fitness | Workout history/details, logging, exercise history, progress, custom exercises, active program | Seed exercise names (not synced), medical advice |
 | Tasks | Per-day to-dos (text, done, planned minutes, focus seconds), daily habits | Priority, due dates, cross-day projects, task recurrence |
@@ -47,9 +47,10 @@ The repository has moved on from the Supabase/Postgres design described in some 
 | Diet | Context, week plan, day log, food search, logging, custom foods, targets | — (reuses the native diet logic) |
 | Learning | YouTube learning log + takeaways | — |
 
-**Removed from MeOS and therefore not implemented:** the journal, and the standalone
-accounts/transactions/portfolio/net-worth finance module. The Fold integration is a read-only external
-snapshot, not a ledger. There is no honest way to offer `meos_finance_list_transactions`.
+**Removed from MeOS:** the journal. Finance is now a first-class encrypted ledger in the native app.
+`meos_finance_ledger_*` reads and writes that document through the same vault and state store as every
+other module. `meos_finance_*` remains the separate Fold/Stuff surface. The two must never be mixed.
+The statement-import parser and live market feed are still deliberately absent.
 
 `meos_get_capabilities` returns this inventory at runtime so an agent can check instead of assuming.
 
@@ -203,6 +204,8 @@ refused; one account cannot read another's notes; expired token is refused.
 
 ## 6. Tool catalogue
 
+116 tools are registered at runtime; `meos_get_capabilities` is the authoritative inventory.
+
 All results use the same envelope:
 
 ```json
@@ -217,7 +220,36 @@ Errors are `{ "success": false, "error": { "code", "message", "hint?" } }` with 
 Lists use `limit` (max 100) and an opaque `cursor`; the response includes
 `page.next_cursor`, `page.has_more`, and `total_matching` where meaningful.
 
-### Finance (`read`, writes need `write`)
+### Finance ledger (`read`, writes need `write`)
+
+These tools read and write the encrypted `meos.finance` document. The gateway unlocks it with the same
+vault DEK used for notes and health; it never reads plaintext from the server. Finance writes require the
+`write` scope (`MEOS_MCP_SCOPES=read,write`). Destructive finance deletion is deliberately not exposed;
+corrections use `update_transaction` with a mandatory audit reason.
+
+| Tool | Purpose |
+|---|---|
+| `meos_finance_ledger_get_summary` | Net worth, assets, liabilities, cash, investments, month totals |
+| `meos_finance_ledger_list_accounts` | Signed balances, available credit, reconciliation date |
+| `meos_finance_ledger_list_transactions` | Filtered, paginated ledger with classification flags |
+| `meos_finance_ledger_get_transaction` | One transaction plus its immutable audit trail |
+| `meos_finance_ledger_search` | Search payee, note, reference, tag, category or account |
+| `meos_finance_ledger_get_spending` | Category/payee spend and savings rate |
+| `meos_finance_ledger_get_net_worth` | Dated net-worth history with certainty |
+| `meos_finance_ledger_get_investments` | Holdings, invested capital, return, allocation |
+| `meos_finance_ledger_get_liabilities` | Outstanding debt, EMI, rate, ownership |
+| `meos_finance_ledger_list_budgets` | Planned vs actual and variance |
+| `meos_finance_ledger_list_goals` | Goal targets and progress |
+| `meos_finance_ledger_get_timeline` | First events and user milestones |
+| `meos_finance_ledger_add_account` | Create an owned account |
+| `meos_finance_ledger_add_transaction` | Record income, expense, refund, fee, tax, interest, dividend, investment or loan repayment |
+| `meos_finance_ledger_update_transaction` | Correct a non-transfer row with required audit reason |
+| `meos_finance_ledger_add_transfer` | Create a linked pair; never income/spend |
+| `meos_finance_ledger_add_investment` | Add a holding and dated valuation |
+| `meos_finance_ledger_add_valuation` | Upsert a dated valuation |
+| `meos_finance_ledger_add_liability` | Add a loan/card liability |
+
+### Fold snapshot + Stuff (`read`, writes need `write`)
 
 | Tool | Purpose |
 |---|---|
@@ -234,10 +266,11 @@ Lists use `limit` (max 100) and an opaque `cursor`; the response includes
 | `meos_finance_list_categories` | Built-in + custom Stuff shelves |
 | `meos_finance_get_purchase_summary` | Ownership burn vs take-home pay |
 
-**Financial accuracy:** these tools never add transactions. Fold's `netWorth`, `liquid`, `investments`,
-`debt`, `spentThisMonth`, `stocksValue`, `mfValue` and category totals are passed through unchanged. A
-Fold snapshot older than two days is flagged `stale: true`. An unlinked Fold returns `linked: false` and
-no net-worth number — never zero.
+**Financial accuracy:** the ledger tools use the same rules as the app. Transfers, card settlements and
+investment purchases are not spending; refunds reduce spend; loan principal reduces debt and only
+interest is an expense. The Fold tools pass Fold's numbers through unchanged and flag a snapshot older
+than two days as stale. An unlinked Fold returns `linked: false`, not zero. Never sum Fold and ledger
+figures into one number.
 
 ### Health and fitness (`read`/`write` + `health`)
 
@@ -333,8 +366,10 @@ automatically read personal data.
 | URI | Content |
 |---|---|
 | `meos://profile` | Profile (redacted without `secret`) |
-| `meos://finance/summary` | Fold + Stuff summary |
-| `meos://finance/accounts` | Masked accounts |
+| `meos://finance/ledger` | Encrypted ledger net worth/assets/liabilities summary |
+| `meos://finance/ledger/spending` | Encrypted ledger current-month spending |
+| `meos://finance/summary` | Separate Fold + Stuff summary |
+| `meos://finance/accounts` | Masked Fold accounts |
 | `meos://health/summary` | Health summary |
 | `meos://fitness/progress` | Weight/workout progress |
 | `meos://tasks/active` | Today's open tasks |
