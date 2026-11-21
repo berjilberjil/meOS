@@ -166,3 +166,12 @@ create table if not exists mfa_recovery_codes (
   used_at   text,
   primary key (user_id, code_hash)
 );
+
+-- Last successful offsite backup/restore, recorded by scripts/record-backup.sh.
+-- D1 Time Travel itself is managed by Cloudflare; this is the operator's log.
+create table if not exists backup_status (
+  user_id         integer primary key references users(id) on delete cascade,
+  last_backup_at  text,
+  last_restore_at text,
+  last_kind       text
+);

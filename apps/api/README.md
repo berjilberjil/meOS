@@ -90,8 +90,9 @@ src/
   with `MEOS_ALLOW_SIGNUP=true`.
 - Session cookie is httpOnly, SameSite=Strict, Secure except localhost. Only a
   SHA-256 hash of the token is stored; legacy rows upgrade on use.
-- Passwords are PBKDF2-SHA256 `v3` (peppered with `MEOS_PASSWORD_PEPPER`) or
-  `v2`/legacy scrypt; successful sign-in upgrades the hash.
+- Passwords are PBKDF2-SHA256 `v3` (peppered with `MEOS_PASSWORD_PEPPER`) or optional
+  Argon2id `v4` (`MEOS_PASSWORD_KDF=argon2id`, paid Workers plan). `v2`/legacy scrypt
+  still verify; successful sign-in upgrades to the configured current format.
 - Optional TOTP MFA with one-time recovery codes. Sensitive actions require a
   5-minute re-auth; export/MFA/secret rotation/AI-key changes ask for the
   password (and MFA) again.

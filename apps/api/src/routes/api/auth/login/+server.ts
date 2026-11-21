@@ -11,6 +11,7 @@ import {
   recordFailedLogin,
   clearFailedLogins,
   dummyVerify,
+  passwordKdf,
   passwordPepperConfigured
 } from '$lib/server/auth';
 import { isMfaEnabled, verifySecondFactor } from '$lib/server/mfa';
@@ -104,9 +105,15 @@ export const POST: RequestHandler = async ({ request, cookies, url, getClientAdd
   // to migrate it without asking the owner to change their password. This also
   // upgrades v2 to the peppered v3 format when a pepper is configured.
   const stored = String(user.password_hash);
-  // Upgrade a legacy scrypt hash to v2 even without a pepper; upgrade v2 to v3
-  // only when a pepper exists (otherwise every login would rewrite the salt).
-  const needsUpgrade = !stored.startsWith('v3:') && (passwordPepperConfigured() || !stored.startsWith('v2:'));
+  // Upgrade to the currently configured format once, without rewriting a hash
+  // that is already current. `v4` is Argon2id; `v3` is peppered PBKDF2.
+  const needsUpgrade = stored.startsWith('v4:')
+    ? false // never downgrade Argon2id to PBKDF2
+    : stored.startsWith('v3:')
+      ? passwordKdf() === 'argon2id'
+      : stored.startsWith('v2:')
+        ? passwordKdf() === 'argon2id' || passwordPepperConfigured()
+        : true; // legacy scrypt
   if (needsUpgrade) {
     try {
       const upgraded = await hashPassword(password);

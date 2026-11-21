@@ -5,6 +5,7 @@ import { hasFreshReauth } from '$lib/server/auth';
 import { bumpStateVersion } from '$lib/server/stateVersion';
 import {
   isAllowedStateKey,
+  isDeletableStateKey,
   isRoutingDocument,
   isSealedEnvelope,
   MAX_STATE_VALUE_BYTES,
@@ -141,8 +142,21 @@ export const DELETE: RequestHandler = async ({ params, locals, request, getClien
     }
   }
 
-  // Deliberately NOT allowlisted: removed modules (myos.finance, myos.portfolio,
-  // myos.networth) are purged by key, and those names are no longer in the set.
+  // Current modules are not deletable through the API. A stolen session must
+  // not be able to wipe notes/finance/health with one request. Legacy `myos.*`
+  // cleanup and the explicit Fold disconnect are the only exceptions.
+  if (!isDeletableStateKey(params.key)) {
+    void audit({
+      event: 'state_delete',
+      outcome: 'denied',
+      userId: locals.user.id,
+      ip: ipOf(getClientAddress),
+      userAgent: request.headers.get('user-agent'),
+      meta: { key: params.key, reason: 'current_module' }
+    });
+    throw error(403, 'Whole current modules cannot be deleted through the state API');
+  }
+
   await sql`delete from app_state where user_id = ${locals.user.id} and key = ${params.key}`;
   await bumpStateVersion(locals.user.id);
   void audit({

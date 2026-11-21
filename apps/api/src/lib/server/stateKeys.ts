@@ -88,6 +88,18 @@ export function isAllowedStateKey(key: string): boolean {
   return STATE_KEYS.has(key) || FINANCE_SHARD_RE.test(key);
 }
 
+/**
+ * Which entire state documents may be deleted through the API.
+ *
+ * Current modules are not deletable: a stolen session must not be able to wipe
+ * `meos.notes`, `meos.finance`, `meos.health`, etc. with one request. The two
+ * exceptions are legacy `myos.*` cleanup after migration and `meos.fold` when
+ * the owner explicitly disconnects Fold. `meos.crypto` is never deletable.
+ */
+export function isDeletableStateKey(key: string): boolean {
+  return key.startsWith('myos.') || key === 'meos.fold';
+}
+
 /** The only state values that are allowed to be plaintext. */
 export const PLAINTEXT_STATE_KEYS = new Set([
   'meos.crypto',

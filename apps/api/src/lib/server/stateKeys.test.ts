@@ -5,6 +5,7 @@ import {
   MAX_STATE_VALUE_BYTES,
   STATE_KEYS,
   isAllowedStateKey,
+  isDeletableStateKey,
   isSealedEnvelope,
   validateCryptoMeta
 } from './stateKeys';
@@ -42,6 +43,16 @@ describe('state key allowlist', () => {
 
   it('keeps the cap below D1’s 2 MB row limit', () => {
     expect(MAX_STATE_VALUE_BYTES).toBeLessThan(2_000_000);
+  });
+
+  it('allows only legacy cleanup and Fold disconnect to delete a whole document', () => {
+    expect(isDeletableStateKey('myos.finance')).toBe(true);
+    expect(isDeletableStateKey('myos.notes')).toBe(true);
+    expect(isDeletableStateKey('meos.fold')).toBe(true);
+    expect(isDeletableStateKey('meos.notes')).toBe(false);
+    expect(isDeletableStateKey('meos.finance')).toBe(false);
+    expect(isDeletableStateKey('meos.health')).toBe(false);
+    expect(isDeletableStateKey('meos.crypto')).toBe(false);
   });
 });
 

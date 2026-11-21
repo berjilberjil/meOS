@@ -38,6 +38,55 @@ export function pbkdf2Iterations(): number {
   return Math.max(MIN_PBKDF2_ITERATIONS, Math.min(MAX_PBKDF2_ITERATIONS, Math.trunc(raw)));
 }
 
+/* -------------------------------------------------------------------------- */
+/* Argon2id (optional, paid Workers plan)                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * PBKDF2 remains the default because the free Workers plan caps CPU at 10 ms
+ * per request and Argon2id at OWASP's 19 MiB / t=2 costs roughly 60 ms in
+ * WebAssembly. Deployments with enough CPU budget can set
+ * `MEOS_PASSWORD_KDF=argon2id`; new hashes are `v4`, old `v3`/`v2`/scrypt
+ * hashes still verify and upgrade on the next successful login.
+ */
+const ARGON2_MIN_MEMORY_KIB = 19_456;
+const ARGON2_MAX_MEMORY_KIB = 65_536;
+const ARGON2_MIN_ITERATIONS = 2;
+const ARGON2_MAX_ITERATIONS = 10;
+
+export function passwordKdf(): 'pbkdf2-v3' | 'argon2id' {
+  return env.MEOS_PASSWORD_KDF?.trim().toLowerCase() === 'argon2id' ? 'argon2id' : 'pbkdf2-v3';
+}
+
+function argon2MemoryKib(): number {
+  const raw = Number(env.MEOS_ARGON2_MEMORY_KIB ?? ARGON2_MIN_MEMORY_KIB);
+  if (!Number.isFinite(raw)) return ARGON2_MIN_MEMORY_KIB;
+  return Math.max(ARGON2_MIN_MEMORY_KIB, Math.min(ARGON2_MAX_MEMORY_KIB, Math.trunc(raw)));
+}
+
+function argon2Iterations(): number {
+  const raw = Number(env.MEOS_ARGON2_ITERATIONS ?? ARGON2_MIN_ITERATIONS);
+  if (!Number.isFinite(raw)) return ARGON2_MIN_ITERATIONS;
+  return Math.max(ARGON2_MIN_ITERATIONS, Math.min(ARGON2_MAX_ITERATIONS, Math.trunc(raw)));
+}
+
+async function argon2(passwordBytes: Uint8Array, salt: Uint8Array, iterations: number, memoryKib: number): Promise<Uint8Array> {
+  // Dynamic import keeps the WASM module out of the PBKDF2-only path (the
+  // free-tier default) and out of isolate startup.
+  const { argon2id } = await import('hash-wasm');
+  return new Uint8Array(
+    await argon2id({
+      password: passwordBytes,
+      salt,
+      parallelism: 1,
+      iterations,
+      memorySize: memoryKib,
+      hashLength: 32,
+      outputType: 'binary'
+    })
+  );
+}
+
 function toHex(bytes: Uint8Array): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -100,11 +149,19 @@ async function pbkdf2(
 
 export async function hashPassword(pw: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iterations = pbkdf2Iterations();
   const pepperBytes = await pepper();
+  const material = pepperBytes ? await hmacPepper(pw, pepperBytes) : new TextEncoder().encode(pw);
+
+  if (passwordKdf() === 'argon2id') {
+    const iterations = argon2Iterations();
+    const memoryKib = argon2MemoryKib();
+    const hash = await argon2(material, salt, iterations, memoryKib);
+    return `v4:${iterations}:${memoryKib}:1:${toHex(salt)}:${toHex(hash)}`;
+  }
+
+  const iterations = pbkdf2Iterations();
   if (pepperBytes) {
-    const peppered = await hmacPepper(pw, pepperBytes);
-    const hash = await pbkdf2(peppered, salt, iterations);
+    const hash = await pbkdf2(material, salt, iterations);
     return `v3:${iterations}:${toHex(salt)}:${toHex(hash)}`;
   }
   const hash = await pbkdf2(pw, salt, iterations);
@@ -112,6 +169,26 @@ export async function hashPassword(pw: string): Promise<string> {
 }
 
 export async function verifyPassword(pw: string, stored: string): Promise<boolean> {
+  if (stored.startsWith('v4:')) {
+    const [, iterationsRaw, memoryRaw, parallelismRaw, saltHex, hashHex] = stored.split(':');
+    const iterations = Number(iterationsRaw);
+    const memoryKib = Number(memoryRaw);
+    const parallelism = Number(parallelismRaw);
+    if (
+      !saltHex || !hashHex ||
+      !Number.isInteger(iterations) || iterations < ARGON2_MIN_ITERATIONS || iterations > ARGON2_MAX_ITERATIONS ||
+      !Number.isInteger(memoryKib) || memoryKib < ARGON2_MIN_MEMORY_KIB || memoryKib > ARGON2_MAX_MEMORY_KIB ||
+      parallelism !== 1
+    ) {
+      return false;
+    }
+    const pepperBytes = await pepper();
+    const material = pepperBytes ? await hmacPepper(pw, pepperBytes) : new TextEncoder().encode(pw);
+    const salt = fromHex(saltHex);
+    if (salt.length !== 16) return false;
+    const test = await argon2(material, salt, iterations, memoryKib);
+    return constantTimeEqual(fromHex(hashHex), test);
+  }
   if (stored.startsWith('v3:')) {
     const [, iters, saltHex, hashHex] = stored.split(':');
     const pepperBytes = await pepper();
@@ -160,8 +237,12 @@ function constantTimeEqual(orig: Uint8Array, test: Uint8Array): boolean {
 export async function dummyVerify(password: string): Promise<void> {
   const salt = new Uint8Array(16);
   const pepperBytes = await pepper();
-  if (pepperBytes) await pbkdf2(await hmacPepper(password, pepperBytes), salt, pbkdf2Iterations());
-  else await pbkdf2(password, salt, pbkdf2Iterations());
+  const material = pepperBytes ? await hmacPepper(password, pepperBytes) : new TextEncoder().encode(password);
+  if (passwordKdf() === 'argon2id') {
+    await argon2(material, salt, argon2Iterations(), argon2MemoryKib());
+  } else {
+    await pbkdf2(material, salt, pbkdf2Iterations());
+  }
 }
 
 export const LOGIN_MAX_ATTEMPTS = 10;
