@@ -29,7 +29,9 @@ export const GET: RequestHandler = async ({ locals }) => {
         id: stem,
         date: stem.slice(0, 10),
         url: signed[`${p}${o.name}`] ?? null,
-        updatedAt: o.updatedAt ?? null
+        updatedAt: o.updatedAt ?? null,
+        // Size only. The bytes themselves are vault ciphertext.
+        bytes: o.bytes ?? null
       };
     })
     .filter((r) => r.url);
