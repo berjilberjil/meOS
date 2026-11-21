@@ -89,6 +89,86 @@ export function isAllowedStateKey(key: string): boolean {
 }
 
 /**
+ * Which entire state documents may be deleted through the API.
+ *
+ * Current modules are not deletable: a stolen session must not be able to wipe
+ * `meos.notes`, `meos.finance`, `meos.health`, etc. with one request. The two
+ * exceptions are legacy `myos.*` cleanup after migration and `meos.fold` when
+ * the owner explicitly disconnects Fold. `meos.crypto` is never deletable.
+ */
+export function isDeletableStateKey(key: string): boolean {
+  return key.startsWith('myos.') || key === 'meos.fold';
+}
+
+/** The only state values that are allowed to be plaintext. */
+export const PLAINTEXT_STATE_KEYS = new Set([
+  'meos.crypto',
+  'myos.crypto',
+  'meos.ai.routes',
+  'myos.ai.routes'
+]);
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function base64Bytes(value: unknown): number | null {
+  if (typeof value !== 'string' || !value || value.length > 4_000) return null;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 !== 0) return null;
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
+  return (value.length / 4) * 3 - padding;
+}
+
+/** A client-sealed `{ v, ct }` envelope. `ct` is base64(nonce‖ciphertext‖tag). */
+export function isSealedEnvelope(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  const version = value.v;
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1 || version > 10) return false;
+  const bytes = base64Bytes(value.ct);
+  return bytes !== null && bytes >= 28;
+}
+
+/**
+ * Structural validation of the public vault metadata. It cannot prove the
+ * cryptography is sound (the server has no key), but it rejects junk, a
+ * plaintext downgrade, absurd KDF work factors and values that would make the
+ * client crash on launch.
+ */
+export function validateCryptoMeta(value: unknown): string | null {
+  if (!isObject(value)) return 'Vault metadata must be a JSON object';
+  const v = value.v;
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > 10) return 'Vault metadata version is invalid';
+  if (value.kdf !== 'pbkdf2-sha256') return 'Only pbkdf2-sha256 vaults are supported';
+  const iterations = value.iterations;
+  if (typeof iterations !== 'number' || !Number.isInteger(iterations) || iterations < 10_000 || iterations > 2_000_000) {
+    return 'Vault KDF iterations are outside the supported range';
+  }
+  for (const [name, min, max] of [
+    ['passSalt', 16, 64],
+    ['recoverySalt', 16, 64]
+  ] as const) {
+    const n = base64Bytes(value[name]);
+    if (n === null || n < min || n > max) return `Vault ${name} is invalid`;
+  }
+  for (const name of ['wrappedByPass', 'wrappedByRecovery', 'check'] as const) {
+    const n = base64Bytes(value[name]);
+    if (n === null || n < 28 || n > 1_024) return `Vault ${name} is invalid`;
+  }
+  for (const name of ['dataVersion', 'wrapVersion'] as const) {
+    const n = value[name];
+    if (n !== undefined && (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > 10)) {
+      return `Vault ${name} is invalid`;
+    }
+  }
+  return null;
+}
+
+/** Object-valued routing document (`meos.ai.routes`), bounded by the caller. */
+export function isRoutingDocument(value: unknown): boolean {
+  return isObject(value);
+}
+
+/**
  * D1's documented maximum row/value size is 2,000,000 bytes. Leave headroom for
  * the row's other columns and SQLite's record header, and measure UTF-8 bytes
  * rather than JavaScript string length.

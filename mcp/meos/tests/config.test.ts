@@ -26,6 +26,30 @@ test('HTTP refuses to start without a token', () => {
   );
 });
 
+test('OAuth-only HTTP starts without a static bearer token', () => {
+  const config = loadConfig({
+    ...baseEnv,
+    MEOS_MCP_TRANSPORT: 'http',
+    MEOS_MCP_PUBLIC_URL: 'https://mcp.example.com',
+    MEOS_MCP_ADMIN_PASSWORD: 'a-long-admin-password'
+  } as NodeJS.ProcessEnv);
+  assert.equal(config.clients.size, 0);
+  assert.equal(config.oauth?.issuer, 'https://mcp.example.com');
+  assert.equal(config.oauth?.resource, 'https://mcp.example.com/mcp');
+});
+
+test('OAuth refuses a public URL without an admin password', () => {
+  assert.throws(
+    () =>
+      loadConfig({
+        ...baseEnv,
+        MEOS_MCP_TRANSPORT: 'http',
+        MEOS_MCP_PUBLIC_URL: 'https://mcp.example.com'
+      } as NodeJS.ProcessEnv),
+    /ADMIN_PASSWORD/
+  );
+});
+
 test('HTTP client tokens are hashed, never retained in plaintext', () => {
   const config = loadConfig({
     ...baseEnv,

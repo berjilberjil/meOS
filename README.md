@@ -63,6 +63,26 @@ xcodebuild -scheme MeOS-macOS build
 `xcodegen generate` is required after adding or removing a Swift file — the
 `.xcodeproj` is generated and gitignored.
 
+## Security
+
+MeOS is end-to-end encrypted for personal modules and hardened at the API, database,
+storage, session and AI boundaries. Start here:
+
+- [`SECURITY.md`](SECURITY.md) — architecture, auth, operations, limitations, reporting
+- [`ENCRYPTION.md`](ENCRYPTION.md) — what is E2E encrypted, key hierarchy, guarantees
+- [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md) — findings, risk register, acceptance evidence
+- [`MCP_SETUP.md`](MCP_SETUP.md) — connect ChatGPT/Claude through OAuth + a tunnel
+- [`DATA_CLASSIFICATION.md`](DATA_CLASSIFICATION.md), [`KEY_MANAGEMENT.md`](KEY_MANAGEMENT.md),
+  [`THREAT_MODEL.md`](THREAT_MODEL.md), [`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md),
+  [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md), [`SECURITY_TEST_RESULTS.md`](SECURITY_TEST_RESULTS.md)
+- [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md), [`docs/STORAGE_SECURITY.md`](docs/STORAGE_SECURITY.md),
+  [`docs/DATABASE_SECURITY.md`](docs/DATABASE_SECURITY.md), [`docs/API_SECURITY.md`](docs/API_SECURITY.md)
+- [`docs/DEPLOYMENT_CHECKLIST.md`](docs/DEPLOYMENT_CHECKLIST.md), [`docs/BACKUP.md`](docs/BACKUP.md),
+  [`docs/SECURITY_TEST_EVIDENCE.md`](docs/SECURITY_TEST_EVIDENCE.md)
+
+Run `./scripts/security-scan.sh` before deploying. The production dependency audits are clean; the MCP
+gateway has OAuth 2.1 + PKCE, per-module scopes, revocation, and a local admin dashboard.
+
 ## Status
 
 Working modules: Today, Fitness/Health, Notes, Events, Assistant (Catherine),
@@ -73,3 +93,9 @@ Finance tracking is **not** in the native app today. It was intentionally
 replaced by the read-only Fold dashboard; the old Supabase finance tables are
 legacy. The Personal Finance expansion is the next major phase — see
 `docs/finance-foundation.md`.
+
+Security hardening completed: hashed sessions, optional TOTP, re-auth for
+sensitive actions, audit trail, CSP/CSRF/CORS headers, anti-downgrade state
+writes, encrypted backups, MCP OAuth/scopes/revocation and a local AI client
+dashboard. Remaining gaps (Argon2id, passkeys, automated DEK rotation) are
+listed in `SECURITY.md` §12.

@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, pbkdf2, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, hkdfSync, pbkdf2, randomBytes } from 'node:crypto';
 import { promisify } from 'node:util';
 
 const pbkdf2Async = promisify(pbkdf2);
@@ -36,7 +36,7 @@ export function open(base64: string, key: Buffer, aad: Buffer = Buffer.alloc(0))
 	const iv = combined.subarray(0, IV_BYTES);
 	const tag = combined.subarray(combined.length - TAG_BYTES);
 	const ct = combined.subarray(IV_BYTES, combined.length - TAG_BYTES);
-	const decipher = createDecipheriv('aes-256-gcm', key, iv);
+	const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: TAG_BYTES });
 	if (aad.length) decipher.setAAD(aad);
 	decipher.setAuthTag(tag);
 	try {
@@ -55,6 +55,8 @@ export type CryptoMeta = {
 	wrappedByPass: string;
 	wrappedByRecovery: string;
 	check: string;
+	/** 2 = per-key HKDF subkeys + v2 AAD. Missing/1 = legacy DEK-as-key. */
+	dataVersion?: number;
 };
 
 export type SealedEnvelope = { v: number; ct: string };
@@ -89,10 +91,28 @@ export function normalizeRecoveryCode(code: string): string {
 	return [...s].filter((ch) => B32.includes(ch)).join('');
 }
 
-export function sealValue(plaintextJson: Buffer, dek: Buffer, key: string): SealedEnvelope {
+/** One purpose-specific 32-byte key per state slot (v2 vaults). */
+export function deriveSubkey(dek: Buffer, key: string): Buffer {
+	return Buffer.from(hkdfSync('sha256', dek, Buffer.alloc(0), Buffer.from(`meos.data.v2:${key}`), KEY_BYTES));
+}
+
+export function sealValue(
+	plaintextJson: Buffer,
+	dek: Buffer,
+	key: string,
+	dataVersion = FORMAT_VERSION
+): SealedEnvelope {
+	if (dataVersion >= 2) {
+		const subkey = deriveSubkey(dek, key);
+		return { v: 2, ct: seal(plaintextJson, subkey, Buffer.from(`meos.envelope.v2:${key}`)) };
+	}
 	return { v: FORMAT_VERSION, ct: seal(plaintextJson, dek, Buffer.from(key)) };
 }
 
 export function openValue(envelope: SealedEnvelope, dek: Buffer, key: string): Buffer {
+	if (envelope.v >= 2) {
+		const subkey = deriveSubkey(dek, key);
+		return open(envelope.ct, subkey, Buffer.from(`meos.envelope.v2:${key}`));
+	}
 	return open(envelope.ct, dek, Buffer.from(key));
 }

@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { reserveVoiceChars, refundVoiceChars } from '$lib/server/voiceBudget';
 import { readJsonBody } from '$lib/server/http';
+import { enforceRateLimit } from '$lib/server/security';
 
 /**
  * Catrine's voice.
@@ -47,6 +48,7 @@ type WorkersAI = {
 
 export const POST: RequestHandler = async ({ request, locals, platform }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  enforceRateLimit(`voice:${locals.user.id}`, 60, 60_000);
 
   const body = (await readJsonBody(request, 8_192)) as Record<string, unknown>;
   const text = String(body.text ?? '').trim().slice(0, MAX_TEXT);
@@ -80,11 +82,12 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
         'X-Voice-Remaining': String(budget.remaining)
       }
     });
-  } catch (e) {
+  } catch {
     // Cloudflare's own neuron allowance ran out (3036) or capacity is short
     // (3040). Either way the client should fall back, not show an error — and
     // a request that produced no audio must not spend the day's characters.
+    // Provider detail is not returned: it can include the submitted text.
     await refundVoiceChars(locals.user.id, text.length);
-    return json({ code: 'voice_unavailable', detail: (e as Error)?.message ?? '' }, { status: 429 });
+    return json({ code: 'voice_unavailable' }, { status: 429 });
   }
 };

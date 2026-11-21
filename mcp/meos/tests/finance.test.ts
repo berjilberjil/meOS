@@ -83,14 +83,15 @@ test('purchase list, add, update and recycle-bin delete', async () => {
       name: 'Mechanical keyboard',
       price_inr: '₹7,499',
       category: 'gadgets',
-      roi_months: 24
+      roi_months: 24,
+      confirm: true
     });
     const item = payload(added).data;
     assert.equal(item.price_inr, 7499);
     assert.equal(item.category, 'gadgets');
 
     const updated = payload(
-      await h.call(ctx, 'meos_finance_update_purchase', { id: item.id, retired: true, note: 'Sold' })
+      await h.call(ctx, 'meos_finance_update_purchase', { id: item.id, retired: true, note: 'Sold', confirm: true })
     ).data;
     assert.equal(updated.retired, true);
     assert.equal(updated.note, 'Sold');
@@ -114,7 +115,8 @@ test('purchase input is validated', async () => {
     const badCategory = await h.call(ctx, 'meos_finance_add_purchase', {
       name: 'Thing',
       price_inr: 100,
-      category: 'spaceship'
+      category: 'spaceship',
+      confirm: true
     });
     assert.equal(errorCode(badCategory), 'invalid_input');
 
@@ -122,7 +124,8 @@ test('purchase input is validated', async () => {
       name: 'Thing',
       price_inr: 100,
       category: 'other',
-      link: 'javascript:alert(1)'
+      link: 'javascript:alert(1)',
+      confirm: true
     });
     assert.equal(errorCode(badLink), 'invalid_input');
   } finally {

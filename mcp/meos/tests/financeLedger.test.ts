@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { createHarness, errorCode, payload } from './support/harness.ts';
 import type { FinanceDocument } from '../src/schemas/finance.ts';
 
+let writeSeq = 0;
+const writeOpts = () => ({ confirm: true as const, idempotency_key: `mcp-ledger-test-${++writeSeq}` });
+
 const call = async (h: Awaited<ReturnType<typeof createHarness>>, name: string, args: any = {}, scopes: any = ['read']) =>
   h.call(h.ctxFor('a', scopes), name, args);
 
@@ -92,6 +95,7 @@ test('adds an account and a transaction with a complete Swift-shaped record', as
     const ctx = h.ctxFor('a', ['read', 'write']);
     const addedAccount = payload(
       await h.call(ctx, 'meos_finance_ledger_add_account', {
+        ...writeOpts(),
         name: 'Cash wallet',
         type: 'cash',
         opening_balance_inr: 2000
@@ -101,6 +105,7 @@ test('adds an account and a transaction with a complete Swift-shaped record', as
 
     const added = payload(
       await h.call(ctx, 'meos_finance_ledger_add_transaction', {
+        ...writeOpts(),
         date: '2026-11-20',
         amount_inr: '₹250.50',
         type: 'expense',
@@ -135,6 +140,7 @@ test('adds a linked transfer without changing net worth or spend', async () => {
     const ctx = h.ctxFor('a', ['read', 'write']);
     const savings = payload(
       await h.call(ctx, 'meos_finance_ledger_add_account', {
+        ...writeOpts(),
         name: 'Rainy day', type: 'savings', opening_balance_inr: 0, opening_date: '2026-01-01'
       })
     ).data.account;
@@ -142,6 +148,7 @@ test('adds a linked transfer without changing net worth or spend', async () => {
     const before = payload(await h.call(ctx, 'meos_finance_ledger_get_summary')).data;
     const transfer = payload(
       await h.call(ctx, 'meos_finance_ledger_add_transfer', {
+        ...writeOpts(),
         from_account_id: 'acct-bank',
         to_account_id: savings.id,
         amount_inr: 1000,
@@ -172,6 +179,7 @@ test('corrections append audit entries with old and new values', async () => {
     const ctx = h.ctxFor('a', ['read', 'write']);
     const updated = payload(
       await h.call(ctx, 'meos_finance_ledger_update_transaction', {
+        ...writeOpts(),
         id: 'txn-food',
         note: 'Corrected payee',
         category_id: 'cat-food',
@@ -195,6 +203,7 @@ test('MCP-created investments, valuations and liabilities are Swift-decodable sh
   try {
     const ctx = h.ctxFor('a', ['read', 'write']);
     const investment = payload(await h.call(ctx, 'meos_finance_ledger_add_investment', {
+      ...writeOpts(),
       name: 'Gold ETF',
       asset_class: 'etf',
       invested_inr: 5000,
@@ -211,6 +220,7 @@ test('MCP-created investments, valuations and liabilities are Swift-decodable sh
     }
 
     const valuation = payload(await h.call(ctx, 'meos_finance_ledger_add_valuation', {
+      ...writeOpts(),
       investment_id: investment.id,
       value_inr: 5800,
       date: '2026-11-21',
@@ -219,6 +229,7 @@ test('MCP-created investments, valuations and liabilities are Swift-decodable sh
     assert.equal(valuation.value_paise, 580_000);
 
     const liability = payload(await h.call(ctx, 'meos_finance_ledger_add_liability', {
+      ...writeOpts(),
       name: 'Camera loan',
       kind: 'personalLoan',
       original_principal_inr: 20000,
@@ -248,9 +259,11 @@ test('MCP-created transfers are complete linked pairs', async () => {
   try {
     const ctx = h.ctxFor('a', ['read', 'write']);
     const savings = payload(await h.call(ctx, 'meos_finance_ledger_add_account', {
+      ...writeOpts(),
       name: 'Savings', type: 'savings', opening_balance_inr: 0, opening_date: '2026-01-01'
     })).data.account;
     const transfer = payload(await h.call(ctx, 'meos_finance_ledger_add_transfer', {
+      ...writeOpts(),
       from_account_id: 'acct-bank', to_account_id: savings.id, amount_inr: 500, date: '2026-11-20'
     })).data.transfer;
 
@@ -264,6 +277,75 @@ test('MCP-created transfers are complete linked pairs', async () => {
     for (const key of ['id', 'fromAccountID', 'toAccountID', 'amountPaise', 'date', 'feePaise', 'reference', 'note', 'reconciled', 'isDemo', 'createdAt']) {
       assert.ok(Object.prototype.hasOwnProperty.call(record, key), `transfer missing ${key}`);
     }
+  } finally {
+    await h.close();
+  }
+});
+
+test('finance ledger writes require confirmation, idempotency and owner-only verification', async () => {
+  const h = await createHarness();
+  try {
+    const ctx = h.ctxFor('a', ['read', 'write']);
+    const noConfirm = await h.call(ctx, 'meos_finance_ledger_add_account', {
+      idempotency_key: 'finance-no-confirm',
+      name: 'No confirm',
+      type: 'cash'
+    });
+    assert.equal(errorCode(noConfirm), 'confirmation_required');
+
+    const noIdempotency = await h.call(ctx, 'meos_finance_ledger_add_account', {
+      confirm: true,
+      name: 'No key',
+      type: 'cash'
+    });
+    assert.equal(errorCode(noIdempotency), 'invalid_input');
+
+    const account = payload(await h.call(ctx, 'meos_finance_ledger_add_account', {
+      ...writeOpts(),
+      name: 'AI cash',
+      type: 'cash',
+      opening_balance_inr: 100
+    })).data.account;
+    const txn = payload(await h.call(ctx, 'meos_finance_ledger_add_transaction', {
+      ...writeOpts(),
+      date: '2026-11-20',
+      amount_inr: 20,
+      type: 'expense',
+      account_id: account.id
+    })).data.transaction;
+    assert.equal(txn.verification, 'needsReview');
+
+    const selfVerify = await h.call(ctx, 'meos_finance_ledger_update_transaction', {
+      ...writeOpts(),
+      id: txn.id,
+      verification: 'verified',
+      reason: 'AI says this is verified'
+    });
+    assert.equal(errorCode(selfVerify), 'invalid_input');
+  } finally {
+    await h.close();
+  }
+});
+
+test('concurrent finance ledger writes are serialized, not last-write-wins', async () => {
+  const h = await createHarness();
+  try {
+    const ctx = h.ctxFor('a', ['read', 'write']);
+    await Promise.all([
+      h.call(ctx, 'meos_finance_ledger_add_account', {
+        ...writeOpts(),
+        name: 'Concurrent one',
+        type: 'cash'
+      }),
+      h.call(ctx, 'meos_finance_ledger_add_account', {
+        ...writeOpts(),
+        name: 'Concurrent two',
+        type: 'cash'
+      })
+    ]);
+    const stored = await ctx.services.store.read<FinanceDocument>('meos.finance', true);
+    assert.ok(stored?.accounts.some((a) => a.name === 'Concurrent one'));
+    assert.ok(stored?.accounts.some((a) => a.name === 'Concurrent two'));
   } finally {
     await h.close();
   }

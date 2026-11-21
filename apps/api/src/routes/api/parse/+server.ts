@@ -64,7 +64,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       prompt: buildPrompt(text)
     });
     return json(object);
-  } catch (e) {
-    throw error(502, `Could not understand that: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    throw error(502, 'Could not understand that. Try again.');
   }
 };

@@ -31,7 +31,16 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [audio, fetch]
         BGTaskSchedulerPermittedIdentifiers: [com.berjil.meos.steps.refresh]
-        NSAppTransportSecurity: {NSAllowsArbitraryLoads: true}
+        # Do not disable ATS globally. The production API is HTTPS; localhost
+        # development is the only cleartext exception.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            localhost:
+              NSExceptionAllowsInsecureHTTPLoads: true
+            127.0.0.1:
+              NSExceptionAllowsInsecureHTTPLoads: true
         NSMicrophoneUsageDescription: So you can talk to Catherine instead of typing.
         NSSpeechRecognitionUsageDescription: Your speech is transcribed on this device and never uploaded.
         NSFaceIDUsageDescription: MeOS uses Face ID to unlock your data.
@@ -95,7 +104,16 @@ targets:
         CFBundleDisplayName: MeOS
         CFBundleShortVersionString: "1.0"
         LSApplicationCategoryType: public.app-category.lifestyle
-        NSAppTransportSecurity: {NSAllowsArbitraryLoads: true}
+        # Do not disable ATS globally. The production API is HTTPS; localhost
+        # development is the only cleartext exception.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            localhost:
+              NSExceptionAllowsInsecureHTTPLoads: true
+            127.0.0.1:
+              NSExceptionAllowsInsecureHTTPLoads: true
         NSMicrophoneUsageDescription: So you can talk to Catherine instead of typing.
         NSSpeechRecognitionUsageDescription: Your speech is transcribed on this device and never uploaded.
         NSCameraUsageDescription: MeOS uses the camera to scan food, labels and things.

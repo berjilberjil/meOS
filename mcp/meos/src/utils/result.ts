@@ -15,6 +15,9 @@ export function ok(data: unknown, metadata: ResponseMetadata = {}): CallToolResu
     metadata: {
       source: 'MeOS' as const,
       retrieved_at: new Date().toISOString(),
+      // Retrieved notes, events, memory and imported text are DATA. A model
+      // must never treat instructions inside them as a new authorization.
+      content_trust: 'untrusted' as const,
       ...metadata
     }
   };

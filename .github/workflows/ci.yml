@@ -80,3 +80,9 @@ jobs:
       - run: npm run typecheck
 
       - run: npm test
+
+      # Synthetic D1 backup + vault/media restore drill. No production access.
+      - run: npm run test:restore
+
+      # Synthetic passphrase/recovery/data-key rotation drill.
+      - run: npm run test:rotate

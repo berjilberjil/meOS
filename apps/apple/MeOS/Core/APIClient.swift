@@ -6,6 +6,12 @@ import Foundation
 struct APIError: LocalizedError {
     let status: Int
     let message: String
+    /// Stable machine code when the server supplies one (never shown raw).
+    var code: String? = nil
+    /// The account has a second factor; retry login with `code`.
+    var mfaRequired: Bool = false
+    /// The action needs the login password again (`POST api/auth/reauth`).
+    var reauthRequired: Bool = false
     var errorDescription: String? { message }
 }
 
@@ -85,7 +91,7 @@ final class APIClient {
             throw APIError(status: -1, message: "No response from server")
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw APIError(status: http.statusCode, message: Self.errorText(from: data, status: http.statusCode))
+            throw Self.apiError(from: data, status: http.statusCode)
         }
         return data
     }
@@ -111,7 +117,7 @@ final class APIClient {
             throw APIError(status: -1, message: "No response from server")
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw APIError(status: http.statusCode, message: Self.errorText(from: data, status: http.statusCode))
+            throw Self.apiError(from: data, status: http.statusCode)
         }
         return data
     }
@@ -119,8 +125,10 @@ final class APIClient {
     // MARK: - Auth
 
     @discardableResult
-    func login(username: String, password: String) async throws -> AuthUser {
-        let data = try await request("POST", "api/auth/login", body: ["username": username, "password": password])
+    func login(username: String, password: String, code: String = "") async throws -> AuthUser {
+        var body: [String: String] = ["username": username, "password": password]
+        if !code.isEmpty { body["code"] = code }
+        let data = try await request("POST", "api/auth/login", body: body)
         return try decoder.decode(AuthUser.self, from: data)
     }
 
@@ -135,8 +143,116 @@ final class APIClient {
     func logout() async { _ = try? await request("POST", "api/auth/logout") }
 
     /// Change the login password. Server checks `current`; the vault passphrase is untouched.
-    func changePassword(current: String, next: String) async throws {
-        _ = try await request("POST", "api/auth/password", body: ["current": current, "next": next])
+    /// If MFA is enabled the server also requires a current authenticator code.
+    func changePassword(current: String, next: String, code: String = "") async throws {
+        var body: [String: String] = ["current": current, "next": next]
+        if !code.isEmpty { body["code"] = code }
+        _ = try await request("POST", "api/auth/password", body: body)
+    }
+
+    /// Re-prove the login password for a sensitive action (5-minute window).
+    func reauth(password: String, code: String = "") async throws {
+        var body: [String: String] = ["password": password]
+        if !code.isEmpty { body["code"] = code }
+        _ = try await request("POST", "api/auth/reauth", body: body)
+    }
+
+    struct MFAStatus: Codable {
+        let enabled: Bool
+        let pending: Bool
+        let recoveryCodesRemaining: Int
+    }
+
+    struct MFASetup: Codable {
+        let secret: String
+        let otpauthUrl: String
+        let recoveryCodes: [String]
+    }
+
+    func mfaStatus() async throws -> MFAStatus {
+        try await get("api/auth/mfa", as: MFAStatus.self)
+    }
+
+    func mfaSetup(password: String, code: String = "") async throws -> MFASetup {
+        var body: [String: String] = ["password": password]
+        if !code.isEmpty { body["code"] = code }
+        let data = try await request("POST", "api/auth/mfa/setup", body: body)
+        return try decoder.decode(MFASetup.self, from: data)
+    }
+
+    func mfaEnable(code: String) async throws -> MFAStatus {
+        let data = try await request("POST", "api/auth/mfa/enable", body: ["code": code])
+        return try decoder.decode(MFAStatus.self, from: data)
+    }
+
+    func mfaDisable(password: String, code: String) async throws -> MFAStatus {
+        let data = try await request("POST", "api/auth/mfa/disable", body: ["password": password, "code": code])
+        return try decoder.decode(MFAStatus.self, from: data)
+    }
+
+    struct SessionInfo: Codable, Identifiable {
+        let id: String
+        let createdAt: String
+        let lastSeenAt: String
+        let expiresAt: String
+        let userAgent: String?
+        let current: Bool
+    }
+
+    func sessions() async throws -> [SessionInfo] {
+        struct R: Decodable { let sessions: [SessionInfo] }
+        return try decoder.decode(R.self, from: try await request("GET", "api/security/sessions")).sessions
+    }
+
+    /// Revokes every other session. The server requires the login password.
+    func revokeOtherSessions(password: String, code: String = "") async throws {
+        var body: [String: String] = ["password": password]
+        if !code.isEmpty { body["code"] = code }
+        _ = try await request("DELETE", "api/security/sessions", body: body)
+    }
+
+    struct SecurityEvent: Codable, Identifiable {
+        let id: Int
+        let at: String
+        let event: String
+        let outcome: String
+        let ipHash: String?
+        let userAgent: String?
+    }
+
+    struct SecurityFeed: Codable {
+        let events: [SecurityEvent]
+        let alerts: [String]
+    }
+
+    func securityEvents() async throws -> SecurityFeed {
+        try await get("api/security/events?limit=100", as: SecurityFeed.self)
+    }
+
+    struct SecurityOverview: Codable {
+        struct MediaBucket: Codable { let count: Int; let bytes: Int }
+        struct Media: Codable { let bodyPhotos: MediaBucket; let eventMedia: MediaBucket }
+        struct Backup: Codable {
+            let lastBackupAt: String?
+            let lastRestoreAt: String?
+            let lastKind: String?
+            let note: String
+        }
+        let passwordKdf: String
+        let secretsKeyVersion: String?
+        let sessionDays: Int
+        let sessionIdleDays: Int
+        let sessionsCount: Int
+        let devicesCount: Int
+        let aiKeys: Int
+        let mfa: MFAStatus
+        let media: Media
+        let backup: Backup
+        let recentEvents: [SecurityEvent]
+    }
+
+    func securityOverview() async throws -> SecurityOverview {
+        try await get("api/security/overview", as: SecurityOverview.self)
     }
 
     // MARK: - Devices
@@ -239,8 +355,7 @@ final class APIClient {
         }
         if http.statusCode == 304 { return nil }
         guard (200..<300).contains(http.statusCode) else {
-            throw APIError(status: http.statusCode,
-                           message: Self.errorText(from: data, status: http.statusCode))
+            throw Self.apiError(from: data, status: http.statusCode)
         }
         // Held, not committed. Only the caller knows whether the payload was
         // actually applied, and storing it here meant a snapshot `applyRemote`
@@ -683,21 +798,26 @@ final class APIClient {
 
     /// Add a key. The server validates it live (which fetches its models) then stores
     /// it encrypted — so this can take a moment; it uses the longer AI timeout.
-    func aiAddKey(provider: String, label: String, key: String) async throws -> AIKeyDTO {
+    /// Adding a provider is a sensitive action, so the login password is required
+    /// (plus an authenticator code when MFA is enabled).
+    func aiAddKey(provider: String, label: String, key: String, password: String, code: String = "") async throws -> AIKeyDTO {
         struct R: Decodable { let key: AIKeyDTO }
-        let body = AddKeyRequest(provider: provider, label: label, key: key)
+        let body = AddKeyRequest(provider: provider, label: label, key: key, password: password, code: code.isEmpty ? nil : code)
         return try decoder.decode(R.self, from: try await request("POST", "api/ai/keys", body: body, using: aiSession)).key
     }
 
-    func aiUpdateKey(id: Int, label: String? = nil, enabled: Bool? = nil, key: String? = nil) async throws -> AIKeyDTO {
+    func aiUpdateKey(id: Int, label: String? = nil, enabled: Bool? = nil, key: String? = nil,
+                     password: String? = nil, code: String? = nil) async throws -> AIKeyDTO {
         struct R: Decodable { let key: AIKeyDTO }
-        let body = PatchKeyRequest(label: label, enabled: enabled, key: key)
+        let body = PatchKeyRequest(label: label, enabled: enabled, key: key, password: password, code: code)
         let session = key != nil ? aiSession : nil
         return try decoder.decode(R.self, from: try await request("PATCH", "api/ai/keys/\(id)", body: body, using: session)).key
     }
 
-    func aiDeleteKey(id: Int) async throws {
-        _ = try await request("DELETE", "api/ai/keys/\(id)")
+    func aiDeleteKey(id: Int, password: String, code: String = "") async throws {
+        struct Body: Encodable { let password: String; let code: String? }
+        let body = Body(password: password, code: code.isEmpty ? nil : code)
+        _ = try await request("DELETE", "api/ai/keys/\(id)", body: body)
     }
 
     /// Re-validate a stored key and refresh its model list. Returns the fresh list.
@@ -714,8 +834,20 @@ final class APIClient {
         _ = try await request("PUT", "api/ai/routes", body: routing)
     }
 
-    private struct AddKeyRequest: Encodable { let provider: String; let label: String; let key: String }
-    private struct PatchKeyRequest: Encodable { let label: String?; let enabled: Bool?; let key: String? }
+    private struct AddKeyRequest: Encodable {
+        let provider: String
+        let label: String
+        let key: String
+        let password: String
+        let code: String?
+    }
+    private struct PatchKeyRequest: Encodable {
+        let label: String?
+        let enabled: Bool?
+        let key: String?
+        var password: String? = nil
+        var code: String? = nil
+    }
 
     // MARK: - Instant-relaunch cache
 
@@ -728,7 +860,10 @@ final class APIClient {
     }()
 
     private static func writeCache(_ data: Data, _ name: String) {
-        try? data.write(to: cacheDir.appendingPathComponent(name), options: .atomic)
+        // The state cache is ciphertext for sealed modules, but it also holds
+        // the public vault meta and any legacy plaintext key. Keep it behind
+        // the platform file-protection class anyway.
+        try? data.write(to: cacheDir.appendingPathComponent(name), options: [.atomic, .completeFileProtection])
     }
 
     func clearCache() {
@@ -737,12 +872,25 @@ final class APIClient {
 
     // MARK: - Helpers
 
-    private static func errorText(from data: Data, status: Int) -> String {
+    private static func apiError(from data: Data, status: Int) -> APIError {
+        var message: String?
+        var code: String?
+        var mfa = false
+        var reauth = false
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let m = obj["message"] as? String { return m }
-            if let e = obj["error"] as? [String: Any], let m = e["message"] as? String { return m }
+            if let m = obj["message"] as? String { message = m }
+            if let e = obj["error"] as? [String: Any], let m = e["message"] as? String { message = m }
+            code = obj["code"] as? String ?? (obj["error"] as? [String: Any])?["code"] as? String
+            mfa = obj["mfaRequired"] as? Bool ?? false
+            reauth = obj["reauthRequired"] as? Bool ?? false
         }
-        return "Request failed (\(status))"
+        return APIError(
+            status: status,
+            message: message ?? "Request failed (\(status))",
+            code: code,
+            mfaRequired: mfa,
+            reauthRequired: reauth
+        )
     }
 }
 

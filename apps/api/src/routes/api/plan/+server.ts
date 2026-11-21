@@ -82,7 +82,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       prompt
     });
     return json(object);
-  } catch (e) {
-    throw error(502, `Could not build a plan: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    throw error(502, 'Could not build a plan. Try again.');
   }
 };

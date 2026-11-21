@@ -17,6 +17,9 @@ struct CryptoMeta: Codable, Equatable, Sendable {
     var wrappedByPass: String     // base64 sealed-box
     var wrappedByRecovery: String // base64 sealed-box
     var check: String             // base64 sealed-box of CHECK_TOKEN under the DEK
+    /// 2 = per-key HKDF subkeys + v2 AAD. nil/1 = legacy DEK-as-key format.
+    /// Optional so pre-upgrade metas decode and keep working unchanged.
+    var dataVersion: Int?
 }
 
 /// The envelope written in place of each encrypted `app_state` value:
@@ -117,7 +120,8 @@ final class Vault {
             recoverySalt: recoverySalt.base64EncodedString(),
             wrappedByPass: try MyOSCrypto.seal(dekData, key: kekPass, aad: Data("wrap:pass".utf8)),
             wrappedByRecovery: try MyOSCrypto.seal(dekData, key: kekRec, aad: Data("wrap:recovery".utf8)),
-            check: try MyOSCrypto.seal(Self.checkToken, key: dek, aad: Data("check".utf8)))
+            check: try MyOSCrypto.seal(Self.checkToken, key: dek, aad: Data("check".utf8)),
+            dataVersion: 2)
         return SetupMaterial(meta: meta, recoveryCode: recoveryCode, dekData: dekData)
     }
 
@@ -261,17 +265,28 @@ final class Vault {
     }
 
     /// Encode plaintext JSON bytes as an encrypted envelope `{v,ct}` (JSON Data).
+    /// New vaults derive a per-key subkey (v2); legacy vaults keep the v1 shape.
     func sealValue(_ plaintextJSON: Data, key: String) throws -> Data {
         guard let dek else { throw VaultError.locked }
+        if meta?.dataVersion == 2 {
+            let subkey = MyOSCrypto.deriveSubkey(from: dek, info: "meos.data.v2:\(key)")
+            let ct = try MyOSCrypto.seal(plaintextJSON, key: subkey, aad: Data("meos.envelope.v2:\(key)".utf8))
+            return try JSONEncoder().encode(SealedEnvelope(v: 2, ct: ct))
+        }
         let ct = try MyOSCrypto.seal(plaintextJSON, key: dek, aad: Data(key.utf8))
-        let env = SealedEnvelope(v: MyOSCrypto.formatVersion, ct: ct)
-        return try JSONEncoder().encode(env)
+        return try JSONEncoder().encode(SealedEnvelope(v: MyOSCrypto.formatVersion, ct: ct))
     }
 
     /// Given a decoded envelope dict, return the decrypted plaintext JSON bytes.
+    /// Reads both v2 (subkey + v2 AAD) and legacy v1 envelopes.
     func openValue(_ envelope: [String: Any], key: String) throws -> Data {
         guard let dek else { throw VaultError.locked }
         guard let ct = envelope["ct"] as? String else { throw MyOSCryptoError.badBase64 }
+        let version = (envelope["v"] as? Int) ?? 1
+        if version >= 2 {
+            let subkey = MyOSCrypto.deriveSubkey(from: dek, info: "meos.data.v2:\(key)")
+            return try MyOSCrypto.open(ct, key: subkey, aad: Data("meos.envelope.v2:\(key)".utf8))
+        }
         return try MyOSCrypto.open(ct, key: dek, aad: Data(key.utf8))
     }
 

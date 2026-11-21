@@ -111,6 +111,19 @@ async function readFinance(ctx: ToolContext): Promise<FinanceDocument> {
 }
 
 async function saveFinance(ctx: ToolContext, doc: FinanceDocument): Promise<void> {
+  // Optimistic concurrency: the handler read this document before mutating it.
+  // If another MCP call (or the app) wrote in between, do not silently lose one
+  // of the money changes. The caller can retry; a money write should never be a
+  // last-write-wins overwrite.
+  const expectedUpdatedAt = doc.updatedAt;
+  const currentRaw = await ctx.services.store.read<unknown>(STATE_KEYS.finance, true);
+  const current = normalizeFinance(currentRaw);
+  if (currentRaw != null && current.updatedAt !== expectedUpdatedAt) {
+    throw errors.conflict(
+      'The Finance ledger changed while this write was being prepared. Nothing was saved; re-read the ledger and retry with the same idempotency key.'
+    );
+  }
+
   doc.updatedAt = nowStamp();
   const bytes = Buffer.byteLength(JSON.stringify(doc), 'utf8');
   if (bytes > FINANCE_PLAINTEXT_LIMIT) {
@@ -750,6 +763,8 @@ export const financeLedgerTools: ToolDefinition[] = [
       notes: z.string().max(2000).optional()
     },
     scopes: ['read', 'write'],
+    confirmation: true,
+    idempotencyRequired: true,
     async handler(args, ctx) {
       const doc = await readFinance(ctx);
       const name = cleanText(String(args.name), 'name', 120);
@@ -774,7 +789,7 @@ export const financeLedgerTools: ToolDefinition[] = [
     name: 'meos_finance_ledger_add_transaction',
     title: 'Add a Finance transaction',
     description:
-      'Record an ordinary income, expense, refund, fee, tax, interest or dividend transaction in the ledger. Use add_transfer for internal transfers. Investment purchases and loan repayments link to an existing holding/liability and update their capital/debt. This is a real write that syncs to the native app.',
+      'Record an ordinary income, expense, refund, fee, tax, interest or dividend transaction in the ledger. Use add_transfer for internal transfers. Investment purchases and loan repayments link to an existing holding/liability and update their capital/debt. This is a real, money-moving write: it requires confirm=true and a unique idempotency_key, and the new row starts needsReview (only the owner can verify it).',
     inputSchema: {
       date: DateKey,
       amount_inr: Money,
@@ -793,6 +808,8 @@ export const financeLedgerTools: ToolDefinition[] = [
       interest_inr: Money.optional()
     },
     scopes: ['read', 'write'],
+    confirmation: true,
+    idempotencyRequired: true,
     async handler(args, ctx) {
       const doc = await readFinance(ctx);
       const amount = parseMoney(args.amount_inr, 'amount_inr', true)!;
@@ -850,7 +867,9 @@ export const financeLedgerTools: ToolDefinition[] = [
         principalPaise: principal,
         interestPaise: interest,
         source: 'manual',
-        verification: 'verified'
+        // AI-created money rows start unverified. Only the owner can mark a
+        // record verified/reconciled in the native app.
+        verification: 'needsReview'
       });
 
       doc.transactions.push(txn);
@@ -916,6 +935,8 @@ export const financeLedgerTools: ToolDefinition[] = [
       reason: z.string().min(1).max(500)
     },
     scopes: ['read', 'write'],
+    confirmation: true,
+    idempotencyRequired: true,
     async handler(args, ctx) {
       const doc = await readFinance(ctx);
       const id = cleanId(String(args.id));
@@ -973,6 +994,11 @@ export const financeLedgerTools: ToolDefinition[] = [
         updated.tags = next;
       }
       if (args.verification !== undefined) {
+        if (args.verification === 'verified' || args.verification === 'reconciled') {
+          throw errors.invalidInput(
+            'Only the owner can mark a transaction verified/reconciled. MCP may correct fields but cannot self-verify a money record.'
+          );
+        }
         noteChange('verification', before.verification, String(args.verification));
         updated.verification = args.verification as FinanceVerification;
       }
@@ -1010,6 +1036,8 @@ export const financeLedgerTools: ToolDefinition[] = [
       note: z.string().max(4000).optional()
     },
     scopes: ['read', 'write'],
+    confirmation: true,
+    idempotencyRequired: true,
     async handler(args, ctx) {
       const doc = await readFinance(ctx);
       const from = cleanId(String(args.from_account_id), 'from_account_id');
@@ -1109,6 +1137,8 @@ export const financeLedgerTools: ToolDefinition[] = [
       notes: z.string().max(2000).optional()
     },
     scopes: ['read', 'write'],
+    confirmation: true,
+    idempotencyRequired: true,
     async handler(args, ctx) {
       const doc = await readFinance(ctx);
       const invested = parseMoney(args.invested_inr, 'invested_inr', true)!;
@@ -1157,6 +1187,8 @@ export const financeLedgerTools: ToolDefinition[] = [
       note: z.string().max(500).optional()
     },
     scopes: ['read', 'write'],
+    confirmation: true,
+    idempotencyRequired: true,
     async handler(args, ctx) {
       const doc = await readFinance(ctx);
       const id = cleanId(String(args.investment_id), 'investment_id');
@@ -1213,6 +1245,8 @@ export const financeLedgerTools: ToolDefinition[] = [
       notes: z.string().max(2000).optional()
     },
     scopes: ['read', 'write'],
+    confirmation: true,
+    idempotencyRequired: true,
     async handler(args, ctx) {
       const doc = await readFinance(ctx);
       const accountId = args.account_id ? cleanId(String(args.account_id), 'account_id') : null;

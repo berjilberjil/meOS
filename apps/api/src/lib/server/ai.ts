@@ -7,6 +7,7 @@ import { reserveAICall } from './aiBudget';
 import { sql, nowISO } from './db';
 import { bumpStateVersion } from './stateVersion';
 import { decryptSecret } from './secrets';
+import { enforceRateLimit } from './security';
 import type { ProviderId } from './modelCatalog';
 
 /**
@@ -127,6 +128,10 @@ export class AIBudgetExhausted extends Error {
 }
 
 export async function resolveModel(feature: Feature, userId: number): Promise<Resolved> {
+  // Per-isolate burst guard in front of every AI route. D1 budgets below are
+  // the durable spend ceiling; this just stops one client from burning CPU and
+  // provider quota in a tight loop.
+  enforceRateLimit(`ai-call:${userId}`, 120, 60_000);
   await ensureAiTable();
 
   let ref: RouteRef | undefined;

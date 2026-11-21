@@ -19,16 +19,21 @@ export class RateLimiter {
 
   /** Throws `rate_limited` when the client is over budget. */
   take(clientId: string): void {
+    this.takeN(clientId, this.max, this.windowMs);
+  }
+
+  /** A separate bucket with its own budget (OAuth/register/admin endpoints). */
+  takeN(key: string, max: number, windowMs: number): void {
     const now = this.now();
-    const bucket = this.buckets.get(clientId) ?? { hits: [] };
-    bucket.hits = bucket.hits.filter((t) => now - t < this.windowMs);
-    if (bucket.hits.length >= this.max) {
+    const bucket = this.buckets.get(key) ?? { hits: [] };
+    bucket.hits = bucket.hits.filter((t) => now - t < windowMs);
+    if (bucket.hits.length >= max) {
       const oldest = bucket.hits[0] ?? now;
-      const retry = Math.max(1, Math.ceil((this.windowMs - (now - oldest)) / 1000));
-      this.buckets.set(clientId, bucket);
+      const retry = Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000));
+      this.buckets.set(key, bucket);
       throw errors.rateLimited(retry);
     }
     bucket.hits.push(now);
-    this.buckets.set(clientId, bucket);
+    this.buckets.set(key, bucket);
   }
 }

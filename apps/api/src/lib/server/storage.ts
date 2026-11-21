@@ -87,6 +87,18 @@ export async function bytesUnder(prefix: string): Promise<number> {
   return total;
 }
 
+/** Object count under a prefix, without exposing keys or contents. */
+export async function countObjects(prefix: string): Promise<number> {
+  let total = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await media().list({ prefix, cursor });
+    total += page.objects.length;
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return total;
+}
+
 /** Whether `incoming` more bytes still fit under this user's ceiling. */
 export async function mediaRoomFor(prefix: string, incoming: number): Promise<boolean> {
   return (await bytesUnder(prefix)) + incoming <= USER_MEDIA_BYTES;

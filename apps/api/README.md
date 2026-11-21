@@ -41,13 +41,21 @@ bunx wrangler deploy
 Secrets (never in git) are set once per environment:
 
 ```bash
-bunx wrangler secret put MEOS_SECRETS_KEY     # openssl rand -base64 32
+bunx wrangler secret put MEOS_SECRETS_KEY          # openssl rand -base64 32
+bunx wrangler secret put MEOS_PASSWORD_PEPPER      # separate, stable
+bunx wrangler secret put MEOS_MFA_RECOVERY_PEPPER  # separate, stable
+bunx wrangler secret put MEOS_AUDIT_SALT
+# Optional first-run gate (send as setupToken with the first registration):
+# bunx wrangler secret put MEOS_SETUP_TOKEN
 bunx wrangler secret put GEMINI_API_KEY
 bunx wrangler secret put R2_ACCOUNT_ID
 bunx wrangler secret put R2_ACCESS_KEY_ID
 bunx wrangler secret put R2_SECRET_ACCESS_KEY
 bunx wrangler secret put R2_BUCKET
 ```
+
+`MEOS_SECRETS_KEYS` + `MEOS_SECRETS_KEY_ID` can replace the single
+`MEOS_SECRETS_KEY` for rotation; see `SECURITY.md` and `ENCRYPTION.md`.
 
 Apply the schema to the remote database only when it changes:
 
@@ -80,15 +88,30 @@ src/
 
 - Single owner. `POST /api/auth/register` works only while `users` is empty, or
   with `MEOS_ALLOW_SIGNUP=true`.
-- Session cookie is httpOnly, SameSite=Lax, Secure except localhost.
-- Passwords are PBKDF2-SHA256 (`v2:` format); legacy scrypt hashes still verify
-  and are upgraded on the next successful sign-in.
+- Session cookie is httpOnly, SameSite=Strict, Secure except localhost. Only a
+  SHA-256 hash of the token is stored; legacy rows upgrade on use.
+- Passwords are PBKDF2-SHA256 `v3` (peppered with `MEOS_PASSWORD_PEPPER`) or optional
+  Argon2id `v4` (`MEOS_PASSWORD_KDF=argon2id`, paid Workers plan). `v2`/legacy scrypt
+  still verify; successful sign-in upgrades to the configured current format.
+- Optional TOTP MFA with one-time recovery codes. Sensitive actions require a
+  5-minute re-auth; export/MFA/secret rotation/AI-key changes ask for the
+  password (and MFA) again.
 - State is one encrypted document per module. The server stores ciphertext and
-  cannot read module contents.
+  cannot read module contents. Once `meos.crypto` exists, plaintext module
+  writes are refused (anti-downgrade); vault-meta replacement needs a fresh
+  session/re-auth and deletion is blocked.
 - Every row query is scoped by `user_id` — there is no RLS safety net in D1.
-- User AI keys are AES-256-GCM encrypted with `MEOS_SECRETS_KEY`; only the
-  masked form is returned to clients.
+- AI/TOTP secrets are AES-256-GCM encrypted with the `MEOS_SECRETS_KEY` ring;
+  only masked forms are returned.
 - Server-key AI calls and voice characters are capped per user and per account
   per UTC day.
+- Security events are metadata-only in `security_events` (salted IP, no
+  payloads), exposed at `/api/security/events`.
+- Unsafe `/api/*` requests require a trusted Origin; CORS is deny-by-default;
+  responses carry CSP/HSTS/frame/nosniff/referrer/COOP/CORP headers.
 - Authenticated responses are `Cache-Control: private, no-store`; `/api/anatomy`
   is the only public, cacheable route.
+
+Full model, threat model and evidence: [`../../SECURITY.md`](../../SECURITY.md),
+[`../../SECURITY_AUDIT.md`](../../SECURITY_AUDIT.md),
+[`../../docs/API_SECURITY.md`](../../docs/API_SECURITY.md).

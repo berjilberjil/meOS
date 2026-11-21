@@ -303,6 +303,9 @@ struct MeSettings: View {
     @EnvironmentObject private var mio: MioController
     @State private var faceID = BiometricLock.isEnabled
     @State private var exportURL: URL?
+    @State private var showExport = false
+    @State private var showRecoveryAuth = false
+    @State private var showVaultPass = false
 
     var body: some View {
         Screen(title: "Settings", sub: state.username) {
@@ -332,21 +335,35 @@ struct MeSettings: View {
             group("AI & keys", "key") { MeAI() }
             group("Memory", "brain") { MeMemory() }
             group("Reminders", "bell") { MeReminders() }
+            group("Security", "lock.shield") { MeSecurity() }
             group("Change password", "key.viewfinder") { MeChangePassword() }
             MCard {
-                Button { Task { await state.regenerateRecoveryCode() } } label: { Label("New recovery code", systemImage: "key.horizontal").font(.headline) }
+                Button { showVaultPass = true } label: {
+                    Label("Change encryption passphrase", systemImage: "lock.rotation").font(.headline)
+                }
                 Divider()
-                Button {
-                    guard let data = state.exportJSON() else { return }
-                    let url = FileManager.default.temporaryDirectory.appendingPathComponent("MeOS-backup.json")
-                    try? data.write(to: url); exportURL = url
-                } label: { Label("Export backup (JSON)", systemImage: "square.and.arrow.up").font(.headline) }
+                Button { showRecoveryAuth = true } label: { Label("New recovery code", systemImage: "key.horizontal").font(.headline) }
+                Divider()
+                Button { showExport = true } label: {
+                    Label("Export encrypted backup", systemImage: "lock.square.and.arrow.up").font(.headline)
+                }
                 if let exportURL { ShareLink(item: exportURL) { Label("Share backup", systemImage: "doc").font(.headline) } }
             }
             Button { Task { await state.logout() } } label: {
                 Text("Log out").font(.title3.weight(.semibold)).frame(maxWidth: .infinity).frame(height: 62).background(Color.card, in: .rect(cornerRadius: 22))
             }
             .buttonStyle(.press)
+        }
+        .sheet(isPresented: $showExport) {
+            MeExportBackup { url in exportURL = url; showExport = false }
+        }
+        .sheet(isPresented: $showRecoveryAuth) {
+            MeRecoveryAuth { password, code in
+                await state.regenerateRecoveryCode(loginPassword: password, mfaCode: code)
+            }
+        }
+        .sheet(isPresented: $showVaultPass) {
+            MeChangeVaultPassphrase()
         }
     }
 
@@ -358,12 +375,145 @@ struct MeSettings: View {
     }
 }
 
+/// Change the vault passphrase. The current passphrase is verified on-device;
+/// the login password is what the server can verify before accepting new
+/// wrapped key material. The DEK and ciphertext do not change.
+struct MeChangeVaultPassphrase: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var current = ""
+    @State private var next = ""
+    @State private var confirm = ""
+    @State private var loginPassword = ""
+    @State private var mfaCode = ""
+    @State private var done = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Encryption passphrase").font(.title2.bold())
+            Text("The server never sees this. Changing it re-wraps the same data key; your notes/health/finance stay encrypted.")
+                .foregroundStyle(Color.dim)
+            SecureField("Current vault passphrase", text: $current)
+            SecureField("New passphrase (8+)", text: $next)
+            SecureField("Confirm new passphrase", text: $confirm)
+            Divider()
+            SecureField("Login password (to confirm)", text: $loginPassword)
+            TextField("Authenticator code (if enabled)", text: $mfaCode)
+            if let e = state.vaultError { Text(e).font(.subheadline.weight(.semibold)) }
+            HStack {
+                Button("Cancel") { dismiss() }.buttonStyle(.bordered)
+                Spacer()
+                Button(done ? "Changed" : "Change passphrase") {
+                    Task {
+                        guard next == confirm else { state.vaultError = "The new passphrases don’t match."; return }
+                        guard !loginPassword.isEmpty else { state.vaultError = "Enter your login password."; return }
+                        state.vaultError = nil
+                        let ok = await state.changePassphrase(current: current, to: next,
+                                                              loginPassword: loginPassword, mfaCode: mfaCode)
+                        if ok { done = true; try? await Task.sleep(for: .seconds(1)); dismiss() }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(current.isEmpty || next.isEmpty || loginPassword.isEmpty)
+            }
+        }
+        .padding(DS.pad)
+        .onAppear { state.vaultError = nil }
+    }
+}
+
+/// Re-auth before replacing recovery credentials. The vault passphrase is
+/// verified on-device; this extra login proof is what the server can verify.
+struct MeRecoveryAuth: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    let onSubmit: (String, String) async -> Void
+    @State private var password = ""
+    @State private var code = ""
+    @State private var busy = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Confirm it’s you").font(.title2.bold())
+            Text("A new recovery code replaces the old one immediately. Confirm your login password (and authenticator code if enabled).")
+                .foregroundStyle(Color.dim)
+            SecureField("Login password", text: $password)
+            TextField("Authenticator code (if enabled)", text: $code)
+            if let e = state.vaultError { Text(e).font(.subheadline.weight(.semibold)) }
+            HStack {
+                Button("Cancel") { dismiss() }.buttonStyle(.bordered)
+                Spacer()
+                Button(busy ? "Working…" : "Continue") {
+                    Task {
+                        busy = true; defer { busy = false }
+                        await onSubmit(password, code)
+                        if state.vaultError == nil { dismiss() }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(password.isEmpty || busy)
+            }
+        }
+        .padding(DS.pad)
+        .onAppear { state.vaultError = nil }
+    }
+}
+
+/// Encrypted backup sheet. The file is sealed before it touches the temporary
+/// directory, so even the intermediate copy is unreadable.
+struct MeExportBackup: View {
+    @EnvironmentObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    let onReady: (URL) -> Void
+    @State private var passphrase = ""
+    @State private var confirm = ""
+    @State private var busy = false
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Encrypted backup").font(.title2.bold())
+            Text("Choose a backup passphrase. It is not stored anywhere — if you lose it, this file cannot be opened. The server cannot read the backup either.")
+                .foregroundStyle(Color.dim)
+            SecureField("Backup passphrase (10+)", text: $passphrase)
+            SecureField("Confirm passphrase", text: $confirm)
+            if let message { Text(message).font(.subheadline.weight(.semibold)) }
+            HStack {
+                Button("Cancel") { dismiss() }.buttonStyle(.bordered)
+                Spacer()
+                Button(busy ? "Sealing…" : "Create file") {
+                    guard passphrase.count >= 10 else { message = "Use at least 10 characters."; return }
+                    guard passphrase == confirm else { message = "The passphrases don’t match."; return }
+                    busy = true; defer { busy = false }
+                    guard let data = state.exportEncrypted(passphrase: passphrase) else {
+                        message = "Could not build the backup."; return
+                    }
+                    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("MeOS-Backups", isDirectory: true)
+                    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                    let url = dir.appendingPathComponent("MeOS-backup.meosenc.json")
+                    do {
+                        try data.write(to: url, options: [.atomic, .completeFileProtection])
+                        onReady(url)
+                        dismiss()
+                    } catch {
+                        message = "Could not write the backup file."
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(passphrase.isEmpty || confirm.isEmpty || busy)
+            }
+        }
+        .padding(DS.pad)
+    }
+}
+
 struct MeChangePassword: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var current = ""
     @State private var next = ""
     @State private var confirm = ""
+    @State private var code = ""
     @State private var busy = false
     @State private var message: String?
     @State private var done = false
@@ -375,6 +525,7 @@ struct MeChangePassword: View {
             MField(icon: "key", placeholder: "Current password", text: $current, secure: true)
             MField(icon: "key.fill", placeholder: "New password (8+)", text: $next, secure: true)
             MField(icon: "checkmark.shield", placeholder: "Confirm new password", text: $confirm, secure: true)
+            MField(icon: "number", placeholder: "Authenticator code (if enabled)", text: $code)
             if let message { Text(message).font(.subheadline.weight(.semibold)).transition(.opacity) }
             MButton(title: busy ? "Saving…" : done ? "Changed" : "Change password", icon: done ? "checkmark" : "arrow.right") { Task { await save() } }
                 .disabled(busy || done)
@@ -387,7 +538,7 @@ struct MeChangePassword: View {
         guard next == confirm else { message = "The new passwords don’t match."; return }
         busy = true; defer { busy = false }
         do {
-            try await state.api.changePassword(current: current, next: next)
+            try await state.api.changePassword(current: current, next: next, code: code)
             withAnimation(DS.spring) { done = true; message = "Password changed." }
             try? await Task.sleep(for: .seconds(1)); dismiss()
         } catch let e as APIError where e.status == 404 {

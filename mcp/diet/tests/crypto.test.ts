@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { deriveKey, newSalt, open, seal } from '../src/crypto';
+import { deriveKey, newSalt, open, openValue, seal, sealValue } from '../src/crypto';
 
 const plain = Buffer.from('{"txns":[{"amount":200,"cat":"auto"}]}');
 
@@ -26,5 +26,17 @@ describe('vault crypto', () => {
 		const a = await deriveKey('abc', salt, 10_000);
 		const b = await deriveKey('abc', salt, 10_000);
 		expect(a.equals(b)).toBe(true);
+	});
+
+	test('v2 envelopes use a per-key subkey and reject v1 cross-reads', async () => {
+		const dek = Buffer.alloc(32, 3);
+		const env = sealValue(plain, dek, 'meos.notes', 2);
+		expect(env.v).toBe(2);
+		expect(openValue(env, dek, 'meos.notes').equals(plain)).toBe(true);
+		expect(() => openValue(env, dek, 'meos.events')).toThrow();
+
+		const legacy = sealValue(plain, dek, 'meos.notes', 1);
+		expect(legacy.v).toBe(1);
+		expect(openValue(legacy, dek, 'meos.notes').equals(plain)).toBe(true);
 	});
 });

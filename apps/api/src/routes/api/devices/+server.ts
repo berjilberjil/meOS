@@ -2,10 +2,12 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { listDevices, parseDeviceRegistration, registerDevice } from '$lib/server/devices';
 import { readJsonBody } from '$lib/server/http';
+import { enforceRateLimit } from '$lib/server/security';
 
 /** Every device signed into this account, most recently active first. */
 export const GET: RequestHandler = async ({ locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  enforceRateLimit(`devices-get:${locals.user.id}`, 60, 60_000);
   return json({ devices: await listDevices(locals.user.id) });
 };
 
@@ -16,6 +18,7 @@ export const GET: RequestHandler = async ({ locals }) => {
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  enforceRateLimit(`devices-put:${locals.user.id}`, 60, 60_000);
 
   const body = (await readJsonBody(request, 8_192)) as Record<string, unknown>;
   const parsed = parseDeviceRegistration(body);

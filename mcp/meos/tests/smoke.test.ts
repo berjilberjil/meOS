@@ -153,7 +153,8 @@ test('future dates are accepted for events but not past purchases', async () => 
       name: 'Time machine',
       price_inr: 10,
       category: 'other',
-      bought_on: addDays(todayKey(), 10)
+      bought_on: addDays(todayKey(), 10),
+      confirm: true
     });
     assert.equal((badPurchase.structuredContent as any).error.code, 'invalid_input');
   } finally {

@@ -1,5 +1,6 @@
 import type { AccountConfig } from '../config/types.ts';
 import { MeosMcpError, errors } from '../utils/errors.ts';
+import { totp } from '../auth/totp.ts';
 
 export interface MeosUser {
   id: number;
@@ -74,10 +75,16 @@ export class MeosApiClient {
   }
 
   private async signIn(): Promise<void> {
+    const body: Record<string, string> = {
+      username: this.account.username,
+      password: this.account.password
+    };
+    if (this.account.mfaSecret) body.code = totp(this.account.mfaSecret);
+
     const res = await this.fetchImpl(`${this.account.baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ username: this.account.username, password: this.account.password }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(this.account.requestTimeoutMs)
     }).catch(() => {
       throw errors.upstream('Could not reach the MeOS backend.');
@@ -86,6 +93,21 @@ export class MeosApiClient {
     if (!res.ok) {
       if (res.status === 429) throw errors.rateLimited(60);
       if (res.status >= 500) throw errors.upstream('The MeOS backend is temporarily unavailable.');
+      if (res.status === 401) {
+        const text = (await res.text().catch(() => '')).slice(0, 2_000);
+        let mfaRequired = false;
+        try {
+          const body = JSON.parse(text) as { mfaRequired?: unknown };
+          mfaRequired = body.mfaRequired === true;
+        } catch {
+          /* not JSON; generic error below */
+        }
+        if (mfaRequired) {
+          throw errors.unauthenticated(
+            'MeOS MFA is enabled for this account. Set MEOS_MCP_MFA_SECRET to the same TOTP seed (or disable MFA for the gateway account).'
+          );
+        }
+      }
       // Never distinguish "no such user" from "wrong password".
       throw errors.unauthenticated('The configured MeOS account could not sign in. Check MEOS_USERNAME / MEOS_PASSWORD.');
     }
@@ -140,12 +162,13 @@ export class MeosApiClient {
       throw errors.rateLimited(30);
     }
     if (!res.ok) {
-      const text = (await res.text().catch(() => '')).slice(0, 200).replace(/\s+/g, ' ');
+      // Never echo an upstream body here: a 4xx message can contain a record's
+      // title or another user's input, and MCP errors are shown to the model.
       throw new MeosMcpError(
         res.status >= 500 ? 'upstream_unavailable' : 'upstream_error',
         res.status >= 500
           ? 'The MeOS backend is temporarily unavailable.'
-          : `The MeOS backend rejected the request (HTTP ${res.status}${text ? `: ${text}` : ''}).`,
+          : `The MeOS backend rejected the request (HTTP ${res.status}).`,
         { status: res.status }
       );
     }

@@ -1,0 +1,90 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly dependency/secret drift check.
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: TruffleHog (verified secrets only)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ""
+          head: HEAD
+          extra_args: --only-verified
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: API (production dependencies)
+        working-directory: apps/api
+        run: |
+          bun install --frozen-lockfile
+          bun audit --production
+
+      - name: MCP gateway (production dependencies)
+        working-directory: mcp/meos
+        run: |
+          npm ci
+          npm audit --omit=dev --audit-level=high
+
+      - name: Diet MCP (production dependencies)
+        working-directory: mcp/diet
+        run: |
+          bun install --frozen-lockfile
+          bun audit --production
+
+      - name: Stuff MCP (production dependencies)
+        working-directory: mcp/stuff
+        run: |
+          bun install --frozen-lockfile
+          bun audit --production
+
+  sast:
+    name: Semgrep + Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install semgrep
+      - name: Semgrep (OWASP + secrets)
+        run: semgrep scan --config p/owasp-top-ten --config p/secrets --severity ERROR --error apps/api/src mcp/meos/src mcp/diet/src mcp/stuff/src
+      # Advisory: Trivy also sees dev-only tooling (Vite/Vitest). The blocking
+      # dependency gate is the production audit above; keep this visible without
+      # turning a dev-server advisory into a red build.
+      - name: Trivy filesystem (high/critical, advisory)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table

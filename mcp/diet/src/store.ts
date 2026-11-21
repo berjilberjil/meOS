@@ -124,7 +124,7 @@ async function localUp(): Promise<boolean> {
 	}
 }
 
-type Remote = { base: string; cookie: string; dek: Buffer };
+type Remote = { base: string; cookie: string; dek: Buffer; dataVersion: number };
 
 async function connectRemote(): Promise<Remote> {
 	const base = menv('BASE_URL', 'https://meos-api.berjiljacob.workers.dev').replace(/\/$/, '');
@@ -150,7 +150,7 @@ async function connectRemote(): Promise<Remote> {
 			: (() => {
 					throw new Error('Set MEOS_VAULT_PASSPHRASE (or MEOS_VAULT_RECOVERY)');
 				})();
-	return { base, cookie, dek };
+	return { base, cookie, dek, dataVersion: meta.dataVersion ?? 1 };
 }
 
 function decodeKey(raw: Record<string, unknown>, dek: Buffer, key: string): unknown {
@@ -170,7 +170,7 @@ async function remoteNutrition(r: Remote): Promise<{ raw: Record<string, unknown
 }
 
 async function putNutrition(r: Remote, n: NutritionState): Promise<void> {
-	const envl = sealValue(Buffer.from(JSON.stringify(n)), r.dek, 'meos.nutrition');
+	const envl = sealValue(Buffer.from(JSON.stringify(n)), r.dek, 'meos.nutrition', r.dataVersion);
 	const res = await fetch(r.base + '/api/state/meos.nutrition', {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json', Cookie: r.cookie },

@@ -222,7 +222,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       ]
     });
     return json(object);
-  } catch (e) {
-    throw error(502, `Could not read that image: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    // Provider errors can echo prompt/image content; never return them.
+    throw error(502, 'Could not read that image. Try again.');
   }
 };
