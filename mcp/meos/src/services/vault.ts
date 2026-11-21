@@ -129,7 +129,7 @@ export class VaultService {
     }
     const dek = await this.unlock();
     if (!dek) throw errors.vaultLocked();
-    const envelope = sealValue(Buffer.from(JSON.stringify(value), 'utf8'), dek, key);
+    const envelope = sealValue(Buffer.from(JSON.stringify(value), 'utf8'), dek, key, meta.dataVersion ?? 1);
     await this.api.putState(key, envelope);
   }
 

@@ -18,6 +18,8 @@ final class AppState: ObservableObject {
     @Published var username = ""
     @Published var authError: String?
     @Published var isWorking = false
+    /// The account has TOTP enabled and the last sign-in needs a code.
+    @Published var mfaRequired = false
 
     // Zero-knowledge vault
     let vault = Vault()
@@ -355,8 +357,8 @@ final class AppState: ObservableObject {
         }
     }
 
-    func login(username u: String, password p: String) async {
-        await authenticate { try await self.api.login(username: u, password: p) }
+    func login(username u: String, password p: String, code: String = "") async {
+        await authenticate { try await self.api.login(username: u, password: p, code: code) }
     }
     func register(username u: String, password p: String) async {
         await authenticate { try await self.api.register(username: u, password: p) }
@@ -367,10 +369,14 @@ final class AppState: ObservableObject {
         defer { isWorking = false }
         do {
             let user = try await op()
+            mfaRequired = false
             username = user.username
             markSession(active: true, username: user.username)
             await loadAndGate(hadCache: false)
         } catch {
+            if let api = error as? APIError, api.mfaRequired {
+                mfaRequired = true
+            }
             authError = (error as? APIError)?.message ?? error.localizedDescription
         }
     }
@@ -466,6 +472,12 @@ final class AppState: ObservableObject {
         await api.logout()
         markSession(active: false)
         api.clearCache()
+        // The old plaintext export (and any encrypted backup copy) lived in the
+        // temporary directory. Remove both on logout so a signed-out device
+        // does not keep a shareable copy of the vault around.
+        let tmp = FileManager.default.temporaryDirectory
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("MeOS-backup.json"))
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("MeOS-Backups", isDirectory: true))
         vault.forget(username: username)
         HTTPCookieStorage.shared.cookies?.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
         fitness = [:]
@@ -484,6 +496,7 @@ final class AppState: ObservableObject {
         fold = nil
         username = ""; isHydrated = false; lastSyncError = nil
         pendingRaw = nil; recoveryCodeToShow = nil; vaultError = nil
+        mfaRequired = false
         phase = .loggedOut
     }
 
@@ -519,10 +532,15 @@ final class AppState: ObservableObject {
             let material = try await Task.detached(priority: .userInitiated) {
                 try Vault.deriveSetup(passphrase: passphrase)
             }.value
+            // Decode the pre-encryption snapshot BEFORE adopting the new meta.
+            // Once `vault.hasMeta` is true, `decodePayload` deliberately drops
+            // any module that arrives in plaintext (anti-downgrade). During
+            // first-run setup every module is still plaintext, so decoding after
+            // adoption would empty the local models — and `migrateEncryptExisting`
+            // would then upload those empties as the new "encrypted" state.
+            let payload = try api.decodePayload(fromRaw: raw)
             vault.adoptSetup(material)
             let (meta, code) = (material.meta, material.recoveryCode)
-            // The raw pulled at login is all plaintext (pre-encryption) → passes through.
-            let payload = try api.decodePayload(fromRaw: raw)
             apply(payload)
             try await api.putCryptoMeta(meta)
             // Cache the key BEFORE migrating so an interrupted first run can still
@@ -530,12 +548,15 @@ final class AppState: ObservableObject {
             vault.cacheToKeychain(username: username)
             isHydrated = true
             migrateTrainingIfNeeded()
-            await migrateEncryptExisting(raw: raw)
+            let failed = await migrateEncryptExisting(raw: raw)
             // Refresh the on-disk cache so it holds ciphertext, not the old plaintext.
             _ = try? await api.fetchStateRaw()
             recoveryCodeToShow = code
             pendingRaw = nil
-            lastSyncError = nil; lastHydrateError = nil
+            lastSyncError = failed.isEmpty
+                ? nil
+                : "Some modules could not be encrypted yet: \(failed.joined(separator: ", ")). Keep the app open and retry."
+            lastHydrateError = nil
             phase = .loggedIn
             Task { await self.registerCurrentDevice(force: true) }
             SixPackWidgetStore.save(sixPack)
@@ -546,7 +567,11 @@ final class AppState: ObservableObject {
     }
 
     /// Re-upload every existing module encrypted (one-time migration after setup).
-    private func migrateEncryptExisting(raw: [String: Any]) async {
+    private func migrateEncryptExisting(raw: [String: Any]) async -> [String] {
+        // Surface failures instead of `try?`-ing every module into an empty
+        // success. A plaintext module left behind after the meta exists is
+        // dropped by the anti-downgrade read path on the next unlock.
+        var failed: [String] = []
         let jobs: [(String, Encodable)] = [
             (StateKey.fitness, fitness), (StateKey.fitnessProfile, fitnessProfile),
             (StateKey.notes, notes), (StateKey.days, days), (StateKey.profile, profile),
@@ -560,9 +585,14 @@ final class AppState: ObservableObject {
             (StateKey.appearance, AppearanceStore.shared.settings)
         ]
         for (key, value) in jobs where raw[key] != nil {
-            try? await api.putState(key, value)
+            do { try await api.putState(key, value) }
+            catch { failed.append(key) }
         }
-        if let f = fold { try? await api.putState(StateKey.fold, f) }
+        if let f = fold {
+            do { try await api.putState(StateKey.fold, f) }
+            catch { failed.append(StateKey.fold) }
+        }
+        return failed
     }
 
     func unlockWithPassphrase(_ passphrase: String) async {
@@ -635,11 +665,20 @@ final class AppState: ObservableObject {
     /// an unlocked running MeOS could type a new passphrase, have it accepted
     /// because the DEK is already in memory, and lock the owner out at the next
     /// launch — recoverable only with the recovery code.
-    func changePassphrase(current: String, to newPass: String) async -> Bool {
+    func changePassphrase(current: String, to newPass: String,
+                          loginPassword: String, mfaCode: String = "") async -> Bool {
         vaultError = nil
         guard newPass.count >= 8 else { vaultError = "Use at least 8 characters."; return false }
         guard !vaultBusy else { return false }
         vaultBusy = true; defer { vaultBusy = false }
+        do {
+            // The server cannot verify the vault passphrase, so require a
+            // login re-auth before accepting new wrapped key material.
+            try await api.reauth(password: loginPassword, code: mfaCode)
+        } catch {
+            vaultError = (error as? APIError)?.message ?? "Couldn't confirm your login password."
+            return false
+        }
         guard await verifyPassphrase(current) else {
             vaultError = "That isn't your current passphrase."
             return false
@@ -656,10 +695,18 @@ final class AppState: ObservableObject {
         }
     }
 
-    func regenerateRecoveryCode() async {
+    func regenerateRecoveryCode(loginPassword: String, mfaCode: String = "") async {
         vaultError = nil
         guard !vaultBusy else { return }
         vaultBusy = true; defer { vaultBusy = false }
+        do {
+            // Changing encryption credentials needs a fresh login proof on the
+            // server as well as the current vault passphrase on this device.
+            try await api.reauth(password: loginPassword, code: mfaCode)
+        } catch {
+            vaultError = (error as? APIError)?.message ?? "Couldn't confirm your login password."
+            return
+        }
         let built: (meta: CryptoMeta, recoveryCode: String)
         do { built = try vault.regenerateRecovery() } catch {
             vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -717,6 +764,13 @@ final class AppState: ObservableObject {
         add("fold", fold)
         add("appearance", AppearanceStore.shared.settings)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    /// A backup the server can never read and a lost passphrase cannot open.
+    /// Replaces the old plaintext temp-file export.
+    func exportEncrypted(passphrase: String) -> Data? {
+        guard let plain = exportJSON() else { return nil }
+        return try? EncryptedExport.seal(plain, passphrase: passphrase)
     }
 
     // MARK: - Instant push + live pull (Mac ↔ iPhone)

@@ -60,7 +60,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       prompt
     });
     return json(object);
-  } catch (e) {
-    throw error(502, `Could not read your day: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    throw error(502, 'Could not read your day. Try again.');
   }
 };

@@ -2,6 +2,8 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from './config/env.ts';
 import { createLogger } from './services/logger.ts';
+import { AuditLog } from './services/audit.ts';
+import { IdempotencyStore } from './services/idempotency.ts';
 import { ServiceRegistry } from './services/account.ts';
 import { RateLimiter } from './auth/rateLimit.ts';
 import { stdioClient } from './auth/authenticate.ts';
@@ -11,13 +13,15 @@ import { createHttpServer } from './http.ts';
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
+  const audit = new AuditLog();
+  const idempotency = new IdempotencyStore();
   const registry = new ServiceRegistry(config.accounts, logger);
   const limiter = new RateLimiter(config.rateLimit.windowMs, config.rateLimit.max);
 
   if (config.transport === 'stdio') {
     const client = stdioClient(config);
     const services = registry.get(client.accountId);
-    const server = buildServer({ client, services, logger, limiter });
+    const server = buildServer({ client, services, logger, limiter, audit, idempotency });
     const transport = new StdioServerTransport();
     await server.connect(transport);
     logger.info('ready', { transport: 'stdio', client: client.id, scopes: client.scopes.join(','), tools: 'meos' });
@@ -31,7 +35,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const http = createHttpServer({ config, registry, limiter, logger });
+  const http = createHttpServer({ config, registry, limiter, logger, audit, idempotency });
   await new Promise<void>((resolve, reject) => {
     http.once('error', reject);
     http.listen(config.http.port, config.http.host, () => resolve());

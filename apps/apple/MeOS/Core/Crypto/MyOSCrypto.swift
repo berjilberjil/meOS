@@ -85,6 +85,22 @@ enum MyOSCrypto {
         return SymmetricKey(data: derived)
     }
 
+    // MARK: - Key separation (HKDF-SHA256)
+
+    /// Derive a purpose-specific 32-byte key from the vault DEK.
+    ///
+    /// New vaults (`dataVersion = 2`) use one subkey per state key, so a
+    /// ciphertext moved between two slots fails twice: the key differs and the
+    /// AAD differs. Legacy vaults keep using the DEK directly so existing
+    /// ciphertext and older clients continue to work.
+    static func deriveSubkey(from dek: SymmetricKey, info: String) -> SymmetricKey {
+        HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: dek,
+            info: Data(info.utf8),
+            outputByteCount: dekBytes
+        )
+    }
+
     // MARK: - Seal / open (AES-256-GCM)
 
     /// Seal plaintext → base64(combined box). `aad` binds the ciphertext to a

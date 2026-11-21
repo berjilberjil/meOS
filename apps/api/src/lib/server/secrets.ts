@@ -1,81 +1,176 @@
 import { env } from '$env/dynamic/private';
 
 /**
- * Symmetric encryption for user-added AI provider keys, so they can live in the DB
- * (and sync across devices) without being readable from a database dump alone.
+ * Symmetric encryption for user-added AI provider keys and the TOTP secret, so
+ * they can live in the database without being readable from a database dump
+ * alone.
  *
- * AES-256-GCM (authenticated). The master key comes from MEOS_SECRETS_KEY
- * (legacy MYOS_SECRETS_KEY still works as a fallback):
- *   - a base64 string that decodes to exactly 32 bytes is used directly, or
- *   - any other string is sha256'd into 32 bytes (so a plain passphrase works too).
+ * AES-256-GCM (authenticated). The master key comes from a key ring:
+ *
+ *   MEOS_SECRETS_KEYS='{"v1":"<base64 32 bytes>","v2":"<base64 32 bytes>"}'
+ *   MEOS_SECRETS_KEY_ID=v2
+ *
+ * or the single-key form:
+ *
+ *   MEOS_SECRETS_KEY=<base64 32 bytes>
+ *
+ * New ciphertext is `v2:<key-id>:<base64(iv ‖ ciphertext ‖ tag)>`. Legacy
+ * ciphertext (raw base64, no key id, no AAD) is still decrypted so a rotation
+ * does not lose data; it is re-encrypted lazily by the rotate endpoint.
  *
  * Threat model, honestly: this protects against a DB-only leak (backup, stray
  * SELECT, read replica). It does NOT protect against a full server compromise —
  * the master key is in env, and the server must decrypt to call the providers.
- * If the master key is lost or changed, stored keys become undecryptable and the
- * user re-enters them.
+ * Designated vault data is separately end-to-end encrypted on the client; this
+ * key never touches it.
  *
- * WHY THIS FILE WAS REWRITTEN (Oct 2026, Workers free-tier CPU fix):
- * node:crypto's createCipheriv/createDecipheriv/createHash run through a slow
- * polyfill on Workers — 15-45ms CPU per encrypt/decrypt, over the 10ms free
- * cap, so AI requests died mid-flight. crypto.subtle is native on Workers and
- * fast. The CryptoKey is now derived once and cached in module scope (it used
- * to re-hash the raw key on every single call).
- *
- * Wire format is UNCHANGED: base64(iv(12) ‖ tag(16) ‖ ciphertext), so anything
- * encrypted with the old code still decrypts. Both functions are now async —
- * call sites must await them.
+ * A non-32-byte `MEOS_SECRETS_KEY` is accepted only for *decryption* of legacy
+ * data. New encryption fails closed unless `MEOS_ALLOW_WEAK_SECRETS_KEY=true`,
+ * so a passphrase cannot quietly become the long-term key again.
  */
 
-let cachedKeyPromise: Promise<CryptoKey> | null = null;
-let cachedRaw: string | null = null;
+const KEY_BYTES = 32;
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
 
-async function masterKey(): Promise<CryptoKey> {
-  const raw = env.MEOS_SECRETS_KEY || env.MYOS_SECRETS_KEY;
-  if (!raw) throw new Error('MEOS_SECRETS_KEY is not set on the server');
-  if (cachedKeyPromise && cachedRaw === raw) return cachedKeyPromise;
-  cachedRaw = raw;
-  cachedKeyPromise = (async () => {
-    const decoded = Buffer.from(raw, 'base64');
-    // typed Uint8Array<ArrayBuffer>, not Buffer: crypto.subtle's BufferSource
-    // rejects Buffer's ArrayBufferLike (SharedArrayBuffer can sneak in)
-    let keyBytes: Uint8Array<ArrayBuffer>;
-    if (decoded.length === 32) {
-      keyBytes = new Uint8Array(decoded); // copies into a fresh ArrayBuffer
-    } else {
-      keyBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)));
+type KeyEntry = { id: string; raw: string; key: Promise<CryptoKey>; strong: boolean };
+
+let cache: { signature: string; entries: Map<string, KeyEntry>; active: string } | null = null;
+
+function keyConfig(): { active: string; values: Map<string, string> } {
+  const rawRing = env.MEOS_SECRETS_KEYS?.trim();
+  if (rawRing) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawRing);
+    } catch {
+      throw new Error('MEOS_SECRETS_KEYS must be a JSON object of key-id → base64 key');
     }
-    return crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
-  })().catch((e) => {
-    cachedKeyPromise = null; // never cache a failed derivation
-    cachedRaw = null;
-    throw e;
-  });
-  return cachedKeyPromise;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('MEOS_SECRETS_KEYS must be a JSON object of key-id → base64 key');
+    }
+    const values = new Map<string, string>();
+    for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!/^[a-z0-9_-]{1,32}$/i.test(id)) throw new Error(`Invalid secrets key id "${id}"`);
+      if (typeof value !== 'string' || !value.trim()) throw new Error(`Secrets key "${id}" is empty`);
+      values.set(id, value.trim());
+    }
+    if (!values.size) throw new Error('MEOS_SECRETS_KEYS has no keys');
+    const active = env.MEOS_SECRETS_KEY_ID?.trim() || values.keys().next().value!;
+    if (!values.has(active)) throw new Error(`MEOS_SECRETS_KEY_ID "${active}" is not in MEOS_SECRETS_KEYS`);
+    return { active, values };
+  }
+
+  const single = env.MEOS_SECRETS_KEY || env.MYOS_SECRETS_KEY;
+  if (!single) throw new Error('MEOS_SECRETS_KEY is not set on the server');
+  return { active: env.MEOS_SECRETS_KEY_ID?.trim() || 'v1', values: new Map([['v1', single]]) };
 }
 
-/** Returns base64 of iv(12) ‖ authTag(16) ‖ ciphertext. */
+async function importKey(raw: string): Promise<{ key: CryptoKey; strong: boolean }> {
+  const decoded = Buffer.from(raw, 'base64');
+  if (decoded.length === KEY_BYTES) {
+    return {
+      key: await crypto.subtle.importKey('raw', new Uint8Array(decoded), 'AES-GCM', false, ['encrypt', 'decrypt']),
+      strong: true
+    };
+  }
+  // Legacy passphrase: sha256 it exactly as the old code did, so old ciphertext
+  // still opens. This is never used for new encryption unless explicitly allowed.
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return {
+    key: await crypto.subtle.importKey('raw', new Uint8Array(digest), 'AES-GCM', false, ['encrypt', 'decrypt']),
+    strong: false
+  };
+}
+
+function ring(): { entries: Map<string, KeyEntry>; active: string; activeEntry: KeyEntry } {
+  const cfg = keyConfig();
+  const signature = JSON.stringify([cfg.active, [...cfg.values.entries()]]);
+  if (!cache || cache.signature !== signature) {
+    const entries = new Map<string, KeyEntry>();
+    for (const [id, raw] of cfg.values) {
+      const strong = Buffer.from(raw, 'base64').length === KEY_BYTES;
+      entries.set(id, { id, raw, key: importKey(raw).then((k) => k.key), strong });
+    }
+    cache = { signature, entries, active: cfg.active };
+  }
+  const activeEntry = cache.entries.get(cfg.active);
+  if (!activeEntry) throw new Error('Active secrets key is missing');
+  return { entries: cache.entries, active: cfg.active, activeEntry };
+}
+
+export function activeSecretsKeyId(): string {
+  return ring().active;
+}
+
+function aad(keyId: string): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(new TextEncoder().encode(`meos.secret.v2:${keyId}`));
+}
+
+/** Returns `v2:<key-id>:<base64(iv ‖ ciphertext ‖ tag)>`. */
 export async function encryptSecret(plain: string): Promise<string> {
-  const key = await masterKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  // WebCrypto appends the 16-byte auth tag to the ciphertext — the same layout
-  // the old node:crypto code assembled by hand.
+  const { active, activeEntry } = ring();
+  if (!activeEntry.strong && env.MEOS_ALLOW_WEAK_SECRETS_KEY !== 'true') {
+    throw new Error(
+      'MEOS_SECRETS_KEY must decode to exactly 32 bytes for new encryption. Generate one with: openssl rand -base64 32'
+    );
+  }
+  const key = await activeEntry.key;
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const packed = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain))
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: aad(active) },
+      key,
+      new TextEncoder().encode(plain)
+    )
   );
   const out = new Uint8Array(iv.length + packed.length);
   out.set(iv, 0);
   out.set(packed, iv.length);
-  return Buffer.from(out).toString('base64');
+  return `v2:${active}:${Buffer.from(out).toString('base64')}`;
+}
+
+function parseV2(blob: string): { keyId: string; body: string } | null {
+  const match = /^v2:([a-z0-9_-]{1,32}):(.+)$/i.exec(blob);
+  return match ? { keyId: match[1]!, body: match[2]! } : null;
 }
 
 export async function decryptSecret(blob: string): Promise<string> {
-  const key = await masterKey();
+  const { entries, activeEntry } = ring();
+  const parsed = parseV2(blob);
+  if (parsed) {
+    const entry = entries.get(parsed.keyId);
+    if (!entry) throw new Error(`Unknown secrets key id "${parsed.keyId}" — add it to MEOS_SECRETS_KEYS`);
+    const buf = Buffer.from(parsed.body, 'base64');
+    const plain = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: new Uint8Array(buf.subarray(0, IV_BYTES)),
+        additionalData: aad(parsed.keyId)
+      },
+      await entry.key,
+      new Uint8Array(buf.subarray(IV_BYTES))
+    );
+    return new TextDecoder().decode(plain);
+  }
+
+  // Legacy raw base64(iv ‖ ciphertext ‖ tag), no key id, no AAD. Try the active
+  // key first, then every other key in the ring so a rotation is reversible.
   const buf = Buffer.from(blob, 'base64');
-  const iv = buf.subarray(0, 12);
-  const packed = buf.subarray(12); // ciphertext ‖ tag
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, packed);
-  return new TextDecoder().decode(plain);
+  const candidates = [activeEntry, ...[...entries.values()].filter((e) => e.id !== activeEntry.id)];
+  for (const entry of candidates) {
+    try {
+      const plain = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: new Uint8Array(buf.subarray(0, IV_BYTES)) },
+        await entry.key,
+        new Uint8Array(buf.subarray(IV_BYTES))
+      );
+      return new TextDecoder().decode(plain);
+    } catch {
+      /* try the next key */
+    }
+  }
+  throw new Error('Could not decrypt the stored secret with any configured key');
 }
 
 /** Display form for the UI — never send the raw key back to the client. */
@@ -83,4 +178,11 @@ export function maskKey(plain: string): string {
   const t = plain.trim();
   if (t.length <= 8) return '••••';
   return `${t.slice(0, 4)}…${t.slice(-4)}`;
+}
+
+/** Re-encrypt one stored secret under the active key. */
+export async function rotateSecret(blob: string): Promise<string> {
+  const plain = await decryptSecret(blob);
+  const next = await encryptSecret(plain);
+  return next;
 }

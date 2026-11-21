@@ -42,7 +42,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         .join('\n')
     });
     return json(object);
-  } catch (e) {
-    throw error(502, `Could not classify that: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    throw error(502, 'Could not classify that. Try again.');
   }
 };

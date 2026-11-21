@@ -4,6 +4,11 @@ One central [Model Context Protocol](https://modelcontextprotocol.io) server for
 modules that genuinely exist in this repository to authorised AI clients over **stdio** or **Streamable
 HTTP**, using the existing MeOS backend and the existing zero-knowledge vault.
 
+For remote clients (ChatGPT, Claude, Cursor) it is a full **OAuth 2.1 authorization server** with PKCE,
+dynamic client registration, per-module scopes, refresh-token rotation and a local client dashboard. The
+gateway runs on the owner's machine (or a trusted host) and is exposed through an HTTPS tunnel; the MeOS
+backend only ever sees ciphertext.
+
 This is an extension of MeOS, not a second product:
 
 - No duplicate database, user table, or profile.
@@ -58,18 +63,28 @@ snapshot, not a ledger. There is no honest way to offer `meos_finance_list_trans
 ## 2. Architecture
 
 ```
-MCP client (Claude Desktop / Claude Code / Cursor / other)
-        │  stdio  or  Streamable HTTP (POST /mcp + Bearer token)
+ChatGPT / Claude / Cursor / other MCP client
+        │  HTTPS (public tunnel)  ── OAuth 2.1 + PKCE ──▶  /oauth/authorize, /oauth/token
+        │  POST /mcp  + Bearer access token
         ▼
-mcp/meos  ── auth ─ rate limit ─ scope check ─ zod validation ─ audit log
+mcp/meos  ── OAuth token validation ─ scope check ─ rate limit ─ zod validation
+        │        │
+        │        ├── /admin  (loopback-only dashboard: clients, scopes, revoke, audit)
+        │        ├── audit.jsonl (0600, metadata only)
+        │        └── idempotency.json (0600, write replay protection)
         │
         ├── MeosApiClient  ── HTTPS ──▶ apps/api (Cloudflare Worker)
-        │                                  └── D1 app_state + R2
+        │                                  └── D1 app_state + R2 (ciphertext)
         │
         ├── VaultService   ── unlocks the DEK from meos.crypto, AES-GCM per key
         ├── StateStore     ── one key at a time, per-key lock, no whole-state writes
         └── existing diet/plan.ts for all meal maths
 ```
+
+The gateway is the **only** place plaintext exists outside the owner's devices. The MeOS Worker never
+receives the vault passphrase, the DEK, or decrypted module data. This is why the MCP server is local
+rather than a route inside the Worker: putting decryption in the Worker would silently turn the
+end-to-end encryption into server-side encryption.
 
 Every write touches **only the module key being changed** (plus `meos.trash` for deletes). There is no
 endpoint that accepts arbitrary SQL, table names, or user ids.
@@ -89,7 +104,7 @@ mcp/meos/
     prompts/            reusable MeOS prompts
     schemas/            structural mirrors of the Swift models
     utils/              dates, pagination, recurrence, errors, result envelope
-  tests/                fake MeOS backend + 91 tests
+  tests/                fake MeOS backend + 104 tests
 ```
 
 ---
@@ -128,11 +143,43 @@ The HTTP transport is **stateless** (`enableJsonResponse: true`): every MCP requ
 GET streams are intentionally disabled (405). This keeps the gateway horizontally simple and avoids
 long-lived in-memory sessions.
 
-The listener refuses to start without a token, and refuses a non-loopback bind unless
-`MEOS_MCP_ALLOW_REMOTE=true`. For any remote deployment, terminate TLS in a trusted proxy (Caddy, nginx,
-Cloudflare Tunnel) and keep the gateway itself on loopback.
+The listener refuses to start without credentials (a static token/client map, or OAuth), and refuses a
+non-loopback bind unless `MEOS_MCP_ALLOW_REMOTE=true`. For any remote deployment, terminate TLS in a
+trusted proxy (Caddy, nginx, Cloudflare Tunnel) and keep the gateway itself on loopback.
 
 Health check: `GET /healthz` → `{"ok":true}` (no data, no auth).
+
+### OAuth 2.1 + ChatGPT (recommended for remote clients)
+
+Static bearer tokens are fine for a desktop client you launch yourself. ChatGPT and other remote
+connectors need OAuth. Set:
+
+```bash
+MEOS_MCP_TRANSPORT=http
+MEOS_MCP_PUBLIC_URL=https://mcp.example.com   # HTTPS origin of your tunnel, no path
+MEOS_MCP_ADMIN_PASSWORD="$(openssl rand -base64 24)"
+MEOS_MCP_HTTP_HOST=127.0.0.1
+```
+
+Then expose `127.0.0.1:8788` through Cloudflare Tunnel (or Caddy) and point the client at
+`https://mcp.example.com/mcp`. The client discovers:
+
+- `GET /.well-known/oauth-protected-resource` — resource + authorization server
+- `GET /.well-known/oauth-authorization-server` — endpoints, PKCE S256, DCR
+- `POST /oauth/register` — dynamic client registration (public client, PKCE required)
+- `GET/POST /oauth/authorize` — owner consent screen; asks for `MEOS_MCP_ADMIN_PASSWORD`
+- `POST /oauth/token` — authorization code + refresh grant
+- `POST /oauth/revoke` — token revocation
+
+The consent screen starts with **only `meos.profile.read`** ticked. Every other module must be granted
+deliberately; write scopes, `secret` and `destructive` are off by default. Access tokens last 15 minutes,
+refresh tokens rotate, and reusing an old refresh token revokes the whole family.
+
+Admin dashboard: `http://127.0.0.1:8788/admin`. It is loopback-only by default; use
+`ssh -L 8788:127.0.0.1:8788 <host>`. It lists connected clients, granted scopes, last use, token counts
+and recent audit events, and has a one-click **Disconnect** that revokes every token for that client.
+
+Full ChatGPT steps are in [`MCP_SETUP.md`](../../MCP_SETUP.md).
 
 ---
 
@@ -148,9 +195,10 @@ user.
 | `MEOS_USERNAME` / `MEOS_PASSWORD` | yes | MeOS account used by the server |
 | `MEOS_VAULT_PASSPHRASE` | for encrypted data | Vault passphrase |
 | `MEOS_VAULT_RECOVERY` | alternative | One-time recovery code |
+| `MEOS_MFA_SECRET` | if login MFA enabled | Same base32 TOTP seed as the app, so the gateway can sign in unattended |
 | `MEOS_TIMEZONE` | no | IANA zone for "today" and app-style stamps; set when the host is elsewhere |
 | `MEOS_MCP_SCOPES` | no | Scopes for stdio / single-token mode; default `read` |
-| `MEOS_MCP_HTTP_TOKEN` | HTTP single-client | Bearer token |
+| `MEOS_MCP_HTTP_TOKEN` | HTTP single-client | Bearer token; optional when OAuth is configured |
 | `MEOS_MCP_CLIENTS_JSON` | HTTP multi-client | Per-client token hash, scopes, account, optional expiry |
 | `MEOS_MCP_ACCOUNTS_JSON` | no | Additional MeOS accounts for genuine isolation |
 | `MEOS_MCP_HTTP_HOST` / `PORT` / `PATH` | no | Defaults `127.0.0.1:8788/mcp` |
@@ -158,6 +206,14 @@ user.
 | `MEOS_MCP_RATE_LIMIT` | no | Requests per client per minute (default 120) |
 | `MEOS_MCP_MAX_BODY_BYTES` | no | HTTP body cap (default 2 MB) |
 | `MEOS_MCP_LOG_LEVEL` | no | `debug`, `info`, `warn`, `error` |
+| `MEOS_MCP_PUBLIC_URL` | for OAuth | HTTPS origin of the tunnel, e.g. `https://mcp.example.com` (no path) |
+| `MEOS_MCP_ADMIN_PASSWORD` | for OAuth | ≥12 chars; gates consent + `/admin`. Not the MeOS login or vault passphrase |
+| `MEOS_MCP_ALLOW_DCR` | no | Dynamic client registration, default `true` |
+| `MEOS_MCP_ADMIN_LOCAL_ONLY` | no | Refuse `/admin` through a proxy, default `true` |
+| `MEOS_MCP_OAUTH_STORE` | no | OAuth state file, default `~/.meos/mcp/oauth.json` (0600) |
+| `MEOS_MCP_AUDIT_LOG` | no | Audit log, default `~/.meos/mcp/audit.log` (0600) |
+| `MEOS_MCP_IDEMPOTENCY_STORE` | no | Write replay cache, default `~/.meos/mcp/idempotency.json` (0600) |
+| `MEOS_MCP_CORS_ORIGINS` | no | Exact browser origins allowed to call `/mcp`; default none |
 
 Multi-client example (raw tokens are hashed at startup and discarded; `token_sha256` avoids plaintext
 entirely):
@@ -178,26 +234,56 @@ gateway and never leaves it.)
 
 ## 5. Permission model
 
+**Granular scopes (OAuth; one per module):**
+
 | Scope | Grants |
 |---|---|
-| `read` | list, get, search, analyse, summarise |
-| `write` | create, update, complete, tick, log |
+| `meos.profile.read` / `.write` | name, city, role, links, goals, achievements; edit profile |
+| `meos.finance.read` / `.write` | net worth, balances, spending, purchases; log/edit purchases |
+| `meos.fitness.read` / `.write` | workouts, programme, body metrics; log/edit workouts |
+| `meos.health.read` / `.write` | weight, calories, water, steps; log daily metrics |
+| `meos.notes.read` / `.write` | notes/search; create, edit, pin, delete |
+| `meos.tasks.read` / `.write` | to-dos and habits; create, complete, move |
+| `meos.calendar.read` / `.write` | events, tags, reminders; create/edit |
+| `meos.goals.read` / `.write` | life goals, achievements; edit/archive |
+| `meos.memory.read` / `.write` | curated memory; add/update |
+| `meos.diet.read` / `.write` | meal plans, food log, targets; edit/log |
+| `meos.knowledge.read` / `.write` | learning videos; add/edit |
+| `meos.files.read` / `.write` | media metadata, storage usage, recycle bin; restore/purge |
+| `meos.analytics.read` | daily/weekly/monthly summaries and app status |
+| `offline_access` | issue a refresh token for use while the client is not active |
+
+**Additional flags:**
+
+| Scope | Effect |
+|---|---|
+| `secret` | locked note bodies, profile contact/private brief, body-photo metadata |
 | `destructive` | delete/purge; **also requires `confirm: true` in the call** |
-| `health` | health, fitness, diet and body-photo data (read and write) |
-| `secret` | locked notes, profile contact/private brief, body-photo metadata |
+| `meos.admin.none` | explicit no-access sentinel; grants nothing |
+
+**Legacy scopes** (`read`, `write`, `health`, `secret`, `destructive`) still work for static bearer
+clients and stdio. They expand to the granular set with the original gates preserved: `read` alone does
+**not** unlock health/fitness/diet; `health` does; `write` is required for any write.
 
 Rules enforced in code:
 
-1. A newly configured client is **read-only** unless scopes are granted.
-2. Every tool declares its required scopes; all must be present.
-3. Destructive tools additionally refuse without `confirm: true`, and the tool input schema includes it.
-4. Reads of health/fitness/diet need `health`. Body-photo metadata needs `health` **and** `secret`.
-5. Locked note bodies and profile private fields need `secret`; without it they are redacted, not missing.
-6. The body-photo tools never return image bytes, thumbnails, or signed URLs.
-7. Unauthorized calls are rejected before the handler runs, so they reveal nothing about the record.
+1. A newly registered OAuth client gets no data scope; the consent page defaults to
+   `meos.profile.read` only. A static client is read-only unless configured otherwise.
+2. `tools/list` and `resources/list` are filtered. A client cannot even discover a module it lacks.
+3. Every tool declares its required scopes; all must be present. The check runs before the handler and
+   before any record lookup.
+4. Destructive tools additionally refuse without `confirm: true`; financially significant purchase writes
+   also require `confirm: true`.
+5. Body-photo metadata needs the fitness scope **and** `secret`; image bytes, thumbnails and signed URLs
+   are never returned.
+6. Locked note bodies and profile private fields need `secret`; without it they are redacted, not missing.
+7. Write tools accept an optional `idempotency_key`. A retry with the same client + tool + key returns the
+   cached result instead of executing twice.
 
 Tested cases include: read-only client cannot write; write client cannot destruct; missing confirm is
-refused; one account cannot read another's notes; expired token is refused.
+refused; finance writes need confirm; one account cannot read another's notes; expired, revoked and
+wrong-audience tokens are refused; refresh-token reuse revokes the family; prompt-injected note text cannot
+widen scopes.
 
 ---
 
@@ -228,8 +314,8 @@ Lists use `limit` (max 100) and an opaque `cursor`; the response includes
 | `meos_finance_get_spending` | Category spend with refunds/interest separated |
 | `meos_finance_list_purchases` | Stuff ledger with ROI maths, filterable/paginated |
 | `meos_finance_get_purchase` | One purchase |
-| `meos_finance_add_purchase` | Log a purchase (rupees or `"₹2,499"`, months → 30-day life) |
-| `meos_finance_update_purchase` | Partial update; `retired=true` preferred over delete |
+| `meos_finance_add_purchase` | Log a purchase (rupees or `"₹2,499"`, months → 30-day life); requires `confirm: true` |
+| `meos_finance_update_purchase` | Partial update; `retired=true` preferred over delete; requires `confirm: true` |
 | `meos_finance_delete_purchase` | Move to recycle bin (**destructive + confirm**) |
 | `meos_finance_list_categories` | Built-in + custom Stuff shelves |
 | `meos_finance_get_purchase_summary` | Ownership burn vs take-home pay |
@@ -436,17 +522,24 @@ Cursor remote server entry:
 }
 ```
 
-**ChatGPT:** support depends on the connector. Only use a remote MCP connector that can send a custom
-`Authorization: Bearer` header. If your plan/connector cannot, put an OAuth-aware proxy in front rather
-than weakening this server. Do not expose an unauthenticated endpoint.
+**ChatGPT:** use a remote MCP connector that supports OAuth. Point it at
+`https://<your-tunnel>/mcp`; it discovers the metadata, registers, and opens the consent page. If your
+plan/connector can only send a static bearer header, use that instead — never expose an unauthenticated
+endpoint or put a shared token in a URL.
 
 ---
 
 ## 10. Security architecture
 
-- **Authentication.** HTTP requires `Authorization: Bearer`. Tokens are compared as SHA-256 hashes in
-  constant time; raw tokens are never retained after startup. Optional `expires_at` enforces expiry.
-  stdio relies on the OS process boundary and is launched by the local user.
+- **Authentication.** HTTP requires `Authorization: Bearer`. Static tokens are compared as SHA-256 hashes
+  in constant time; raw tokens are never retained after startup. OAuth access tokens are opaque,
+  hash-only at rest, audience-bound to the `/mcp` resource, short-lived (15 min), revocable, and validated
+  for expiry/revocation on every request. Refresh tokens rotate and family-reuse detection revokes the
+  chain. stdio relies on the OS process boundary and is launched by the local user.
+- **OAuth.** Authorization code + PKCE S256 only; no implicit flow, no password grant, no client secret
+  for public clients. Dynamic registration is exact-redirect-URI only (HTTPS or loopback), capped, and
+  rate-limited. The consent screen requires the MCP admin password and grants only the modules the owner
+  ticks. `WWW-Authenticate` advertises the protected-resource metadata.
 - **Identity.** The gateway signs in to MeOS with server-side credentials and derives the user from the
   session. No tool has a `user_id`, `account`, or `username` argument. Multiple accounts are isolated by
   separate `AccountServices` (separate cookie, DEK, and state cache).
@@ -458,12 +551,17 @@ than weakening this server. Do not expose an unauthenticated endpoint.
   ids, enums, amounts and array sizes are bounded. No arbitrary SQL or table access exists.
 - **Rate limiting.** Sliding-window per client (default 120/min), applied once per HTTP request or per
   stdio tool call.
-- **Logging.** Structured JSON to stderr. Field names matching token/password/secret/body/content/note/
-  transaction/health/args are dropped; only tool name, client id, outcome, duration and key count are
-  logged. No payloads.
+- **Logging.** Structured JSON to stderr plus an append-only local audit log (`audit.log`, 0600, rotated
+  at 5 MB). Field names matching token/password/secret/body/content/note/transaction/health/args/key are
+  dropped; only tool name, client id, outcome, duration, request id and salted IP/UA hashes are recorded.
+  No payloads, no raw IPs, no arguments.
+- **Prompt injection.** Tool results are marked `content_trust: "untrusted"`; server instructions tell the
+  model that retrieved notes/events/memory are data, never authorization. The server enforces scopes,
+  confirmation and ownership before any handler runs, so an injected instruction cannot call a tool the
+  client was not granted — even if the model believes it should.
 - **Errors.** Stable codes (`forbidden`, `confirmation_required`, `vault_locked`, `not_found`,
-  `invalid_input`, `rate_limited`, `upstream_error`, …) with safe messages. Upstream text is truncated and
-  never includes credentials.
+  `invalid_input`, `rate_limited`, `upstream_error`, …) with safe messages. Upstream response bodies are
+  never echoed to a client — only the status code and a generic message.
 - **Transport.** Loopback by default; non-loopback requires explicit opt-in; body size capped; JSON only;
   no GET SSE; no CORS wildcard.
 - **Recycle bin.** Deletes capture the whole object (and media keys) in `meos.trash` *before* removing it.
@@ -473,15 +571,11 @@ than weakening this server. Do not expose an unauthenticated endpoint.
 
 ### Changes made to the existing backend
 
-Two small, additive changes were needed for real functionality (no schema migration):
-
-1. `apps/api/src/routes/api/state/[key]/+server.ts` — allowlist `meos.trash` / `myos.trash`. The app
-   already pushes `StateKey.trash`; without this, a delete could not be captured and an MCP delete would
-   have failed safely.
-2. `apps/api/src/lib/server/storage.ts` + `body-photos/+server.ts` — include each object's `bytes` so the
-   gateway can report aggregate media usage. The response field is additive; existing clients ignore it.
-
-Existing app functionality, sync, encryption, RLS-era migrations and the diet/stuff MCPs are untouched.
+The gateway itself is additive. The security hardening pass also changed the Worker (hashed sessions,
+MFA, re-auth, audit, CSP/CSRF, anti-downgrade state checks, 10-minute media URLs) and the Apple client
+(MFA/reauth UI, encrypted backup, first-run setup fix, v2 envelopes). The complete file map and risk
+register are in [`SECURITY_AUDIT.md`](../../SECURITY_AUDIT.md). Existing app functionality, sync, the
+vault format (v1 read/write compatibility) and the diet/stuff MCPs are preserved.
 
 ---
 
@@ -536,7 +630,7 @@ Do not expose port 8788 directly. The gateway speaks plain HTTP and expects a tr
 
 ```bash
 cd mcp/meos
-npm test          # 91 tests, node:test
+npm test          # 104 tests, node:test
 npm run typecheck # tsc --noEmit
 ```
 
@@ -556,7 +650,13 @@ drives the tools through the same dispatcher and MCP transport used in productio
 - diet plan/log semantics and partial food updates;
 - recycle-bin capture, restore and media release;
 - Streamable HTTP initialize, tools/list, tools/call, resources and prompts;
-- HTTP 401/404/405/413 behaviour.
+- HTTP 401/404/405/413 behaviour;
+- OAuth 2.1 DCR, PKCE consent, code exchange, wrong verifier, code reuse, refresh rotation and reuse
+  detection, token revocation, admin login/revoke, unsafe redirect URIs;
+- granular scope filtering of `tools/list` and server-side denial of an ungranted tool;
+- idempotent write replay;
+- prompt-injected note text cannot widen scopes or auto-confirm a delete;
+- audit-log redaction of tokens, passwords, note text and key material.
 
 No test needs a real account, network, or secrets.
 
@@ -568,8 +668,8 @@ No test needs a real account, network, or secrets.
 |---|---|
 | `vault_locked` | Set `MEOS_VAULT_PASSPHRASE` (or recovery code). The login password does not unlock the vault. |
 | `locked_bad_key` in status | The passphrase is wrong or the meta was rewrapped. Recheck it. No data was changed. |
-| `The configured MeOS account could not sign in` | Check `MEOS_USERNAME` / `MEOS_PASSWORD`; the backend never distinguishes wrong user from wrong password. |
-| HTTP exits with “refuses to start without credentials” | Set `MEOS_MCP_HTTP_TOKEN` or `MEOS_MCP_CLIENTS_JSON`. |
+| `The configured MeOS account could not sign in` | Check `MEOS_USERNAME` / `MEOS_PASSWORD`; the backend never distinguishes wrong user from wrong password. If MFA is on, set `MEOS_MCP_MFA_SECRET` and make sure the host clock is correct (TOTP allows ±30s). |
+| HTTP exits with “refuses to start without credentials” | Set `MEOS_MCP_HTTP_TOKEN`, `MEOS_MCP_CLIENTS_JSON`, or both OAuth vars (`MEOS_MCP_PUBLIC_URL` + `MEOS_MCP_ADMIN_PASSWORD`). |
 | HTTP exits with “Refusing to bind” | Keep loopback, or set `MEOS_MCP_ALLOW_REMOTE=true` behind TLS. |
 | `forbidden` on health/diet | Grant the `health` scope. Locked notes and body photos also need `secret`. |
 | `confirmation_required` | Re-call a destructive tool with `"confirm": true` after user approval. |
@@ -593,5 +693,14 @@ No test needs a real account, network, or secrets.
 - **No standalone reminders.** A reminder is a lead time on an event. Device notifications belong to the app.
 - **Progress photos cannot be restored by MCP.** The files live on the device and in encrypted R2; restore
   is an app action. Metadata is readable with `secret`; bytes never are.
-- **ChatGPT connector support varies.** Use a connector that can send a bearer header, or front the
-  gateway with an OAuth proxy.
+- **The gateway must be running for ChatGPT to reach MeOS.** It is a local process behind a tunnel, not a
+  Worker route. If the Mac is asleep, the connector times out; the dashboard shows the last successful
+  call. This is the price of keeping the vault key off the server.
+- **ChatGPT sees what it asks for.** Once MeOS returns a decrypted journal/note/finance result, the AI
+  provider processes it. MeOS cannot make a third-party model unsee data. Grant modules deliberately and
+  revoke the client when you are done.
+- **OAuth admin is local-only by default.** `/admin` is refused when a proxy header is present unless
+  `MEOS_MCP_ADMIN_LOCAL_ONLY=false`. Use SSH port-forwarding.
+- **No generic SQL / filesystem / URL-fetch tool.** This is intentional and not configurable.
+- **Journal is not a MeOS module.** `meos.journal.*` is therefore not a grantable scope; notes and memory
+  are the closest real surfaces and have their own scopes.

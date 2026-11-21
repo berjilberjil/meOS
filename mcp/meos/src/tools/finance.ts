@@ -339,7 +339,7 @@ export const financeTools: ToolDefinition[] = [
     name: 'meos_finance_add_purchase',
     title: 'Add a purchase',
     description:
-      'Log something bought into the MeOS Stuff ledger. Price may be passed as rupees (number or string). The payback window is months; it is converted to the 30-day months MeOS stores. This is a real write and syncs to the app.',
+      'Log something bought into the MeOS Stuff ledger. Price may be passed as rupees (number or string). The payback window is months; it is converted to the 30-day months MeOS stores. This is a financially significant write: it requires the write scope and confirm=true, and it syncs to the app.',
     inputSchema: {
       name: z.string().min(1).max(120),
       price_inr: z.union([z.number(), z.string()]).describe('Price in rupees, e.g. 2499 or "₹2,499".'),
@@ -347,9 +347,11 @@ export const financeTools: ToolDefinition[] = [
       bought_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       roi_months: z.number().int().min(1).max(600).optional(),
       note: z.string().max(2000).optional(),
-      link: z.string().max(2000).optional()
+      link: z.string().max(2000).optional(),
+      confirm: z.boolean().optional()
     },
     scopes: ['write'],
+    confirmation: true,
     async handler(args, ctx) {
       const name = cleanText(args.name, 'name', 120);
       const pricePaise = parseRupees(args.price_inr, 'price_inr');
@@ -390,7 +392,7 @@ export const financeTools: ToolDefinition[] = [
     name: 'meos_finance_update_purchase',
     title: 'Update a purchase',
     description:
-      'Change fields on a Stuff purchase. Only supplied fields are touched. Use retired=true for something you no longer own; prefer that over deleting.',
+      'Change fields on a Stuff purchase. Only supplied fields are touched. Use retired=true for something you no longer own; prefer that over deleting. Requires confirm=true because it changes a financial record.',
     inputSchema: {
       id: z.string().min(1),
       name: z.string().min(1).max(120).optional(),
@@ -400,9 +402,11 @@ export const financeTools: ToolDefinition[] = [
       roi_months: z.number().int().min(1).max(600).optional(),
       note: z.string().max(2000).optional(),
       link: z.string().max(2000).optional(),
-      retired: z.boolean().optional()
+      retired: z.boolean().optional(),
+      confirm: z.boolean().optional()
     },
     scopes: ['write'],
+    confirmation: true,
     async handler(args, ctx) {
       const id = String(args.id).toLowerCase();
       const state = await readObject<BelongingsState>(ctx, STATE_KEYS.belongings, DEFAULT_BELONGINGS);

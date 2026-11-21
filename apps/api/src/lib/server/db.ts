@@ -81,6 +81,19 @@ export async function sql(
 sql.json = (v: unknown): string => JSON.stringify(v);
 
 /**
+ * Execute a fixed SQL statement with no caller-supplied values.
+ *
+ * This exists only for DDL that cannot take bind parameters (ALTER TABLE /
+ * PRAGMA identifiers). Every call site must pass a literal built from a fixed
+ * allowlist — never a request value. Application data always goes through the
+ * tagged template above.
+ */
+export async function execLiteral(query: string): Promise<Row[]> {
+  const res = await db().prepare(query).all();
+  return (res.results ?? []).map(revive);
+}
+
+/**
  * ISO-8601 UTC — the one timestamp format this database uses. SQLite's
  * `current_timestamp` renders `YYYY-MM-DD HH:MM:SS`, which does NOT sort
  * against an ISO string ('T' > ' '), so timestamps are always written from

@@ -3,10 +3,14 @@ import type { RequestHandler } from './$types';
 import { sql } from '$lib/server/db';
 import { etagMatches } from '$lib/server/etag';
 import { readStateVersion } from '$lib/server/stateVersion';
+import { enforceRateLimit } from '$lib/server/security';
 
 // Return all of the logged-in user's app state as { key: value }.
 export const GET: RequestHandler = async ({ locals, request }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  // The app polls every 1.5s (~40/min). 180 leaves room for a second device
+  // and a manual refresh without letting a stolen cookie hammer D1.
+  enforceRateLimit(`state-get:${locals.user.id}`, 180, 60_000);
 
   const etag = await readStateVersion(locals.user.id);
 

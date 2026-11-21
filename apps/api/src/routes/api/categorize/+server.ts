@@ -50,7 +50,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       ].join('\n')
     });
     return json(object);
-  } catch (e) {
-    throw error(502, `Could not categorize: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    throw error(502, 'Could not categorize. Try again.');
   }
 };

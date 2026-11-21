@@ -115,7 +115,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       toolCalls: calls,
       model: resolved.providerId
     });
-  } catch (e) {
-    throw error(502, `Could not answer that: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    // Provider errors can echo prompt content; keep the client message generic.
+    throw error(502, 'Could not answer that. Try again.');
   }
 };

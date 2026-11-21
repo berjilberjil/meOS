@@ -69,7 +69,7 @@ export const POST: RequestHandler = async ({ locals }) => {
     });
 
     return json(object);
-  } catch (e) {
-    throw error(502, `Could not fetch news: ${(e as Error)?.message ?? 'try again'}`);
+  } catch {
+    throw error(502, 'Could not fetch news. Try again.');
   }
 };

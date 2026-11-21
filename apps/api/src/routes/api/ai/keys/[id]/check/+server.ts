@@ -2,11 +2,15 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sql, nowISO } from '$lib/server/db';
 import { decryptSecret } from '$lib/server/secrets';
+import { ensureAiTable } from '$lib/server/ai';
 import { listModels, type ProviderId } from '$lib/server/modelCatalog';
+import { enforceRateLimit } from '$lib/server/security';
 
 /** Re-validate a stored key and refresh its cached model list. */
 export const POST: RequestHandler = async ({ params, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  enforceRateLimit(`ai-key-check:${locals.user.id}`, 30, 60_000);
+  await ensureAiTable();
   const id = Number(params.id);
   if (!Number.isFinite(id)) throw error(400, 'Bad id');
 
@@ -21,7 +25,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
   }
 
   const res = await listModels(rows[0].provider as ProviderId, apiKey);
-  if (!res.ok) throw error(400, `Key check failed: ${res.error ?? 'invalid key'}`);
+  if (!res.ok) throw error(400, 'The provider rejected that key.');
 
   await sql`update ai_credentials set models = ${sql.json(res.models)}, updated_at = ${nowISO()}
             where id = ${id} and user_id = ${locals.user.id}`;

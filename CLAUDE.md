@@ -39,7 +39,8 @@ meOS/
 - **AI:** AI SDK 5 with Gemini / Anthropic / OpenAI. Gemini is the env fallback.
   Voice uses Workers AI (Deepgram Aura).
 - **MCP:** Bun + stdio for `diet`/`stuff`; Node 22.18+ with the official SDK
-  for the central `meos` gateway (stdio + Streamable HTTP).
+  for the central `meos` gateway (stdio + Streamable HTTP + OAuth 2.1/PKCE,
+  per-module scopes, admin dashboard, audit log).
 
 ## Run
 
@@ -147,7 +148,13 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
   scoped by `user_id`; there is no RLS to fall back on, so every query must
   include that predicate.
 - **Secrets:** never commit them. Server secrets live in Wrangler; user AI
-  keys are AES-256-GCM encrypted with `MEOS_SECRETS_KEY`.
+  keys and TOTP seeds are AES-256-GCM encrypted with the `MEOS_SECRETS_KEY`
+  ring. Login-password pepper and MFA recovery pepper are separate stable values.
+- **Security:** read `SECURITY.md` before changing auth, state, media or MCP.
+  Sessions are hash-only; unsafe API requests need a trusted Origin; once
+  `meos.crypto` exists the server refuses plaintext module values. The MCP
+  gateway is local and holds the vault DEK by design; never move decryption into
+  the Worker.
 - **TDD**, frequent commits, conventional-commit messages.
 
 ## Status & roadmap

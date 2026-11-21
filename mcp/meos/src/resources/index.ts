@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { findTool } from '../tools/index.ts';
 import { runTool, type ToolContext } from '../tools/registry.ts';
+import { canUseTool } from '../auth/scopes.ts';
 import { todayKey } from '../utils/dates.ts';
 
 interface ResourceSpec {
@@ -110,6 +111,11 @@ const RESOURCES: ResourceSpec[] = [
 
 export function registerResources(server: McpServer, ctx: ToolContext): void {
   for (const spec of RESOURCES) {
+    // A resource is a thin wrapper over a tool, so its visibility follows the
+    // same module scope. Do not advertise `meos://finance/summary` to a client
+    // that cannot read finance.
+    const backing = findTool(spec.tool);
+    if (!canUseTool(ctx.client.scopes, backing)) continue;
     server.registerResource(
       spec.name,
       spec.uri,

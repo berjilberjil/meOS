@@ -862,6 +862,9 @@ struct MeAI: View {
     @State private var provider: AIProvider = .gemini
     @State private var key = ""
     @State private var label = ""
+    @State private var loginPassword = ""
+    @State private var authCode = ""
+    @State private var deleteTarget: APIClient.AIKeyDTO?
 
     var body: some View {
         Screen(title: "AI", sub: "Assistant & keys") {
@@ -884,7 +887,7 @@ struct MeAI: View {
                 }
                 .contextMenu {
                     Button("Recheck") { Task { await ai.recheck(k) } }
-                    Button("Delete", role: .destructive) { Task { await ai.delete(k) } }
+                    Button("Delete", role: .destructive) { deleteTarget = k }
                 }
             }
             MCard {
@@ -892,10 +895,17 @@ struct MeAI: View {
                 Picker("Provider", selection: $provider) { ForEach(AIProvider.allCases) { Text($0.label).tag($0) } }.pickerStyle(.segmented)
                 TextField("Label (optional)", text: $label)
                 SecureField("API key", text: $key)
+                SecureField("Login password (to confirm)", text: $loginPassword)
+                TextField("Authenticator code (if enabled)", text: $authCode)
                 Button(ai.busy ? "Checking…" : "Add key") {
-                    Task { if await ai.addKey(provider: provider, label: label, key: key) { key = ""; label = "" } }
+                    Task {
+                        if await ai.addKey(provider: provider, label: label, key: key,
+                                           password: loginPassword, code: authCode) {
+                            key = ""; label = ""; loginPassword = ""; authCode = ""
+                        }
+                    }
                 }
-                .font(.headline).disabled(key.isEmpty || ai.busy)
+                .font(.headline).disabled(key.isEmpty || loginPassword.isEmpty || ai.busy)
                 if let e = ai.actionError { Text(e).font(.subheadline) }
             }
             if !ai.keys.isEmpty {
@@ -912,6 +922,45 @@ struct MeAI: View {
             }
         }
         .task { await ai.loadIfNeeded() }
+        .sheet(item: $deleteTarget) { k in MeDeleteAIKey(key: k) }
+    }
+}
+
+/// Deleting a provider key is a sensitive action: the server asks for the login
+/// password (and an authenticator code when MFA is enabled) on top of the
+/// session. A stolen session alone cannot remove a key.
+struct MeDeleteAIKey: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var ai = AISettingsStore.shared
+    let key: APIClient.AIKeyDTO
+    @State private var password = ""
+    @State private var code = ""
+    @State private var busy = false
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Delete \(key.label.isEmpty ? key.provider.capitalized : key.label)?").font(.title2.bold())
+            Text("The key is removed from the server permanently. The AI features fall back to the built-in model.")
+                .foregroundStyle(Color.dim)
+            SecureField("Login password", text: $password)
+            TextField("Authenticator code (if enabled)", text: $code)
+            if let message { Text(message).font(.subheadline.weight(.semibold)) }
+            HStack {
+                Button("Cancel") { dismiss() }.buttonStyle(.bordered)
+                Spacer()
+                Button(busy ? "Deleting…" : "Delete") {
+                    Task {
+                        busy = true; defer { busy = false }
+                        if await ai.delete(key, password: password, code: code) { dismiss() }
+                        else { message = ai.actionError ?? "Could not delete the key." }
+                    }
+                }
+                .buttonStyle(.borderedProminent).tint(.red)
+                .disabled(password.isEmpty || busy)
+            }
+        }
+        .padding(DS.pad)
     }
 }
 

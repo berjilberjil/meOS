@@ -64,6 +64,7 @@ function parseAccounts(env: NodeJS.ProcessEnv): Map<string, AccountConfig> {
     password: oneLine(requireEnv(env, 'MEOS_PASSWORD'), 'MEOS_PASSWORD'),
     vaultPassphrase: env.MEOS_VAULT_PASSPHRASE?.trim() || undefined,
     vaultRecovery: env.MEOS_VAULT_RECOVERY?.trim() || undefined,
+    mfaSecret: env.MEOS_MFA_SECRET ? oneLine(env.MEOS_MFA_SECRET.trim(), 'MEOS_MFA_SECRET') : undefined,
     requestTimeoutMs
   };
 
@@ -80,13 +81,19 @@ function parseAccounts(env: NodeJS.ProcessEnv): Map<string, AccountConfig> {
       password: oneLine(String(row.password ?? ''), `account ${id} password`),
       vaultPassphrase: row.vaultPassphrase ? String(row.vaultPassphrase) : undefined,
       vaultRecovery: row.vaultRecovery ? String(row.vaultRecovery) : undefined,
+      mfaSecret: row.mfaSecret ? String(row.mfaSecret) : undefined,
       requestTimeoutMs
     });
   }
   return accounts;
 }
 
-function parseClients(env: NodeJS.ProcessEnv, accounts: Map<string, AccountConfig>, transport: TransportKind): Map<string, ClientConfig> {
+function parseClients(
+  env: NodeJS.ProcessEnv,
+  accounts: Map<string, AccountConfig>,
+  transport: TransportKind,
+  oauthEnabled = false
+): Map<string, ClientConfig> {
   const clients = new Map<string, ClientConfig>();
   const raw = parseJsonArray<Record<string, unknown>>(env.MEOS_MCP_CLIENTS_JSON, 'MEOS_MCP_CLIENTS_JSON');
 
@@ -111,7 +118,8 @@ function parseClients(env: NodeJS.ProcessEnv, accounts: Map<string, AccountConfi
       tokenHash: sha || hashToken(token),
       scopes: row.scopes ? parseScopes(Array.isArray(row.scopes) ? row.scopes.join(',') : String(row.scopes)) : defaultScopes,
       accountId,
-      expiresAt
+      expiresAt,
+      authMethod: 'static'
     });
   }
 
@@ -122,21 +130,26 @@ function parseClients(env: NodeJS.ProcessEnv, accounts: Map<string, AccountConfi
       id: 'stdio',
       tokenHash: null,
       scopes: defaultScopes,
-      accountId: 'owner'
+      accountId: 'owner',
+      authMethod: 'stdio'
     });
   } else if (clients.size === 0) {
     const token = env.MEOS_MCP_HTTP_TOKEN?.trim();
-    if (!token) {
+    if (token) {
+      clients.set('default', {
+        id: 'default',
+        tokenHash: hashToken(token),
+        scopes: defaultScopes,
+        accountId: 'owner',
+        authMethod: 'static'
+      });
+    } else if (!oauthEnabled) {
       throw new Error(
-        'HTTP transport refuses to start without credentials. Set MEOS_MCP_HTTP_TOKEN or MEOS_MCP_CLIENTS_JSON.'
+        'HTTP transport refuses to start without credentials. Set MEOS_MCP_HTTP_TOKEN, MEOS_MCP_CLIENTS_JSON, or OAuth (MEOS_MCP_PUBLIC_URL + MEOS_MCP_ADMIN_PASSWORD).'
       );
     }
-    clients.set('default', {
-      id: 'default',
-      tokenHash: hashToken(token),
-      scopes: defaultScopes,
-      accountId: 'owner'
-    });
+    // OAuth-only mode: no static token is required; every request must present
+    // an access token issued through consent.
   }
 
   if (transport === 'stdio' && clients.size > 1) {
@@ -156,6 +169,54 @@ function parseClients(env: NodeJS.ProcessEnv, accounts: Map<string, AccountConfi
   return clients;
 }
 
+function parseOAuth(env: NodeJS.ProcessEnv, path: string): RuntimeConfig['oauth'] {
+  const publicUrl = env.MEOS_MCP_PUBLIC_URL?.trim();
+  const adminPassword = env.MEOS_MCP_ADMIN_PASSWORD?.trim();
+  if (!publicUrl && !adminPassword) return undefined;
+  if (!publicUrl) {
+    throw new Error('MEOS_MCP_ADMIN_PASSWORD is set but MEOS_MCP_PUBLIC_URL is missing. OAuth needs the public HTTPS base URL.');
+  }
+  if (!adminPassword) {
+    throw new Error(
+      'MEOS_MCP_PUBLIC_URL is set but MEOS_MCP_ADMIN_PASSWORD is missing. The consent screen and dashboard require an admin password.'
+    );
+  }
+  if (adminPassword.length < 12) {
+    throw new Error('MEOS_MCP_ADMIN_PASSWORD must be at least 12 characters. Generate: openssl rand -base64 24');
+  }
+  oneLine(adminPassword, 'MEOS_MCP_ADMIN_PASSWORD');
+
+  let issuer: URL;
+  try {
+    issuer = new URL(publicUrl);
+  } catch {
+    throw new Error('MEOS_MCP_PUBLIC_URL must be a valid URL');
+  }
+  const local = issuer.hostname === 'localhost' || issuer.hostname === '127.0.0.1' || issuer.hostname === '[::1]';
+  if (issuer.protocol !== 'https:' && !(issuer.protocol === 'http:' && local)) {
+    throw new Error('MEOS_MCP_PUBLIC_URL must use https:// (http:// only for localhost)');
+  }
+  if (issuer.search || issuer.hash) throw new Error('MEOS_MCP_PUBLIC_URL must not contain a query or fragment');
+  if (issuer.pathname !== '/' && issuer.pathname !== '') {
+    throw new Error('MEOS_MCP_PUBLIC_URL must be an origin (no path)');
+  }
+  const base = issuer.origin;
+  const resource = `${base}${path}`;
+
+  const allowDcr = env.MEOS_MCP_ALLOW_DCR !== 'false';
+  const adminLocalOnly = env.MEOS_MCP_ADMIN_LOCAL_ONLY !== 'false';
+
+  return {
+    issuer: base,
+    resource,
+    adminPassword,
+    storePath: env.MEOS_MCP_OAUTH_STORE?.trim() || '',
+    allowDynamicClientRegistration: allowDcr,
+    adminLocalOnly,
+    accessTokenTtlSeconds: 900
+  };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const transport = (env.MEOS_MCP_TRANSPORT?.trim().toLowerCase() || 'stdio') as TransportKind;
   if (transport !== 'stdio' && transport !== 'http') {
@@ -163,7 +224,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig 
   }
 
   const accounts = parseAccounts(env);
-  const clients = parseClients(env, accounts, transport);
+  // OAuth is parsed first so an OAuth-only HTTP gateway is allowed to start
+  // without a static bearer token.
+  const path = env.MEOS_MCP_HTTP_PATH?.trim() || '/mcp';
+  if (!path.startsWith('/') || /[?#]/.test(path)) {
+    throw new Error('MEOS_MCP_HTTP_PATH must start with "/" and contain no query or fragment');
+  }
+  if (['/admin', '/oauth', '/.well-known', '/healthz'].some((p) => path === p || path.startsWith(`${p}/`))) {
+    throw new Error('MEOS_MCP_HTTP_PATH must not shadow /admin, /oauth, /.well-known or /healthz');
+  }
+  const oauth = parseOAuth(env, path);
+  const clients = parseClients(env, accounts, transport, Boolean(oauth));
 
   const rateMax = Number(env.MEOS_MCP_RATE_LIMIT ?? '120');
   if (!Number.isFinite(rateMax) || rateMax < 1) throw new Error('MEOS_MCP_RATE_LIMIT must be a positive number');
@@ -176,11 +247,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig 
   const port = Number(env.MEOS_MCP_HTTP_PORT ?? '8788');
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('MEOS_MCP_HTTP_PORT must be an integer between 1 and 65535');
-  }
-
-  const path = env.MEOS_MCP_HTTP_PATH?.trim() || '/mcp';
-  if (!path.startsWith('/') || /[?#]/.test(path)) {
-    throw new Error('MEOS_MCP_HTTP_PATH must start with "/" and contain no query or fragment');
   }
 
   const logLevel = (env.MEOS_MCP_LOG_LEVEL?.trim().toLowerCase() || 'info') as RuntimeConfig['logLevel'];
@@ -209,6 +275,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig 
     clients,
     stdioClientId: 'stdio',
     rateLimit: { windowMs: 60_000, max: rateMax },
-    logLevel
+    logLevel,
+    oauth
   };
 }

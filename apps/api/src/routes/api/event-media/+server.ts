@@ -3,10 +3,21 @@ import type { RequestHandler } from './$types';
 import { eventMediaKey, mediaRoomFor, signObjects, uploadObject } from '$lib/server/storage';
 import { decodeBase64Capped, isMediaId } from '$lib/server/media';
 import { readJsonBody } from '$lib/server/http';
+import { enforceRateLimit } from '$lib/server/security';
+import { audit } from '$lib/server/audit';
 
 const MAX_MEDIA_BYTES = 60_000_000;
 /** base64 is 4/3 the decoded size, plus a little JSON envelope. */
 const MAX_REQUEST_BYTES = 81_000_000;
+const SIGNED_URL_TTL_SECONDS = 600;
+
+function ipOf(getClientAddress: () => string): string {
+  try {
+    return getClientAddress();
+  } catch {
+    return 'unknown';
+  }
+}
 
 // Event photos/videos live in R2 instead of inside the encrypted `meos.events`
 // blob, which was 2 MB of base64 re-synced on every poll. SvelteKit only allows
@@ -15,6 +26,7 @@ const MAX_REQUEST_BYTES = 81_000_000;
 // Sign a batch of media ids for reading. `?ids=a,b,c`
 export const GET: RequestHandler = async ({ url, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  enforceRateLimit(`event-media-get:${locals.user.id}`, 120, 60_000);
   const ids = (url.searchParams.get('ids') ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -23,7 +35,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   if (ids.length > 200) throw error(400, 'Too many ids');
 
   const keys = ids.map((id) => eventMediaKey(locals.user!.id, id));
-  const signed = await signObjects(keys, 3600);
+  const signed = await signObjects(keys, SIGNED_URL_TTL_SECONDS);
   const out: Record<string, string> = {};
   for (const id of ids) {
     const u = signed[eventMediaKey(locals.user!.id, id)];
@@ -33,8 +45,9 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 };
 
 // Upload one sealed media object. Body: { id, ciphertextBase64 }.
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, getClientAddress }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  enforceRateLimit(`event-media-put:${locals.user.id}`, 30, 60_000);
   const body = (await readJsonBody(
     request,
     MAX_REQUEST_BYTES,
@@ -55,5 +68,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   await uploadObject(eventMediaKey(locals.user.id, id), bytes, 'application/octet-stream');
+  void audit({
+    event: 'media_upload',
+    outcome: 'success',
+    userId: locals.user.id,
+    ip: ipOf(getClientAddress),
+    userAgent: request.headers.get('user-agent'),
+    meta: { kind: 'event_media', bytes: bytes.length }
+  });
   return json({ ok: true, id });
 };

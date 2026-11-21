@@ -14,12 +14,24 @@ create table if not exists users (
   created_at    text not null default (datetime('now'))
 );
 
+-- Session tokens are never stored. `token_hash` is SHA-256(cookie); `token`
+-- is a random internal id (legacy rows still carry the cookie until first use,
+-- then are upgraded lazily). `public_id` is safe to show in the session list.
 create table if not exists sessions (
-  token      text primary key,
-  user_id    integer not null references users(id) on delete cascade,
-  expires_at text not null
+  token        text primary key,
+  token_hash   text unique,
+  public_id    text unique,
+  user_id      integer not null references users(id) on delete cascade,
+  expires_at   text not null,
+  created_at   text,
+  last_seen_at text,
+  user_agent   text,
+  ip_hash      text,
+  reauth_at    text
 );
 create index if not exists sessions_user_idx on sessions(user_id);
+create index if not exists sessions_token_hash_idx on sessions(token_hash);
+create index if not exists sessions_public_id_idx on sessions(public_id);
 
 -- Per-user app state. One JSON document per key (myos.notes, myos.events, …).
 -- The whole product is built on this table. Values are ciphertext envelopes —
@@ -121,4 +133,36 @@ create table if not exists macro_day (
   payload    text not null,
   created_at text not null,
   primary key (user_id, date)
+);
+
+-- Security audit trail. Metadata only: no request bodies, note text, amounts,
+-- tokens, keys or ciphertext. IP addresses are stored as a salted hash. Kept
+-- for 180 days by opportunistic pruning in lib/server/audit.ts.
+create table if not exists security_events (
+  id         integer primary key autoincrement,
+  at         text not null,
+  user_id    integer,
+  event      text not null,
+  outcome    text not null,
+  ip_hash    text,
+  user_agent text,
+  meta       text
+);
+create index if not exists security_events_user_at_idx on security_events(user_id, at);
+create index if not exists security_events_event_at_idx on security_events(event, at);
+
+-- Optional TOTP second factor. `secret` is AES-256-GCM encrypted with
+-- MEOS_SECRETS_KEY; recovery codes are SHA-256 hashes and are burned on use.
+create table if not exists user_mfa (
+  user_id    integer primary key references users(id) on delete cascade,
+  secret     text not null,
+  enabled    integer not null default 0,
+  created_at text not null,
+  enabled_at text
+);
+create table if not exists mfa_recovery_codes (
+  user_id   integer not null references users(id) on delete cascade,
+  code_hash text not null,
+  used_at   text,
+  primary key (user_id, code_hash)
 );

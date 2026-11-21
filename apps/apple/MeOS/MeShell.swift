@@ -132,6 +132,7 @@ struct MeLogin: View {
     @State private var register = false
     @State private var user = ""
     @State private var pass = ""
+    @State private var code = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -143,6 +144,10 @@ struct MeLogin: View {
             MField(icon: "person", placeholder: "Username", text: $user).padding(.top, 12)
             MField(icon: "key", placeholder: "Password", text: $pass, secure: true)
                 .onSubmit { Task { await submit() } }
+            if state.mfaRequired && !register {
+                MField(icon: "number", placeholder: "Authenticator code", text: $code)
+                    .onSubmit { Task { await submit() } }
+            }
             if let err = state.authError {
                 Text(err).font(.subheadline.weight(.semibold)).transition(.opacity)
             }
@@ -162,7 +167,11 @@ struct MeLogin: View {
         let u = user.trimmingCharacters(in: .whitespaces)
         guard u.count >= 3 else { state.authError = "Username must be at least 3 characters."; return }
         guard pass.count >= 8 else { state.authError = "Password must be at least 8 characters."; return }
-        if register { await state.register(username: u, password: pass) } else { await state.login(username: u, password: pass) }
+        if register {
+            await state.register(username: u, password: pass)
+        } else {
+            await state.login(username: u, password: pass, code: code)
+        }
     }
 }
 

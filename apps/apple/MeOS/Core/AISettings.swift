@@ -111,11 +111,12 @@ final class AISettingsStore: ObservableObject {
     }
 
     @discardableResult
-    func addKey(provider: AIProvider, label: String, key: String) async -> Bool {
+    func addKey(provider: AIProvider, label: String, key: String, password: String, code: String = "") async -> Bool {
         busy = true; actionError = nil
         defer { busy = false }
         do {
-            let added = try await api.aiAddKey(provider: provider.rawValue, label: label, key: key)
+            let added = try await api.aiAddKey(provider: provider.rawValue, label: label, key: key,
+                                               password: password, code: code)
             keys.append(added)
             return true
         } catch {
@@ -147,14 +148,16 @@ final class AISettingsStore: ObservableObject {
         }
     }
 
-    func delete(_ key: APIClient.AIKeyDTO) async {
+    func delete(_ key: APIClient.AIKeyDTO, password: String, code: String = "") async -> Bool {
         actionError = nil
         do {
-            try await api.aiDeleteKey(id: key.id)
+            try await api.aiDeleteKey(id: key.id, password: password, code: code)
             keys.removeAll { $0.id == key.id }
             await pruneRoutes(removing: key.id)
+            return true
         } catch {
             actionError = Self.msg(error)
+            return false
         }
     }
 
