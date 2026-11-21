@@ -35,8 +35,8 @@ $ npm run typecheck
 > tsc --noEmit            (no output = success)
 
 $ npm test
-ℹ tests 104
-ℹ pass 104
+ℹ tests 118
+ℹ pass 118
 ℹ fail 0
 
 $ npm audit --omit=dev --audit-level=high

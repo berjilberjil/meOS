@@ -105,7 +105,7 @@ mcp/meos/
     prompts/            reusable MeOS prompts
     schemas/            structural mirrors of the Swift models
     utils/              dates, pagination, recurrence, errors, result envelope
-  tests/                fake MeOS backend + 104 tests
+  tests/                fake MeOS backend + 118 tests
 ```
 
 ---
@@ -665,7 +665,7 @@ Do not expose port 8788 directly. The gateway speaks plain HTTP and expects a tr
 
 ```bash
 cd mcp/meos
-npm test          # 104 tests, node:test
+npm test          # 118 tests, node:test
 npm run typecheck # tsc --noEmit
 ```
 

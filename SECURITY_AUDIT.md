@@ -170,7 +170,7 @@ Legend: ✅ verified; ⚠️ verified with a documented limitation; ❌ not met.
 | Security-sensitive actions have audit trails | ✅ | `security_events`; MCP JSONL; events for login/MFA/reauth/export/keys/sessions/media/state/OAuth/tool calls |
 | Backups are protected | ✅ | age-encrypted export script; private R2; D1 Time Travel; `docs/BACKUP.md` |
 | Recovery procedures are tested | ⚠️ | Procedure documented; vault recovery/rewrap code exists; no destructive production restore test (by constraint). A local restore drill is in `docs/BACKUP.md`. |
-| Automated security tests pass | ✅ | API 78, MCP 104, diet 13, stuff 10; typecheck/build; `docs/SECURITY_TEST_EVIDENCE.md` |
+| Automated security tests pass | ✅ | API 78, MCP 118, diet 13, stuff 10; typecheck/build; `docs/SECURITY_TEST_EVIDENCE.md` |
 | No unresolved critical/high vulnerabilities | ⚠️ | SEC-15 fixed; production dependency audit clean. Residual high-by-design: MCP host holds passphrase, AI provider sees requested plaintext. No unmitigated critical/high implementation bug known. |
 
 ---
