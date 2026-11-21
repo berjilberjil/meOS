@@ -41,3 +41,6 @@ apps/*/.derived/
 
 # Claude Code local state (also holds scratch copies that can contain .env files)
 .claude/
+
+# SwiftPM finance test build products
+apps/apple/.build/

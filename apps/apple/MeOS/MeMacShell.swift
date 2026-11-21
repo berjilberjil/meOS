@@ -11,16 +11,17 @@ struct MeMacShell: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     enum Space: String, CaseIterable, Identifiable {
-        case today, fitness, notes
+        case today, finance, fitness, notes
         case catherine, events, watch, scan, productivity, stuff, money, macro, gallery, bin, settings
         var id: String { rawValue }
 
-        static let main: [Space] = [.today, .fitness, .notes]
+        static let main: [Space] = [.today, .finance, .fitness, .notes]
         static let more: [Space] = [.catherine, .events, .watch, .scan, .productivity, .stuff, .money, .macro, .gallery, .bin, .settings]
 
         var title: String {
             switch self {
             case .today: "Today"
+            case .finance: "Finance"
             case .fitness: "Fitness"
             case .notes: "Notes"
             case .catherine: AgentConfig.shared.name
@@ -29,7 +30,7 @@ struct MeMacShell: View {
             case .scan: "Scan"
             case .productivity: "Productivity"
             case .stuff: "Stuff"
-            case .money: "Money"
+            case .money: "Fold money"
             case .macro: "Macro"
             case .gallery: "Gallery"
             case .bin: "Recycle bin"
@@ -40,6 +41,7 @@ struct MeMacShell: View {
         var icon: String {
             switch self {
             case .today: "sun.max"
+            case .finance: "indianrupeesign.circle"
             case .fitness: "figure.run"
             case .notes: "note.text"
             case .catherine: "sparkles"
@@ -59,6 +61,7 @@ struct MeMacShell: View {
         @MainActor @ViewBuilder var screen: some View {
             switch self {
             case .today: MeToday()
+            case .finance: MeFinance()
             case .fitness: MeFitness()
             case .notes: MeNotes()
             case .catherine: MeAssistant()
@@ -83,7 +86,7 @@ struct MeMacShell: View {
             Rectangle().fill(Color.hairline).frame(width: 1).ignoresSafeArea()
             NavigationStack {
                 selection.screen
-                    .frame(maxWidth: 760)
+                    .frame(maxWidth: selection == .finance ? 1320 : 760)
                     .frame(maxWidth: .infinity)
             }
             .id(selection)

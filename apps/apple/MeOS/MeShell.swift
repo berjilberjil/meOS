@@ -91,6 +91,7 @@ struct MeTabs: View {
     var body: some View {
         TabView {
             Tab("Today", systemImage: "sun.max") { NavigationStack { MeToday() } }
+            Tab("Finance", systemImage: "indianrupeesign.circle") { NavigationStack { MeFinance() } }
             Tab("Fitness", systemImage: "figure.run") { NavigationStack { MeFitness() } }
             Tab("Notes", systemImage: "note.text") { NavigationStack { MeNotes() } }
             Tab("More", systemImage: "square.grid.2x2") { NavigationStack { MeMore() } }
