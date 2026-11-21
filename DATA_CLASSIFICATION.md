@@ -7,7 +7,7 @@ more specific than “sensitive vs not”, because the encryption and MCP scopes
 
 | Class | Examples | Storage | Encrypted by | Readable by |
 |---|---|---|---|---|
-| **C4 — vault secret** | Finance ledger (accounts, transactions, bank names, balances, investments, liabilities, budgets, goals, statements metadata), notes, journal-like text, health metrics, workouts, diet, events, memory, chat, scans, recycle-bin payloads, profile private fields | D1 `app_state.value` | Client DEK / per-key HKDF; AES-256-GCM | Client with unlocked vault |
+| **C4 — vault secret** | Finance ledger (accounts, transactions, bank names, balances, investments, liabilities, budgets, goals, statements metadata), notes, journal-like text, health metrics, workouts, diet, events, memory, chat, scans, recycle-bin payloads, profile private fields, MCP connector registry (token hashes, scopes, expiry; never raw tokens) | D1 `app_state.value` | Client DEK / per-key HKDF; AES-256-GCM | Client with unlocked vault |
 | **C4 — private media** | Event photos/videos, body/progress photos, document-like attachments | R2 `event-media/<user>/…`, `body-photos/<user>/…` | Client DEK; AES-GCM + per-id AAD | Client with DEK; 10-min signed URL after session check |
 | **C3 — vault key material** | `meos.crypto` wrapped DEK, salts, check token | D1 `app_state['meos.crypto']` | Public by design; wrapped under passphrase/recovery | Anyone with DB can attempt offline passphrase guessing; no plaintext key |
 | **C3 — server secret** | AI provider keys, TOTP seed | D1 `ai_credentials.secret`, `user_mfa.secret` | Worker AES-256-GCM key ring | Worker with `MEOS_SECRETS_KEY`; never returned masked/plain |
@@ -21,6 +21,8 @@ more specific than “sensitive vs not”, because the encryption and MCP scopes
 - Every `app_state` key except `meos.crypto`, `myos.crypto`, `meos.ai.routes`, `myos.ai.routes`.
 - The entire finance ledger document (`meos.finance`) — accounts, transactions, balances, investments,
   liabilities, budgets, goals, audit history.
+- The MCP connector registry (`meos.mcp`) — only SHA-256 token hashes, short prefixes, scopes and expiry.
+  Raw bearer tokens are shown once in the app and are never stored or uploaded.
 - Event/body media bytes in R2.
 - Fold tokens are sealed under the DEK and stored in Keychain / encrypted state.
 - Backups preserve the ciphertext and wrapped key material; they do not add a server-readable copy.
@@ -46,8 +48,9 @@ The Worker stores ciphertext and cannot decrypt these classes. This is verified 
 
 A database-only attacker can learn: number of accounts/transactions is not visible as rows because finance
 is one encrypted document; but module names, document sizes, update times, device names, session times,
-AI model routing, key ids, media object sizes and audit metadata are visible. They cannot read note text,
-transaction payees/amounts, bank names, health values or media bytes.
+AI model routing, key ids, media object sizes and audit metadata are visible. A `meos.mcp` document reveals
+that MCP connectors exist and its approximate size, but not a token, prefix or scope. They cannot read note
+text, transaction payees/amounts, bank names, health values or media bytes.
 
 ## 5. Retention
 

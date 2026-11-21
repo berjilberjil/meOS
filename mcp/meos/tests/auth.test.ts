@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 import { createHarness, errorCode, payload } from './support/harness.ts';
 import { authenticateBearer } from '../src/auth/authenticate.ts';
 import { hashToken } from '../src/config/env.ts';
+import { ServiceRegistry } from '../src/services/account.ts';
+import { DynamicClientRegistry } from '../src/auth/dynamicClients.ts';
+import { silentLogger } from '../src/services/logger.ts';
 import { testConfig } from './support/harness.ts';
 import type { ClientConfig } from '../src/config/types.ts';
 
-test('bearer authentication accepts the configured token and rejects others', () => {
+test('bearer authentication accepts the configured token and rejects others', async () => {
   const client: ClientConfig = {
     id: 'claude',
     tokenHash: hashToken('correct-token'),
@@ -15,10 +18,10 @@ test('bearer authentication accepts the configured token and rejects others', ()
   };
   const config = testConfig({ clients: new Map([[client.id, client]]) });
 
-  assert.equal(authenticateBearer(config, 'Bearer correct-token').id, 'claude');
-  assert.throws(() => authenticateBearer(config, 'Bearer wrong-token'), /not authenticated|not valid/i);
-  assert.throws(() => authenticateBearer(config, undefined), /not authenticated/i);
-  assert.throws(() => authenticateBearer(config, 'Basic abc'), /Bearer/i);
+  assert.equal((await authenticateBearer(config, 'Bearer correct-token')).id, 'claude');
+  await assert.rejects(authenticateBearer(config, 'Bearer wrong-token'), /not authenticated|not valid/i);
+  await assert.rejects(authenticateBearer(config, undefined), /not authenticated/i);
+  await assert.rejects(authenticateBearer(config, 'Basic abc'), /Bearer/i);
 });
 
 test('a transient state-fetch failure is not remembered as an absent vault', async () => {
@@ -44,7 +47,7 @@ test('a transient state-fetch failure is not remembered as an absent vault', asy
   }
 });
 
-test('an expired bearer token is refused', () => {
+test('an expired bearer token is refused', async () => {
   const client: ClientConfig = {
     id: 'claude',
     tokenHash: hashToken('correct-token'),
@@ -53,7 +56,7 @@ test('an expired bearer token is refused', () => {
     expiresAt: '2020-01-01T00:00:00.000Z'
   };
   const config = testConfig({ clients: new Map([[client.id, client]]) });
-  assert.throws(() => authenticateBearer(config, 'Bearer correct-token'), /expired/i);
+  await assert.rejects(authenticateBearer(config, 'Bearer correct-token'), /expired/i);
 });
 
 test('a read-only client cannot create a note', async () => {
@@ -179,6 +182,46 @@ test('profile contact details and private brief are redacted without the secret 
     assert.equal(payload(full).data.identity.email, 'berjil@example.com');
     assert.equal(payload(full).data.about, 'PRIVATE_ABOUT_TEXT');
     assert.equal(JSON.stringify(payload(full)).includes('SECRET_PROFILE_PHOTO_BASE64'), false);
+  } finally {
+    await h.close();
+  }
+});
+
+
+test('app-created tokens authenticate through the encrypted meos.mcp registry', async () => {
+  const h = await createHarness();
+  try {
+    const account = {
+      id: 'a',
+      baseUrl: h.baseUrl,
+      username: h.accounts.a.username,
+      password: h.accounts.a.password,
+      vaultPassphrase: h.accounts.a.passphrase,
+      requestTimeoutMs: 5000
+    };
+    const config = testConfig({ accounts: new Map([['a', account]]), clients: new Map() });
+    const registry = new ServiceRegistry(config.accounts, silentLogger);
+    const dynamic = new DynamicClientRegistry(config, registry, silentLogger, { ttlMs: 0 });
+
+    const active = await authenticateBearer(config, 'Bearer app-secret', dynamic);
+    assert.equal(active.id, 'app:app-claude');
+    assert.deepEqual(active.scopes, ['read', 'health']);
+    assert.equal(active.accountId, 'a');
+
+    await assert.rejects(authenticateBearer(config, 'Bearer revoked-secret', dynamic), /not valid/i);
+    await assert.rejects(authenticateBearer(config, 'Bearer expired-secret', dynamic), /not valid/i);
+    // An empty scope list must never fall through to legacy read-all.
+    await assert.rejects(authenticateBearer(config, 'Bearer empty-secret', dynamic), /not valid/i);
+
+    // App tokens use the same granular vocabulary as OAuth: notes-only must
+    // not unlock finance.
+    const notes = await authenticateBearer(config, 'Bearer notes-secret', dynamic);
+    assert.deepEqual(notes.scopes, ['meos.notes.read']);
+    const notesCtx = { ...h.ctxFor('a'), client: notes };
+    const ownModule = payload(await h.call(notesCtx, 'meos_notes_list'));
+    assert.ok(Array.isArray(ownModule.data.items));
+    const otherModule = await h.call(notesCtx, 'meos_finance_ledger_get_summary');
+    assert.equal(errorCode(otherModule), 'forbidden');
   } finally {
     await h.close();
   }

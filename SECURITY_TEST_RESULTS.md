@@ -13,7 +13,7 @@ Synthetic data only; no production deployment or destructive migration was perfo
 | API production build | success | `bun run build` + `wrangler deploy --dry-run` (2.50 MB / 462 KB gzip) |
 | API production deps | **0 vulnerabilities** | `bun audit --production` (15 packages) |
 | MCP gateway type-check | clean | `npm run typecheck` |
-| MCP gateway tests | **120 passed / 120** | `npm test` |
+| MCP gateway tests | **123 passed / 123** | `npm test` |
 | MCP production deps | **0 vulnerabilities** | `npm audit --omit=dev --audit-level=high` |
 | Diet MCP | 13 passed | `bun test` |
 | Stuff MCP | 10 passed | `bun test` |
@@ -54,6 +54,9 @@ The exact command output is in [`docs/SECURITY_TEST_EVIDENCE.md`](docs/SECURITY_
   login/revoke, unsafe redirect rejection.
 - Granular scopes, filtered `tools/list`, direct ungranted call denied, cross-account isolation,
   locked-note/private-profile redaction.
+- App-managed tokens (`Settings → MCP & AI connectors`) authenticate from the encrypted `meos.mcp` registry;
+  revoked, expired, unparsable and empty-scope tokens fail closed; a notes-only token cannot read finance.
+  The raw token is never stored or returned by the server.
 - Prompt-injected note content cannot widen scopes or auto-confirm a destructive action.
 - Finance ledger writes require `confirm: true` + a unique idempotency key; AI rows start `needsReview`;
   MCP cannot mark them verified/reconciled.
@@ -101,7 +104,7 @@ The exact command output is in [`docs/SECURITY_TEST_EVIDENCE.md`](docs/SECURITY_
 | Sensitive AI writes require confirmation | ✅ | finance/destructive confirm tests |
 | No unrestricted SQL/shell/filesystem | ✅ | tool inventory review |
 | Backup restore tested | ✅ synthetic | `test:restore` |
-| Security regression tests pass | ✅ | 81 API + 120 MCP + diet/stuff |
+| Security regression tests pass | ✅ | 81 API + 123 MCP + diet/stuff |
 | No unresolved critical | ✅ | SEC-15 fixed; no known open critical |
 | No unresolved high without acceptance | ⚠️ | disclosed high-by-design: MCP host trust, AI-provider plaintext |
 | Independent penetration test | ❌ | not performed |

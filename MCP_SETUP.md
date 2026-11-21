@@ -13,6 +13,19 @@ This is deliberate:
 If you want the convenience of "ask ChatGPT about my MeOS data", this is the architecture that keeps the
 database provider out of the plaintext path.
 
+There are two ways to connect a client:
+
+| Client | Recommended auth | Where |
+|---|---|---|
+| Claude Desktop, OpenCode, Cursor, any client that accepts a remote URL + bearer header | **App-managed token** | MeOS → Settings → **MCP & AI connectors** |
+| ChatGPT remote connector / any OAuth 2.1 client | **OAuth + PKCE** | consent screen with `MEOS_MCP_ADMIN_PASSWORD` |
+
+Both use the same module scopes. App-managed tokens are created on an unlocked device, stored as a SHA-256
+hash in the encrypted `meos.mcp` document, and shown raw only once. The gateway decrypts that document with
+the vault passphrase; revoke a token in the app and it is refused on the next registry refresh (10 seconds).
+The gateway must therefore have `MEOS_VAULT_PASSPHRASE` (or `MEOS_VAULT_RECOVERY`) even when it uses
+app-managed tokens.
+
 ---
 
 ## 1. What you need
@@ -73,6 +86,19 @@ npm start
 
 You should see `ready` on stderr and `GET http://127.0.0.1:8788/healthz` should return
 `{"ok":true,"service":"meos-mcp","oauth":true}`.
+
+### Desktop connector with an app-managed token
+
+1. Keep `MEOS_VAULT_PASSPHRASE` set and leave `MEOS_MCP_HTTP_TOKEN` blank.
+2. Start the gateway (`npm run start:http`).
+3. In MeOS → **Settings → MCP & AI connectors**, save the local URL
+   `http://127.0.0.1:8788/mcp` (or your public HTTPS URL) and tap **Test gateway**.
+4. **Create MCP token**, pick only the modules the client needs (profile read is the default), and copy the
+   generated config or URL + `Authorization: Bearer …` header into the client.
+5. Revoke the connector in the app when you are done. The gateway refuses it within 10 seconds.
+
+The raw token is shown once. MeOS stores only its SHA-256 hash; losing the token means creating a new one,
+not recovering the old one.
 
 ### Keep the secrets off the process list
 

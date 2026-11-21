@@ -3,6 +3,7 @@ import type { ClientConfig, RuntimeConfig } from '../config/types.ts';
 import type { OAuthStore } from '../oauth/store.ts';
 import { parseScopes } from './scopes.ts';
 import { errors } from '../utils/errors.ts';
+import type { DynamicClientRegistry } from './dynamicClients.ts';
 
 /**
  * Identity for HTTP clients comes only from the bearer token. A `user_id`,
@@ -10,15 +11,21 @@ import { errors } from '../utils/errors.ts';
  * schemas do not contain those fields and the context is fixed before any tool
  * runs.
  *
- * Two token kinds are accepted:
- *   - a static token from server-side config (legacy / automation), and
+ * Three token kinds are accepted:
+ *   - a static token from server-side config (legacy / automation),
+ *   - an app-managed token created in MeOS → Settings → MCP & AI connectors
+ *     (stored as a SHA-256 hash in the encrypted `meos.mcp` document), and
  *   - an OAuth 2.1 access token issued after owner consent (ChatGPT and other
  *     remote MCP clients).
  *
  * OAuth tokens are validated for expiry, revocation, audience and scope. The
  * resulting ClientConfig carries only that grant's scopes.
  */
-export function authenticateBearer(config: RuntimeConfig, authorization: string | undefined): ClientConfig {
+export async function authenticateBearer(
+  config: RuntimeConfig,
+  authorization: string | undefined,
+  dynamic?: DynamicClientRegistry
+): Promise<ClientConfig> {
   if (!authorization) throw errors.unauthenticated();
   const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
   if (!match) throw errors.unauthenticated('Use "Authorization: Bearer <token>".');
@@ -29,6 +36,7 @@ export function authenticateBearer(config: RuntimeConfig, authorization: string 
     if (!client.tokenHash) continue;
     if (tokenHashMatches(presented, client.tokenHash)) found = client;
   }
+  if (!found && dynamic) found = (await dynamic.authenticate(presented)) ?? undefined;
   if (!found) throw errors.unauthenticated('The bearer token is not valid.');
   if (found.expiresAt && Date.parse(found.expiresAt) <= Date.now()) {
     throw errors.unauthenticated('The bearer token has expired.');
@@ -36,19 +44,20 @@ export function authenticateBearer(config: RuntimeConfig, authorization: string 
   return found;
 }
 
-/** Static token first, then an OAuth access token. Constant-time hash lookup. */
-export function authenticateRequest(
+/** Static/app token first, then an OAuth access token. Constant-time hash lookup. */
+export async function authenticateRequest(
   config: RuntimeConfig,
   authorization: string | undefined,
-  oauthStore?: OAuthStore
-): ClientConfig {
+  oauthStore?: OAuthStore,
+  dynamic?: DynamicClientRegistry
+): Promise<ClientConfig> {
   if (!authorization) throw errors.unauthenticated();
   const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
   if (!match) throw errors.unauthenticated('Use "Authorization: Bearer <token>".');
   const raw = match[1]!.trim();
 
   try {
-    return authenticateBearer(config, authorization);
+    return await authenticateBearer(config, authorization, dynamic);
   } catch (e) {
     if (!oauthStore || !config.oauth) throw e;
   }

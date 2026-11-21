@@ -24,6 +24,7 @@ describe('state key allowlist', () => {
     // allowlist, so every bin push failed with 400 and silently stopped sync.
     expect(STATE_KEYS.has('meos.trash')).toBe(true);
     expect(STATE_KEYS.has('meos.finance')).toBe(true);
+    expect(STATE_KEYS.has('meos.mcp')).toBe(true);
   });
 
   it('accepts finance history shards but nothing else with a suffix', () => {

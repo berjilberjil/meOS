@@ -134,6 +134,10 @@ function parseClients(
       authMethod: 'stdio'
     });
   } else if (clients.size === 0) {
+    // App-managed tokens live in the encrypted `meos.mcp` registry and are
+    // verified per request by DynamicClientRegistry. An empty static list is
+    // therefore valid: if no app token exists either, every request fails 401.
+    // A static token remains supported for headless/CI installs.
     const token = env.MEOS_MCP_HTTP_TOKEN?.trim();
     if (token) {
       clients.set('default', {
@@ -144,12 +148,18 @@ function parseClients(
         authMethod: 'static'
       });
     } else if (!oauthEnabled) {
-      throw new Error(
-        'HTTP transport refuses to start without credentials. Set MEOS_MCP_HTTP_TOKEN, MEOS_MCP_CLIENTS_JSON, or OAuth (MEOS_MCP_PUBLIC_URL + MEOS_MCP_ADMIN_PASSWORD).'
-      );
+      // Dynamic tokens are only usable when the gateway can unlock the vault.
+      // Refuse a deployment that has neither static/OAuth credentials nor a
+      // vault passphrase, so an empty gateway never looks healthy.
+      const canUnlockVault = [...accounts.values()].some((a) => a.vaultPassphrase || a.vaultRecovery);
+      if (!canUnlockVault) {
+        throw new Error(
+          'HTTP transport refuses to start without credentials. Set MEOS_MCP_HTTP_TOKEN, MEOS_MCP_CLIENTS_JSON, or OAuth (MEOS_MCP_PUBLIC_URL + MEOS_MCP_ADMIN_PASSWORD); app-managed tokens also require MEOS_VAULT_PASSPHRASE or MEOS_VAULT_RECOVERY.'
+        );
+      }
     }
-    // OAuth-only mode: no static token is required; every request must present
-    // an access token issued through consent.
+    // With a vault passphrase, app-created tokens are read from `meos.mcp`.
+    // With OAuth, every request must present an access token from consent.
   }
 
   if (transport === 'stdio' && clients.size > 1) {

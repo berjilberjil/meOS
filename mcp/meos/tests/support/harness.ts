@@ -11,6 +11,7 @@ import type { ToolContext } from '../../src/tools/registry.ts';
 import { findTool } from '../../src/tools/index.ts';
 import { runTool } from '../../src/tools/registry.ts';
 import { nowStamp, todayKey } from '../../src/utils/dates.ts';
+import { hashToken } from '../../src/config/env.ts';
 import { monthStart } from '../../src/services/financeEngine.ts';
 
 const CHECK_TOKEN = Buffer.from('myos.vault.check.v1');
@@ -129,6 +130,7 @@ const ALLOWED_KEYS = new Set([
   'meos.crypto',
   'meos.sixPack',
   'meos.finance',
+  'meos.mcp',
   'meos.trash'
 ]);
 
@@ -604,6 +606,39 @@ export async function createHarness(options: FakeOptions = {}): Promise<Harness>
       audit: [],
       snapshots: [],
       milestones: []
+    },
+    'meos.mcp': {
+      schemaVersion: 1,
+      updatedAt: nowStamp(),
+      gatewayURL: 'http://127.0.0.1:8788/mcp',
+      publicURL: '',
+      clients: [
+        {
+          id: 'app-claude', name: 'Claude', tokenHash: hashToken('app-secret'),
+          tokenPrefix: 'meos_mcp_app', scopes: ['read', 'health'],
+          createdAt: nowStamp(), expiresAt: null, revoked: false
+        },
+        {
+          id: 'app-revoked', name: 'Old client', tokenHash: hashToken('revoked-secret'),
+          tokenPrefix: 'meos_mcp_rev', scopes: ['read'],
+          createdAt: nowStamp(), expiresAt: null, revoked: true
+        },
+        {
+          id: 'app-expired', name: 'Expired', tokenHash: hashToken('expired-secret'),
+          tokenPrefix: 'meos_mcp_exp', scopes: ['read'],
+          createdAt: nowStamp(), expiresAt: '2020-01-01T00:00:00.000Z', revoked: false
+        },
+        {
+          id: 'app-notes', name: 'Notes only', tokenHash: hashToken('notes-secret'),
+          tokenPrefix: 'meos_mcp_note', scopes: ['meos.notes.read'],
+          createdAt: nowStamp(), expiresAt: null, revoked: false
+        },
+        {
+          id: 'app-empty', name: 'No scopes', tokenHash: hashToken('empty-secret'),
+          tokenPrefix: 'meos_mcp_emp', scopes: [],
+          createdAt: nowStamp(), expiresAt: null, revoked: false
+        }
+      ]
     },
     'meos.ai.routes': { default: { keyId: 1, model: 'gemini-2.5-flash' } }
   };

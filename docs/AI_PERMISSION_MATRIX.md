@@ -1,7 +1,10 @@
 # AI permission matrix
 
-MeOS MCP scopes are granted per client on the OAuth consent screen. The default is **profile read only**;
-every other module is an explicit choice. The server checks the scope before the handler, not the model.
+MeOS MCP scopes are granted per client on the OAuth consent screen or when an app-managed token is created
+in **Settings → MCP & AI connectors**. Both use the same module vocabulary and the default is **profile
+read only**; every other module is an explicit choice. The server checks the scope before the handler, not
+the model. App-managed tokens sync as hashes in the encrypted `meos.mcp` document; the raw value is shown
+once and is never sent to the server.
 
 ## 1. Module scopes
 
@@ -77,7 +80,12 @@ content instead of acting on it. The server, not the model, is the authorization
 
 ## 6. Revocation
 
-- Dashboard `/admin` → Disconnect → all access/refresh tokens and codes for that client are revoked.
-- Single token: `POST /oauth/revoke` (RFC 7009).
-- Expiry: access 15 minutes, refresh 30 days, authorization code 5 minutes.
+- MeOS → Settings → **MCP & AI connectors** → Revoke (app-managed token). The gateway's registry cache is
+  10 seconds, so the next request after that is refused.
+- Dashboard `/admin` → Disconnect → all access/refresh tokens and codes for that OAuth client are revoked.
+- Single OAuth token: `POST /oauth/revoke` (RFC 7009).
+- Expiry: access 15 minutes, refresh 30 days, authorization code 5 minutes; app tokens use the expiry you
+  choose (or never).
 - Reuse of a rotated refresh token revokes the whole family.
+- App tokens are bearer credentials: a leak is access until you revoke it. Prefer the shortest workable
+  expiry and the narrowest module set.

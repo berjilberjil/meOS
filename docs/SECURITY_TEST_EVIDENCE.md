@@ -40,8 +40,8 @@ $ npm run typecheck
 > tsc --noEmit            (no output = success)
 
 $ npm test
-ℹ tests 120
-ℹ pass 120
+ℹ tests 123
+ℹ pass 123
 ℹ fail 0
 
 $ npm audit --omit=dev --audit-level=high
@@ -52,6 +52,9 @@ found 0 vulnerabilities
 revocation, admin login/revoke and unsafe redirects. `tests/security.test.ts` covers idempotent writes,
 prompt injection, granular scope mapping and audit redaction. `tests/financeLedger.test.ts` covers the
 finance ledger’s confirm/idempotency/owner-verification rules and optimistic write protection.
+`tests/auth.test.ts` covers app-managed `meos.mcp` tokens over real Streamable HTTP, revoked/expired/empty
+scope rejection, granular notes-only access (finance refused), and the encrypted registry read.
+`tests/config.test.ts` covers the no-credential startup guard and the OAuth-only path.
 
 ### Diet / Stuff MCP
 

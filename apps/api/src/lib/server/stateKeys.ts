@@ -38,7 +38,8 @@ export const CURRENT_STATE_KEYS = [
   'meos.trash',
   // Reserved for the Personal Finance expansion. The client writes this key
   // through the generic state route, so it must be accepted before the UI ships.
-  'meos.finance'
+  'meos.finance',
+  'meos.mcp'
 ] as const;
 
 /**

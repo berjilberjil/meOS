@@ -82,6 +82,10 @@ stable and backed up separately from the database.
 
 ## 5. MCP / OAuth keys
 
+- **App-managed connector tokens**: 256-bit random, prefixed `meos_mcp_`, shown once in the app. Only the
+  SHA-256 hash and a short prefix are stored in the encrypted `meos.mcp` document; the raw token never
+  reaches the server or another device. Revocation sets `revoked: true`; the gateway's 10-second cache is
+  the maximum delay. These are bearer credentials, not encryption keys: they cannot decrypt the vault.
 - Client registrations: public `client_id`, exact redirect URIs; no client secret (public clients + PKCE).
 - Authorization codes: 256-bit, SHA-256 at rest, 5-minute TTL, single use, PKCE S256 bound.
 - Access tokens: 256-bit opaque, SHA-256 at rest, 15-minute TTL, audience-bound to `<public>/mcp`.
@@ -107,6 +111,7 @@ stable and backed up separately from the database.
 | Passphrase + recovery code | E2E data unrecoverable | restore a backup + matching credentials; no escrow |
 | `MEOS_SECRETS_KEY` | AI/TOTP secrets unreadable | re-enter AI keys; re-enroll MFA; E2E data unaffected |
 | MCP admin password | cannot approve clients | rotate env, restart gateway; existing OAuth clients unaffected until revoked |
+| App-managed MCP token (client side) | that client gets 401 | revoke it in the app and create a replacement; the old hash cannot be reversed |
 | age identity/backup passphrase | that backup unreadable | another backup copy; no server escrow |
 | Device | Keychain DEK gone | re-derive on another device with passphrase/recovery |
 

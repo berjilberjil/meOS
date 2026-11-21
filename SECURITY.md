@@ -208,6 +208,10 @@ The gateway is a separate security domain:
   binding, 15-minute access tokens, rotating refresh tokens with reuse detection, RFC 7009 revocation.
 - Admin consent requires a dedicated MCP admin password and explicit module checkboxes; default is profile
   read only.
+- App-managed tokens for desktop clients are created on an unlocked device. Only a SHA-256 hash and short
+  prefix sync in the encrypted `meos.mcp` document; the raw token is shown once. They use the same module
+  scopes, can expire, and are refused within 10 seconds of revocation. They are bearer credentials, so a
+  leaked token is access until revoked.
 - Tool scopes are granular; destructive/finance writes need `confirm: true`; money-moving ledger writes
   require a unique idempotency key; AI-created finance rows start `needsReview` and cannot self-verify.
   Prompt-injected content is marked untrusted and cannot change server permissions.
@@ -270,6 +274,7 @@ Report a vulnerability privately to the owner (Berjil) via the repository's priv
 | DEK rotation not automated | Passphrase/recovery re-wrap works; ciphertext stays under the same DEK | Documented manual export/re-encrypt procedure is a follow-up |
 | `meos.crypto` write is session-authenticated, not password-proven | A stolen session can cause a vault lockout (not decrypt data) | Client verifies current passphrase before re-wrap; re-auth window; audit |
 | MCP `confirm: true` cannot prove a human approved it | A malicious/over-eager client with a write scope can send `confirm` itself | Grant `finance.write`/`destructive` only to a trusted client; server still enforces scope, idempotency, ownership and audit; do not grant write scopes to ChatGPT by default |
+| App-managed MCP tokens are long-lived bearer credentials | A leaked token is usable until revoked (≤10s after revoke) | Shortest expiry, narrow module scopes, hash-only storage, shown once, revoke on loss; never grant `destructive` casually |
 | Journal module absent | `meos.journal.*` is not grantable | Notes + memory are the real surfaces; do not fake a scope |
 | No email account recovery | Lost login password needs an existing session/device | Keep a device signed in and the recovery code offline |
 | Dev dependencies (Vite/Vitest) carry advisories | Local dev server only; not in the Worker bundle | Production audit is clean; upgrade tracked separately |

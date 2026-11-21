@@ -333,6 +333,7 @@ struct MeSettings: View {
             group("Devices", "laptopcomputer.and.iphone") { MeDevices() }
             group("Profile", "person.crop.circle") { MeProfile() }
             group("AI & keys", "key") { MeAI() }
+            group("MCP & AI connectors", "network") { MeMCPConnectors() }
             group("Memory", "brain") { MeMemory() }
             group("Reminders", "bell") { MeReminders() }
             group("Security", "lock.shield") { MeSecurity() }

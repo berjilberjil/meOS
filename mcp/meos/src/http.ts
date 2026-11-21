@@ -7,6 +7,7 @@ import type { RateLimiter } from './auth/rateLimit.ts';
 import { AuditLog } from './services/audit.ts';
 import type { IdempotencyStore } from './services/idempotency.ts';
 import { authenticateRequest } from './auth/authenticate.ts';
+import { DynamicClientRegistry } from './auth/dynamicClients.ts';
 import { isMeosMcpError } from './utils/errors.ts';
 import { buildServer } from './server.ts';
 import { OAuthStore } from './oauth/store.ts';
@@ -129,6 +130,10 @@ export function createHttpServer(options: HttpServerOptions): Server {
   // If OAuth is configured, an audit sink is mandatory. Never silently run
   // OAuth without the trail that the dashboard and incident response need.
   const audit = options.audit ?? (config.oauth ? new AuditLog() : undefined);
+  // App-managed tokens are stored (hashed) in the encrypted `meos.mcp`
+  // document. The registry keeps a 10s cache so revocation lands quickly
+  // without a state fetch on every request.
+  const dynamicClients = new DynamicClientRegistry(config, registry, logger);
 
   return createServer(async (req, res) => {
     const started = Date.now();
@@ -190,7 +195,7 @@ export function createHttpServer(options: HttpServerOptions): Server {
       }
 
       try {
-        client = authenticateRequest(config, req.headers.authorization, oauthStore);
+        client = await authenticateRequest(config, req.headers.authorization, oauthStore, dynamicClients);
       } catch (e) {
         const message = isMeosMcpError(e) ? e.message : 'The MCP request is not authenticated.';
         audit?.record({

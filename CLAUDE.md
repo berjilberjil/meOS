@@ -166,7 +166,9 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
   gateway is local and holds the vault DEK by design; never move decryption into
   the Worker. Money-moving MCP writes require `confirm: true` **and** a unique
   idempotency key; AI-created finance rows start `needsReview` and cannot
-  self-verify. Run `npm run test:restore` / `test:rotate` after crypto changes.
+  self-verify. App-managed MCP tokens live as SHA-256 hashes in encrypted
+  `meos.mcp` and use the same module scopes as OAuth; never store a raw token.
+  Run `npm run test:restore` / `test:rotate` after crypto changes.
 - **TDD**, frequent commits, conventional-commit messages.
 
 ## Status & roadmap
@@ -180,7 +182,8 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
 7. ✅ Fold integration (read-only banking dashboard)
 8. ✅ Six-Pack Challenge + Home Screen widget
 9. ✅ Central MeOS MCP gateway (`mcp/meos`: scoped auth, vault, 116 tools,
-   resources, prompts, stdio + Streamable HTTP)
+   resources, prompts, stdio + Streamable HTTP; app-managed connector tokens
+   in Settings → MCP & AI connectors, encrypted in `meos.mcp`)
 10. ✅ **Finance OS (single-document phase)** — 18-section Mac/iPhone module:
     auditable ledger, accounts, transfers, income/expenses, budgets, goals,
     recurring, investments, liabilities, net worth, timeline, statements,

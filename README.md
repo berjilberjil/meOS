@@ -71,7 +71,7 @@ storage, session and AI boundaries. Start here:
 - [`SECURITY.md`](SECURITY.md) — architecture, auth, operations, limitations, reporting
 - [`ENCRYPTION.md`](ENCRYPTION.md) — what is E2E encrypted, key hierarchy, guarantees
 - [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md) — findings, risk register, acceptance evidence
-- [`MCP_SETUP.md`](MCP_SETUP.md) — connect ChatGPT/Claude through OAuth + a tunnel
+- [`MCP_SETUP.md`](MCP_SETUP.md) — connect ChatGPT/Claude through OAuth or an app-managed token
 - [`DATA_CLASSIFICATION.md`](DATA_CLASSIFICATION.md), [`KEY_MANAGEMENT.md`](KEY_MANAGEMENT.md),
   [`THREAT_MODEL.md`](THREAT_MODEL.md), [`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md),
   [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md), [`SECURITY_TEST_RESULTS.md`](SECURITY_TEST_RESULTS.md)
@@ -87,15 +87,16 @@ gateway has OAuth 2.1 + PKCE, per-module scopes, revocation, and a local admin d
 
 Working modules: Today, Fitness/Health, Notes, Events, Assistant (Catherine),
 Scan, Stuff, Macro, Gallery, Devices, Recycle Bin, Six-Pack Challenge, Fold
-read-only banking dashboard, and the backend sync/AI/media stack.
+read-only banking, the native Finance ledger, Settings → **MCP & AI
+connectors**, and the backend sync/AI/media stack.
 
-Finance tracking is **not** in the native app today. It was intentionally
-replaced by the read-only Fold dashboard; the old Supabase finance tables are
-legacy. The Personal Finance expansion is the next major phase — see
-`docs/finance-foundation.md`.
+The Finance ledger is the source of truth for accounts, transactions, budgets,
+investments and liabilities. It syncs as one encrypted document, so a lifetime
+history must be split into year pages before it approaches the sync size guard
+(`docs/finance-foundation.md`). The old Supabase finance tables are legacy.
 
 Security hardening completed: hashed sessions, optional TOTP, re-auth for
 sensitive actions, audit trail, CSP/CSRF/CORS headers, anti-downgrade state
-writes, encrypted backups, MCP OAuth/scopes/revocation and a local AI client
-dashboard. Remaining gaps (Argon2id, passkeys, automated DEK rotation) are
-listed in `SECURITY.md` §12.
+writes, encrypted backups, MCP OAuth/scopes/revocation, app-managed scoped MCP
+tokens and a local AI client dashboard. Remaining gaps (on-device Argon2id,
+passkeys, automated production DEK rotation) are listed in `SECURITY.md` §12.
