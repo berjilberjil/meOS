@@ -38,6 +38,8 @@ export interface ToolDefinition {
   destructive?: boolean;
   /** Financially significant write: also requires `confirm: true`. */
   confirmation?: boolean;
+  /** Money-moving write: the caller must supply an idempotency key. */
+  idempotencyRequired?: boolean;
   handler: (args: Record<string, any>, ctx: ToolContext) => Promise<CallToolResult> | CallToolResult;
 }
 
@@ -56,7 +58,9 @@ export function schemaFor(def: ToolDefinition): ZodShape | undefined {
   return {
     ...(def.inputSchema ?? {}),
     ...(def.destructive || def.confirmation ? { confirm: z.boolean().optional() } : {}),
-    idempotency_key: z.string().min(8).max(120).optional()
+    idempotency_key: def.idempotencyRequired
+      ? z.string().min(8).max(120)
+      : z.string().min(8).max(120).optional()
   };
 }
 
@@ -82,6 +86,29 @@ export function registerTools(server: McpServer, definitions: ToolDefinition[], 
       },
       async (args: Record<string, any>) => runTool(def, args ?? {}, ctx)
     );
+  }
+}
+
+/**
+ * The finance ledger is one encrypted document. MCP writes must be serialized
+ * inside this process, otherwise two calls can both read the same snapshot and
+ * the second overwrites the first (the app's sync is last-write-wins, but a
+ * money tool must not be). The optimistic `updatedAt` check in financeLedger.ts
+ * remains as a cross-process guard.
+ */
+let financeWriteGate: Promise<void> = Promise.resolve();
+
+async function serializeFinanceWrite<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = financeWriteGate;
+  let release!: () => void;
+  financeWriteGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
   }
 }
 
@@ -117,6 +144,11 @@ export async function runTool(def: ToolDefinition, args: Record<string, any>, ct
 
     const idempotencyKey =
       typeof parsedArgs.idempotency_key === 'string' ? parsedArgs.idempotency_key : null;
+    if (def.idempotencyRequired && !idempotencyKey) {
+      throw errors.invalidInput(
+        'idempotency_key is required for this money-moving write; use a unique key per intended transaction and reuse it only for retries.'
+      );
+    }
     if (idempotencyKey && ctx.idempotency) {
       const replay = ctx.idempotency.get(ctx.client.id, def.name, idempotencyKey);
       if (replay) {
@@ -132,7 +164,12 @@ export async function runTool(def: ToolDefinition, args: Record<string, any>, ct
       }
     }
 
-    const result = await def.handler(parsedArgs, ctx);
+    const isFinanceLedgerWrite =
+      def.name.startsWith('meos_finance_ledger_') &&
+      (def.scopes.includes('write') || Boolean(def.destructive));
+    const result = isFinanceLedgerWrite
+      ? await serializeFinanceWrite(async () => await def.handler(parsedArgs, ctx))
+      : await def.handler(parsedArgs, ctx);
     if (idempotencyKey && ctx.idempotency) {
       // The write already happened. A cache failure must not turn it into an
       // error the model retries (which would duplicate it).

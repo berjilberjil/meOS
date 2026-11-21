@@ -8,8 +8,8 @@ every other module is an explicit choice. The server checks the scope before the
 | Scope | Read tools include | Write tools include | Sensitive? |
 |---|---|---|---|
 | `meos.profile.read` | `meos_get_profile`, `meos_list_devices`, `meos_get_device` | — | contact/private brief also needs `secret` |
-| `meos.finance.read` | `meos_finance_get_summary`, `list_accounts`, `get_net_worth`, `get_investments`, `get_spending`, `list_purchases`, `list_categories`, `get_purchase_summary` | — | yes |
-| `meos.finance.write` | — | `meos_finance_add_purchase`, `update_purchase` (both require `confirm: true`), `delete_purchase` (also `destructive`) | yes |
+| `meos.finance.read` | `meos_finance_get_summary`, `list_accounts`, `get_net_worth`, `get_investments`, `get_spending`, `list_purchases`, `list_categories`, `get_purchase_summary`; all `meos_finance_ledger_get_*` / `list_*` / `search` | — | yes |
+| `meos.finance.write` | — | `meos_finance_add_purchase`, `update_purchase` (both require `confirm: true`), `delete_purchase` (also `destructive`); ledger `add_account`, `add_transaction`, `update_transaction`, `add_transfer`, `add_investment`, `add_valuation`, `add_liability` (all require `confirm: true` and a unique `idempotency_key`) | yes |
 | `meos.fitness.read` | `meos_fitness_get_profile`, `get_workout_history`, `get_workout_details`, `get_exercise_history`, `get_progress`, `get_goals`, `list_exercises`, `get_program` | — | body-photo metadata also needs `secret` |
 | `meos.fitness.write` | — | `meos_fitness_log_workout`, `update_workout` | yes |
 | `meos.health.read` | `meos_health_get_summary`, `list_daily_metrics`, `get_daily_metrics`, `get_body_metrics` | — | yes |
@@ -32,7 +32,10 @@ every other module is an explicit choice. The server checks the scope before the
 | `meos.files.write` | — | `meos_restore_from_trash`, `meos_purge_from_trash` (also `destructive`) | yes |
 | `meos.analytics.read` | `meos_get_app_status`, `get_module_status`, `get_capabilities`, `get_settings`, `meos_ai_get_available_models`, `meos_ai_get_routes` | — | no payloads |
 
-`meos.journal.*` is **not** a grantable scope because MeOS has no journal module. Do not invent one.
+Money rows created over MCP start `needsReview`; MCP cannot mark a transaction `verified` or `reconciled`.
+That is an owner-only action in the native app. `confirm: true` and the idempotency key are server-enforced
+requirements, but the server cannot prove a human saw the confirmation; grant write scopes only to a client
+you trust. `meos.journal.*` is **not** a grantable scope because MeOS has no journal module. Do not invent one.
 `meos.admin.none` is a sentinel that grants nothing.
 
 ## 2. Extra flags

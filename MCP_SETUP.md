@@ -184,7 +184,7 @@ authorized tool returns**. There is no bulk export tool and no "read everything"
 | Your data | ChatGPT can see it if… |
 |---|---|
 | Profile, goals, achievements | `meos.profile.read` |
-| Finance snapshot / purchases | `meos.finance.read` |
+| Finance snapshot / purchases / encrypted ledger | `meos.finance.read` |
 | Weight, calories, steps | `meos.health.read` |
 | Workouts, programme | `meos.fitness.read` |
 | Notes | `meos.notes.read`; locked note bodies also need `secret` |
@@ -261,7 +261,7 @@ anything long-lived.
 | `invalid_target` | The client requested a different `resource` than `MEOS_MCP_PUBLIC_URL` + path. Fix the connector URL. |
 | Tools missing | The client lacks that module scope. Re-authorize and tick it; `tools/list` is filtered by design. |
 | `vault_locked` | `MEOS_VAULT_PASSPHRASE` / `MEOS_VAULT_RECOVERY` is missing or wrong. The login password does not unlock the vault. |
-| `confirmation_required` | Destructive or finance write without `confirm: true`; ask the assistant to confirm the action with you first. |
+| `confirmation_required` | Destructive or finance write without `confirm: true`; money-moving ledger writes also need a unique `idempotency_key`. Ask the assistant to confirm the action with you first. |
 | ChatGPT times out | The gateway host is asleep/offline or the tunnel is down. Check `/healthz` and the dashboard's last-use time. |
 | Everything is read-only | That is the default. Grant a write scope on the consent screen, deliberately. |
 

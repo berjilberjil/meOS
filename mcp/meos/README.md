@@ -105,7 +105,7 @@ mcp/meos/
     prompts/            reusable MeOS prompts
     schemas/            structural mirrors of the Swift models
     utils/              dates, pagination, recurrence, errors, result envelope
-  tests/                fake MeOS backend + 118 tests
+  tests/                fake MeOS backend + 120 tests
 ```
 
 ---
@@ -273,13 +273,14 @@ Rules enforced in code:
 2. `tools/list` and `resources/list` are filtered. A client cannot even discover a module it lacks.
 3. Every tool declares its required scopes; all must be present. The check runs before the handler and
    before any record lookup.
-4. Destructive tools additionally refuse without `confirm: true`; financially significant purchase writes
-   also require `confirm: true`.
-5. Body-photo metadata needs the fitness scope **and** `secret`; image bytes, thumbnails and signed URLs
+4. Destructive tools refuse without `confirm: true`; finance-ledger and purchase writes also require it.
+5. Money-moving finance writes require a unique `idempotency_key`; retries with the same key return the
+   cached result instead of creating a second transaction. AI-created money rows start `needsReview` and
+   cannot mark themselves verified/reconciled.
+6. Body-photo metadata needs the fitness scope **and** `secret`; image bytes, thumbnails and signed URLs
    are never returned.
-6. Locked note bodies and profile private fields need `secret`; without it they are redacted, not missing.
-7. Write tools accept an optional `idempotency_key`. A retry with the same client + tool + key returns the
-   cached result instead of executing twice.
+7. Locked note bodies and profile private fields need `secret`; without it they are redacted, not missing.
+8. Other write tools accept an optional `idempotency_key`; the finance ones require it.
 
 Tested cases include: read-only client cannot write; write client cannot destruct; missing confirm is
 refused; finance writes need confirm; one account cannot read another's notes; expired, revoked and
@@ -327,13 +328,13 @@ corrections use `update_transaction` with a mandatory audit reason.
 | `meos_finance_ledger_list_budgets` | Planned vs actual and variance |
 | `meos_finance_ledger_list_goals` | Goal targets and progress |
 | `meos_finance_ledger_get_timeline` | First events and user milestones |
-| `meos_finance_ledger_add_account` | Create an owned account |
-| `meos_finance_ledger_add_transaction` | Record income, expense, refund, fee, tax, interest, dividend, investment or loan repayment |
-| `meos_finance_ledger_update_transaction` | Correct a non-transfer row with required audit reason |
-| `meos_finance_ledger_add_transfer` | Create a linked pair; never income/spend |
-| `meos_finance_ledger_add_investment` | Add a holding and dated valuation |
-| `meos_finance_ledger_add_valuation` | Upsert a dated valuation |
-| `meos_finance_ledger_add_liability` | Add a loan/card liability |
+| `meos_finance_ledger_add_account` | Create an owned account (confirm + idempotency key) |
+| `meos_finance_ledger_add_transaction` | Record income/expense/refund/fee/tax/interest/dividend/investment/loan repayment (confirm + idempotency; new rows start needsReview) |
+| `meos_finance_ledger_update_transaction` | Correct a non-transfer row with required audit reason (confirm + idempotency; cannot self-verify) |
+| `meos_finance_ledger_add_transfer` | Create a linked pair; never income/spend (confirm + idempotency) |
+| `meos_finance_ledger_add_investment` | Add a holding and dated valuation (confirm + idempotency) |
+| `meos_finance_ledger_add_valuation` | Upsert a dated valuation (confirm + idempotency) |
+| `meos_finance_ledger_add_liability` | Add a loan/card liability (confirm + idempotency) |
 
 ### Fold snapshot + Stuff (`read`, writes need `write`)
 
@@ -665,7 +666,7 @@ Do not expose port 8788 directly. The gateway speaks plain HTTP and expects a tr
 
 ```bash
 cd mcp/meos
-npm test          # 118 tests, node:test
+npm test          # 120 tests, node:test
 npm run typecheck # tsc --noEmit
 ```
 

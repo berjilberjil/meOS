@@ -12,6 +12,8 @@
     "start:stdio": "MEOS_MCP_TRANSPORT=stdio node --env-file-if-exists=.env src/index.ts",
     "start:http": "MEOS_MCP_TRANSPORT=http node --env-file-if-exists=.env src/index.ts",
     "test": "node --test --test-concurrency=1 tests/*.test.ts",
+    "test:restore": "node --experimental-strip-types ../../scripts/restore-drill.ts",
+    "test:rotate": "node --experimental-strip-types ../../scripts/key-rotation-drill.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
