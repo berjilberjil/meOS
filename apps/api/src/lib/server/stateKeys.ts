@@ -113,8 +113,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function base64Bytes(value: unknown): number | null {
-  if (typeof value !== 'string' || !value || value.length > 4_000) return null;
+function base64Bytes(value: unknown, maxLength = 4_000): number | null {
+  if (typeof value !== 'string' || !value || value.length > maxLength) return null;
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 !== 0) return null;
   const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
   return (value.length / 4) * 3 - padding;
@@ -125,7 +125,12 @@ export function isSealedEnvelope(value: unknown): boolean {
   if (!isObject(value)) return false;
   const version = value.v;
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1 || version > 10) return false;
-  const bytes = base64Bytes(value.ct);
+  // A module is one encrypted document and can legitimately be hundreds of
+  // kilobytes (notes, finance, chat). The old 4 KB cap rejected every large
+  // sealed write as "plaintext", which broke normal app saves. The state route
+  // already enforces the real body limit; here we only need the same ceiling.
+  const maxBase64Chars = Math.ceil(MAX_STATE_VALUE_BYTES / 3) * 4 + 8;
+  const bytes = base64Bytes(value.ct, maxBase64Chars);
   return bytes !== null && bytes >= 28;
 }
 

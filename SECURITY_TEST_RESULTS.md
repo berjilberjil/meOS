@@ -9,7 +9,7 @@ Synthetic data only; no production deployment or destructive migration was perfo
 | Suite | Result | Evidence |
 |---|---|---|
 | API type-check | 0 errors / 0 warnings | `bun run check` |
-| API unit tests | **81 passed / 81** (14 files) | `bun run test` |
+| API unit tests | **82 passed / 82** (14 files) | `bun run test` |
 | API production build | success | `bun run build` + `wrangler deploy --dry-run` (2.50 MB / 462 KB gzip) |
 | API production deps | **0 vulnerabilities** | `bun audit --production` (15 packages) |
 | MCP gateway type-check | clean | `npm run typecheck` |
@@ -104,7 +104,7 @@ The exact command output is in [`docs/SECURITY_TEST_EVIDENCE.md`](docs/SECURITY_
 | Sensitive AI writes require confirmation | ✅ | finance/destructive confirm tests |
 | No unrestricted SQL/shell/filesystem | ✅ | tool inventory review |
 | Backup restore tested | ✅ synthetic | `test:restore` |
-| Security regression tests pass | ✅ | 81 API + 123 MCP + diet/stuff |
+| Security regression tests pass | ✅ | 82 API + 123 MCP + diet/stuff |
 | No unresolved critical | ✅ | SEC-15 fixed; no known open critical |
 | No unresolved high without acceptance | ⚠️ | disclosed high-by-design: MCP host trust, AI-provider plaintext |
 | Independent penetration test | ❌ | not performed |

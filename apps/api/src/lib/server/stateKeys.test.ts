@@ -46,6 +46,13 @@ describe('state key allowlist', () => {
     expect(MAX_STATE_VALUE_BYTES).toBeLessThan(2_000_000);
   });
 
+  it('accepts a large sealed module, not just tiny values', () => {
+    // A real notes/finance document is tens to hundreds of KB. The old 4 KB
+    // base64 cap classified it as plaintext and rejected every app save.
+    expect(isSealedEnvelope({ v: 1, ct: 'A'.repeat(100_000) })).toBe(true);
+    expect(isSealedEnvelope({ v: 2, ct: 'A'.repeat(1_000_000) })).toBe(true);
+  });
+
   it('allows only legacy cleanup and Fold disconnect to delete a whole document', () => {
     expect(isDeletableStateKey('myos.finance')).toBe(true);
     expect(isDeletableStateKey('myos.notes')).toBe(true);

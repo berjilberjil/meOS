@@ -137,6 +137,7 @@ the end of this work.
 | SEC-34 | **Medium** | Finance ledger reads the whole encrypted document then writes it; two concurrent MCP calls could silently overwrite one money change. | `financeLedger.ts`, `registry.ts` | Lost transaction/balance update | Per-process write serialization + optimistic `updatedAt` check against a forced-fresh read; conflict instead of last-write-wins | **Fixed** | `financeLedger.test.ts` “concurrent finance ledger writes are serialized” |
 | SEC-35 | **High** | `DELETE /api/state/meos.<module>` only required a session, so a stolen cookie could wipe notes, finance, health, etc. with one request. | State route | Data loss / denial of service | Current `meos.*` modules are refused; only legacy `myos.*` cleanup and explicit `meos.fold` disconnect are deletable; `meos.crypto` always blocked | **Fixed** | `stateKeys.test.ts` deletion policy; route review |
 | SEC-36 | **Medium** | The app-managed MCP token registry treated an empty scope list as legacy `read`, which would have granted every non-health module. | `mcp/meos/src/auth/dynamicClients.ts` | Over-broad AI access after a corrupted/edited connector | Empty scope lists fail closed; tokens use granular module scopes; legacy scopes remain for static/old clients only | **Fixed** | `auth.test.ts` app-token tests |
+| SEC-37 | **High** | `isSealedEnvelope` capped the base64 ciphertext at 4,000 characters, so any encrypted module larger than ~3 KB was misclassified as plaintext. Normal notes (87 KB), finance and chat saves returned HTTP 400 after this hardening deploy. | `apps/api/src/lib/server/stateKeys.ts` | Data loss / inability to save; AI writes fail while reads still work | Envelope validation now accepts up to `MAX_STATE_VALUE_BYTES`; metadata fields keep the small cap; regression test with 100 KB and 1 MB envelopes | **Fixed** | `stateKeys.test.ts` “accepts a large sealed module”; API 82/82; production deploy `cda8566c` |
 
 ### Highest-priority items that remain
 
@@ -176,7 +177,7 @@ Legend: ✅ verified; ⚠️ verified with a documented limitation; ❌ not met.
 | Security-sensitive actions have audit trails | ✅ | `security_events`; MCP JSONL; events for login/MFA/reauth/export/keys/sessions/media/state/OAuth/tool calls |
 | Backups are protected | ✅ | age-encrypted export script; private R2; D1 Time Travel; `docs/BACKUP.md` |
 | Recovery procedures are tested | ✅ synthetic | `npm run test:restore` restores a D1-shaped DB, unlocks the vault, decrypts note/media, rejects tampering; production restore remains manual (no prod access by constraint) |
-| Automated security tests pass | ✅ | API 81, MCP 123, diet 13, stuff 10; typecheck/build; `docs/SECURITY_TEST_EVIDENCE.md` |
+| Automated security tests pass | ✅ | API 82, MCP 123, diet 13, stuff 10; typecheck/build; `docs/SECURITY_TEST_EVIDENCE.md` |
 | No unresolved critical/high vulnerabilities | ⚠️ | SEC-15 fixed; production dependency audit clean. Residual high-by-design: MCP host holds passphrase, AI provider sees requested plaintext. No unmitigated critical/high implementation bug known. |
 
 ---

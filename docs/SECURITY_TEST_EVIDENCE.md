@@ -13,7 +13,7 @@ svelte-check found 0 errors and 0 warnings
 
 $ bun run test
 Test Files  14 passed (14)
-     Tests  81 passed (81)
+     Tests  82 passed (82)
 
 $ bun run build
 ✓ built in 1.89s
@@ -32,6 +32,8 @@ No vulnerabilities found (checked 15 packages)
 Security-relevant files include `authArgon2.test.ts`, `authPepper.test.ts`, `secrets.test.ts`, `security.test.ts`,
 `stateKeys.test.ts`, `mfa.test.ts`, and the existing `auth.test.ts`, `media.test.ts`, `presign.test.ts`,
 `devices.test.ts`, `etag.test.ts`, `stateVersion.test.ts`, `aiBudget.test.ts`, `voiceBudget.test.ts`.
+`stateKeys.test.ts` now also proves a 100 KB / 1 MB sealed module is accepted — the earlier 4 KB
+base64 cap rejected real notes/finance documents as “plaintext” (SEC-37).
 
 ### MCP gateway (`mcp/meos`)
 
