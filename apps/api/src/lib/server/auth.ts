@@ -83,6 +83,20 @@ export async function verifyPassword(pw: string, stored: string): Promise<boolea
 export const LOGIN_MAX_ATTEMPTS = 10;
 export const LOGIN_WINDOW_MINUTES = 15;
 
+/** A failed sign-in writes one row per scope, so each scope is judged alone. */
+export function attemptsAllowed(usernameCount: number, ipCount: number): boolean {
+  return usernameCount < LOGIN_MAX_ATTEMPTS && ipCount < LOGIN_MAX_ATTEMPTS;
+}
+
+/**
+ * Public signup is closed for this single-owner app, but the first account must
+ * be creatable on a fresh database. `MEOS_ALLOW_SIGNUP=true` is the explicit
+ * escape hatch for a deliberate second account.
+ */
+export function signupAllowed(userCount: number, allowFlag: string | undefined): boolean {
+  return allowFlag === 'true' || userCount === 0;
+}
+
 let attemptsReady = false;
 async function ensureAttempts(): Promise<void> {
   if (attemptsReady) return;
@@ -102,11 +116,12 @@ function windowStart(): string {
 /** Whether this username/IP pair still has attempts left in the window. */
 export async function loginAllowed(username: string, ip: string): Promise<boolean> {
   await ensureAttempts();
-  const since = windowStart();
   const rows = await sql`
-    select count(*) as n from login_attempts
-    where at > ${since} and scope in (${'u:' + username}, ${'i:' + ip})`;
-  return Number(rows[0]?.n ?? 0) < LOGIN_MAX_ATTEMPTS;
+    select scope, count(*) as n from login_attempts
+    where at > ${windowStart()} and scope in (${'u:' + username}, ${'i:' + ip})
+    group by scope`;
+  const counts = new Map(rows.map((r) => [String(r.scope), Number(r.n)]));
+  return attemptsAllowed(counts.get('u:' + username) ?? 0, counts.get('i:' + ip) ?? 0);
 }
 
 /** Record a failure, and opportunistically drop rows that have aged out. */
@@ -118,10 +133,10 @@ export async function recordFailedLogin(username: string, ip: string): Promise<v
   await sql`insert into login_attempts (scope, at) values (${'i:' + ip}, ${now})`;
 }
 
-/** A clean sign-in clears the username's failures. */
-export async function clearFailedLogins(username: string): Promise<void> {
+/** A clean sign-in clears this username's and this address's failures. */
+export async function clearFailedLogins(username: string, ip: string): Promise<void> {
   await ensureAttempts();
-  await sql`delete from login_attempts where scope = ${'u:' + username}`;
+  await sql`delete from login_attempts where scope in (${'u:' + username}, ${'i:' + ip})`;
 }
 
 export async function createSession(userId: number): Promise<string> {

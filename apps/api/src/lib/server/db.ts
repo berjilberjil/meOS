@@ -3,10 +3,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 /**
  * D1 (SQLite) behind a `postgres.js`-shaped tagged template.
  *
- * The whole backend is four tables and ~20 single-table queries — no joins, no
- * jsonb operators, no extensions — so moving off Postgres is a driver swap
- * rather than a rewrite. Keeping the `sql` tagged-template shape means none of
- * the call sites had to change.
+ * The whole backend is a handful of single-table queries — no joins, no jsonb
+ * operators, no extensions — so moving off Postgres was a driver swap rather
+ * than a rewrite. Keeping the `sql` tagged-template shape means none of the
+ * call sites had to change.
  *
  * The binding arrives per-request on `platform.env`, so there is no module-level
  * connection to hold. `hooks.server.ts` wraps each request in `withDB`, and

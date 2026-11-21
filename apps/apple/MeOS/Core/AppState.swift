@@ -233,6 +233,10 @@ final class AppState: ObservableObject {
         if let v = s.scans, v != scans { scans = v }
         if let v = s.taskMode, v != taskMode { taskMode = v }
         if let v = s.weekly, v != weekly { weekly = v }
+        // The bin is synced state too. Skipping it here left a cold launch with
+        // an empty bin until the first poll, and a subsequent sweep/empty could
+        // then push that empty document over the server copy.
+        if let v = s.trash, v != trash { trash = v }
         // Merged, not replaced: the other device has been appending sessions to
         // the same key. See `ActivityDoc.merged(with:)`.
         let mergedActivity = activity.merged(with: s.activity ?? ActivityDoc())
@@ -296,10 +300,18 @@ final class AppState: ObservableObject {
     private func purgeRemovedFinanceKeys() async {
         let d = UserDefaults.standard
         guard !d.bool(forKey: Self.kFinancePurged) else { return }
+        var allDeleted = true
         for key in ["myos.finance", "myos.portfolio", "myos.networth"] {
-            try? await api.deleteState(key)
+            do {
+                try await api.deleteState(key)
+            } catch {
+                allDeleted = false
+            }
         }
-        d.set(true, forKey: Self.kFinancePurged)
+        // Only mark it done once every delete landed. Marking it unconditionally
+        // meant an offline first launch retired the purge forever and the old
+        // money keys kept syncing to every device.
+        if allDeleted { d.set(true, forKey: Self.kFinancePurged) }
     }
 
     /// One-time rename of local persistence `myos.*` → `meos.*` (UserDefaults).
@@ -544,7 +556,8 @@ final class AppState: ObservableObject {
             (StateKey.memory, memory), (StateKey.scans, scans),
             (StateKey.taskMode, taskMode), (StateKey.weekly, weekly),
             (StateKey.activity, activity), (StateKey.trash, trash),
-            (StateKey.sixPack, sixPack)
+            (StateKey.sixPack, sixPack),
+            (StateKey.appearance, AppearanceStore.shared.settings)
         ]
         for (key, value) in jobs where raw[key] != nil {
             try? await api.putState(key, value)
@@ -701,6 +714,8 @@ final class AppState: ObservableObject {
         add("activity", activity)
         add("trash", trash)
         add("sixPack", sixPack)
+        add("fold", fold)
+        add("appearance", AppearanceStore.shared.settings)
         return try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
     }
 
@@ -794,7 +809,13 @@ final class AppState: ObservableObject {
     private func finishPush(_ key: String, gen: Int, error: String?) {
         guard pushGen[key] == gen else { return }
         pushTasks[key] = nil
-        lastSyncError = error.map { "Couldn't save \(key): \($0)" }
+        if let error {
+            lastSyncError = "Couldn't save \(key): \(error)"
+        } else if lastSyncError?.hasPrefix("Couldn't save \(key):") == true {
+            // Clearing unconditionally hid another module's failure whenever any
+            // other push succeeded.
+            lastSyncError = nil
+        }
     }
 
     private func isCurrentPush(_ key: String, gen: Int) -> Bool { pushGen[key] == gen }
@@ -2460,6 +2481,13 @@ final class AppState: ObservableObject {
     func disconnectFold() {
         FoldClient.unlink()
         foldLinked = false
+        // Leaving the last snapshot in memory, on disk and in `meos.fold` meant
+        // the dashboard kept showing the account after "Disconnect" until the
+        // next launch — and the numbers kept syncing to other devices.
+        fold = nil
+        foldError = nil
+        FoldData.deleteFromDisk()
+        Task { [api] in try? await api.deleteState(StateKey.fold) }
     }
 
     /// Live Fold pull when signed in. A failed live call must not re-read the

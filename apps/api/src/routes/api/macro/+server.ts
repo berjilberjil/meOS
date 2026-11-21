@@ -37,7 +37,9 @@ const Brief = z.object({
   speculative: z.boolean()
 });
 
+let ensured = false;
 async function ensureTable() {
+  if (ensured) return;
   await sql`create table if not exists macro_day (
     user_id integer not null,
     date    text not null,
@@ -45,6 +47,7 @@ async function ensureTable() {
     created_at text not null,
     primary key (user_id, date)
   )`;
+  ensured = true;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);

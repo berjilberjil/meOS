@@ -4,6 +4,9 @@ import { sql } from '$lib/server/db';
 import { encryptSecret, maskKey } from '$lib/server/secrets';
 import { listModels, PROVIDERS, type ProviderId } from '$lib/server/modelCatalog';
 import { ensureAiTable } from '$lib/server/ai';
+import { readJsonBody } from '$lib/server/http';
+
+const MAX_KEY_LENGTH = 4_096;
 
 /** List the user's AI provider keys — masked, never the raw secret. */
 export const GET: RequestHandler = async ({ locals }) => {
@@ -21,13 +24,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
   await ensureAiTable();
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 8_192)) as Record<string, unknown>;
   const provider = String(body.provider ?? '') as ProviderId;
   const key = String(body.key ?? '').trim();
   const label = (String(body.label ?? '').trim() || provider).slice(0, 60);
 
   if (!PROVIDERS.includes(provider)) throw error(400, 'Unknown provider');
   if (key.length < 8) throw error(400, 'Enter a valid API key');
+  if (key.length > MAX_KEY_LENGTH) throw error(400, 'That API key is too long');
 
   const res = await listModels(provider, key);
   if (!res.ok) throw error(400, `Key check failed: ${res.error ?? 'invalid key'}`);

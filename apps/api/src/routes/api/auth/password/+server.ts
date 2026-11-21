@@ -9,6 +9,7 @@ import {
   recordFailedLogin,
   clearFailedLogins
 } from '$lib/server/auth';
+import { readJsonBody } from '$lib/server/http';
 
 // Change the login password. Needs a live session AND the current password, so a
 // stolen session cookie alone cannot lock the owner out. Wrong guesses share the
@@ -18,12 +19,14 @@ export const POST: RequestHandler = async ({ request, cookies, locals, getClient
   const user = locals.user;
   if (!user) throw error(401, 'Not signed in');
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 4_096)) as Record<string, unknown>;
   const current = String(body.current ?? '');
   const next = String(body.next ?? '');
   const ip = getClientAddress();
 
   if (next.length < 8) throw error(400, 'New password must be at least 8 characters.');
+  if (next.length > 200) throw error(400, 'New password is too long.');
+
   if (!(await loginAllowed(user.username, ip))) {
     throw error(429, 'Too many attempts. Wait a few minutes and try again.');
   }
@@ -39,6 +42,6 @@ export const POST: RequestHandler = async ({ request, cookies, locals, getClient
   // Sign out every other device; keep this one.
   const token = cookies.get(SESSION_COOKIE) ?? '';
   await sql`delete from sessions where user_id = ${user.id} and token <> ${token}`;
-  await clearFailedLogins(user.username);
+  await clearFailedLogins(user.username, ip);
   return json({ ok: true });
 };

@@ -23,14 +23,12 @@ struct MeFitness: View {
                 Label(log.done ? "Done today" : log.skipped ? "Skipped" : "Today", systemImage: log.done ? "checkmark" : "flame").font(.headline).opacity(0.7)
                 Text(log.title ?? (workout.isEmpty ? "Rest day" : "\(workout.count) exercises"))
                     .font(.system(size: 32, weight: .bold)).tracking(-0.6)
-                if true {
-                    NavigationLink { MeWorkoutSession(date: today) } label: {
-                        Label(log.done ? "Open workout" : "Start workout", systemImage: "play.fill").font(.title3.weight(.semibold))
-                            .frame(maxWidth: .infinity).frame(height: 56)
-                            .foregroundStyle(Color.ink).background(Color.paper, in: .rect(cornerRadius: 18))
-                    }
-                    .buttonStyle(.press).padding(.top, 8)
+                NavigationLink { MeWorkoutSession(date: today) } label: {
+                    Label(log.done ? "Open workout" : "Start workout", systemImage: "play.fill").font(.title3.weight(.semibold))
+                        .frame(maxWidth: .infinity).frame(height: 56)
+                        .foregroundStyle(Color.ink).background(Color.paper, in: .rect(cornerRadius: 18))
                 }
+                .buttonStyle(.press).padding(.top, 8)
             }
             .appear(1)
 

@@ -7,7 +7,9 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapterCloudflare()
+    // `platformProxy` gives `bun run dev` the same DB/MEDIA/AI bindings that
+    // `wrangler dev` provides, so local development does not 503 on every route.
+    adapter: adapterCloudflare({ platformProxy: { enabled: true } })
   }
 };
 

@@ -1,8 +1,12 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { eventMediaKey, mediaRoomFor, signObjects, uploadObject } from '$lib/server/storage';
+import { decodeBase64Capped, isMediaId } from '$lib/server/media';
+import { readJsonBody } from '$lib/server/http';
 
-const ID_RE = /^[A-Za-z0-9._-]{1,200}$/;
+const MAX_MEDIA_BYTES = 60_000_000;
+/** base64 is 4/3 the decoded size, plus a little JSON envelope. */
+const MAX_REQUEST_BYTES = 81_000_000;
 
 // Event photos/videos live in R2 instead of inside the encrypted `meos.events`
 // blob, which was 2 MB of base64 re-synced on every poll. SvelteKit only allows
@@ -14,7 +18,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   const ids = (url.searchParams.get('ids') ?? '')
     .split(',')
     .map((s) => s.trim())
-    .filter((s) => ID_RE.test(s));
+    .filter((s) => isMediaId(s));
   if (ids.length === 0) return json({});
   if (ids.length > 200) throw error(400, 'Too many ids');
 
@@ -31,15 +35,19 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 // Upload one sealed media object. Body: { id, ciphertextBase64 }.
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(
+    request,
+    MAX_REQUEST_BYTES,
+    'That media is too large to upload'
+  )) as Record<string, unknown>;
   const id = String(body.id ?? '').trim();
   const b64 = String(body.ciphertextBase64 ?? '');
-  if (!ID_RE.test(id)) throw error(400, 'Bad id');
+  if (!isMediaId(id)) throw error(400, 'Bad id');
   if (!b64) throw error(400, 'Missing ciphertext');
 
-  const bytes = Buffer.from(b64, 'base64');
+  const bytes = decodeBase64Capped(b64, MAX_MEDIA_BYTES);
   // Video is capped on-device; this is a backstop, not the real limit.
-  if (bytes.length === 0 || bytes.length > 60_000_000) throw error(400, 'Bad media size');
+  if (!bytes) throw error(400, 'Bad media size');
   // The per-object cap alone is not a limit: 168 of them is R2's whole free
   // tier, which is account-wide, so one user could stop sync for everyone.
   if (!(await mediaRoomFor(`event-media/${locals.user.id}/`, bytes.length))) {

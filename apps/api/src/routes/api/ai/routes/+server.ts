@@ -1,6 +1,9 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sql, nowISO } from '$lib/server/db';
+import { bumpStateVersion } from '$lib/server/stateVersion';
+import { MAX_STATE_VALUE_BYTES } from '$lib/server/stateKeys';
+import { readJsonBody } from '$lib/server/http';
 
 /**
  * Per-feature model routing for the logged-in user. Non-secret (just references to
@@ -20,10 +23,16 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 export const PUT: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  const value = await request.json().catch(() => ({}));
+  const body = await readJsonBody(request, MAX_STATE_VALUE_BYTES);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw error(400, 'Routing must be a JSON object');
+  }
   await sql`
     insert into app_state (user_id, key, value, updated_at)
-    values (${locals.user.id}, ${KEY}, ${sql.json(value)}, ${nowISO()})
+    values (${locals.user.id}, ${KEY}, ${sql.json(body)}, ${nowISO()})
     on conflict (user_id, key) do update set value = excluded.value, updated_at = ${nowISO()}`;
+  // Without this the state GET's ETag never moves, so every other device keeps
+  // getting a 304 and never observes the new routing document.
+  await bumpStateVersion(locals.user.id);
   return json({ ok: true });
 };

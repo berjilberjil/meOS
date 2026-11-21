@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateObject } from 'ai';
 import { resolveModel } from '$lib/server/ai';
+import { readJsonBody } from '$lib/server/http';
 import { z } from 'zod';
 
 /**
@@ -45,7 +46,7 @@ function buildPrompt(text: string): string {
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 64_000)) as Record<string, unknown>;
   const text = String(body.text ?? '').trim().slice(0, 8000);
   if (!text) throw error(400, 'Nothing to parse');
 

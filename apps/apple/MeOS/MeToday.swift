@@ -98,7 +98,9 @@ struct MeToday: View {
     }
 
     private func countdown(_ k: String) -> String {
-        switch state.daysUntil(k) ?? 0 { case 0: "Today"; case 1: "Tomorrow"; case let n: "\(n) days" }
+        // `?? 0` used to label an event with no/unreadable date as "Today".
+        guard let days = state.daysUntil(k) else { return "—" }
+        switch days { case 0: return "Today"; case 1: return "Tomorrow"; case let n: return "\(n) days" }
     }
 
     private var dayBar: some View {

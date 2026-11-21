@@ -10,7 +10,7 @@ command -v xcodegen >/dev/null || brew install xcodegen
 cd "$(dirname "$0")/../apps/apple"
 xcodegen generate
 
-xcodebuild -project meOS.xcodeproj -scheme MeOS-macOS -configuration Debug build 2>&1 | tail -20
+xcodebuild -project MeOS.xcodeproj -scheme MeOS-macOS -configuration Debug build 2>&1 | tail -20
 
-APP_DIR=$(xcodebuild -project meOS.xcodeproj -scheme MeOS-macOS -configuration Debug -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/{print $2; exit}')
+APP_DIR=$(xcodebuild -project MeOS.xcodeproj -scheme MeOS-macOS -configuration Debug -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR =/{print $2; exit}')
 open "$APP_DIR/MeOS.app"

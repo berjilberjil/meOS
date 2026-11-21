@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { listDevices, parseDeviceRegistration, registerDevice } from '$lib/server/devices';
+import { readJsonBody } from '$lib/server/http';
 
 /** Every device signed into this account, most recently active first. */
 export const GET: RequestHandler = async ({ locals }) => {
@@ -16,7 +17,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 8_192)) as Record<string, unknown>;
   const parsed = parseDeviceRegistration(body);
   if (!parsed.ok) throw error(400, parsed.message);
 

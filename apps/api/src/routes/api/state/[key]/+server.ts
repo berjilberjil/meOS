@@ -1,70 +1,32 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sql, nowISO } from '$lib/server/db';
-
-/**
- * Move this user's state version on. The GET reads it instead of scanning
- * `app_state` — see the note in ../+server.ts.
- */
-async function bumpStateVersion(userId: number): Promise<void> {
-  const now = nowISO();
-  await sql`
-    create table if not exists state_version (
-      user_id integer primary key,
-      version integer not null default 0,
-      at      text not null
-    )`;
-  await sql`
-    insert into state_version (user_id, version, at) values (${userId}, 1, ${now})
-    on conflict (user_id) do update set version = state_version.version + 1, at = ${now}`;
-}
-
-/**
- * The keys a client is allowed to write, mirroring `StateKey` in the app plus
- * the vault's own metadata row.
- *
- * `meos.*` is the current namespace (renamed from `myos.*`). The legacy
- * `myos.*` names stay allowlisted so older app builds keep syncing while the
- * migration runs; new writes use `meos.*`. Remove the legacy names once no
- * client still writes them.
- *
- * The route used to take any key name at all, with no cap on the body either.
- * One authenticated account could loop `PUT /api/state/<random-uuid>` with a
- * large payload and consume the shared D1 database and the account-wide
- * 100k-writes-a-day free quota — stopping sync for every other user. An
- * allowlist is also the cheaper guard: it rejects before touching the database.
- */
-const KEYS = new Set([
-  'meos.fitness', 'meos.fitnessProfile',
-  'meos.notes', 'meos.days', 'meos.profile', 'meos.chat', 'meos.nutrition',
-  'meos.training', 'meos.events', 'meos.eventTags', 'meos.watch',
-  'meos.belongings', 'meos.fold', 'meos.memory', 'meos.scans', 'meos.taskMode',
-  'meos.weekly', 'meos.activity', 'meos.appearance', 'meos.crypto',
-  'meos.sixPack',
-  // Legacy MyOS namespace — accepted while clients migrate. See above.
-  'myos.fitness', 'myos.fitnessProfile',
-  'myos.notes', 'myos.days', 'myos.profile', 'myos.chat', 'myos.nutrition',
-  'myos.training', 'myos.events', 'myos.eventTags', 'myos.watch',
-  'myos.belongings', 'myos.fold', 'myos.memory', 'myos.scans', 'myos.taskMode',
-  'myos.weekly', 'myos.activity', 'myos.appearance', 'myos.crypto',
-  'myos.sixPack'
-]);
-
-/** Well clear of the largest real blob, well under what would hurt the DB. */
-const MAX_VALUE_BYTES = 8_000_000;
+import { bumpStateVersion } from '$lib/server/stateVersion';
+import { isAllowedStateKey, MAX_STATE_VALUE_BYTES } from '$lib/server/stateKeys';
+import { utf8Bytes } from '$lib/server/http';
 
 // Upsert one key of the logged-in user's app state.
 export const PUT: RequestHandler = async ({ params, request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
-  if (!KEYS.has(params.key)) throw error(400, 'Unknown state key');
-  // Every other route catches this; without it a malformed body 500s, and a 500
-  // is retried four times by the client.
-  const value = await request.json().catch(() => {
-    throw error(400, 'Body must be JSON');
-  });
-  if (JSON.stringify(value ?? null).length > MAX_VALUE_BYTES) {
+  if (!isAllowedStateKey(params.key)) throw error(400, 'Unknown state key');
+
+  // Read and parse behind the same byte cap. `request.json()` would allocate an
+  // oversized body before the check, and D1 rejects values above 2 MB anyway.
+  const declared = Number(request.headers.get('content-length') ?? '');
+  if (Number.isFinite(declared) && declared > MAX_STATE_VALUE_BYTES) {
     throw error(413, 'That is too large to sync');
   }
+  const raw = await request.text().catch(() => {
+    throw error(400, 'Body must be JSON');
+  });
+  if (utf8Bytes(raw) > MAX_STATE_VALUE_BYTES) throw error(413, 'That is too large to sync');
+  let value: unknown;
+  try {
+    value = raw.trim() ? JSON.parse(raw) : {};
+  } catch {
+    throw error(400, 'Body must be JSON');
+  }
+
   await sql`
     insert into app_state (user_id, key, value, updated_at)
     values (${locals.user.id}, ${params.key}, ${sql.json(value)}, ${nowISO()})
@@ -76,8 +38,9 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 // Delete one key of the logged-in user's app state (used to purge removed modules).
 export const DELETE: RequestHandler = async ({ params, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
+  if (!params.key || params.key.length > 120) throw error(400, 'Bad key');
   // Deliberately NOT allowlisted: removed modules (myos.finance, myos.portfolio,
-  // myos.networth) are purged by key, and those names are no longer in KEYS.
+  // myos.networth) are purged by key, and those names are no longer in the set.
   await sql`delete from app_state where user_id = ${locals.user.id} and key = ${params.key}`;
   await bumpStateVersion(locals.user.id);
   return json({ ok: true });

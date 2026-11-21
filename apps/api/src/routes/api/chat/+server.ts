@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateText, jsonSchema, tool } from 'ai';
 import { resolveModel } from '$lib/server/ai';
+import { readJsonBody } from '$lib/server/http';
 import { mentorChatSystem } from '$lib/mentor';
 
 /**
@@ -56,12 +57,15 @@ function buildTools(raw: unknown) {
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 256_000)) as Record<string, unknown>;
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const context = String(body.context ?? '').slice(0, 8000);
 
   // Who the assistant should be (name / tone / style) — client-editable, bounded.
-  const rawAgent = body.agent && typeof body.agent === 'object' ? body.agent : {};
+  const rawAgent = (body.agent && typeof body.agent === 'object' ? body.agent : {}) as Record<
+    string,
+    unknown
+  >;
   const persona = {
     name: typeof rawAgent.name === 'string' ? rawAgent.name.slice(0, 40) : undefined,
     tone: typeof rawAgent.tone === 'string' ? rawAgent.tone.slice(0, 400) : undefined,

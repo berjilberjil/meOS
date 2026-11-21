@@ -40,6 +40,10 @@ data["WorkingDirectory"] = str(pathlib.Path(root).resolve())
 env = data.setdefault("EnvironmentVariables", {})
 env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 env["MEOS_ROOT"] = str(pathlib.Path(root).resolve())
+logs = pathlib.Path.home() / "Library/Logs/MeOS"
+logs.mkdir(parents=True, exist_ok=True)
+data["StandardOutPath"] = str(logs / "ios-refresh-launchd.log")
+data["StandardErrorPath"] = str(logs / "ios-refresh-launchd.log")
 pathlib.Path(dest).write_bytes(plistlib.dumps(data))
 PY
 

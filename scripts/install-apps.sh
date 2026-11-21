@@ -48,7 +48,7 @@ install_mac() {
   # even on a fresh install. Compare the executable instead.
   local a b
   a=$(shasum -a 256 build/mac/Build/Products/Release/MeOS.app/Contents/MacOS/MeOS | cut -c1-16)
-  b=$(shasum -a 256 /Applications/MeOS.app/Contents/MacOS/meOS | cut -c1-16)
+  b=$(shasum -a 256 /Applications/MeOS.app/Contents/MacOS/MeOS | cut -c1-16)
   [[ "$a" == "$b" ]] && print "    verified $a" || { print "    HASH MISMATCH"; return 1; }
   open -a /Applications/MeOS.app
 }

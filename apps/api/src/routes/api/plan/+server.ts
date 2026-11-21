@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateObject } from 'ai';
 import { resolveModel } from '$lib/server/ai';
+import { readJsonBody } from '$lib/server/http';
 import { z } from 'zod';
 
 /**
@@ -34,17 +35,21 @@ const PlanSchema = z.object({
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
-  const body = await request.json().catch(() => ({}));
-  const goal = String(body.goal ?? 'maintain');
-  const cals = Number(body.calories ?? 0);
-  const protein = Number(body.protein ?? 0);
+  const body = (await readJsonBody(request, 64_000)) as Record<string, unknown>;
+  const goal = String(body.goal ?? 'maintain').slice(0, 200);
+  const numberIn = (v: unknown, min: number, max: number): number => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : 0;
+  };
+  const cals = numberIn(body.calories, 0, 20_000);
+  const protein = numberIn(body.protein, 0, 1_000);
   // 120 elements was capped; the length of each element was not, so one
   // element could carry the whole prompt.
   const names = (v: unknown): string[] =>
     Array.isArray(v) ? v.slice(0, 120).map((x) => String(x).slice(0, 120)) : [];
   const foods: string[] = names(body.foods);
   const exercises: string[] = names(body.exercises);
-  const daysPerWeek = Number(body.daysPerWeek ?? 5);
+  const daysPerWeek = numberIn(body.daysPerWeek ?? 5, 0, 7);
 
   const prompt = [
     `Build the user a 7-day fitness plan. Goal: ${goal}. Daily target ≈ ${cals || '(unknown)'} kcal and`,

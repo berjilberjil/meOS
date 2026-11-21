@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateObject } from 'ai';
 import { resolveModel } from '$lib/server/ai';
+import { readJsonBody } from '$lib/server/http';
 import { z } from 'zod';
 
 /**
@@ -162,7 +163,10 @@ function foodPrompt(): string {
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Not logged in');
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await readJsonBody(request, 33_000_000, 'Those images are too large')) as Record<
+    string,
+    unknown
+  >;
   // An allowlist, not whatever the client says — this string is handed to the
   // provider.
   const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
