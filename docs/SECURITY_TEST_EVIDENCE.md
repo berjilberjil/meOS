@@ -12,19 +12,24 @@ $ bun run check
 svelte-check found 0 errors and 0 warnings
 
 $ bun run test
-Test Files  13 passed (13)
-     Tests  78 passed (78)
+Test Files  14 passed (14)
+     Tests  81 passed (81)
 
 $ bun run build
 ✓ built in 1.89s
 > Using @sveltejs/adapter-cloudflare
   ✔ done
 
+$ bunx wrangler deploy --dry-run --outdir /tmp/meos-worker
+Total Upload: 2498.52 KiB / gzip: 461.99 KiB
+--dry-run: exiting now.
+# bundles the optional hash-wasm/Argon2id path into the Worker
+
 $ bun audit --production
-No vulnerabilities found (checked 14 packages)
+No vulnerabilities found (checked 15 packages)
 ```
 
-Security-relevant files include `authPepper.test.ts`, `secrets.test.ts`, `security.test.ts`,
+Security-relevant files include `authArgon2.test.ts`, `authPepper.test.ts`, `secrets.test.ts`, `security.test.ts`,
 `stateKeys.test.ts`, `mfa.test.ts`, and the existing `auth.test.ts`, `media.test.ts`, `presign.test.ts`,
 `devices.test.ts`, `etag.test.ts`, `stateVersion.test.ts`, `aiBudget.test.ts`, `voiceBudget.test.ts`.
 
@@ -35,8 +40,8 @@ $ npm run typecheck
 > tsc --noEmit            (no output = success)
 
 $ npm test
-ℹ tests 118
-ℹ pass 118
+ℹ tests 120
+ℹ pass 120
 ℹ fail 0
 
 $ npm audit --omit=dev --audit-level=high
@@ -45,7 +50,8 @@ found 0 vulnerabilities
 
 `tests/oauth.test.ts` covers DCR, PKCE consent, wrong verifier, code reuse, refresh rotation/reuse,
 revocation, admin login/revoke and unsafe redirects. `tests/security.test.ts` covers idempotent writes,
-prompt injection, granular scope mapping and audit redaction.
+prompt injection, granular scope mapping and audit redaction. `tests/financeLedger.test.ts` covers the
+finance ledger’s confirm/idempotency/owner-verification rules and optimistic write protection.
 
 ### Diet / Stuff MCP
 
@@ -70,11 +76,40 @@ $ xcodebuild -scheme MeOS -sdk iphonesimulator build
 
 Warnings are pre-existing Swift 6 concurrency warnings in `AgentLoop.swift`; no errors.
 
+
+### Backup and key-rotation drills (synthetic)
+
+```text
+$ cd mcp/meos && npm run test:restore
+{
+  "ok": true,
+  "database": "D1-shaped SQLite backup restored",
+  "vaultUnlocked": true,
+  "noteDecrypted": true,
+  "tamperRejected": true,
+  "mediaDecrypted": true
+}
+
+$ npm run test:rotate
+{
+  "ok": true,
+  "passphraseRewrap": true,
+  "recoveryRewrap": true,
+  "existingCiphertextPreserved": true,
+  "dataKeyReencryptionDrill": true,
+  "oldDekRejectedAfterReencrypt": true
+}
+```
+
+These use only synthetic state and media. They prove the D1-shaped backup restores, the vault still
+unlocks, ciphertext is integrity-checked, the media decrypts, passphrase/recovery rewrap works, and a new
+DEK rejects the old one. See `scripts/restore-drill.ts` and `scripts/key-rotation-drill.ts`.
+
 ### Repository security gate
 
 ```text
 $ ./scripts/security-scan.sh
-No vulnerabilities found (checked 14 packages)     # API production
+No vulnerabilities found (checked 15 packages)     # API production
 No vulnerabilities found (checked 91 packages)     # diet production
 No vulnerabilities found (checked 91 packages)     # stuff production
 found 0 vulnerabilities                            # MCP gateway production
@@ -117,6 +152,8 @@ with Trivy as an advisory job.
 | MCP revoke | Disconnect in `/admin`, retry token | `401` immediately |
 | Prompt injection | note body “ignore previous instructions…” | returned as data with `content_trust: untrusted`; no scope change |
 | Idempotency | same `idempotency_key` twice on a write | one record; identical result |
+| Finance MCP write guard | ledger `add_transaction` without `confirm` / without key | `confirmation_required` / `invalid_input`; row starts `needsReview`; MCP cannot self-verify |
+| Finance concurrent write | two MCP writes prepared from the same snapshot | second gets a conflict; no silent lost update |
 | Audit redaction | inspect `security_events` / `audit.log` | no token/password/note text/amount; IP is a hash |
 | Vault setup | new account, import pre-vault data, create passphrase | data is preserved, then encrypted; note not empty |
 | Encrypted backup recovery | create a `meosenc.json` envelope, then `MEOS_EXPORT_PASSPHRASE=… node scripts/decrypt-export.mjs <file>` | plaintext JSON is recovered; wrong passphrase exits 1 |

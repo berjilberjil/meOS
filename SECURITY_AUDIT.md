@@ -10,7 +10,7 @@ was verified, and what remains. The most important honest statements:
 
 - The app already had a real client-side vault. This work did not invent a second one.
 - A first-run bug would have emptied a new vault; it is fixed and called out as SEC-15.
-- Argon2id, passkeys and automatic DEK rotation are **not** implemented; they are listed as residual gaps.
+- Argon2id is available for the server login hash on paid Workers (`v4`) but not yet on-device for the vault; passkeys and automatic DEK rotation remain residual gaps.
 - The MCP gateway now has OAuth 2.1 + PKCE + per-module scopes + revocation + audit, but it remains a local
   process that holds the vault passphrase. That is an architectural trade, not a hidden detail.
 
@@ -102,7 +102,7 @@ the end of this work.
 | ID | Severity | Finding / attack scenario | Affected | Impact | Mitigation | Status | Evidence |
 |---|---|---|---|---|---|---|---|
 | SEC-01 | **High** | Session tokens stored verbatim in D1. A read-only DB/backup leak hands over live 60-day cookies. | `sessions` | Account takeover; ciphertext download; meta replacement (lockout) | Store only SHA-256(token); random public id; legacy rows upgraded on use; 30-day absolute/14-day idle; revoke-others | **Fixed** | `auth.ts` `createSession/findSession`; `sessions` schema; code review |
-| SEC-02 | **High** | Login KDF at 10k PBKDF2 with no pepper; DB-only leak allows fast offline guessing of login passwords. | `users.password_hash` | Password reuse, account access, offline attack | v3 = HMAC-SHA256(pepper, pw) + PBKDF2; dedicated `MEOS_PASSWORD_PEPPER`; configurable iterations; dummy verify; rate limit | **Mitigated** (Argon2id remains a gap) | `authPepper.test.ts` (3), `auth.test.ts` |
+| SEC-02 | **High** | Login KDF at 10k PBKDF2 with no pepper; DB-only leak allows fast offline guessing of login passwords. | `users.password_hash` | Password reuse, account access, offline attack | v3 = HMAC-SHA256(pepper, pw) + PBKDF2; optional v4 Argon2id (19 MiB, t=2); dedicated pepper; configurable iterations; dummy verify; rate limit | **Mitigated** (server Argon2id optional; on-device vault KDF remains PBKDF2) | `authPepper.test.ts` (3), `authArgon2.test.ts` (2), `auth.test.ts` |
 | SEC-03 | **High** | No Origin/Sec-Fetch-Site check on cookie-authenticated unsafe `/api/*` requests. Defence-in-depth gap behind SameSite/CORS. | All mutating routes | CSRF if a browser edge case/trusted-origin misconfig exists | `originAllowed()` in hooks; exact trusted origins; `SameSite=Strict`; JSON-only bodies | **Fixed** | `security.test.ts` (4 origin cases); `hooks.server.ts` |
 | SEC-04 | **Medium** | Missing HSTS/CSP/frame/COOP/CORP/Permissions-Policy; HTML surface had no CSP. | Worker responses | Clickjacking, script injection, referrer leakage | Security headers in hooks + SvelteKit CSP default-deny | **Fixed** | `security.test.ts`; build output; `svelte.config.js` |
 | SEC-05 | **High** | No second factor. A phished password gives full account access. | Login | Account takeover | Optional TOTP + one-time recovery codes; MFA enforced at login/password/reauth | **Fixed** (opt-in) | `mfa.test.ts` (RFC vector); `auth/mfa/*` routes; native Security screen |
@@ -116,13 +116,13 @@ the end of this work.
 | SEC-13 | **Medium** | R2 signed GET URLs lived 1 hour; a leaked URL stayed valid for an hour. | Media | Photo exposure via shared URL | 600-second TTL; session + ownership check before signing; no URL returned to MCP clients | **Fixed** | `body-photos`, `event-media` routes |
 | SEC-14 | **High** | The native “Export backup” wrote a **plaintext** JSON dump to the temporary directory and offered it in the share sheet. | Apple app | Full vault disclosure via Mail/Downloads/cloud sync | Encrypted export (`EncryptedExport`, PBKDF2 600k + AES-GCM); temp copies removed on logout; UI asks for a backup passphrase | **Fixed** | `EncryptedExport.swift`; `MeExportBackup`; iOS/macOS build |
 | SEC-15 | **Critical** | First-run vault setup decoded the plaintext snapshot **after** adopting the new meta. Anti-downgrade dropped every plaintext module, then `migrateEncryptExisting` uploaded the empty models as the new encrypted state. | Apple setup | A brand-new vault could be created empty, losing the imported pre-vault data | Decode `raw` before `vault.adoptSetup`; then apply and migrate | **Fixed** | `AppState.completeVaultSetup`; code review; builds |
-| SEC-16 | **Medium** | No documented encrypted backup/restore or tested procedure; D1 Time Travel alone is not offsite. | Ops | Permanent loss or untested restore | `scripts/backup-d1.sh` (age), `docs/BACKUP.md`, retention/restore steps, key-loss warning | **Fixed** | script + docs |
+| SEC-16 | **Medium** | No documented encrypted backup/restore or tested procedure; D1 Time Travel alone is not offsite. | Ops | Permanent loss or untested restore | `scripts/backup-d1.sh` (age), `docs/BACKUP.md`, `scripts/restore-drill.ts` (synthetic D1 + note/media + tamper), retention/key-loss warning | **Fixed** | `npm run test:restore`; `BACKUP_RECOVERY.md` |
 | SEC-17 | **Medium** | D1 has no RLS; a missed `user_id` predicate would cross users. | DB | Cross-user exposure if a query is wrong | Every route reviewed; all user tables carry `user_id`; explicit ownership in updates/deletes; no service-role key; single-owner deployment | **Accepted / controlled** | `docs/DATABASE_SECURITY.md`; query inventory |
 | SEC-18 | **Medium** | No passkeys/WebAuthn; TOTP is phishable. | Login | Credential phishing | TOTP; strong unique password; re-auth; planned WebAuthn | **Open** | `SECURITY.md` limitations |
 | SEC-19 | **Medium** | Argon2id is not used on-device; PBKDF2 600k is the KDF. | Vault | GPU/ASIC guessing cheaper than Argon2id | 600k rounds, 16-byte salt, unique passphrase; planned vetted Argon2id migration | **Open** | `ENCRYPTION.md`; `MyOSCrypto.swift` |
 | SEC-20 | **Medium** | MCP gateway stores the vault passphrase in `.env`, and the DEK in process memory. | Gateway host | Host compromise = vault compromise | 0600 env, loopback bind, trusted host, no untrusted code, dashboard local-only, docs | **Accepted / controlled** | `MCP_SETUP.md`; `.env.example` |
 | SEC-21 | **Low** | Burst limiter is per-isolate; across Workers isolates the effective limit multiplies. | API | Resource exhaustion in a distributed burst | Durable login attempts and AI budgets are primary; rate limits are burst control | **Accepted** | `security.ts`; `README` |
-| SEC-22 | **Medium** | No automated DEK rotation. Passphrase/recovery re-wrap does not change the DEK. | Vault | A long-lived DEK; old ciphertext under an exposed passphrase stays exposed | Passphrase + recovery rotation implemented; DEK rotation documented as a manual/offline follow-up; `dataVersion`/`v` ready | **Open** | `ENCRYPTION.md` rotation section |
+| SEC-22 | **Medium** | No automated production DEK rotation. Passphrase/recovery re-wrap does not change the DEK. | Vault | A long-lived DEK; old ciphertext under an exposed passphrase stays exposed | Passphrase + recovery rewrap implemented; synthetic new-DEK re-encryption drill; production rotation remains backup-gated manual; `dataVersion`/`v` ready | **Open** | `npm run test:rotate`; `KEY_MANAGEMENT.md` |
 | SEC-23 | **Medium** | `PUT /api/state/meos.crypto` is session-authenticated; the server cannot verify the vault passphrase. A stolen session can replace the wrapped DEK and lock the owner out (not decrypt data). | Vault metadata | Denial of service / lockout | Client verifies current passphrase before re-wrap; anti-downgrade; audit; fresh login for setup; document as residual | **Accepted / controlled** | `Vault.swift` `rewrap`; `state/[key]` validation |
 | SEC-24 | **Low** | No email password reset. | Account | Lost login password requires an existing device/session | Single-owner design; recovery code covers the vault; keep a device signed in | **Accepted** | `SECURITY.md` |
 | SEC-25 | **High (by design)** | ChatGPT/any AI provider sees plaintext it retrieves. | AI boundary | Third-party processing | Explicit consent, per-module scopes, data minimization, no bulk export, disconnect; documented privacy boundary | **Accepted / disclosed** | `MCP_SETUP.md` §5; consent page |
@@ -133,6 +133,9 @@ the end of this work.
 | SEC-30 | **Low** | `ip_hash` salt rotation makes old hashes non-comparable. | Audit | Loss of correlation, not exposure | Documented; use a stable `MEOS_AUDIT_SALT` | **Accepted** | `audit.ts` |
 | SEC-31 | **Low** | Node `createDecipheriv('aes-256-gcm')` did not pin an authentication-tag length; a shorter tag could be accepted by a malformed ciphertext. | `mcp/diet/src/crypto.ts` | Weakens GCM forgery resistance in the Node runtime | Pass `{ authTagLength: 16 }`; Semgrep now reports 0 blocking findings | **Fixed** | Semgrep output in `docs/SECURITY_TEST_EVIDENCE.md`; diet crypto tests (13) |
 | SEC-32 | **High** | The Apple app disabled ATS globally (`NSAllowsArbitraryLoads: true`), permitting cleartext HTTP to any host if the base URL is overridden or DNS is attacked. | `apps/apple/project.yml` | MITM/session theft on a hostile network | ATS enabled; only `localhost` / `127.0.0.1` has an insecure-load exception for local development | **Fixed** | `project.yml`; macOS + iOS builds succeed |
+| SEC-33 | **High** | Finance ledger MCP writes added after the first audit accepted unconfirmed money writes and allowed duplicate transactions on retry; AI rows could mark themselves `verified`. | `mcp/meos/src/tools/financeLedger.ts`, registry | Wrong balances, duplicate spends, false reconciliation | `confirm: true` + required unique `idempotency_key` on every money write; AI rows start `needsReview`; MCP cannot set `verified`/`reconciled` | **Fixed** | `financeLedger.test.ts` “requires confirmation, idempotency and owner-only verification”; 120 MCP tests |
+| SEC-34 | **Medium** | Finance ledger reads the whole encrypted document then writes it; two concurrent MCP calls could silently overwrite one money change. | `financeLedger.ts`, `registry.ts` | Lost transaction/balance update | Per-process write serialization + optimistic `updatedAt` check against a forced-fresh read; conflict instead of last-write-wins | **Fixed** | `financeLedger.test.ts` “concurrent finance ledger writes are serialized” |
+| SEC-35 | **High** | `DELETE /api/state/meos.<module>` only required a session, so a stolen cookie could wipe notes, finance, health, etc. with one request. | State route | Data loss / denial of service | Current `meos.*` modules are refused; only legacy `myos.*` cleanup and explicit `meos.fold` disconnect are deletable; `meos.crypto` always blocked | **Fixed** | `stateKeys.test.ts` deletion policy; route review |
 
 ### Highest-priority items that remain
 
@@ -155,6 +158,7 @@ Legend: ✅ verified; ⚠️ verified with a documented limitation; ❌ not met.
 | Unauthenticated users cannot access private data | ✅ | Every `/api/*` private route checks `locals.user`; MCP returns 401; `oauth.test.ts`; manual `curl /api/me` |
 | One user cannot access another’s data | ✅ | All queries scoped by session `user_id`; MCP harness two-account tests; media prefixes; AI key ownership checks |
 | Sensitive records encrypted per documented architecture | ✅ | `app_state` envelopes; R2 ciphertext; `ENCRYPTION.md`; D1 inspection procedure |
+| Password hashing meets modern guidance | ⚠️ | PBKDF2 v3 default; optional Argon2id v4 (19 MiB, t=2) on paid Workers; on-device vault remains PBKDF2 600k (SEC-19) |
 | DB-only access does not reveal E2E content | ✅ | Envelope format; no DEK in D1; `secrets.test.ts` covers server secrets separately; manual D1 check |
 | Private storage cannot be accessed publicly | ✅ | R2 private bucket; no public URL; signed GET only after session; 600s TTL; tests for ID handling |
 | No secrets in frontend code | ✅ | `.env` server-only; no service-role key; `security-scan.sh` secret grep clean; landing page static |
@@ -167,10 +171,11 @@ Legend: ✅ verified; ⚠️ verified with a documented limitation; ❌ not met.
 | MCP cannot perform unrestricted DB operations | ✅ | No SQL tool; `MeosApiClient` only fixed endpoints; state keys allowlisted; no service-role credential |
 | Prompt injection cannot bypass server permissions | ✅ | Server checks scopes/ownership/confirm before handler; `content_trust: untrusted`; injection test |
 | Write operations require appropriate authorization | ✅ | Module write scope; destructive + confirm; finance + confirm; idempotency; OAuth consent |
+| Bulk/whole-module deletion is blocked or re-authenticated | ✅ | Current `meos.*` documents cannot be deleted via the state API; legacy cleanup/Fold only; account wipe is an offline procedure |
 | Security-sensitive actions have audit trails | ✅ | `security_events`; MCP JSONL; events for login/MFA/reauth/export/keys/sessions/media/state/OAuth/tool calls |
 | Backups are protected | ✅ | age-encrypted export script; private R2; D1 Time Travel; `docs/BACKUP.md` |
-| Recovery procedures are tested | ⚠️ | Procedure documented; vault recovery/rewrap code exists; no destructive production restore test (by constraint). A local restore drill is in `docs/BACKUP.md`. |
-| Automated security tests pass | ✅ | API 78, MCP 118, diet 13, stuff 10; typecheck/build; `docs/SECURITY_TEST_EVIDENCE.md` |
+| Recovery procedures are tested | ✅ synthetic | `npm run test:restore` restores a D1-shaped DB, unlocks the vault, decrypts note/media, rejects tampering; production restore remains manual (no prod access by constraint) |
+| Automated security tests pass | ✅ | API 81, MCP 120, diet 13, stuff 10; typecheck/build; `docs/SECURITY_TEST_EVIDENCE.md` |
 | No unresolved critical/high vulnerabilities | ⚠️ | SEC-15 fixed; production dependency audit clean. Residual high-by-design: MCP host holds passphrase, AI provider sees requested plaintext. No unmitigated critical/high implementation bug known. |
 
 ---
@@ -181,16 +186,16 @@ Legend: ✅ verified; ⚠️ verified with a documented limitation; ❌ not met.
 
 - `src/hooks.server.ts` — session resolution via hashed tokens, CSRF/origin check, security headers, CORS,
   body cap, sanitized error hook.
-- `src/lib/server/auth.ts` — v3 pepper, session hashing/rotation/idle/reauth, revoke helpers.
+- `src/lib/server/auth.ts` — v3 pepper + optional Argon2id v4, session hashing/rotation/idle/reauth, revoke helpers.
 - `src/lib/server/security.ts` — origin/CORS/rate limit/headers.
 - `src/lib/server/audit.ts` — metadata audit + salted IP.
 - `src/lib/server/mfa.ts` — TOTP/recovery.
 - `src/lib/server/sensitive.ts` — re-auth proof.
 - `src/lib/server/secrets.ts` — key ring, v2 format, strong-key enforcement, rotation.
 - `src/lib/server/stateKeys.ts` — meta/envelope validation, plaintext key list.
-- `src/routes/api/state/*` — anti-downgrade, rate limits, audit.
+- `src/routes/api/state/*` — anti-downgrade, whole-module delete refusal, rate limits, audit.
 - `src/routes/api/auth/*` — MFA, reauth, password+session revocation, audit.
-- `src/routes/api/security/*` — sessions, events, rotate secrets.
+- `src/routes/api/security/*` — sessions, events, overview dashboard, backup status, rotate secrets.
 - `src/routes/api/export` — encrypted export.
 - `src/routes/api/ai/keys/*` — re-auth, rate limit, generic provider errors, audit.
 - `src/routes/api/{body,event}-media/*` — 600s URLs, rate limits, audit, octet-stream ciphertext.
@@ -214,7 +219,7 @@ Legend: ✅ verified; ⚠️ verified with a documented limitation; ❌ not met.
 - `src/oauth/{store,routes,admin}.ts` — OAuth 2.1, PKCE, DCR, consent, admin.
 - `src/auth/{scopes,authenticate}.ts` — granular scopes, OAuth validation.
 - `src/services/{audit,idempotency}.ts` — audit + write replay.
-- `src/tools/registry.ts` — filtered tools, granular enforcement, confirm, idempotency, audit.
+- `src/tools/registry.ts` — filtered tools, granular enforcement, confirm, required money-write idempotency, finance write serialization, audit.
 - `src/http.ts` — OAuth routing, 401 challenge, CORS, headers, audit.
 - `src/config/{env,types}.ts` — OAuth config.
 - `README.md`, `.env.example` — new setup.
@@ -223,11 +228,14 @@ Legend: ✅ verified; ⚠️ verified with a documented limitation; ❌ not met.
 **Docs/ops**
 
 - `SECURITY.md`, `ENCRYPTION.md`, `MCP_SETUP.md`, `SECURITY_AUDIT.md`
+- `DATA_CLASSIFICATION.md`, `KEY_MANAGEMENT.md`, `THREAT_MODEL.md`, `BACKUP_RECOVERY.md`,
+  `INCIDENT_RESPONSE.md`, `SECURITY_TEST_RESULTS.md`
 - `docs/THREAT_MODEL.md`, `docs/DATABASE_SECURITY.md`, `docs/API_SECURITY.md`,
   `docs/STORAGE_SECURITY.md`, `docs/AUTHENTICATION.md`, `docs/BACKUP.md`,
   `docs/INCIDENT_RESPONSE.md`, `docs/DEPLOYMENT_CHECKLIST.md`,
   `docs/AI_PERMISSION_MATRIX.md`, `docs/SECURITY_TEST_EVIDENCE.md`
 - `scripts/security-scan.sh`, `scripts/backup-d1.sh`, `scripts/decrypt-export.mjs`,
+  `scripts/restore-drill.ts`, `scripts/key-rotation-drill.ts`, `scripts/record-backup.sh`,
   `scripts/register-mcp-client.ts`
 - `.github/workflows/security.yml`
 

@@ -47,7 +47,7 @@ The API is a headless JSON service. Every private route resolves the user from t
 |---|---|---|---|
 | GET | `/api/state` | cookie | ETag/304, 180/min, only own rows |
 | PUT | `/api/state/[key]` | cookie | allowlisted key, 1.9MB cap, meta/envelope validation, anti-downgrade, audit |
-| DELETE | `/api/state/[key]` | cookie | own key only, 60/min, audit |
+| DELETE | `/api/state/[key]` | cookie | own key only, 60/min, audit; current `meos.*` modules are refused (legacy `myos.*` cleanup and `meos.fold` disconnect only) |
 
 `meos.crypto` and `meos.ai.routes` are the only plaintext keys. Once a vault exists, every other module
 value must be a sealed envelope; plaintext is refused with 400.
@@ -88,6 +88,7 @@ there is no anonymous or cross-user URL.
 | GET | `/api/security/sessions` | cookie | own sessions, public ids only |
 | DELETE | `/api/security/sessions` | cookie + password (+MFA) | revoke every other session, audit |
 | DELETE | `/api/security/sessions/[id]` | cookie + password (+MFA) | revoke one, ownership, audit |
+| GET | `/api/security/overview` | cookie | KDF/key version, sessions/devices/AI-key counts, media counts, backup status, last events |
 | GET | `/api/security/events` | cookie | own audit rows, no payloads |
 | POST | `/api/security/rotate-ai-keys` | cookie + password (+MFA) | re-encrypt AI/TOTP secrets under active key, audit |
 | POST | `/api/export` | cookie + password (+MFA) | encrypted state + masked metadata + media counts; 3/hour; audit |

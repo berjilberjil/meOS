@@ -15,6 +15,8 @@ cd ../../mcp/meos
 npm ci
 npm run typecheck
 npm test
+npm run test:restore   # synthetic D1 backup + vault/media restore drill
+npm run test:rotate    # synthetic passphrase/recovery/DEK rotation drill
 
 cd ../diet && bun test
 cd ../stuff && bun test
@@ -33,6 +35,8 @@ cd apps/apple && xcodegen generate && xcodebuild -scheme MeOS-macOS build && xco
 - [ ] `MEOS_SECRETS_KEY` is 32 random bytes, base64 (`openssl rand -base64 32`), or a key ring.
 - [ ] `MEOS_PASSWORD_PEPPER` is set to a **separate** stable value.
 - [ ] `MEOS_MFA_RECOVERY_PEPPER` is set (independent of the password pepper).
+- [ ] On a paid Workers plan, set `MEOS_PASSWORD_KDF=argon2id` (19 MiB, t=2) and benchmark login; leave
+      PBKDF2 v3 on the free tier. Argon2id is optional because the free tier's 10 ms CPU cap cannot run it.
 - [ ] `MEOS_AUDIT_SALT` is set.
 - [ ] `R2_*` credentials are scoped to the media bucket; no account-wide token.
 - [ ] `MEOS_ALLOW_SIGNUP` unset after the first account.

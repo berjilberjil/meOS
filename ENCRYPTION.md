@@ -68,9 +68,11 @@ is an honest gap versus the ideal; moving to Argon2id requires a vetted library 
 migration, not a quick change. `CryptoMeta.kdf` is checked by the client and the entry point rejects
 unknown KDFs.
 
-The server login password is a separate credential. It uses PBKDF2 (peppered `v3` when
-`MEOS_PASSWORD_PEPPER` is set) because the Worker free tier caps CPU at 10 ms/request. The vault passphrase
-is the one that protects the data, and it never reaches the server.
+The server login password is a separate credential. It uses peppered PBKDF2 `v3` by default because the
+Worker free tier caps CPU at 10 ms/request. A deployment with enough CPU budget can set
+`MEOS_PASSWORD_KDF=argon2id` to write `v4` Argon2id hashes (19 MiB, t=2 by default); old `v2`/`v3`/scrypt
+hashes still verify and upgrade. The pepper is applied before either KDF. The vault passphrase is the one
+that protects the data, and it never reaches the server.
 
 ---
 

@@ -95,12 +95,14 @@ metadata leakage, not content. It is documented rather than hidden.
 
 ## 3. Authentication and sessions
 
-- **Login password**: PBKDF2-SHA256, versioned `v3` (peppered) / `v2` / legacy scrypt. The pepper is
-  `MEOS_PASSWORD_PEPPER`; it is deliberately separate from the rotating secrets key. Work factor is
-  configurable (`MEOS_PBKDF2_ITERATIONS`, default 10k for the Workers free tier). A DB-only leak without
-  the pepper cannot verify guesses.
+- **Login password**: PBKDF2-SHA256 `v3` (peppered) or optional **Argon2id `v4`** (19 MiB, t=2) selected
+  with `MEOS_PASSWORD_KDF=argon2id`; `v2` and legacy scrypt still verify and upgrade. The pepper is
+  `MEOS_PASSWORD_PEPPER`, deliberately separate from the rotating secrets key; it is applied before either
+  KDF. PBKDF2 work factor is configurable (`MEOS_PBKDF2_ITERATIONS`, default 10k for the Workers free
+  tier). A DB-only leak without the pepper cannot verify guesses. Argon2id is opt-in because it costs
+  ~60 ms per hash and the free Workers plan caps CPU at 10 ms.
 - **Vault passphrase**: separate, never sent to the server, PBKDF2-HMAC-SHA256 **600,000** rounds on-device
-  (CommonCrypto), AES-256-GCM. Argon2id is not implemented; see [`ENCRYPTION.md`](ENCRYPTION.md).
+  (CommonCrypto), AES-256-GCM. On-device Argon2id is still a gap; see [`ENCRYPTION.md`](ENCRYPTION.md).
 - **Sessions**: random 256-bit cookie, only a SHA-256 hash stored in D1. `HttpOnly`, `Secure` in
   production, `SameSite=Strict`, 30-day absolute / 14-day idle expiry. Legacy plaintext rows are upgraded
   on first use. Password change revokes every other session.
@@ -177,7 +179,9 @@ metadata leakage, not content. It is documented rather than hidden.
   numbers, full request bodies.
 - IPs are salted hashes; user agents are truncated hashes in the MCP log. Retention is 180 days for D1 and
   5 MB × 3 rotations for the MCP JSONL.
-- Dashboard: `/api/security/events` (native Security screen) and the MCP `/admin` page. Alerts surface
+- Dashboard: `/api/security/overview` + `/api/security/events` (native Security screen) and the MCP
+  `/admin` page. The native card shows the active password KDF, server-secret key version, session/device/
+  AI-key counts, media object counts, last recorded backup/restore and recent events. Alerts surface
   repeated failed logins and refused cross-site requests.
 
 ---
@@ -204,8 +208,9 @@ The gateway is a separate security domain:
   binding, 15-minute access tokens, rotating refresh tokens with reuse detection, RFC 7009 revocation.
 - Admin consent requires a dedicated MCP admin password and explicit module checkboxes; default is profile
   read only.
-- Tool scopes are granular; destructive/finance writes need `confirm: true`; write tools support
-  idempotency keys; prompt-injected content is marked untrusted and cannot change server permissions.
+- Tool scopes are granular; destructive/finance writes need `confirm: true`; money-moving ledger writes
+  require a unique idempotency key; AI-created finance rows start `needsReview` and cannot self-verify.
+  Prompt-injected content is marked untrusted and cannot change server permissions.
 - The gateway holds the vault passphrase in its environment. Protect that host. It is not exposed to
   ChatGPT; only the HTTPS tunnel is.
 - No SQL, filesystem, shell, arbitrary URL or service-role tool exists, and adding one is not a config
@@ -264,6 +269,7 @@ Report a vulnerability privately to the owner (Berjil) via the repository's priv
 | AI provider sees retrieved plaintext | Third-party processing | Explicit consent, per-module scopes, data minimization, disconnect |
 | DEK rotation not automated | Passphrase/recovery re-wrap works; ciphertext stays under the same DEK | Documented manual export/re-encrypt procedure is a follow-up |
 | `meos.crypto` write is session-authenticated, not password-proven | A stolen session can cause a vault lockout (not decrypt data) | Client verifies current passphrase before re-wrap; re-auth window; audit |
+| MCP `confirm: true` cannot prove a human approved it | A malicious/over-eager client with a write scope can send `confirm` itself | Grant `finance.write`/`destructive` only to a trusted client; server still enforces scope, idempotency, ownership and audit; do not grant write scopes to ChatGPT by default |
 | Journal module absent | `meos.journal.*` is not grantable | Notes + memory are the real surfaces; do not fake a scope |
 | No email account recovery | Lost login password needs an existing session/device | Keep a device signed in and the recovery code offline |
 | Dev dependencies (Vite/Vitest) carry advisories | Local dev server only; not in the Worker bundle | Production audit is clean; upgrade tracked separately |
@@ -276,7 +282,7 @@ The following are reproducible:
 
 ```bash
 cd apps/api && bun run check && bun run test && bun run build
-cd mcp/meos && npm run typecheck && npm test
+cd mcp/meos && npm run typecheck && npm test && npm run test:restore && npm run test:rotate
 cd mcp/diet && bun test
 cd mcp/stuff && bun test
 ./scripts/security-scan.sh           # production audits + secret grep

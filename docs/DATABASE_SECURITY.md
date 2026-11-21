@@ -28,6 +28,7 @@ records the actual controls and the compensating measures.
 | `security_events` | `user_id` (nullable) | audit metadata | 180-day prune |
 | `user_mfa` | `user_id` | encrypted TOTP secret | one row |
 | `mfa_recovery_codes` | `user_id` | hashed one-time codes | burned on use |
+| `backup_status` | `user_id` | last backup/restore timestamp and label | metadata only; written by `scripts/record-backup.sh` |
 
 ## 3. Ownership rules
 

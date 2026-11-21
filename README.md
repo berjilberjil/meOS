@@ -72,10 +72,13 @@ storage, session and AI boundaries. Start here:
 - [`ENCRYPTION.md`](ENCRYPTION.md) — what is E2E encrypted, key hierarchy, guarantees
 - [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md) — findings, risk register, acceptance evidence
 - [`MCP_SETUP.md`](MCP_SETUP.md) — connect ChatGPT/Claude through OAuth + a tunnel
+- [`DATA_CLASSIFICATION.md`](DATA_CLASSIFICATION.md), [`KEY_MANAGEMENT.md`](KEY_MANAGEMENT.md),
+  [`THREAT_MODEL.md`](THREAT_MODEL.md), [`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md),
+  [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md), [`SECURITY_TEST_RESULTS.md`](SECURITY_TEST_RESULTS.md)
 - [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md), [`docs/STORAGE_SECURITY.md`](docs/STORAGE_SECURITY.md),
   [`docs/DATABASE_SECURITY.md`](docs/DATABASE_SECURITY.md), [`docs/API_SECURITY.md`](docs/API_SECURITY.md)
 - [`docs/DEPLOYMENT_CHECKLIST.md`](docs/DEPLOYMENT_CHECKLIST.md), [`docs/BACKUP.md`](docs/BACKUP.md),
-  [`docs/INCIDENT_RESPONSE.md`](docs/INCIDENT_RESPONSE.md), [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
+  [`docs/SECURITY_TEST_EVIDENCE.md`](docs/SECURITY_TEST_EVIDENCE.md)
 
 Run `./scripts/security-scan.sh` before deploying. The production dependency audits are clean; the MCP
 gateway has OAuth 2.1 + PKCE, per-module scopes, revocation, and a local admin dashboard.

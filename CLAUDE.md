@@ -164,7 +164,9 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
   Sessions are hash-only; unsafe API requests need a trusted Origin; once
   `meos.crypto` exists the server refuses plaintext module values. The MCP
   gateway is local and holds the vault DEK by design; never move decryption into
-  the Worker.
+  the Worker. Money-moving MCP writes require `confirm: true` **and** a unique
+  idempotency key; AI-created finance rows start `needsReview` and cannot
+  self-verify. Run `npm run test:restore` / `test:rotate` after crypto changes.
 - **TDD**, frequent commits, conventional-commit messages.
 
 ## Status & roadmap

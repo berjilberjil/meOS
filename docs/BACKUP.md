@@ -60,6 +60,12 @@ age -d -i ~/.config/meos/backup.agekey backups/meos-d1-*.sql.age | head
 age -d -i ~/.config/meos/backup.agekey backups/meos-d1-*.sql.age | sha256sum
 ```
 
+After verifying, record it for the Security dashboard:
+
+```bash
+./scripts/record-backup.sh backup age-d1
+```
+
 ## 4. Native encrypted JSON export
 
 Settings → **Export encrypted backup** creates `MeOS-backup.meosenc.json`:
