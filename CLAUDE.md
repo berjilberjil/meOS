@@ -171,7 +171,8 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
 7. ✅ Fold integration (read-only banking dashboard)
 8. ✅ Six-Pack Challenge + Home Screen widget
 9. ✅ Central MeOS MCP gateway (`mcp/meos`: scoped auth, vault, 116 tools,
-   resources, prompts, stdio + Streamable HTTP)
+   resources, prompts, stdio + Streamable HTTP; app-managed connector tokens
+   in Settings → MCP & AI connectors, encrypted in `meos.mcp`)
 10. ✅ **Finance OS (single-document phase)** — 18-section Mac/iPhone module:
     auditable ledger, accounts, transfers, income/expenses, budgets, goals,
     recurring, investments, liabilities, net worth, timeline, statements,

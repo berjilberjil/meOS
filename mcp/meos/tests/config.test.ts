@@ -19,11 +19,9 @@ test('stdio config creates a local client with read scopes by default', () => {
   assert.equal(client!.accountId, 'owner');
 });
 
-test('HTTP refuses to start without a token', () => {
-  assert.throws(
-    () => loadConfig({ ...baseEnv, MEOS_MCP_TRANSPORT: 'http' } as NodeJS.ProcessEnv),
-    /refuses to start without credentials/
-  );
+test('HTTP starts with no static token because app-managed tokens are read from meos.mcp', () => {
+  const config = loadConfig({ ...baseEnv, MEOS_MCP_TRANSPORT: 'http' } as NodeJS.ProcessEnv);
+  assert.equal(config.clients.size, 0);
 });
 
 test('HTTP client tokens are hashed, never retained in plaintext', () => {

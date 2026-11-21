@@ -931,6 +931,7 @@ struct AppStatePayload: Codable {
     var trash: [TrashEntry]?
     var sixPack: SixPackState?
     var finance: FinanceDocument?
+    var mcp: MCPConfig?
 
     init() {}
 
@@ -957,6 +958,7 @@ struct AppStatePayload: Codable {
         case trash          = "meos.trash"
         case sixPack        = "meos.sixPack"
         case finance        = "meos.finance"
+        case mcp            = "meos.mcp"
     }
 
     // Decode each module independently: one unexpected key can no longer sink the
@@ -985,6 +987,7 @@ struct AppStatePayload: Codable {
         appearance     = try? c.decodeIfPresent(AppearanceSettings.self, forKey: .appearance)
         sixPack        = try? c.decodeIfPresent(SixPackState.self, forKey: .sixPack)
         finance        = try? c.decodeIfPresent(FinanceDocument.self, forKey: .finance)
+        mcp            = try? c.decodeIfPresent(MCPConfig.self, forKey: .mcp)
     }
 }
 
@@ -1068,6 +1071,7 @@ enum StateKey {
     static let trash          = "meos.trash"
     static let sixPack        = "meos.sixPack"
     static let finance        = "meos.finance"
+    static let mcp            = "meos.mcp"
 
     /// The pre-rename spelling, for reading back data written by older builds.
     static func legacyKey(for newKey: String) -> String? {
@@ -1086,6 +1090,6 @@ enum StateKey {
         fitness, fitnessProfile, notes, days, profile,
         chat, nutrition, training, events, eventTags, watch, belongings,
         fold, memory, scans, taskMode, weekly, activity, appearance, trash, sixPack,
-        finance,
+        finance, mcp,
     ]
 }

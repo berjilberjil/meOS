@@ -119,21 +119,49 @@ hand.
 ### Streamable HTTP (remote clients)
 
 ```bash
-MEOS_MCP_TRANSPORT=http \
-MEOS_MCP_HTTP_TOKEN='generate-a-long-random-token' \
-npm start
+# App-managed tokens (recommended): create one in MeOS → Settings → MCP & AI connectors.
+MEOS_MCP_TRANSPORT=http npm run start:http
 # POST http://127.0.0.1:8788/mcp
+
+# Or a static headless token:
+MEOS_MCP_TRANSPORT=http MEOS_MCP_HTTP_TOKEN='generate-a-long-random-token' npm start
 ```
 
 The HTTP transport is **stateless** (`enableJsonResponse: true`): every MCP request is a POST. Server-sent
 GET streams are intentionally disabled (405). This keeps the gateway horizontally simple and avoids
 long-lived in-memory sessions.
 
-The listener refuses to start without a token, and refuses a non-loopback bind unless
+The listener accepts **app-managed tokens** from the encrypted `meos.mcp` document created in
+**MeOS → Settings → MCP & AI connectors**. A static `MEOS_MCP_HTTP_TOKEN` / `MEOS_MCP_CLIENTS_JSON` still
+works for headless installs. If neither exists, requests fail 401. A non-loopback bind is refused unless
 `MEOS_MCP_ALLOW_REMOTE=true`. For any remote deployment, terminate TLS in a trusted proxy (Caddy, nginx,
 Cloudflare Tunnel) and keep the gateway itself on loopback.
 
 Health check: `GET /healthz` → `{"ok":true}` (no data, no auth).
+
+### App-managed connectors (recommended)
+
+MeOS → **Settings → MCP & AI connectors** creates a random bearer token, stores only its SHA-256 hash and
+scopes in the encrypted `meos.mcp` document, and shows the raw token exactly once. The gateway decrypts
+that document with the owner's vault passphrase and accepts active, unexpired tokens. Revoke from the same
+screen; the gateway refuses it on its next registry refresh (10s cache).
+
+A token can be scoped to `read`, `write`, `health`, `secret` and (explicitly) `destructive`. Finance ledger
+writes need `read,write`. This is the route to use for Claude, OpenCode, Cursor and any MCP client that
+supports a remote Streamable HTTP URL with a custom `Authorization: Bearer` header.
+
+Cloud clients such as ChatGPT also need the gateway reachable on public HTTPS. Run the HTTP listener on
+the Mac and put a tunnel in front:
+
+```bash
+cd mcp/meos
+npm run start:http                       # http://127.0.0.1:8788/mcp
+cloudflared tunnel --url http://127.0.0.1:8788
+```
+
+Paste the resulting public URL into MeOS → Settings → MCP & AI connectors, then copy the URL + token into
+the client. Whether ChatGPT's current connector UI accepts a custom bearer header depends on its plan and
+connector type; the gateway itself is standard Streamable HTTP with bearer auth.
 
 ---
 
@@ -151,8 +179,8 @@ user.
 | `MEOS_VAULT_RECOVERY` | alternative | One-time recovery code |
 | `MEOS_TIMEZONE` | no | IANA zone for "today" and app-style stamps; set when the host is elsewhere |
 | `MEOS_MCP_SCOPES` | no | Scopes for stdio / single-token mode; default `read` |
-| `MEOS_MCP_HTTP_TOKEN` | HTTP single-client | Bearer token |
-| `MEOS_MCP_CLIENTS_JSON` | HTTP multi-client | Per-client token hash, scopes, account, optional expiry |
+| `MEOS_MCP_HTTP_TOKEN` | no | Optional static bearer token for headless HTTP |
+| `MEOS_MCP_CLIENTS_JSON` | no | Optional static multi-client hashes/scopes/accounts |
 | `MEOS_MCP_ACCOUNTS_JSON` | no | Additional MeOS accounts for genuine isolation |
 | `MEOS_MCP_HTTP_HOST` / `PORT` / `PATH` | no | Defaults `127.0.0.1:8788/mcp` |
 | `MEOS_MCP_ALLOW_REMOTE` | no | Must be `true` to bind non-loopback |
@@ -604,7 +632,8 @@ No test needs a real account, network, or secrets.
 | `vault_locked` | Set `MEOS_VAULT_PASSPHRASE` (or recovery code). The login password does not unlock the vault. |
 | `locked_bad_key` in status | The passphrase is wrong or the meta was rewrapped. Recheck it. No data was changed. |
 | `The configured MeOS account could not sign in` | Check `MEOS_USERNAME` / `MEOS_PASSWORD`; the backend never distinguishes wrong user from wrong password. |
-| HTTP exits with “refuses to start without credentials” | Set `MEOS_MCP_HTTP_TOKEN` or `MEOS_MCP_CLIENTS_JSON`. |
+| HTTP returns 401 for every request | Create a token in MeOS → Settings → MCP & AI connectors, or set a static `MEOS_MCP_HTTP_TOKEN`. |
+| A newly created token still returns 401 | The gateway caches the registry for 10s; retry. Check the token was not revoked and the vault passphrase is correct. |
 | HTTP exits with “Refusing to bind” | Keep loopback, or set `MEOS_MCP_ALLOW_REMOTE=true` behind TLS. |
 | `forbidden` on health/diet | Grant the `health` scope. Locked notes and body photos also need `secret`. |
 | `confirmation_required` | Re-call a destructive tool with `"confirm": true` after user approval. |

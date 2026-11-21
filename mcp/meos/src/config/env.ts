@@ -125,18 +125,19 @@ function parseClients(env: NodeJS.ProcessEnv, accounts: Map<string, AccountConfi
       accountId: 'owner'
     });
   } else if (clients.size === 0) {
+    // App-managed tokens live in the encrypted `meos.mcp` registry and are
+    // verified per request by DynamicClientRegistry. An empty static list is
+    // therefore valid: if no app token exists either, every request fails 401.
+    // A static token remains supported for headless/CI installs.
     const token = env.MEOS_MCP_HTTP_TOKEN?.trim();
-    if (!token) {
-      throw new Error(
-        'HTTP transport refuses to start without credentials. Set MEOS_MCP_HTTP_TOKEN or MEOS_MCP_CLIENTS_JSON.'
-      );
+    if (token) {
+      clients.set('default', {
+        id: 'default',
+        tokenHash: hashToken(token),
+        scopes: defaultScopes,
+        accountId: 'owner'
+      });
     }
-    clients.set('default', {
-      id: 'default',
-      tokenHash: hashToken(token),
-      scopes: defaultScopes,
-      accountId: 'owner'
-    });
   }
 
   if (transport === 'stdio' && clients.size > 1) {

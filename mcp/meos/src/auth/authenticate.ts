@@ -1,6 +1,7 @@
 import { hashToken, tokenHashMatches } from '../config/env.ts';
 import type { ClientConfig, RuntimeConfig } from '../config/types.ts';
 import { errors } from '../utils/errors.ts';
+import type { DynamicClientRegistry } from './dynamicClients.ts';
 
 /**
  * Identity for HTTP clients comes only from the bearer token. A `user_id`,
@@ -8,7 +9,11 @@ import { errors } from '../utils/errors.ts';
  * schemas do not contain those fields and the context is fixed before any tool
  * runs.
  */
-export function authenticateBearer(config: RuntimeConfig, authorization: string | undefined): ClientConfig {
+export async function authenticateBearer(
+  config: RuntimeConfig,
+  authorization: string | undefined,
+  dynamic?: DynamicClientRegistry
+): Promise<ClientConfig> {
   if (!authorization) throw errors.unauthenticated();
   const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
   if (!match) throw errors.unauthenticated('Use "Authorization: Bearer <token>".');
@@ -19,6 +24,7 @@ export function authenticateBearer(config: RuntimeConfig, authorization: string 
     if (!client.tokenHash) continue;
     if (tokenHashMatches(presented, client.tokenHash)) found = client;
   }
+  if (!found && dynamic) found = (await dynamic.authenticate(presented)) ?? undefined;
   if (!found) throw errors.unauthenticated('The bearer token is not valid.');
   if (found.expiresAt && Date.parse(found.expiresAt) <= Date.now()) {
     throw errors.unauthenticated('The bearer token has expired.');

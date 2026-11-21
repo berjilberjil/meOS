@@ -5,6 +5,7 @@ import type { ServiceRegistry } from './services/account.ts';
 import type { Logger } from './services/logger.ts';
 import type { RateLimiter } from './auth/rateLimit.ts';
 import { authenticateBearer } from './auth/authenticate.ts';
+import { DynamicClientRegistry } from './auth/dynamicClients.ts';
 import { isMeosMcpError } from './utils/errors.ts';
 import { buildServer } from './server.ts';
 
@@ -70,6 +71,7 @@ function sendMcpError(res: ServerResponse, status: number, code: string, message
 
 export function createHttpServer(options: HttpServerOptions): Server {
   const { config, registry, limiter, logger } = options;
+  const dynamicClients = new DynamicClientRegistry(config, registry, logger);
 
   return createServer(async (req, res) => {
     const started = Date.now();
@@ -111,7 +113,7 @@ export function createHttpServer(options: HttpServerOptions): Server {
         );
       }
 
-      client = authenticateBearer(config, req.headers.authorization);
+      client = await authenticateBearer(config, req.headers.authorization, dynamicClients);
       limiter.take(client.id);
 
       const body = await readJsonBody(req, config.http.maxBodyBytes);

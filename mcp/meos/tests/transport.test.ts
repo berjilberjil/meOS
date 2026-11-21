@@ -10,6 +10,7 @@ import { silentLogger } from '../src/services/logger.ts';
 import { hashToken } from '../src/config/env.ts';
 import type { AccountConfig, ClientConfig } from '../src/config/types.ts';
 
+
 test('Streamable HTTP supports initialize, tool discovery and a tool call', async () => {
   const h = await createHarness();
   const account: AccountConfig = {
@@ -171,6 +172,69 @@ test('HTTP caps request bodies', async () => {
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'x', params: { pad: 'a'.repeat(5000) } })
     });
     assert.equal(res.status, 413);
+  } finally {
+    await new Promise<void>((resolve) => http.close(() => resolve()));
+    await h.close();
+  }
+});
+
+
+test('HTTP accepts a token created in the native MCP settings', async () => {
+  const h = await createHarness();
+  const account: AccountConfig = {
+    id: 'a',
+    baseUrl: h.baseUrl,
+    username: h.accounts.a.username,
+    password: h.accounts.a.password,
+    vaultPassphrase: h.accounts.a.passphrase,
+    requestTimeoutMs: 5000
+  };
+  const config = testConfig({
+    accounts: new Map([['a', account]]),
+    clients: new Map()
+  });
+  const http = createHttpServer({
+    config,
+    registry: new ServiceRegistry(config.accounts, silentLogger),
+    limiter: new RateLimiter(60_000, 1000),
+    logger: silentLogger
+  });
+  await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+  const address = http.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Authorization: 'Bearer app-secret'
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'app-token-test', version: '1.0.0' }
+        }
+      })
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json() as any;
+    assert.equal(body.result.serverInfo.name, 'meos');
+
+    const revoked = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer revoked-secret'
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'initialize', params: {} })
+    });
+    assert.equal(revoked.status, 401);
   } finally {
     await new Promise<void>((resolve) => http.close(() => resolve()));
     await h.close();
