@@ -13,7 +13,12 @@ export type Food = {
 };
 export type PlanItem = { id: string; foodId: string; quantity: number };
 export type MealKey = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
-export type MealLog = { meals: Record<string, PlanItem[]>; skipped: string[] };
+export type MealLog = {
+	meals: Record<string, PlanItem[]>;
+	skipped: string[];
+	/** Meals the user confirmed, even if emptied afterwards. Mirrors the Swift model. */
+	confirmed?: string[];
+};
 export type NutritionState = {
 	customFoods: Food[];
 	log: Record<string, MealLog>;
@@ -134,7 +139,8 @@ export function logFood(
 	const day = n.log[date] ?? { meals: {}, skipped: [] };
 	const meals = { ...day.meals, [m]: [...(day.meals[m] ?? []), item(foodId, quantity)] };
 	const skipped = day.skipped.filter((s) => s !== m);
-	return { ...n, log: { ...n.log, [date]: { meals, skipped } } };
+	const confirmed = [...new Set([...(day.confirmed ?? []), m])];
+	return { ...n, log: { ...n.log, [date]: { meals, skipped, confirmed } } };
 }
 
 export function logPlannedMeal(n: NutritionState, date: string, weekday: string, meal: string): NutritionState {
@@ -145,7 +151,8 @@ export function logPlannedMeal(n: NutritionState, date: string, weekday: string,
 	const copied = planned.map((p) => item(p.foodId, p.quantity));
 	const meals = { ...day.meals, [m]: copied };
 	const skipped = day.skipped.filter((s) => s !== m);
-	return { ...n, log: { ...n.log, [date]: { meals, skipped } } };
+	const confirmed = [...new Set([...(day.confirmed ?? []), m])];
+	return { ...n, log: { ...n.log, [date]: { meals, skipped, confirmed } } };
 }
 
 export function deleteLogItem(n: NutritionState, logId: string): NutritionState {
@@ -156,7 +163,7 @@ export function deleteLogItem(n: NutritionState, logId: string): NutritionState 
 			const kept = items.filter((x) => x.id !== logId);
 			if (kept.length) meals[meal] = kept;
 		}
-		log[date] = { meals, skipped: day.skipped };
+		log[date] = { meals, skipped: day.skipped, confirmed: day.confirmed ?? [] };
 	}
 	return { ...n, log };
 }

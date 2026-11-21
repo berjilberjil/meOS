@@ -98,8 +98,8 @@ export async function uploadObject(key: string, bytes: Uint8Array, contentType: 
 
 /// Objects under `prefix`, with `name` relative to it (mirrors how callers
 /// used the old Supabase Storage `list` response).
-export async function listObjects(prefix: string): Promise<{ name: string; updatedAt?: string }[]> {
-  const out: { name: string; updatedAt?: string }[] = [];
+export async function listObjects(prefix: string): Promise<{ name: string; updatedAt?: string; bytes?: number }[]> {
+  const out: { name: string; updatedAt?: string; bytes?: number }[] = [];
   let cursor: string | undefined;
   do {
     const page = await media().list({ prefix, cursor });
@@ -108,7 +108,8 @@ export async function listObjects(prefix: string): Promise<{ name: string; updat
       if (!/\.jpe?g$/i.test(name)) continue;
       out.push({
         name,
-        updatedAt: o.uploaded instanceof Date ? o.uploaded.toISOString() : undefined
+        updatedAt: o.uploaded instanceof Date ? o.uploaded.toISOString() : undefined,
+        bytes: o.size ?? undefined
       });
     }
     cursor = page.truncated ? page.cursor : undefined;

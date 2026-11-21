@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "meos": {
+      "command": "node",
+      "args": [
+        "--env-file-if-exists=/absolute/path/to/meOS/mcp/meos/.env",
+        "/absolute/path/to/meOS/mcp/meos/src/index.ts"
+      ]
+    }
+  }
+}

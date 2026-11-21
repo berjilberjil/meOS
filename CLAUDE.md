@@ -18,7 +18,8 @@ meOS/
 │   └── api/       # Headless SvelteKit API on Cloudflare Workers — no web UI
 ├── mcp/
 │   ├── diet/      # Meal-plan MCP (stdio, Bun)
-│   └── stuff/     # Purchases / ROI MCP (stdio, Bun)
+│   ├── stuff/     # Purchases / ROI MCP (stdio, Bun)
+│   └── meos/      # Central gateway: all modules, stdio + Streamable HTTP (Node)
 ├── supabase/      # LEGACY pre-Workers schema — not used by the running app
 ├── scripts/       # LaunchAgent installers + app install / iOS re-sign scripts
 ├── packaging/     # Homebrew cask for Mac releases
@@ -37,7 +38,8 @@ meOS/
 - **Media:** Cloudflare R2, private bucket, presigned GET URLs only.
 - **AI:** AI SDK 5 with Gemini / Anthropic / OpenAI. Gemini is the env fallback.
   Voice uses Workers AI (Deepgram Aura).
-- **MCP:** Bun + stdio transport.
+- **MCP:** Bun + stdio for `diet`/`stuff`; Node 22.18+ with the official SDK
+  for the central `meos` gateway (stdio + Streamable HTTP).
 
 ## Run
 
@@ -78,6 +80,17 @@ cd mcp/stuff && bun install && bun run src/index.ts
 ```
 `.mcp.json` / `.grok/config.toml` use repo-relative paths; launch the client
 from the repository root.
+
+### MeOS MCP gateway (all modules)
+```bash
+cd mcp/meos
+npm install
+cp .env.example .env    # MEOS_USERNAME, MEOS_PASSWORD, MEOS_VAULT_PASSPHRASE
+npm test                # fake sealed backend + transport tests
+npm run start:stdio     # or MEOS_MCP_TRANSPORT=http npm start
+```
+See `mcp/meos/README.md` for scopes, client configs, the audited capability
+matrix, and why there is no transaction-ledger or note-tag tool.
 
 ## Sync model
 
@@ -147,9 +160,11 @@ ad-hoc-signed Mac app on a tag or manual dispatch.
 6. ✅ Native Mac + iOS apps from one SwiftUI codebase
 7. ✅ Fold integration (read-only banking dashboard)
 8. ✅ Six-Pack Challenge + Home Screen widget
-9. ⏳ **Personal Finance expansion** — historical ledger, imports,
+9. ✅ Central MeOS MCP gateway (`mcp/meos`: scoped auth, vault, 97 tools,
+   resources, prompts, stdio + Streamable HTTP)
+10. ⏳ **Personal Finance expansion** — historical ledger, imports,
    reconciliation, multi-year reports. See `docs/finance-foundation.md`.
-10. Legacy to retire when safe: `supabase/`, `db/schema.sql` (Postgres),
+11. Legacy to retire when safe: `supabase/`, `db/schema.sql` (Postgres),
     `scripts/install-backend-agent.sh` (pre-Workers local server).
 
 Next work = polish/iterate or extend a module; follow the same brainstorm →
