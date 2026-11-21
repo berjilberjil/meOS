@@ -10,7 +10,8 @@ import { silentLogger } from '../../src/services/logger.ts';
 import type { ToolContext } from '../../src/tools/registry.ts';
 import { findTool } from '../../src/tools/index.ts';
 import { runTool } from '../../src/tools/registry.ts';
-import { todayKey } from '../../src/utils/dates.ts';
+import { nowStamp, todayKey } from '../../src/utils/dates.ts';
+import { monthStart } from '../../src/services/financeEngine.ts';
 
 const CHECK_TOKEN = Buffer.from('myos.vault.check.v1');
 const ITERATIONS = 1000;
@@ -127,6 +128,7 @@ const ALLOWED_KEYS = new Set([
   'meos.appearance',
   'meos.crypto',
   'meos.sixPack',
+  'meos.finance',
   'meos.trash'
 ]);
 
@@ -430,6 +432,179 @@ export async function createHarness(options: FakeOptions = {}): Promise<Harness>
     'meos.appearance': { theme: 'dark' },
     'meos.sixPack': { days: {} },
     'meos.chat': { threads: [], activeID: null },
+    'meos.finance': {
+      schemaVersion: 1,
+      updatedAt: nowStamp(),
+      settings: {
+        trackingStartDate: '2026-01-01',
+        birthDate: null,
+        currency: 'INR',
+        locale: 'en_IN',
+        includeHouseholdInNetWorth: false,
+        emergencyFundMonths: 6,
+        hideBalances: false,
+        demoMode: false,
+        demoSeededAt: null
+      },
+      accounts: [
+        {
+          id: 'acct-bank', name: 'Everyday salary', institution: 'Northstar Bank',
+          type: 'savings', currency: 'INR', openingDate: '2026-01-01',
+          openingBalancePaise: 0, statementBalancePaise: null, statementBalanceOn: null,
+          statementBalanceSource: 'verified', creditLimitPaise: null, status: 'active',
+          notes: '', lastReconciledOn: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'acct-card', name: 'Aster card', institution: 'Aster',
+          type: 'creditCard', currency: 'INR', openingDate: '2026-01-01',
+          openingBalancePaise: 0, statementBalancePaise: null, statementBalanceOn: null,
+          statementBalanceSource: 'verified', creditLimitPaise: 5_000_000, status: 'active',
+          notes: '', lastReconciledOn: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        }
+      ],
+      categories: [
+        { id: 'cat-food', name: 'Food', kind: 'expense', group: 'Living', icon: 'fork.knife', parentID: null, isSystem: false, archived: false, isDemo: false, createdAt: nowStamp() },
+        { id: 'cat-salary', name: 'Salary', kind: 'income', group: 'Employment', icon: 'briefcase', parentID: null, isSystem: false, archived: false, isDemo: false, createdAt: nowStamp() }
+      ],
+      transactions: [
+        {
+          id: 'txn-income', date: today, postedDate: null, amountPaise: 10_000_000,
+          currency: 'INR', direction: 'inflow', type: 'income', accountID: 'acct-bank',
+          transferAccountID: null, categoryID: 'cat-salary', subcategoryID: null,
+          merchant: 'Employer', paymentMethod: 'bankTransfer', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: null, linkedTransactionID: null,
+          investmentID: null, liabilityID: null, principalPaise: null, interestPaise: null,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'txn-food', date: today, postedDate: null, amountPaise: 500_000,
+          currency: 'INR', direction: 'outflow', type: 'expense', accountID: 'acct-bank',
+          transferAccountID: null, categoryID: 'cat-food', subcategoryID: null,
+          merchant: 'Cafe', paymentMethod: 'upi', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: null, linkedTransactionID: null,
+          investmentID: null, liabilityID: null, principalPaise: null, interestPaise: null,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'txn-card', date: today, postedDate: null, amountPaise: 200_000,
+          currency: 'INR', direction: 'outflow', type: 'expense', accountID: 'acct-card',
+          transferAccountID: null, categoryID: 'cat-food', subcategoryID: null,
+          merchant: 'Shop', paymentMethod: 'card', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: null, linkedTransactionID: null,
+          investmentID: null, liabilityID: null, principalPaise: null, interestPaise: null,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'txn-transfer-out', date: today, postedDate: null, amountPaise: 200_000,
+          currency: 'INR', direction: 'outflow', type: 'transfer', accountID: 'acct-bank',
+          transferAccountID: 'acct-card', categoryID: null, subcategoryID: null,
+          merchant: 'Card payment', paymentMethod: 'bankTransfer', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: 'tr-seed', linkedTransactionID: 'txn-transfer-in',
+          investmentID: null, liabilityID: null, principalPaise: null, interestPaise: null,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'txn-transfer-in', date: today, postedDate: null, amountPaise: 200_000,
+          currency: 'INR', direction: 'inflow', type: 'transfer', accountID: 'acct-card',
+          transferAccountID: 'acct-bank', categoryID: null, subcategoryID: null,
+          merchant: 'Card payment', paymentMethod: 'bankTransfer', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: 'tr-seed', linkedTransactionID: 'txn-transfer-out',
+          investmentID: null, liabilityID: null, principalPaise: null, interestPaise: null,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'txn-refund', date: today, postedDate: null, amountPaise: 50_000,
+          currency: 'INR', direction: 'inflow', type: 'refund', accountID: 'acct-bank',
+          transferAccountID: null, categoryID: 'cat-food', subcategoryID: null,
+          merchant: 'Cafe refund', paymentMethod: 'upi', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: null, linkedTransactionID: null,
+          investmentID: null, liabilityID: null, principalPaise: null, interestPaise: null,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'txn-invest', date: today, postedDate: null, amountPaise: 1_000_000,
+          currency: 'INR', direction: 'outflow', type: 'investmentPurchase', accountID: 'acct-bank',
+          transferAccountID: null, categoryID: null, subcategoryID: null,
+          merchant: 'Index fund', paymentMethod: 'bankTransfer', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: null, linkedTransactionID: null,
+          investmentID: 'inv-index', liabilityID: null, principalPaise: null, interestPaise: null,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        },
+        {
+          id: 'txn-loan', date: today, postedDate: null, amountPaise: 100_000,
+          currency: 'INR', direction: 'outflow', type: 'loanRepayment', accountID: 'acct-bank',
+          transferAccountID: null, categoryID: null, subcategoryID: null,
+          merchant: 'Education loan', paymentMethod: 'autoDebit', note: '', reference: '',
+          tags: [], source: 'manual', statementID: null, importBatchID: null,
+          verification: 'verified', transferID: null, linkedTransactionID: null,
+          investmentID: null, liabilityID: 'liab-education', principalPaise: 80_000, interestPaise: 20_000,
+          costBasisPaise: null, realisedGainPaise: null, isDemo: false,
+          createdAt: nowStamp(), updatedAt: nowStamp()
+        }
+      ],
+      transfers: [
+        {
+          id: 'tr-seed', fromAccountID: 'acct-bank', toAccountID: 'acct-card', amountPaise: 200_000,
+          date: today, feePaise: 0, reference: '', note: '', fromTransactionID: 'txn-transfer-out',
+          toTransactionID: 'txn-transfer-in', feeTransactionID: null, reconciled: true,
+          isDemo: false, createdAt: nowStamp()
+        }
+      ],
+      budgets: [
+        { id: 'budget-food', name: 'Food', categoryID: 'cat-food', period: 'monthly', startDate: monthStart(today), endDate: null, plannedPaise: 600_000, note: '', archived: false, isDemo: false, createdAt: nowStamp() }
+      ],
+      investments: [
+        {
+          id: 'inv-index', name: 'Index fund', assetClass: 'mutualFund', institution: 'Meridian',
+          units: 100, purchaseDate: '2026-01-01', purchasePricePaise: 10_000,
+          investedPaise: 1_000_000, currentValuePaise: 1_200_000, currentValueOn: today,
+          realisedGainPaise: 0, dividendsPaise: 0, interestPaise: 0, notes: '',
+          accountID: null, archived: false, isDemo: false, createdAt: nowStamp(), updatedAt: nowStamp()
+        }
+      ],
+      valuations: [
+        { id: 'val-index', investmentID: 'inv-index', date: today, valuePaise: 1_200_000, source: 'manual', note: '', isDemo: false, createdAt: nowStamp() }
+      ],
+      liabilities: [
+        {
+          id: 'liab-education', name: 'Education loan', kind: 'educationLoan', lender: 'Northstar Bank',
+          ownership: 'personal', originalPrincipalPaise: 500_000, outstandingPaise: 500_000,
+          asOf: '2026-01-01', interestRateBps: 950, emiPaise: 100_000, dueDay: 7,
+          startDate: '2026-01-01', maturityDate: null, accountID: null, notes: '', closed: false,
+          isDemo: false, createdAt: nowStamp(), updatedAt: nowStamp()
+        }
+      ],
+      debtPayments: [
+        { id: 'dp-loan', liabilityID: 'liab-education', transactionID: 'txn-loan', date: today, amountPaise: 100_000, principalPaise: 80_000, interestPaise: 20_000, note: '', isDemo: false, createdAt: nowStamp() }
+      ],
+      goals: [
+        { id: 'goal-emergency', name: 'Emergency fund', kind: 'emergencyFund', targetPaise: 5_000_000, currentPaise: 1_000_000, deadline: null, monthlyContributionPaise: 100_000, accountID: null, note: '', achieved: false, isDemo: false, createdAt: nowStamp(), updatedAt: nowStamp() }
+      ],
+      recurring: [],
+      statements: [],
+      importBatches: [],
+      importRows: [],
+      reconciliations: [],
+      audit: [],
+      snapshots: [],
+      milestones: []
+    },
     'meos.ai.routes': { default: { keyId: 1, model: 'gemini-2.5-flash' } }
   };
 

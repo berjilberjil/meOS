@@ -37,7 +37,7 @@ export function registerPrompts(server: McpServer): void {
           '1. Call meos_tasks_list with status="open" for the date, and meos_tasks_summary for the date.',
           '2. Call meos_events_get_upcoming with days=7 and mention only occurrences on or after the date.',
           '3. Call meos_health_get_summary and meos_diet_get_context; report what was actually logged versus targets.',
-          '4. Call meos_finance_get_summary; if Fold is not linked or the snapshot is stale, say that instead of estimating.',
+          '4. Call meos_finance_ledger_get_summary first. If the ledger has no records, call meos_finance_get_summary for the separate Fold snapshot and say which source you used. Never mix the two.',
           '5. Finish with three concrete priorities. Do not repeat raw JSON.'
         ].join('\n')
       )
@@ -47,7 +47,7 @@ export function registerPrompts(server: McpServer): void {
     'meos_financial_review',
     {
       title: 'Financial review',
-      description: 'Review the Fold snapshot and the Stuff ledger without inventing a transaction history.',
+      description: 'Review the owned finance ledger, the separate Fold snapshot and the Stuff ledger without mixing their sources.',
       argsSchema: {
         month: z.string().regex(/^\d{4}-\d{2}$/).optional().describe('Month to frame the review (YYYY-MM).')
       }
@@ -57,10 +57,11 @@ export function registerPrompts(server: McpServer): void {
         [
           `Run a financial review${month ? ` for ${month}` : ''} using MeOS.`,
           '',
-          'Call meos_finance_get_summary, meos_finance_list_accounts, meos_finance_get_net_worth, meos_finance_get_investments and meos_finance_get_spending.',
-          'Use only those numbers. MeOS has no transaction ledger: never derive spend by adding transactions, and never infer missing balances.',
-          'Separate (a) Fold-reported balances, (b) Fold-reported category spend, and (c) the Stuff ledger\'s ownership burn — they measure different things.',
-          'Flag a stale Fold snapshot explicitly. Suggest at most three actions, each tied to a number you actually retrieved.'
+          'Start with meos_finance_ledger_get_summary, then use meos_finance_ledger_get_spending, meos_finance_ledger_get_net_worth, meos_finance_ledger_get_investments, meos_finance_ledger_get_liabilities and meos_finance_ledger_list_transactions for evidence.',
+          'Use only recorded numbers. If the ledger has no records, say that; you may then summarize the separate Fold snapshot, clearly labelled.',
+          'Never add transactions together yourself when a ledger summary already provides the total. Transfers, card settlements and investment purchases are not spending; refunds reduce spend.',
+          'Separate (a) the owned ledger, (b) Fold-reported balances, (c) Fold category spend, and (d) Stuff ownership burn — they measure different things.',
+          'Suggest at most three actions, each tied to a number you actually retrieved.'
         ].join('\n')
       )
   );

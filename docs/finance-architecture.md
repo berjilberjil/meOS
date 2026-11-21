@@ -105,12 +105,16 @@ are ready for the next phase; staged rows never post automatically.
 
 ## AI
 
-The existing MeOS assistant gains read-only finance tools
-(`get_finance_summary`, `get_finance_period`, `search_finance`,
-`get_finance_timeline`, `get_investments`, `get_liabilities`,
-`get_net_worth_history`) and a compact finance context section. Every answer is
-derived from the on-device document, carries certainty, and must say when data
-is missing. No credentials or account numbers exist to expose.
+The native assistant gains read-only finance tools and a compact finance context
+section. The MeOS MCP gateway additionally exposes the encrypted ledger to
+authorised external agents through `meos_finance_ledger_*`: summary, accounts,
+transactions, search, spending, net worth, investments, liabilities, budgets,
+goals, timeline, and writes for accounts, transactions, transfers, investments,
+valuations and liabilities. The gateway unlocks the same `meos.finance` document
+with the owner's vault passphrase; the server never sees plaintext. Fold remains
+a separate read-only snapshot and must never be mixed with ledger totals. Every
+answer carries certainty and must state missing data. No credentials or account
+numbers exist to expose.
 
 ## Tests
 

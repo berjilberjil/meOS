@@ -1,5 +1,6 @@
 import type { ToolDefinition } from './registry.ts';
 import { financeTools } from './finance.ts';
+import { financeLedgerTools } from './financeLedger.ts';
 import { healthTools } from './health.ts';
 import { taskTools } from './tasks.ts';
 import { goalTools } from './goals.ts';
@@ -16,6 +17,7 @@ import { knowledgeTools } from './knowledge.ts';
  */
 export const allTools: ToolDefinition[] = [
   ...financeTools,
+  ...financeLedgerTools,
   ...healthTools,
   ...taskTools,
   ...goalTools,

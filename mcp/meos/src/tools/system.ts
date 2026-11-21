@@ -514,17 +514,33 @@ export const systemTools: ToolDefinition[] = [
     name: 'meos_get_capabilities',
     title: 'Get MeOS capability inventory',
     description:
-      'Return the audited capability map of this MeOS build: what genuinely exists, what is deliberately not exposed, and what was removed. Use it instead of assuming a finance ledger or a tag system exists.',
+      'Return the audited capability map of this MeOS build: what genuinely exists, what is deliberately not exposed, and what was removed. Use it before assuming a module, import parser or tag system exists.',
     inputSchema: {},
     scopes: ['read'],
     async handler() {
       return ok({
-        version: '1.0.0-audit',
+        version: '1.1.0-finance',
         modules: {
           finance: {
-            available: ['fold_snapshot (net worth, liquid, investments, debt, spend categories)', 'stuff_purchases (price, ROI, monthly burn)'],
-            unavailable: ['transaction_ledger', 'account_crud', 'budgets', 'transfers', 'savings_goals', 'investment_holdings'],
-            note: 'The standalone finance ledger was removed from the native MeOS app. Fold is an external, read-only snapshot.'
+            available: [
+              'transaction_ledger (search, filter, detail, audit history)',
+              'account_crud (balances, credit limits, opening positions)',
+              'transaction_write (income, expense, refund, fee, tax, interest, dividend)',
+              'linked_transfers (two postings, fees, no double counting)',
+              'budgets', 'financial_goals', 'recurring_schedules',
+              'investment_holdings', 'dated_investment_valuations',
+              'liabilities', 'loan_principal_interest_split',
+              'net_worth_history', 'spending_by_category', 'financial_timeline',
+              'fold_snapshot (separate read-only external bank view)',
+              'stuff_purchases (price, ROI, monthly burn)'
+            ],
+            unavailable: [
+              'statement_import_parser',
+              'live_market_prices',
+              'tax_liability_calculation',
+              'year_sharded_finance_storage'
+            ],
+            note: 'The ledger is the encrypted meos.finance document. Fold is a separate external snapshot. The single-document phase has a sync-size guard; year sharding is the next storage step.'
           },
           health: {
             available: ['daily_metrics (weight, calories, protein, water, steps, note)', 'body_metrics', 'workout_history', 'workout_logging', 'exercise_history', 'progress_photos_metadata'],
