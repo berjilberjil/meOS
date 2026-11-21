@@ -229,6 +229,32 @@ final class APIClient {
         try await get("api/security/events?limit=100", as: SecurityFeed.self)
     }
 
+    struct SecurityOverview: Codable {
+        struct MediaBucket: Codable { let count: Int; let bytes: Int }
+        struct Media: Codable { let bodyPhotos: MediaBucket; let eventMedia: MediaBucket }
+        struct Backup: Codable {
+            let lastBackupAt: String?
+            let lastRestoreAt: String?
+            let lastKind: String?
+            let note: String
+        }
+        let passwordKdf: String
+        let secretsKeyVersion: String?
+        let sessionDays: Int
+        let sessionIdleDays: Int
+        let sessionsCount: Int
+        let devicesCount: Int
+        let aiKeys: Int
+        let mfa: MFAStatus
+        let media: Media
+        let backup: Backup
+        let recentEvents: [SecurityEvent]
+    }
+
+    func securityOverview() async throws -> SecurityOverview {
+        try await get("api/security/overview", as: SecurityOverview.self)
+    }
+
     // MARK: - Devices
 
     /// Announce this install, or refresh its last-seen. Safe to call repeatedly:

@@ -9,6 +9,8 @@ struct MeSecurity: View {
     @EnvironmentObject private var state: AppState
 
     @State private var mfa: APIClient.MFAStatus?
+    @State private var overview: APIClient.SecurityOverview?
+    @State private var overviewLoaded = false
     @State private var setup: APIClient.MFASetup?
     @State private var sessions: [APIClient.SessionInfo] = []
     @State private var feed: APIClient.SecurityFeed?
@@ -19,6 +21,7 @@ struct MeSecurity: View {
 
     var body: some View {
         Screen(title: "Security", sub: "Lock, sessions, audit") {
+            overviewCard
             mfaCard
             sessionsCard
             auditCard
@@ -27,6 +30,28 @@ struct MeSecurity: View {
             }
         }
         .task { await load() }
+    }
+
+    private var overviewCard: some View {
+        MCard {
+            Label("Security posture", systemImage: "shield.lefthalf.filled")
+                .font(.title3.weight(.semibold))
+            if let o = overview {
+                Text("Encryption \(o.passwordKdf.uppercased()) · server secret key \(o.secretsKeyVersion ?? "not configured")")
+                    .font(.subheadline)
+                Text("Sessions \(o.sessionsCount) (\(o.sessionDays)d / \(o.sessionIdleDays)d idle) · devices \(o.devicesCount) · AI keys \(o.aiKeys)")
+                    .font(.subheadline).foregroundStyle(Color.dim)
+                Text("MFA \(o.mfa.enabled ? "on" : "off") · media \(o.media.bodyPhotos.count + o.media.eventMedia.count) objects")
+                    .font(.subheadline).foregroundStyle(Color.dim)
+                Text("Last backup \(o.backup.lastBackupAt?.prefix(19).description ?? "not recorded")")
+                    .font(.caption).foregroundStyle(Color.dim)
+                Text("Last restore \(o.backup.lastRestoreAt?.prefix(19).description ?? "not recorded")")
+                    .font(.caption).foregroundStyle(Color.dim)
+            } else {
+                Text(overviewLoaded ? "Security overview unavailable." : "Loading security metadata…")
+                    .font(.subheadline).foregroundStyle(Color.dim)
+            }
+        }
     }
 
     private var mfaCard: some View {
@@ -113,9 +138,12 @@ struct MeSecurity: View {
     }
 
     private func load() async {
+        async let o = try? state.api.securityOverview()
         async let m = try? state.api.mfaStatus()
         async let s = try? state.api.sessions()
         async let f = try? state.api.securityEvents()
+        overview = await o
+        overviewLoaded = true
         mfa = await m
         sessions = (await s) ?? []
         feed = await f
